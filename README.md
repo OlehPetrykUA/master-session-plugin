@@ -6,9 +6,10 @@ A Claude Code plugin that turns one session into a **validator** for a team of w
 
 | Part | What it does |
 |---|---|
-| Skill `master-session` | The validator protocol: roles, briefs, the tick loop, verification, permissions, the ledger. Ships `worker.md` (the protocol every worker follows), `personas.md` and `board.md` (the chat board when the pane isn't available). |
+| Skill `master-session` | The validator protocol: roles, briefs, the tick loop, verification, permissions, the ledger. Ships `personas.md` (the persona index) and `board.md` (the chat board when the pane isn't available). |
+| Skill `worker` | The protocol every worker session follows: its own worktree, the report tool, talking to the validator, the `ready <sha>` gate. |
 | Status mod | A pane beside the chat with one tile per worker (state, progress, git, tests, commits), a band above the prompt, archive and unarchive, and **Ask for updates**. Workers report through the `mcp__master-session__report` tool; the mod also records their commits, test runs, edits and waits by itself. |
-| Subagents | `master-session:reviewer`, `master-session:qa-verifier`, `master-session:design-checker` and `master-session:researcher`, read-only personas the validator hands short checks to. |
+| Personas | Six roles, each a skill plus an agent of the same name: `implementer`, `refactorer`, `reviewer`, `qa-verifier`, `design-checker` and `researcher`. |
 
 ## Install
 
@@ -47,9 +48,30 @@ Update later with `claude plugin update master-session@master-session`.
   - `every 5m` sets the heartbeat (default 2 minutes); `away` finishes everything inside the briefs without waiting; `quiet` or `verbose`.
   - `tick now`, `status`, `stop`, `archive-done`.
 - `/master-session-status` opens the status pane. `/master-session-status ask` asks every running worker for a fresh report.
-- Workers need nothing installed beyond this plugin: their brief tells them to read `worker.md` and report through the status tool.
+- Workers need nothing installed beyond this plugin: their brief loads the `master-session:worker` skill and their persona's skill, and they report through the status tool.
 
 The ledger, one note per run with every worker, its state and open findings, goes in your notes or memory tool, or a plain markdown file if you use none.
+
+## Personas
+
+Each persona is a skill, `master-session:<persona>`, and an agent of the same name that keeps the model, effort and tool limits listed in [personas.md](skills/master-session/personas.md). The reviewer, QA verifier, design checker and researcher can't edit files.
+
+| Persona | What it does |
+|---|---|
+| `implementer` | Builds one deliverable from a brief in its own worktree and reports `ready <sha>`. |
+| `refactorer` | Moves, renames or splits code without changing behaviour. |
+| `reviewer` | Judges a `ready <sha>` against its brief and rules, ending in PASS or FAIL. |
+| `qa-verifier` | Re-runs the gate at an exact sha in a clean worktree, ending in PASS or FAIL. |
+| `design-checker` | Compares the built UI with the approved design. |
+| `researcher` | Answers one question from published docs, citing each claim. |
+
+Start a session as a persona, with Claude Code's default system prompt kept:
+
+```bash
+claude --agent master-session:implementer
+```
+
+The validator also spawns each one as a subagent, `master-session:<persona>`, which preloads its persona skill. The desktop app's `start_session` can't pick an agent, so a worker started there loads the skills from its brief instead.
 
 ## Requirements
 
