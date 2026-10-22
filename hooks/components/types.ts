@@ -1,6 +1,6 @@
 import type { BoxProps, ButtonProps, ClientProps, ElementConstructor, SvgProps, TextProps } from 'claude-code'
 
-import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Repo, Undone, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Repo, SessionState, Undone, WorkflowRecord } from '../../types'
 
 import type { Counts, Row } from '../lib/rows'
 import type { RunSummary } from '../lib/totals'
@@ -20,7 +20,7 @@ export type Actions = {
   toggle: (id: string) => void
   collapse: (id: string) => void
   confirm: (what: string) => void
-  archive: (rows: readonly Row[], skipped?: number) => void
+  archive: (rows: readonly Row[], all?: { group: SessionState; skipped: number }) => void
   undo: () => void
   stop: (id: string, name: string) => void
   unarchive: (one: LiveSession) => void

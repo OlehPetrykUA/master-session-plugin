@@ -147,12 +147,14 @@ export function world(on: On, child: Child = {}) {
     }
     return text({ ok: true })
   })
+  const gits: string[][] = []
   on('process.run', (_, e) => {
+    gits.push([...e.argv])
     const [, , , cwd, verb] = e.argv
-    const stdout = verb === 'for-each-ref' ? 'x\nxorigin/main\n' : (child.git?.[`${cwd} ${verb}`] ?? GIT[`${cwd} ${verb}`] ?? '')
+    const stdout = verb === 'for-each-ref' ? 'x\nxorigin/main\n' : (child.git?.[`${cwd} ${e.argv.slice(4).join(' ')}`] ?? child.git?.[`${cwd} ${verb}`] ?? GIT[`${cwd} ${verb}`] ?? '')
     return { value: { exitCode: stdout ? 0 : 128, stdout, stderr: stdout ? '' : 'not a git repository', isStdoutTruncated: false, isStderrTruncated: false } }
   })
-  return { calls, opened, toasts, ran, clock }
+  return { calls, opened, toasts, ran, clock, gits }
 }
 
 export const PANE = {

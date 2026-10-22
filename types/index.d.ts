@@ -89,13 +89,14 @@ export type Worktree = {
   upstream: string
   ahead: number
   behind: number
-  unmerged: number
+  unmerged?: number
 }
 
 export type Repo = {
   path: string
   name: string
   localOnly: number
+  base?: string
   worktrees: Worktree[]
 }
 

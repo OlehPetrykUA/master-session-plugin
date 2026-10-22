@@ -27,7 +27,7 @@ export function statusOf(data: PaneData, isDone: boolean): { text: string; icon:
 export function paneViewOf(data: PaneData) {
   const items = itemsOf(data.rows, data.agents, data.workflows)
   const counts = countsOfItems(items, data.archived.length)
-  const groups = groupsOf(items, data.archived, data.chosen, data.archiveView)
+  const groups = groupsOf(items, data.archived, data.chosen, data.archiveView, data.undone?.group)
   const isDone = isAllDone(items)
   const isNarrow = data.columns * COLUMN < NARROW_PX
   const chips: Chip[] = [

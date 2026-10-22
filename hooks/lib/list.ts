@@ -41,7 +41,7 @@ export function countsOfItems(items: readonly ListItem[], archived: number): Rec
   return { all: items.length, 'needs-you': count('needs-you'), working: count('working'), waiting: count('waiting'), done: count('done'), archived }
 }
 
-export function groupsOf(items: readonly ListItem[], archived: readonly LiveSession[], chosen: Filter, archiveView: ArchiveView): ListGroup[] {
+export function groupsOf(items: readonly ListItem[], archived: readonly LiveSession[], chosen: Filter, archiveView: ArchiveView, kept?: SessionState): ListGroup[] {
   const groupOf = (id: SessionState, isPinned = false): ListGroup => ({ id, items: items.filter(item => item.group === id), archived: [], isPinned, isOpen: true })
   const needs = items.some(item => item.group === 'needs-you') ? [groupOf('needs-you', chosen !== 'all' && chosen !== 'needs-you')] : []
   const archive = (isOpen: boolean): ListGroup => ({ id: 'archived', items: [], archived, isPinned: false, isOpen })
@@ -49,7 +49,7 @@ export function groupsOf(items: readonly ListItem[], archived: readonly LiveSess
   if (chosen !== 'all') return chosen === 'needs-you' ? [groupOf('needs-you')] : [...needs, groupOf(chosen)]
   const rest = GROUPS.filter(id => id !== 'needs-you')
     .map(id => groupOf(id))
-    .filter(group => group.items.length)
+    .filter(group => group.items.length || group.id === kept)
   return [...needs, ...rest, ...(archived.length ? [archive(archiveView !== 'closed')] : [])]
 }
 

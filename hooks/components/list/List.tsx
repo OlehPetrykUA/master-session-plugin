@@ -63,7 +63,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       : null
   const archiveAll = (rows: readonly SessionRow[]) => {
     const clean = rows.filter(row => !lossesOf(row, data.trees).length)
-    actions.archive(clean, rows.length - clean.length)
+    actions.archive(clean, { group: 'done', skipped: rows.length - clean.length })
   }
   const groupOf = (group: ListGroup) => {
     if (group.id === 'archived') {
@@ -84,7 +84,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
         children: group.isOpen ? shownArchived(group, data.archiveView, data.chosen).map(one => ArchivedRow(ui, { one, at: data.at, asking: data.asking, isReadOnly, actions })) : [],
       })
     }
-    if (!group.items.length) return empty(`group-${group.id}`)
+    if (!group.items.length && undone?.group !== group.id) return empty(`group-${group.id}`)
     const idle = group.id === 'done' ? idleSessions(group) : []
     return Group(ui, {
       id: group.id,
@@ -101,7 +101,6 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
   return (
     <Box key="section-list" flexDirection="column" gap={down(16)} paddingLeft={across(16)} paddingRight={across(16)} paddingTop={down(16)} paddingBottom={down(16)}>
       {data.chosen === 'all' && !view.items.length ? empty('all') : null}
-      {undone && !view.groups.some(group => group.id === undone.group) ? undoBar() : null}
       {view.groups.map(groupOf)}
       {view.hasMore ? (
         <Box key="archived-more" flexDirection="row" justifyContent="center">

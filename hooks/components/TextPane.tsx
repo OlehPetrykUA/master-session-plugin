@@ -38,7 +38,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
 
   const archiveAll = (rows: readonly Row[]) => {
     const clean = rows.filter(one => !lossesOf(one, trees).length)
-    actions.archive(clean, rows.length - clean.length)
+    actions.archive(clean, { group: 'done', skipped: rows.length - clean.length })
   }
 
   const row = (item: ListItem) => {
@@ -97,7 +97,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
         </Box>
       )
     }
-    if (!one.items.length) return empty(`group-${one.id}`)
+    if (!one.items.length && undone?.group !== one.id) return empty(`group-${one.id}`)
     const idle = one.id === 'done' ? one.items.flatMap((item): Row[] => (item.kind === 'session' && isArchivable(item.row.board ?? { state: item.row.state }, item.row.live) ? [item.row] : [])) : []
     return (
       <Box key={`group-${one.id}`} flexDirection="column">
@@ -148,7 +148,6 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
       </Box>
       <Box key="section-list" flexDirection="column" gap="sm">
         {data.chosen === 'all' && !view.items.length ? empty('all') : null}
-        {undone && !view.groups.some(one => one.id === undone.group) ? undoLine() : null}
         {view.groups.map(group)}
       </Box>
     </Box>

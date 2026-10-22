@@ -32,7 +32,7 @@ function ActionRow(ui: Ui, props: ActionRowProps) {
   const id = row.id
   const isRunning = !!row.live?.isRunning
   const isNeeds = row.state === 'needs-you'
-  const canArchive = !isRunning && !isNeeds && !props.isReadOnly
+  const canArchive = !!row.live && !isRunning && !isNeeds && !props.isReadOnly
   const archive = () => (losses.length ? actions.confirm(`archive:${id}`) : actions.archive([row]))
   if (props.isAsking && canArchive) return ArchiveBox(ui, { id, name: row.name, losses, width, onCancel: () => actions.confirm(''), onArchive: () => actions.archive([row]) })
   const second =
@@ -177,7 +177,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
         : null,
       facts?.verified ? Block(ui, { id: `verified-${row.id}`, icon: 'check', label: 'Verified', children: Strong(ui, { text: facts.verified, isFull: true }) }) : null,
       facts?.risk ? Block(ui, { id: `risk-${row.id}`, icon: 'blocker', label: 'Risk', children: Strong(ui, { text: facts.risk, isFull: true }) }) : null,
-      now ? ActionRow(ui, { row, losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, isReadOnly: props.isReadOnly, actions }) : null,
+      ActionRow(ui, { row, losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, isReadOnly: props.isReadOnly, actions }),
     ],
   })
 }

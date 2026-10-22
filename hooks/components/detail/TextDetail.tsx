@@ -49,6 +49,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
   const model = modelOf(now?.model, now?.effort)
   const losses = lossesOf(row, props.trees)
   const canArchive = !!now && !now.isRunning && row.state !== 'needs-you' && !props.isReadOnly
+  const isStoppable = !!now?.isRunning && row.state !== 'needs-you'
   return TextCard(ui, {
     id: row.id,
     title: titleOf(row),
@@ -70,7 +71,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
       facts?.risk ? `Risk: ${facts.risk}` : '',
     ].filter(Boolean),
     onCollapse: () => actions.collapse(row.id),
-    actions: now ? (
+    actions:
       props.asking === `archive:${row.id}` && canArchive ? (
         <Box key={`confirm-${row.id}`} flexDirection="column">
           <Text weight="semibold">{`Archive ${row.name}?`}</Text>
@@ -85,13 +86,12 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
         </Box>
       ) : (
         <Box key={`actions-${row.id}`} flexDirection="row" gap="sm">
-          {facts?.needsYou ? <Button key={`chat-${row.id}`} variant="primary" label="Open chat" onPress={() => actions.open(row.id, row.name)} /> : null}
+          {now && facts?.needsYou ? <Button key={`chat-${row.id}`} variant="primary" label="Open chat" onPress={() => actions.open(row.id, row.name)} /> : null}
           <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} />
-          {now.isRunning && row.state !== 'needs-you' ? <Button key={`stop-${row.id}`} label="Stop" onPress={() => actions.stop(row.id, row.name)} /> : null}
+          {isStoppable ? <Button key={`stop-${row.id}`} label="Stop" onPress={() => actions.stop(row.id, row.name)} /> : null}
           {canArchive ? <Button key={`archive-${row.id}`} label={losses.length ? 'Archive…' : 'Archive'} onPress={() => (losses.length ? actions.confirm(`archive:${row.id}`) : actions.archive([row]))} /> : null}
         </Box>
-      )
-    ) : null,
+      ),
   })
 }
 

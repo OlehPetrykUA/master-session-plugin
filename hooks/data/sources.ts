@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import type { Board, LiveSession, Repo, Worktree } from '../../types'
+import type { Board, LiveSession, Repo, SessionState, Worktree } from '../../types'
 
 import { bandProgress } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
@@ -169,22 +169,32 @@ export async function git($: EngineInterface, cwd: string, args: readonly string
   return ran.stdout
 }
 
-async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string): Promise<Worktree[]> {
+async function baseOf($: EngineInterface, path: string) {
+  const remote = (await git($, path, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).catch(() => '')).trim()
+  for (const name of [remote.replace(/^origin\//, ''), 'main', 'master'].filter(Boolean)) {
+    if ((await git($, path, ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`]).catch(() => '')).trim()) return name
+  }
+  return undefined
+}
+
+async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined): Promise<Worktree[]> {
   const status = await git($, tree.path, ['status', '--porcelain=v2', '--branch']).catch(() => undefined)
-  const ahead = tree.isMain || !base ? '' : await git($, tree.path, ['rev-list', '--count', `${base}..HEAD`]).catch(() => '')
-  return status ? [{ path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...parseStatus(status), unmerged: Number(ahead.trim()) || 0 }] : []
+  const count = tree.isMain ? '0' : base ? (await git($, tree.path, ['rev-list', '--count', `${base}..HEAD`]).catch(() => '')).trim() : ''
+  return status ? [{ path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...parseStatus(status), unmerged: /^\d+$/.test(count) ? Number(count) : undefined }] : []
 }
 
 export async function repoOf($: EngineInterface, path: string): Promise<Repo | undefined> {
   const trees = parseWorktrees(await git($, path, ['worktree', 'list', '--porcelain']))
   const main = trees.find(tree => tree.isMain) ?? trees[0]
   if (!main) return undefined
-  const worktrees = (await Promise.all(trees.map(tree => treeOf($, tree, main.branch)))).flat()
+  const base = await baseOf($, path)
+  const worktrees = (await Promise.all(trees.map(tree => treeOf($, tree, base)))).flat()
   const refs = await git($, path, ['for-each-ref', 'refs/heads', '--format=x%(upstream:short)']).catch(() => '')
   return {
     path: main.path,
     name: home && main.path.startsWith(`${home}/`) ? `~${main.path.slice(home.length)}` : main.path,
     localOnly: refs.split('\n').filter(line => line === 'x').length,
+    base,
     worktrees,
   }
 }
@@ -253,7 +263,7 @@ async function archiveOne($: EngineInterface, id: string, name: string) {
   if (after && !after.isArchived) throw new Error(`${name} is still active. The app may be waiting for your approval.`)
 }
 
-export async function archive($: EngineInterface, rows: readonly Row[], skipped?: number) {
+export async function archive($: EngineInterface, rows: readonly Row[], all?: { group: SessionState; skipped: number }) {
   await setConfirming($, '')
   const allowed = rows.filter(row => isArchivable(row.board ?? { state: row.state }, row.live))
   const refused = rows.filter(row => !allowed.includes(row)).map(row => row.name)
@@ -269,10 +279,10 @@ export async function archive($: EngineInterface, rows: readonly Row[], skipped?
     }
   }
   await setExpanded($, open => open.filter(id => !archived.some(row => row.id === id)))
-  const group = archived[0]?.state ?? rows[0]?.state
-  if (!group || (!archived.length && !skipped)) return
+  const group = all?.group ?? archived[0]?.state
+  if (!group || (!archived.length && !all?.skipped)) return
   const at = await $.clock.now()
-  await setUndone($, () => ({ ids: archived.map(row => row.id), name: skipped === undefined && archived[0] ? archived[0].name : '', skipped: skipped ?? 0, group, at }))
+  await setUndone($, () => ({ ids: archived.map(row => row.id), name: !all && archived[0] ? archived[0].name : '', skipped: all?.skipped ?? 0, group, at }))
   $.clock.after(UNDO_MS, () => void setUndone($, value => (value?.at === at ? null : value)))
 }
 
