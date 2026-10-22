@@ -5,7 +5,7 @@ import { expandHome, parseStatus } from '../lib/git'
 import { getAgents, saveAgents } from '../state/atoms'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
-import type { SessionState } from '../../types'
+import type { ReportAgent, SessionState } from '../../types'
 import { parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
 type Held = { text: string; tool: string; state: SessionState; needsYou?: string }
@@ -33,6 +33,7 @@ let current: Report | undefined
 let detecting: Promise<void> | undefined
 let gitCwd = ''
 let held = new Map<string, Held>()
+let outbox: ReportAgent[] = []
 
 export const roleOf = () => role
 
@@ -80,15 +81,17 @@ async function callJson($: EngineInterface, server: string, tool: string, args: 
 }
 
 async function save($: EngineInterface, next: Report, now: number) {
-  current = stamped({ ...next, agents: reportAgentsOf(await getAgents($)) }, now)
+  current = stamped({ ...next, agents: outbox }, now)
   await writeReport($, home, current)
 }
 
 export async function syncAgents($: EngineInterface) {
   if (!current) return
   const agents = reportAgentsOf(await getAgents($))
-  if (JSON.stringify(agents) === JSON.stringify(current.agents ?? [])) return
-  await save($, current, await $.clock.now())
+  const now = await $.clock.now()
+  if (!current || JSON.stringify(agents) === JSON.stringify(current.agents ?? [])) return
+  outbox = agents
+  await save($, current, now)
 }
 
 async function agentAsked($: EngineInterface, id: string, text: string, tool: string) {
@@ -118,6 +121,7 @@ async function detect($: EngineInterface) {
   }
   const now = await $.clock.now()
   const known = await readReport($, home, self)
+  outbox = reportAgentsOf(await getAgents($))
   await $.tool.register(REPORT_SPEC)
   await save($, { ...(known ?? freshReport(self, parent, engineId, now)), parent, engineId }, now)
 }
@@ -261,6 +265,7 @@ export async function startRecorder($: EngineInterface) {
   detecting = undefined
   gitCwd = ''
   held = new Map()
+  outbox = []
   void detected($)
 }
 

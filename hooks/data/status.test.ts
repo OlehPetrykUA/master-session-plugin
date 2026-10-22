@@ -157,3 +157,15 @@ test('Ask for updates goes to the worker’s engine id first, then falls back to
     ['ccd_session_mgmt', 'send_message', 'local_c'],
   ])
 })
+
+test('an oversize report drops its lowest-priority agents first, so the asking one stays', async () => {
+  const home = '/home/agents'
+  const { $, files } = disk()
+  const long = 'é'.repeat(500)
+  const agents = Array.from({ length: 20 }, (_, index) => ({ id: `a${index}`, type: 'Explore', description: long, state: 'running' as const, startedAt: index, ...(index ? {} : { asking: { text: long, since: 1 } }) }))
+  await writeReport($, home, report('local_a', { agents }))
+  const written = files[reportPath(home, 'local_a')]?.text ?? ''
+  expect(bytesOf(written)).toBeLessThanOrEqual(REPORT_CAP)
+  const kept = (JSON.parse(written) as Report).agents ?? []
+  expect([kept.length < 20, kept[0]?.id, kept[0]?.asking?.since]).toEqual([true, 'a0', 1])
+})

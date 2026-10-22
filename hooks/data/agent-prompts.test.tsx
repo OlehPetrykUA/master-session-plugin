@@ -6,6 +6,7 @@ import type { AgentRecord, Report } from '../../types'
 
 import { workflowRunsOf } from '../lib/agents'
 import { HOME, MASTER, PANE, SPAWN, world } from '../testing/world'
+import { merge } from './contract'
 import { reportPath } from './status'
 
 const NOW = 3_600_000
@@ -87,7 +88,7 @@ test('a workflow agent prompt shows on that agent and in its run counts, and cle
   expect(workflowRunsOf(await agentsOf($), [])[0]?.counts.asking).toBe(0)
 })
 
-test("a subagent prompt in a worker goes into the worker's report agents with its parent loop, the worker's own state untouched, and clears on the answer", async ($, on) => {
+test("a subagent prompt in a worker goes into the worker's report agents with its parent loop, its row needs-you while it asks, and clears on the answer", async ($, on) => {
   const written: Report[] = []
   on('fs.write', (_, e) => {
     if (e.path === reportPath(HOME, 'local_worker')) written.push(JSON.parse(e.text) as Report)
@@ -102,13 +103,15 @@ test("a subagent prompt in a worker goes into the worker's report agents with it
   await $.agent.spawn({ ...SPAWN, description: 'Check one caller', subagentType: 'Explore', parentAgentId: 'a1' })
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -rf build' }, agent_id: 'a2' } as never)
   const asking = written.at(-1)
-  expect([asking?.state, asking?.persona, asking?.needsYou]).toEqual(['working', 'Implementer', undefined])
   expect(asking?.agents).toEqual([
-    { id: 'a1', type: 'Explore', description: 'Find callers', state: 'running', startedAt: NOW },
     { id: 'a2', type: 'Explore', description: 'Check one caller', state: 'running', startedAt: NOW, parentAgentId: 'a1', asking: { text: 'Allow Bash: rm -rf build', since: NOW } },
+    { id: 'a1', type: 'Explore', description: 'Find callers', state: 'running', startedAt: NOW },
   ])
+  const rowOf = (report: Report | undefined) => merge(null, report ? [report] : [], { self: MASTER, title: '', sessions: [], error: '', at: 0 }, NOW).sessions[0]
+  expect([rowOf(asking)?.state, rowOf(asking)?.needsYou, rowOf(asking)?.persona]).toEqual(['needs-you', 'Allow Bash: rm -rf build', 'Implementer'])
   await $.tool.call({ tool: 'Bash', command: 'rm -rf build', agentId: 'a2' })
-  expect(written.at(-1)?.agents?.[1]?.asking).toBeUndefined()
+  expect(written.at(-1)?.agents?.some(one => one.asking)).toBe(false)
+  expect([rowOf(written.at(-1))?.state, rowOf(written.at(-1))?.needsYou]).toEqual(['waiting', undefined])
 })
 
 test("the master merges a worker's reported subagents under that worker within one refresh, asking and cleared", { plugins: [PROBE] }, async ($, on) => {
@@ -144,8 +147,14 @@ test("the master merges a worker's reported subagents under that worker within o
   files[reportPath(HOME, 'local_setup')] = JSON.stringify({ ...report, seq: 6, at: NOW + 1_000, agents: [{ ...report.agents?.[0], asking: { text: 'Allow Bash: rm -rf build', since: NOW + 1_000 } }] })
   await clock.advance(3_000)
   expect(askingOf(await agentsOf($), 'a2')).toEqual({ text: 'Allow Bash: rm -rf build', since: NOW + 1_000 })
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await pane.find({ key: 'row-local_setup' }))?.props.borderColor).toBe('error')
+  await pane.unmount()
   files[reportPath(HOME, 'local_setup')] = JSON.stringify({ ...report, seq: 7, at: NOW + 4_000 })
   await clock.advance(3_000)
   expect(askingOf(await agentsOf($), 'a2')).toBeUndefined()
   expect((await agentsOf($)).find(one => one.id === 'a1')?.state).toBe('running')
+  const after = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await after.find({ key: 'row-local_setup' }))?.props.borderColor).not.toBe('error')
+  await after.unmount()
 })

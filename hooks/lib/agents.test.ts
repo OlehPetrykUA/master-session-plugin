@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import type { AgentRecord, Board, WorkflowRecord } from '../../types'
 
 import { liveOf } from '../testing/world'
-import { stateCountsOf, subagentsOf, workflowRunsOf } from './agents'
+import { reportAgentsOf, stateCountsOf, subagentsOf, workflowRunsOf } from './agents'
 import { countsOf, rowsOf } from './rows'
 import { runSummaryOf } from './totals'
 
@@ -78,4 +78,25 @@ test('the run summary counts sessions by state, needs you, subagents, workflows,
   })
   const empty = runSummaryOf({ rows: [], counts: countsOf([], []), archived: 0, agents: [], workflows: [], board: null, trees: [], at: NOW })
   expect([empty.tests, empty.duration]).toEqual([undefined, { since: NOW, ms: 0 }])
+})
+
+test("a worker's reported agents stay out of the master's own subagents and workflow runs", () => {
+  const remote: AgentRecord[] = [
+    { id: 'r1', type: 'Explore', description: 'Remote task', state: 'running', startedAt: NOW, parentSessionId: 'local_setup' },
+    { id: 'r2', type: 'workflow-subagent', description: 'remote-scan', run: { id: 'wf_remote', index: 1 }, state: 'running', startedAt: NOW, parentSessionId: 'local_setup' },
+  ]
+  expect(subagentsOf([...AGENTS, ...remote]).map(one => one.id)).toEqual(subagentsOf(AGENTS).map(one => one.id))
+  expect(workflowRunsOf([...AGENTS, ...remote], RUNS).map(one => one.id)).toEqual(workflowRunsOf(AGENTS, RUNS).map(one => one.id))
+})
+
+test('the report keeps asking agents first, then running ones, newest first, at most 20, with texts clipped to 300', () => {
+  const many: AgentRecord[] = Array.from({ length: 21 }, (_, index) => ({ id: `a${index}`, type: 'Explore', description: `task ${index}`, state: index % 3 ? 'running' : 'done', startedAt: NOW + index }))
+  const first = many[0] as AgentRecord
+  many[0] = { ...first, state: 'running', description: 'x'.repeat(400), asking: { text: 'y'.repeat(400), since: NOW } }
+  const kept = reportAgentsOf([...many, { id: 'r1', type: 'Explore', description: 'remote', state: 'running', startedAt: NOW, parentSessionId: 'local_setup' }])
+  expect(kept.length).toBe(20)
+  expect([kept[0]?.id, kept[0]?.description.length, kept[0]?.asking?.text.length]).toEqual(['a0', 300, 300])
+  expect(kept.slice(1, 4).map(one => one.id)).toEqual(['a20', 'a19', 'a17'])
+  expect(kept.some(one => one.id === 'r1')).toBe(false)
+  expect(kept.at(-1)?.state).toBe('done')
 })

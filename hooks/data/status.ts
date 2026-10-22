@@ -25,7 +25,7 @@ export function reportJson(report: Report) {
   let next = capped(report)
   let text = JSON.stringify(next)
   while (bytesOf(text) > REPORT_CAP && !isEmpty(next)) {
-    next = { ...next, activity: next.activity.slice(1), commits: next.commits.slice(1), tests: next.tests.slice(1), files: next.files.slice(1), agents: next.agents?.slice(1) }
+    next = { ...next, activity: next.activity.slice(1), commits: next.commits.slice(1), tests: next.tests.slice(1), files: next.files.slice(1), agents: next.agents?.slice(0, -1) }
     text = JSON.stringify(next)
   }
   return text

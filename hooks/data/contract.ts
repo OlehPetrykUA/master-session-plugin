@@ -230,14 +230,15 @@ function isStoppedOf(report: Report | undefined, live: LiveSession | undefined) 
 function mergeOne(id: string, row: BoardSession | undefined, boardAt: number, report: Report | undefined, live: LiveSession | undefined, now: number): Merged {
   const isReportNewer = !!report && (!row || report.modelAt > boardAt)
   const isLiveTurn = !!report && (!!live?.isRunning || report.run.isRunning) && report.run.since !== undefined && report.run.since > boardAt
-  const isAsking = report?.state === 'needs-you'
+  const agentAsk = report?.agents?.find(one => one.state === 'running' && one.asking)?.asking
+  const isAsking = report?.state === 'needs-you' || !!agentAsk
   const picked = (isReportNewer ? (report?.state ?? row?.state) : (row?.state ?? report?.state)) ?? 'working'
   const isWoken = !isAsking && isLiveTurn && (picked === 'done' || picked === 'waiting')
   const pick = <T>(fromReport: T | undefined, fromBoard: T | undefined) => (isReportNewer || isWoken ? (fromReport ?? fromBoard) : (fromBoard ?? fromReport))
   const reported = isAsking ? 'needs-you' : isWoken ? 'working' : picked
   const isIdle = reported === 'working' && isStoppedOf(report, live)
   const state = isIdle ? 'waiting' : reported
-  const needsYou = isAsking ? (report.needsYou ?? row?.needsYou) : state === 'needs-you' ? pick(report?.needsYou, row?.needsYou) : undefined
+  const needsYou = isAsking ? (report?.needsYou ?? agentAsk?.text ?? row?.needsYou) : state === 'needs-you' ? pick(report?.needsYou, row?.needsYou) : undefined
   const isVerified = !!row?.verified
   const age = report ? Math.max(0, now - report.at) : undefined
   const isQuiet = !!live?.isRunning && age !== undefined && age >= QUIET_MS

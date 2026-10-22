@@ -2,6 +2,12 @@ import type { AgentAsk, AgentRecord, AgentState, Report, ReportAgent, WorkflowRe
 
 const REPORTED_MAX = 20
 
+const REPORTED_TEXT = 300
+
+const clip = (text: string) => text.slice(0, REPORTED_TEXT)
+
+const rankOf = (agent: AgentRecord) => (agent.state === 'running' && agent.asking ? 0 : agent.state === 'running' ? 1 : 2)
+
 export type StateCounts = Record<AgentState, number> & { total: number; asking: number }
 
 export type WorkflowAgent = { id: string; index: number; label: string; type: string; model?: string; state: AgentState; startedAt: number; endedAt?: number; result?: string; tokens?: number; asking?: AgentAsk }
@@ -20,7 +26,7 @@ export type WorkflowRun = {
   tokens: number
 }
 
-export const subagentsOf = (agents: readonly AgentRecord[]) => agents.filter(agent => !agent.run)
+export const subagentsOf = (agents: readonly AgentRecord[]) => agents.filter(agent => !agent.run && !agent.parentSessionId)
 
 export function stateCountsOf(agents: readonly { state: AgentState; asking?: AgentAsk }[]): StateCounts {
   const count = (state: AgentState) => agents.filter(agent => agent.state === state).length
@@ -28,7 +34,8 @@ export function stateCountsOf(agents: readonly { state: AgentState; asking?: Age
   return { total: agents.length, running: count('running'), done: count('done'), failed: count('failed'), asking }
 }
 
-export function workflowRunsOf(agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]): WorkflowRun[] {
+export function workflowRunsOf(all: readonly AgentRecord[], workflows: readonly WorkflowRecord[]): WorkflowRun[] {
+  const agents = all.filter(agent => !agent.parentSessionId)
   const ids = [...new Set([...workflows.map(one => one.id), ...agents.flatMap(agent => (agent.run ? [agent.run.id] : []))])]
   return ids.map(id => {
     const record = workflows.find(one => one.id === id)
@@ -70,16 +77,18 @@ export const asked = (agents: AgentRecord[], id: string, asking: AgentAsk | unde
 export const reportAgentsOf = (agents: readonly AgentRecord[]): ReportAgent[] =>
   agents
     .filter(one => !one.parentSessionId)
-    .slice(-REPORTED_MAX)
-    .map(one => ({
+    .map((one, index) => ({ one, index }))
+    .sort((left, right) => rankOf(left.one) - rankOf(right.one) || right.index - left.index)
+    .slice(0, REPORTED_MAX)
+    .map(({ one }) => ({
       id: one.id,
       type: one.type,
-      description: one.description,
+      description: clip(one.description),
       name: one.name,
       state: one.state,
       startedAt: one.startedAt,
       endedAt: one.endedAt,
-      asking: one.asking,
+      asking: one.asking && { ...one.asking, text: clip(one.asking.text) },
       parentAgentId: one.parentAgentId,
       runId: one.run?.id,
       runIndex: one.run?.index,
