@@ -2,7 +2,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { Board, LiveSession, Repo, SessionState, Worktree } from '../../types'
 
-import { lossesOf } from '../components/detail/losses'
+import { lossesOf, sideOf } from '../components/detail/losses'
 import { bandProgress } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
 import { BOARD_TOOL, PANE, TITLE, UNDO_MS } from '../lib/constants'
@@ -205,8 +205,10 @@ export async function repoOf($: EngineInterface, path: string): Promise<Repo | u
 async function refreshRepos($: EngineInterface) {
   const { board: current } = await boardOf($)
   const rows = rowsOf(current, await getLive($))
+  const ids = new Set(rows.map(row => row.id))
   const paths = [
     ...rows.flatMap(row => [row.board?.cwd ?? '', row.live?.cwd ?? ''].filter(Boolean)),
+    ...(await getLive($)).sessions.filter(one => !one.isArchived && ids.has(one.startedBy ?? '')).map(one => one.cwd),
     ...(current?.repos ?? []).map(path => expandHome(path, home)),
     ...(current?.sessions ?? []).flatMap(one => (one.worktrees ?? []).map(path => expandHome(path, home))),
   ].filter(path => path.startsWith('/'))
@@ -285,16 +287,20 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
   const trees = await refreshRepos($).catch(() => [] as Repo[])
   const fresh = rowsOf((await boardOf($)).board, live)
   const targets = rows.flatMap(row => fresh.filter(one => one.id === row.id))
-  const allowed = targets.filter(row => isArchivable(row.board ?? { state: row.state }, row.live))
-  const refused = rows.filter(row => !allowed.some(one => one.id === row.id)).map(row => row.name)
+  const busyOf = (row: Row) => sideOf(row, live.sessions, trees).find(one => one.isRunning || fresh.some(each => each.id === one.id && each.state === 'needs-you'))
+  const able = targets.filter(row => isArchivable(row.board ?? { state: row.state }, row.live))
+  const allowed = able.filter(row => !busyOf(row))
+  const refused = rows.filter(row => !able.some(one => one.id === row.id)).map(row => row.name)
   if (refused.length) $.ui.toast(`Not archived: ${refused.join(', ')} ${refused.length === 1 ? 'is' : 'are'} still working or waiting for your answer.`)
+  for (const busy of able.flatMap(row => busyOf(row) ?? [])) $.ui.toast(`Not archived: ${busy.name || busy.title} is still working`)
   const first = allowed[0]
-  if (!all && first && JSON.stringify(lossesOf(first, trees)) !== JSON.stringify(confirmed)) {
+  const losses = first ? lossesOf(first, trees, live.sessions) : []
+  if (!all && first && losses.length && JSON.stringify(losses) !== JSON.stringify(confirmed)) {
     await setExpanded($, () => [first.id])
     await setConfirming($, `archive:${first.id}`)
     return
   }
-  const clean = all ? allowed.filter(row => !lossesOf(row, trees).length) : allowed.slice(0, 1)
+  const clean = all ? allowed.filter(row => !lossesOf(row, trees, live.sessions).length) : allowed.slice(0, 1)
   const items = itemsOf(fresh, await getAgents($), await getWorkflows($))
   const archived: Row[] = []
   for (const row of clean) {

@@ -24,7 +24,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
     const collapse = () => actions.collapse(item.id)
     if (item.kind === 'workflow') return TextWorkflowDetail(ui, { run: item.run, at, onCollapse: collapse })
     if (item.kind === 'subagent') return TextSubagentDetail(ui, { agent: item.agent, at, onCollapse: collapse })
-    return TextSessionDetail(ui, { row: item.row, trees, at, asking, isReadOnly, actions })
+    return TextSessionDetail(ui, { row: item.row, trees, sessions: data.live.sessions, at, asking, isReadOnly, actions })
   }
 
   const undone = data.undone
@@ -37,7 +37,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
     ) : null
 
   const archiveAll = (rows: readonly Row[]) => {
-    const clean = rows.filter(one => !lossesOf(one, trees).length)
+    const clean = rows.filter(one => !lossesOf(one, trees, data.live.sessions).length)
     actions.archive(clean, { group: 'done', skipped: rows.length - clean.length })
   }
 

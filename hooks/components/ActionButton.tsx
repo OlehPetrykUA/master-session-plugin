@@ -1,4 +1,4 @@
-import { across, faceWidth, tall } from '../lib/layout'
+import { across, faceWidth, tall, widthOf } from '../lib/layout'
 import { buttonFace } from '../theme/icons'
 import type { FaceLook } from '../theme/icons'
 import { C, KINDS, LABEL_COLOR, SIZES } from '../theme/tokens'
@@ -36,11 +36,13 @@ export function ActionButton(ui: Ui, props: ActionButtonProps) {
   const rest: Tone = props.isQuiet ? 'faint' : props.isPressed ? 'text' : one.tone
   const labelColor = props.isQuiet ? C.faint : props.isPressed ? C.text : color.rest
   const look = props.kind === 'primary' ? PRIMARY : props.kind === 'link' ? LINK : undefined
-  if (look && ui.Client && props.wide === undefined && isIcon(props.icon)) {
-    const [, left] = SIZES[props.size ?? 's']
+  const isWide = props.wide !== undefined && !props.isIconOnly
+  if (look && ui.Client && (props.kind === 'primary' || !isWide) && isIcon(props.icon)) {
+    const [, start] = SIZES[props.size ?? 's']
     const text = props.isIconOnly ? '' : props.label
+    const left = isWide ? Math.max(start, (width - iconSize - gap - widthOf(props.label) * 1.08) / 2) : start
     return (
-      <Box key={`face-${props.id}`} flexDirection="row" flexShrink={0} width={across(width)} height={tall(height)} paddingX={0} paddingY={0}>
+      <Box key={`face-${props.id}`} flexDirection="row" flexShrink={isWide ? 1 : 0} width={isWide ? '100%' : across(width)} minWidth={0} height={tall(height)} paddingX={0} paddingY={0}>
         <Svg key={`${props.id}-face`} source={buttonFace(width, height, props.icon, text, look.rest, left, gap, iconSize)} alt={props.label} width={width} height={height} />
         <Box position="absolute" top={0} left={0} display="none" hover={{ display: 'flex' }}>
           <Svg key={`${props.id}-face-hot`} source={buttonFace(width, height, props.icon, text, look.hover, left, gap, iconSize)} alt={props.label} width={width} height={height} />

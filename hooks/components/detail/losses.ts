@@ -1,4 +1,4 @@
-import type { Repo } from '../../../types'
+import type { LiveSession, Repo } from '../../../types'
 
 import { locate } from '../../lib/git'
 import { plural } from '../../lib/list'
@@ -29,16 +29,32 @@ function lineAt(path: string, trees: readonly Repo[]) {
   return where.unmerged ? `${plural(where.unmerged, 'commit')} not on ${found.repo.base}` : where.dirty ? `${where.dirty} uncommitted` : ''
 }
 
-export function lossesOf(row: Row, trees: readonly Repo[]) {
+const isWorktree = (path: string, trees: readonly Repo[]) => !locate(path, trees)?.tree.isMain
+
+export const sideOf = (row: Row, sessions: readonly LiveSession[], trees: readonly Repo[]) =>
+  sessions.filter(one => !one.isArchived && one.id !== row.id && (one.startedBy === row.id || (!!row.live?.cwd && one.cwd === row.live.cwd && isWorktree(one.cwd, trees))))
+
+const othersOf = (row: Row, sessions: readonly LiveSession[], trees: readonly Repo[]) => sideOf(row, sessions, trees).filter(one => !pathsOf(row).includes(one.cwd))
+
+const nameOf = (one: LiveSession) => one.name || one.title || one.id
+
+export function lossesOf(row: Row, trees: readonly Repo[], sessions: readonly LiveSession[]) {
   if (!row.live?.cwd) return [UNKNOWN]
-  return [...new Set(pathsOf(row).flatMap(path => lossesAt(path, trees)))]
+  const own = pathsOf(row).flatMap(path => lossesAt(path, trees))
+  const side = othersOf(row, sessions, trees).flatMap(one => lossesAt(one.cwd, trees).map(loss => `${nameOf(one)}: ${loss}`))
+  return [...new Set([...own, ...side])]
 }
 
-export function lossLineOf(row: Row, trees: readonly Repo[]) {
+export function lossLineOf(row: Row, trees: readonly Repo[], sessions: readonly LiveSession[]) {
   if (!row.live?.cwd) return UNKNOWN
-  return pathsOf(row)
+  const own = pathsOf(row)
     .map(path => lineAt(path, trees))
-    .find(Boolean) ?? ''
+    .find(Boolean)
+  if (own) return own
+  const side = othersOf(row, sessions, trees)
+    .map(one => ({ one, line: lineAt(one.cwd, trees) }))
+    .find(each => each.line)
+  return side ? `${nameOf(side.one)}: ${side.line}` : ''
 }
 
 export function mergedLineOf(row: Row, trees: readonly Repo[]) {

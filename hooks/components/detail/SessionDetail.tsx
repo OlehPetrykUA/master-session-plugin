@@ -1,4 +1,4 @@
-import type { Repo } from '../../../types'
+import type { LiveSession, Repo } from '../../../types'
 
 import { stepOf } from '../../lib/board'
 import { compactOf, modelOf } from '../../lib/format'
@@ -22,7 +22,7 @@ import { lossesOf } from './losses'
 import { Pair } from './Pair'
 import { Tests } from './Tests'
 
-export type SessionDetailProps = { row: Row; trees: readonly Repo[]; home: string; at: number; asking: string; isReadOnly: boolean; innerWidth: number; actions: Actions }
+export type SessionDetailProps = { row: Row; trees: readonly Repo[]; sessions: readonly LiveSession[]; home: string; at: number; asking: string; isReadOnly: boolean; innerWidth: number; actions: Actions }
 
 type ActionRowProps = { row: Row; losses: readonly string[]; width: number; isAsking: boolean; isReadOnly: boolean; actions: Actions }
 
@@ -78,7 +78,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
   const model = modelOf(now?.model, now?.effort)
   const activity = activityOf(row)
   const files = facts?.files ?? []
-  const losses = lossesOf(row, trees)
+  const losses = lossesOf(row, trees, props.sessions)
   const idle = now ? at - now.lastActivityAt : 0
   const open = () => actions.open(row.id, row.name)
   const half = (label: string, icon: Parameters<typeof Block>[1]['icon'], children: Parameters<typeof Block>[1]['children'], id: string) => Block(ui, { id: `${id}-${row.id}`, icon, label, children, isHalf: true })

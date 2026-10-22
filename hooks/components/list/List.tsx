@@ -41,13 +41,13 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
   const detailOf = (item: ListItem) => {
     if (item.kind === 'workflow') return WorkflowDetail(ui, { run: item.run, at: data.at, innerWidth, onCollapse: collapse(item.id) })
     if (item.kind === 'subagent') return SubagentDetail(ui, { agent: item.agent, at: data.at, onCollapse: collapse(item.id) })
-    return SessionDetail(ui, { row: item.row, trees: data.trees, home: data.home, at: data.at, asking: data.asking, isReadOnly, innerWidth, actions })
+    return SessionDetail(ui, { row: item.row, trees: data.trees, sessions: data.live.sessions, home: data.home, at: data.at, asking: data.asking, isReadOnly, innerWidth, actions })
   }
   const items = (group: ListGroup) => {
     const drawn = group.items.map(item => {
       if (data.open.includes(item.id)) return detailOf(item)
       const name = item.kind === 'session' ? item.row.name : item.id
-      return Row(ui, { item, trees: data.trees, home: data.home, at: data.at, isNarrow: view.isNarrow, width, onOpen: () => actions.toggle(item.id), onChat: () => actions.open(item.id, name) })
+      return Row(ui, { item, trees: data.trees, sessions: data.live.sessions, home: data.home, at: data.at, isNarrow: view.isNarrow, width, onOpen: () => actions.toggle(item.id), onChat: () => actions.open(item.id, name) })
     })
     return undone?.group === group.id ? [...drawn.slice(0, undone.index), undoBar(), ...drawn.slice(undone.index)] : drawn
   }
@@ -64,7 +64,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
         })
       : null
   const archiveAll = (rows: readonly SessionRow[]) => {
-    const clean = rows.filter(row => !lossesOf(row, data.trees).length)
+    const clean = rows.filter(row => !lossesOf(row, data.trees, data.live.sessions).length)
     actions.archive(clean, { group: 'done', skipped: rows.length - clean.length })
   }
   const groupOf = (group: ListGroup) => {

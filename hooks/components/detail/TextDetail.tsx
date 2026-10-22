@@ -1,6 +1,6 @@
 import type { RenderChildren } from 'claude-code'
 
-import type { AgentRecord, Repo } from '../../../types'
+import type { AgentRecord, LiveSession, Repo } from '../../../types'
 
 import type { WorkflowRun } from '../../lib/agents'
 import { stepOf } from '../../lib/board'
@@ -37,7 +37,7 @@ function TextCard(ui: TextUi, props: TextCardProps) {
   )
 }
 
-export type TextSessionProps = { row: Row; trees: readonly Repo[]; at: number; asking: string; isReadOnly: boolean; actions: Actions }
+export type TextSessionProps = { row: Row; trees: readonly Repo[]; sessions: readonly LiveSession[]; at: number; asking: string; isReadOnly: boolean; actions: Actions }
 
 export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
   const { Box, Text, Button } = ui
@@ -48,7 +48,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
   const where = whereOf(row, props.trees)?.tree
   const files = facts?.files ?? []
   const model = modelOf(now?.model, now?.effort)
-  const losses = lossesOf(row, props.trees)
+  const losses = lossesOf(row, props.trees, props.sessions)
   const canArchive = !!now && !now.isRunning && row.state !== 'needs-you' && !props.isReadOnly
   const isStoppable = !!now?.isRunning && row.state !== 'needs-you'
   return TextCard(ui, {

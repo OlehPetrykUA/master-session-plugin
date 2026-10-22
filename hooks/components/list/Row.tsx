@@ -1,4 +1,4 @@
-import type { Repo, SessionState } from '../../../types'
+import type { LiveSession, Repo, SessionState } from '../../../types'
 
 import { dirtyOf } from '../../lib/git'
 import { across, down, tall } from '../../lib/layout'
@@ -14,7 +14,7 @@ import { Hit } from '../Hit'
 import { Icon } from '../Icon'
 import type { Ui } from '../types'
 
-export type RowProps = { item: ListItem; trees: readonly Repo[]; home: string; at: number; isNarrow: boolean; width: number; onOpen: () => void; onChat: () => void }
+export type RowProps = { item: ListItem; trees: readonly Repo[]; sessions: readonly LiveSession[]; home: string; at: number; isNarrow: boolean; width: number; onOpen: () => void; onChat: () => void }
 
 export const ROW_HEIGHT = 56
 
@@ -36,7 +36,7 @@ export function Row(ui: Ui, props: RowProps) {
   const dirty = item.kind === 'session' && where ? dirtyOf(where, item.row.board?.files ?? [], props.home) : 0
   const git = dirty ? gitPill(dirty) : undefined
   const hasRing = !isNeeds && item.kind !== 'subagent'
-  const loss = item.kind === 'session' && item.group === 'done' ? lossLineOf(item.row, props.trees) : ''
+  const loss = item.kind === 'session' && item.group === 'done' ? lossLineOf(item.row, props.trees, props.sessions) : ''
   const merged = item.kind === 'session' && item.group === 'done' && !loss ? mergedLineOf(item.row, props.trees) : ''
   const muted = C.muted
   const line = (
