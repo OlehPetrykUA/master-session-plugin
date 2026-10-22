@@ -3,6 +3,7 @@ import type { EngineInterface, On, ToolCallInput, TurnCompleteInput } from 'clau
 import { expandHome, parseStatus } from '../lib/git'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
+import type { SessionState } from '../../types'
 import { parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
 export type Role = { role: 'worker' | 'master' | ''; self: string; parent: string; engineId: string }
@@ -12,6 +13,9 @@ const COMMIT_LINE = /^\[[^\]\s]+(?: \([^)]*\))? ([0-9a-f]{7,40})\] (.+)$/m
 const TEST_RUNNER = /\b(?:pytest|jest|vitest|mocha|bats|go test|cargo test|(?:npm|pnpm|yarn|bun)(?: run)? test|plugin test|tsc|test_\w+\.(?:py|sh))\b/
 const REPO = /(?:^|&&|;)\s*cd\s+("[^"]+"|'[^']+'|[^\s;&|]+)|\bgit\s+-C\s+("[^"]+"|'[^']+'|[^\s;&|]+)/
 const NUDGE = `Status check from your master session: call ${REPORT_TOOL} at your next step boundary. No chat reply.`
+const ASKING = new Set(['permission_prompt', 'elicitation_dialog', 'elicitation_url_dialog', 'agent_needs_input'])
+const ANSWERED = new Set(['elicitation_complete', 'elicitation_response'])
+const QUESTION_TOOL = 'AskUserQuestion'
 const FAILED: Record<string, string> = {
   [REPORT_TOOL]: 'The status report could not be saved: report in chat instead.',
   [REPORTS_TOOL]: 'The worker reports could not be read.',
@@ -22,6 +26,7 @@ let role = NO_ROLE
 let current: Report | undefined
 let detecting: Promise<void> | undefined
 let gitCwd = ''
+let held: { text: string; tool: string; state: SessionState; needsYou?: string } | undefined
 
 export const roleOf = () => role
 
@@ -31,6 +36,20 @@ export const commitOf = (command: string, output: string) => {
 }
 
 export const isTestCommand = (command: string) => TEST_RUNNER.test(command)
+
+const fieldOf = (input: unknown, key: string) => {
+  const value = typeof input === 'object' && input ? (input as Record<string, unknown>)[key] : undefined
+  return typeof value === 'string' && value ? value : undefined
+}
+
+export function promptTextOf(tool: string, input: unknown) {
+  if (tool === QUESTION_TOOL) {
+    const questions = typeof input === 'object' && input ? (input as { questions?: unknown }).questions : undefined
+    return fieldOf(Array.isArray(questions) ? questions[0] : undefined, 'question') ?? 'Answer the question in the chat'
+  }
+  const detail = ['command', 'file_path', 'url', 'pattern', 'description'].map(key => fieldOf(input, key)).find(Boolean)
+  return `Allow ${tool}${detail ? `: ${detail.slice(0, 160)}` : ''}`
+}
 
 export const summaryOf = (output: string) =>
   (
@@ -124,7 +143,26 @@ async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?:
   )
 }
 
+async function promptOpened($: EngineInterface, text: string, tool: string) {
+  await detected($)
+  if (!current) return
+  const now = await $.clock.now()
+  held = { text, tool, state: held?.state ?? current.state, needsYou: held ? held.needsYou : current.needsYou }
+  if (current.state === 'needs-you' && current.needsYou === text) return
+  await save($, { ...current, state: 'needs-you', needsYou: text, modelAt: now, waits: { since: now, on: 'you' } }, now)
+}
+
+async function promptClosed($: EngineInterface, tool?: string) {
+  if (!current || !held || (tool !== undefined && held.tool && held.tool !== tool)) return
+  const before = held
+  held = undefined
+  if (current.state !== 'needs-you' || current.needsYou !== before.text) return
+  const now = await $.clock.now()
+  await save($, { ...current, state: before.state, needsYou: before.needsYou, modelAt: now, waits: undefined }, now)
+}
+
 async function turnStarted($: EngineInterface) {
+  held = undefined
   if (!current) return
   const now = await $.clock.now()
   const wasAsking = current.state === 'needs-you'
@@ -191,24 +229,40 @@ export async function startRecorder($: EngineInterface) {
   current = undefined
   detecting = undefined
   gitCwd = ''
+  held = undefined
   void detected($)
 }
 
 export async function recordTurnEnd($: EngineInterface, e: TurnCompleteInput) {
-  if (e.agentId === undefined) await turnEnded($, e).catch(() => undefined)
+  if (e.agentId !== undefined) return
+  await promptClosed($).catch(() => undefined)
+  await turnEnded($, e).catch(() => undefined)
 }
 
 export function recorder(on: On) {
   on('tool.call', async ($, e, next) => {
     if (String(e.tool) === REPORT_TOOL) return reported($, e)
     if (String(e.tool) === REPORTS_TOOL) return listed($)
+    if (String(e.tool) === QUESTION_TOOL) await promptOpened($, promptTextOf(QUESTION_TOOL, e), QUESTION_TOOL).catch(() => undefined)
     const out = await next(e)
+    await promptClosed($, String(e.tool)).catch(() => undefined)
     if (current && out.deny === undefined) await recordTool($, e, out).catch(() => undefined)
     return out
   }).catch(($, e, next) => {
     const failed = FAILED[String(e.tool)]
     return failed ? { deny: failed } : next(e)
   })
+
+  on('classic.PermissionRequest', async ($, e, next) => {
+    await promptOpened($, promptTextOf(e.tool_name, e.tool_input), e.tool_name).catch(() => undefined)
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('classic.Notification', async ($, e, next) => {
+    if (ASKING.has(e.notification_type) && !held) await promptOpened($, e.message || e.title || 'Claude needs your input', '').catch(() => undefined)
+    if (ANSWERED.has(e.notification_type)) await promptClosed($).catch(() => undefined)
+    return next(e)
+  }).catch(($, e, next) => next(e))
 
   on('turn.start', async ($, e, next) => {
     const started = await next(e)

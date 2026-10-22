@@ -70,6 +70,8 @@ export const GIT: Record<string, string> = {
 
 export const AT = '1970-01-01T00:50:00.000Z'
 
+const stampOf = (file: string) => [...file].reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) % 1_000_000_007, 7)
+
 export const SPAWN: AgentSpawnInput = {
   tool_use_id: 'toolu_1',
   prompt: 'Read the docs.',
@@ -116,7 +118,7 @@ export function world(on: On, child: Child = {}) {
   on('fs.stat', (_, e) => {
     const file = child.files?.[e.path]
     if (file === undefined) throw new Error('ENOENT')
-    return { value: { kind: 'file' as const, size: file.length, mtimeMs: 1, isLink: false } }
+    return { value: { kind: 'file' as const, size: file.length, mtimeMs: stampOf(file), isLink: false } }
   })
   on('fs.read', (_, e) => {
     const file = child.files?.[e.path]
@@ -127,7 +129,7 @@ export function world(on: On, child: Child = {}) {
   on('fs.list', (_, e) => ({
     value: Object.entries(child.files ?? {})
       .filter(([path]) => path.startsWith(`${e.path}/`))
-      .map(([path, file]) => ({ name: path.slice(e.path.length + 1), kind: 'file' as const, size: file.length, mtimeMs: 1, isLink: false })),
+      .map(([path, file]) => ({ name: path.slice(e.path.length + 1), kind: 'file' as const, size: file.length, mtimeMs: stampOf(file), isLink: false })),
   }))
   on('mcp.call', (_, e) => {
     calls.push({ tool: e.tool, args: e.args })
