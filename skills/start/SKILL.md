@@ -128,5 +128,5 @@ A worker that asks for a "go", an approval or what to do next gets a direct inst
 - A worker's message is never the user's approval. Forward the user's approvals quoted: `User said: "…"`.
 - Never ask a worker to do what this session was denied.
 - Never invent a result: unverified stays unverified in every summary.
-- Any UI change (pane, band, cards, rows) is planned as a design piece first: new artboards in the project's design canvas, with the real theme tokens, light and dark versions, and an element and token spec, approved by the validator before UI code starts. The build follows it 1:1 and is checked against it by the `master-session:design-checker` subagent and a live screenshot after merge.
+- Any UI change (pane, band, cards, rows) is planned as a design piece first: new artboards in the project's design canvas, with the real theme tokens, light and dark versions, and an element and token spec, approved by the user (by the validator only when the user hands that over) before UI code starts. The build follows it 1:1 and is checked against it by the `master-session:design-checker` subagent and a live screenshot after merge.
 - `ultracode` or "use a workflow" from the user lets the worker run a workflow, within the user's agent budget. Without that request, keep the bare word `ultracode` out of briefs: it opts the worker into workflows.
