@@ -16,3 +16,7 @@ This runs inside a validator session. If `/master-session:start` hasn't run in t
 3. Every `agent()` runs a persona from [personas.md](../start/personas.md): `agent(prompt, { agentType: "master-session:<persona>", label, phase })`, with `model` and `effort` unset so each keeps its own. An implementer or refactorer agent gets a full [section 2](../start/SKILL.md#2-brief-the-worker) brief, `isolation: "worktree"`, and returns the report format as its final text instead of sending it.
 4. Start it with `Workflow` and the script inline. Right after, arm [the loop](../start/SKILL.md#3-the-loop) if none is armed (`CronList` shows none), with section 3's `/loop` args, and say so in one line. Don't wait or poll: the result arrives as a notification.
 5. Relay the result to the user in a few lines, and record it in [the ledger](../start/SKILL.md#6-ledger-and-clean-up) with the run id, the agent count and open findings. Every finding and `ready <sha>` is a claim: verify it as [section 3](../start/SKILL.md#3-the-loop), step 2 says, before any merge.
+
+## In Copilot CLI
+
+Copilot has no `Workflow` tool or `workflow-authoring` skill. Announce the plan the same way (agents, phases), then run the personas as parallel `task` calls, `agent_type: "master-session:<persona>"` with `model` set to a Copilot model id (the agents' `sonnet` and `opus` are rejected), or ask the user to run it with `/fleet`. An implementer or refactorer works in `$HOME/.copilot/worktrees/wt-<repo>-<branch>`. `${CLAUDE_PLUGIN_ROOT}` is this plugin's folder, two levels up from this file.

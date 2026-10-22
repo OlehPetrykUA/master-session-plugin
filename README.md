@@ -42,6 +42,24 @@ In the Claude desktop app, where `/plugin` does not run: click **+** next to the
 
 Update later with `claude plugin update master-session@master-session`.
 
+## Copilot CLI
+
+GitHub Copilot CLI loads the same plugin from a clone, live: nothing is copied, and each change in the folder shows up in the next session.
+
+```bash
+copilot plugin marketplace add <path to your clone>
+```
+
+```bash
+copilot plugin install master-session@master-session
+```
+
+`copilot plugin list` shows it under "Live Plugins". The skills keep their own names (`start`, `subchat`, `worker`, the personas), and the agents are `master-session:<persona>`. `start`, `info`, `subchat`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them.
+
+Copilot has no session tools, report tool, status mod or loop. Each skill's "In Copilot CLI" section says what to do instead: the user opens worker sessions and relays their reports, personas run through the `task` tool with a Copilot model id (Copilot rejects the agents' `sonnet` and `opus`), and the board goes in chat. The agents carry `reasoning-effort` for Copilot beside `effort` for Claude Code.
+
+Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do.
+
 ## Usage
 
 | Command | What it does |

@@ -45,3 +45,6 @@ If the parent sends the work back (a finding, or master moved and the merge isn'
 
 ## Conflicts
 When a parent message conflicts with the user's own words in your chat, follow the user and tell the parent.
+
+## In Copilot CLI
+Copilot has no report tool and no SendMessage. Put each update, question and `ready <sha>` in your own chat, in the report format, for the user to relay to the parent. Your worktree is `$HOME/.copilot/worktrees/wt-<repo>-<branch>`. Never `/delegate` a repo hosted outside GitHub, such as Azure DevOps: it opens a GitHub pull request.

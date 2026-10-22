@@ -4,6 +4,7 @@ description: Compares a built UI with its approved design, artboard by artboard,
 disallowedTools: Edit, Write, NotebookEdit
 model: sonnet
 effort: medium
+reasoning-effort: medium
 skills:
-  - master-session:design-checker
+  - design-checker
 ---

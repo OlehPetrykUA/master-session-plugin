@@ -4,6 +4,7 @@ description: Answers one question from published docs (Context7 first), tagging 
 disallowedTools: Edit, Write, NotebookEdit
 model: sonnet
 effort: medium
+reasoning-effort: medium
 skills:
-  - master-session:researcher
+  - researcher
 ---

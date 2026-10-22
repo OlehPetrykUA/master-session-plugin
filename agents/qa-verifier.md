@@ -4,6 +4,7 @@ description: Re-runs a worker's gate at an exact commit in a clean detached work
 disallowedTools: Edit, Write, NotebookEdit
 model: sonnet
 effort: medium
+reasoning-effort: medium
 skills:
-  - master-session:qa-verifier
+  - qa-verifier
 ---

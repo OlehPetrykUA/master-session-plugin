@@ -4,6 +4,7 @@ description: Reviews a worker's ready commit against its brief, the user's rules
 disallowedTools: Edit, Write, NotebookEdit
 model: opus
 effort: high
+reasoning-effort: high
 skills:
-  - master-session:reviewer
+  - reviewer
 ---

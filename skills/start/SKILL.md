@@ -130,3 +130,11 @@ A worker that asks for a "go", an approval or what to do next gets a direct inst
 - Never invent a result: unverified stays unverified in every summary.
 - Any UI change (pane, band, cards, rows) is planned as a design piece first: new artboards in the project's design canvas, with the real theme tokens, light and dark versions, and an element and token spec, approved by the user (by the validator only when the user hands that over) before UI code starts. The build follows it 1:1 and is checked against it by the `master-session:design-checker` subagent and a live screenshot after merge.
 - `ultracode` or "use a workflow" from the user lets the worker run a workflow, within the user's agent budget. Without that request, keep the bare word `ultracode` out of briefs: it opts the worker into workflows.
+
+## In Copilot CLI
+
+Copilot CLI loads this plugin too, without `start_session`, SendMessage, the report tool, the status mod, `/loop` or `ScheduleWakeup`. It leaves `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` as written: read them as the plugin folder and this skill's folder. Run the same protocol with what Copilot has:
+- **Workers:** give the user the brief to paste into a session they open with `/new`, or `/fork` when it needs this chat. The worker makes its worktree at `$HOME/.copilot/worktrees/wt-<repo>-<branch>` and reports in its own chat in the report format; the user relays it.
+- **Persona subagents:** the `task` tool with `agent_type: "master-session:<persona>"` and `model` set to a Copilot model id, such as this session's own. Copilot rejects the agents' `sonnet` and `opus`, and its error lists the ids. `/tasks` shows them; `/fleet` runs several in parallel.
+- **Loop and board:** no heartbeat. Do a tick (section 3) on every user turn and every subagent result, and post the chat board as [board.md](board.md) shows.
+- **`/delegate`** sends the session to GitHub and opens a pull request there: never use it for a repo hosted elsewhere, such as Azure DevOps.
