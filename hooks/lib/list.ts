@@ -259,7 +259,7 @@ export function lineOf(item: RowItem, context: Context): Line {
   return agentLineOf(item.agent, item.status, chainOf(item, context), context)
 }
 
-export const lineTextOf = (line: Line) => `${line.chain ? `${line.chain} ` : ''}${[line.word?.text, line.text].filter(Boolean).join(' · ')}`
+export const lineTextOf = (line: Line) => oneLine(`${line.chain ? `${line.chain} ` : ''}${[line.word?.text, line.text].filter(Boolean).join(' · ')}`)
 
 export const shortNameOf = (item: RowItem) => {
   const name = displayNameOf(item)

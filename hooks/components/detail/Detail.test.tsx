@@ -692,7 +692,15 @@ test('the open tool expands a workflow agent’s own card inside its open run', 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ key: 'detail-wf_7' })).toBeDefined()
   expect(await ui.find({ key: 'detail-w1' })).toBeDefined()
+  expect(await hitsOf(ui)).toContain('hit-top-wf_7')
+  await click(ui, 'hit-top-wf_7')
+  expect(await ui.find({ key: 'detail-w1' })).toBeUndefined()
+  expect(await ui.find({ key: 'detail-wf_7' })).toBeUndefined()
   await ui.unmount()
+  await $.tool.call({ tool: 'mcp__master-session__open', expand: 'w1' })
+  const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await terminal.find({ key: 'detail-wf_7' })).toBeDefined()
+  await terminal.unmount()
 })
 
 test('the 15 s refresh keeps reading a side session past the first 50 from the family list, so the box keeps its commits and yes archives', async ($, on) => {

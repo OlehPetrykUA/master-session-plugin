@@ -4,10 +4,11 @@ import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
 import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, displayNameOf, sessionOfAgent, elapsedOfItem, lineOf, lineTextOf, nameText, plural, shownArchived, stepsOfItem } from '../lib/list'
 import type { Context, ListGroup, ListItem, RowItem } from '../lib/list'
+import { familyOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
 import { TERMINAL_COLOR } from '../theme/tokens'
-import { familyOf, lossesOf } from './detail/losses'
+import { lossesOf } from './detail/losses'
 import { TextSessionDetail, TextSubagentDetail, TextWorkflowDetail, colorOf } from './detail/TextDetail'
 import type { PaneData, TextUi } from './types'
 import { UnarchiveConfirm } from './UnarchiveConfirm'
@@ -63,7 +64,9 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
     )
   }
 
-  const row = (item: ListItem) => (data.open.includes(item.id) ? detail(item) : line(item))
+  const isOpen = (item: ListItem) => data.open.includes(item.id) || (item.kind === 'workflow' && item.run.agents.some(agent => data.open.includes(agent.id)))
+
+  const row = (item: ListItem) => (isOpen(item) ? detail(item) : line(item))
 
   const archivedRow = (item: Extract<RowItem, { kind: 'archived' }>) => {
     const { one } = item

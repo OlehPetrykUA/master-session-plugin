@@ -4,12 +4,13 @@ import { isArchivable } from '../../data/contract'
 import { bodyWidthOf, across, down } from '../../lib/layout'
 import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, plural, sessionOfAgent, shownArchived } from '../../lib/list'
 import type { Context, ListGroup, RowItem } from '../../lib/list'
+import { familyOf } from '../../lib/rows'
 import type { Row as SessionRow } from '../../lib/rows'
 import type { PaneView } from '../../lib/view'
 import type { Tone } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
 import { ArchivedDetail } from '../detail/ArchivedDetail'
-import { familyOf, lossesOf } from '../detail/losses'
+import { lossesOf } from '../detail/losses'
 import { SessionDetail } from '../detail/SessionDetail'
 import { SubagentDetail } from '../detail/SubagentDetail'
 import { UndoBar } from '../detail/UndoBar'
@@ -51,7 +52,11 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
   }
   const isOpen = (item: RowItem) => data.open.includes(item.id) || (item.kind === 'workflow' && item.run.agents.some(agent => data.open.includes(agent.id)))
   const itemOf = (item: RowItem, room: number): RenderChildren => {
-    const onOpen = () => (item.kind === 'agent' && data.open.includes(item.id) ? actions.toggle(item.run.id) : actions.toggle(item.id))
+    const onOpen = () => {
+      if (item.kind === 'agent' && data.open.includes(item.id)) return actions.toggle(item.run.id)
+      const agent = item.kind === 'workflow' ? item.run.agents.find(one => data.open.includes(one.id)) : undefined
+      return actions.toggle(agent?.id ?? item.id)
+    }
     const rowProps = { item, context, home: data.home, width: room, isNarrow: view.isNarrow, onOpen, chat: chatOf(item) }
     if (!isOpen(item)) return Row(ui, rowProps)
     const innerWidth = room - CARD_INSET

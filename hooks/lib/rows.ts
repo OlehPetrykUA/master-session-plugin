@@ -48,6 +48,8 @@ export function countsOf(rows: readonly Row[], repos: readonly Repo[]): Counts {
 
 export const archivedOf = (live: Live) => live.sessions.filter(one => one.isArchived)
 
+export const familyOf = (live: Live) => live.family ?? live.sessions
+
 export const activityOf = (row: Row) =>
   (row.board?.activity ?? []).slice(0, 3).map(line => {
     const cut = line.lastIndexOf(' · ')

@@ -1,4 +1,4 @@
-import type { Live, LiveSession, Repo } from '../../../types'
+import type { LiveSession, Repo } from '../../../types'
 
 import { ARCHIVE_LIMIT } from '../../lib/constants'
 import { locate } from '../../lib/git'
@@ -33,8 +33,6 @@ function lineAt(path: string, trees: readonly Repo[]) {
 const isWorktree = (path: string, trees: readonly Repo[]) => !locate(path, trees)?.tree.isMain
 
 const treeOf = (path: string, trees: readonly Repo[]) => locate(path, trees)?.tree.path ?? path
-
-export const familyOf = (live: Live) => live.family ?? live.sessions
 
 export function sideOf(row: Row, sessions: readonly LiveSession[], trees: readonly Repo[]) {
   const ids = new Set([row.id])
