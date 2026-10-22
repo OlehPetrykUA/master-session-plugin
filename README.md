@@ -88,7 +88,7 @@ Each persona is a skill, `master-session:<persona>`, and an agent of the same na
 | `implementer` | Builds one deliverable from a brief in its own worktree and reports `ready <sha>`. |
 | `refactorer` | Moves, renames or splits code without changing behaviour. |
 | `reviewer` | Judges a `ready <sha>` against its brief and rules, ending in PASS or FAIL. |
-| `qa-verifier` | Re-runs the gate at an exact sha in a clean worktree, ending in PASS or FAIL. |
+| `qa-verifier` | Owns the verification of a ready sha: gate in a clean detached worktree, Reviewer and (UI) Design checker as its own subagents, live screenshot when given a window id; returns one PASS or FAIL with bundled findings. |
 | `design-checker` | Compares the built UI with the approved design. |
 | `researcher` | Answers one question from published docs, citing each claim. |
 | `designer` | Draws the UI design as new artboards in the project's design canvas, in light and dark, for the user to approve before any UI code. |
