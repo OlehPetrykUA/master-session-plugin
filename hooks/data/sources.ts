@@ -2,14 +2,16 @@ import type { EngineInterface } from 'claude-code'
 
 import type { Board, LiveSession, Repo, SessionState, Worktree } from '../../types'
 
+import { lossesOf } from '../components/detail/losses'
 import { bandProgress } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
 import { BOARD_TOOL, PANE, TITLE, UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
 import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
+import { itemsOf } from '../lib/list'
 import { rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
-import { getBoard, getLive, getReports, getShared, getUndone, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
+import { getAgents, getBoard, getLive, getReports, getRepos, getShared, getUndone, getWorkflows, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, merge } from './contract'
 import { roleOf } from './recorder'
 import { askForUpdates, readBoard, readReports, writeBoard } from './status'
@@ -177,10 +179,11 @@ async function baseOf($: EngineInterface, path: string) {
   return undefined
 }
 
-async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined): Promise<Worktree[]> {
+async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined): Promise<Worktree> {
   const status = await git($, tree.path, ['status', '--porcelain=v2', '--branch']).catch(() => undefined)
-  const count = tree.isMain ? '0' : base ? (await git($, tree.path, ['rev-list', '--count', `${base}..HEAD`]).catch(() => '')).trim() : ''
-  return status ? [{ path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...parseStatus(status), unmerged: /^\d+$/.test(count) ? Number(count) : undefined }] : []
+  const count = !status ? '' : tree.isMain ? '0' : base ? (await git($, tree.path, ['rev-list', '--count', `refs/heads/${base}..HEAD`]).catch(() => '')).trim() : ''
+  const known = status ? parseStatus(status) : { dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }
+  return { path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...known, unmerged: /^\d+$/.test(count) ? Number(count) : undefined }
 }
 
 export async function repoOf($: EngineInterface, path: string): Promise<Repo | undefined> {
@@ -188,7 +191,7 @@ export async function repoOf($: EngineInterface, path: string): Promise<Repo | u
   const main = trees.find(tree => tree.isMain) ?? trees[0]
   if (!main) return undefined
   const base = await baseOf($, path)
-  const worktrees = (await Promise.all(trees.map(tree => treeOf($, tree, base)))).flat()
+  const worktrees = await Promise.all(trees.map(tree => treeOf($, tree, base)))
   const refs = await git($, path, ['for-each-ref', 'refs/heads', '--format=x%(upstream:short)']).catch(() => '')
   return {
     path: main.path,
@@ -263,13 +266,26 @@ async function archiveOne($: EngineInterface, id: string, name: string) {
   if (after && !after.isArchived) throw new Error(`${name} is still active. The app may be waiting for your approval.`)
 }
 
-export async function archive($: EngineInterface, rows: readonly Row[], all?: { group: SessionState; skipped: number }) {
+export async function archive($: EngineInterface, rows: readonly Row[], all?: { group: SessionState; skipped: number }, confirmed: readonly string[] = []) {
   await setConfirming($, '')
-  const allowed = rows.filter(row => isArchivable(row.board ?? { state: row.state }, row.live))
-  const refused = rows.filter(row => !allowed.includes(row)).map(row => row.name)
+  await refreshLive($).catch(() => undefined)
+  await refreshRepos($).catch(() => undefined)
+  const trees = await getRepos($)
+  const fresh = rowsOf((await boardOf($)).board, await getLive($))
+  const targets = rows.flatMap(row => fresh.filter(one => one.id === row.id))
+  const allowed = targets.filter(row => isArchivable(row.board ?? { state: row.state }, row.live))
+  const refused = rows.filter(row => !allowed.some(one => one.id === row.id)).map(row => row.name)
   if (refused.length) $.ui.toast(`Not archived: ${refused.join(', ')} ${refused.length === 1 ? 'is' : 'are'} still working or waiting for your answer.`)
+  const first = allowed[0]
+  if (!all && first && JSON.stringify(lossesOf(first, trees)) !== JSON.stringify(confirmed)) {
+    await setExpanded($, () => [first.id])
+    await setConfirming($, `archive:${first.id}`)
+    return
+  }
+  const clean = all ? allowed.filter(row => !lossesOf(row, trees).length) : allowed
+  const items = itemsOf(fresh, await getAgents($), await getWorkflows($))
   const archived: Row[] = []
-  for (const row of allowed) {
+  for (const row of clean) {
     try {
       await archiveOne($, row.id, row.name)
       archived.push(row)
@@ -280,9 +296,11 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
   }
   await setExpanded($, open => open.filter(id => !archived.some(row => row.id === id)))
   const group = all?.group ?? archived[0]?.state
-  if (!group || (!archived.length && !all?.skipped)) return
+  const skipped = all ? all.skipped + allowed.length - clean.length : 0
+  if (!group || (!archived.length && !skipped)) return
   const at = await $.clock.now()
-  await setUndone($, () => ({ ids: archived.map(row => row.id), name: !all && archived[0] ? archived[0].name : '', skipped: all?.skipped ?? 0, group, at }))
+  const index = all || !archived[0] ? 0 : Math.max(0, items.filter(item => item.group === group).findIndex(item => item.id === archived[0]?.id))
+  await setUndone($, () => ({ ids: archived.map(row => row.id), name: !all && archived[0] ? archived[0].name : '', skipped, group, index, at }))
   $.clock.after(UNDO_MS, () => void setUndone($, value => (value?.at === at ? null : value)))
 }
 

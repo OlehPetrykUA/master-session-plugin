@@ -3,6 +3,7 @@ import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { across } from '../../lib/layout'
+import { C } from '../../theme/tokens'
 import { AT, BOARD, HOME, PANE, SELF, SPAWN, TOOLKIT, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 import type { Ui } from '../../testing/world'
 
@@ -142,7 +143,7 @@ test('Archive all archives the clean sessions without asking, skips unmerged wor
   expect(await ui.find({ type: 'Text', text: 'Archive all' })).toBeDefined()
   await click(ui, 'hit-archive-all')
   expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
-  expect(await ui.find({ type: 'Text', text: 'Archived 1 session · skipped 1 with unmerged work' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Archived 1 session · skipped 1 with work to keep' })).toBeDefined()
   expect(await ui.find({ key: 'row-local_setup' })).toBeDefined()
   await click(ui, 'hit-undo-done')
   expect(calls.filter(one => one.tool === 'unarchive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
@@ -212,7 +213,7 @@ test('the terminal Archive all and one-click archive mirror the desktop: no box 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await ui.press({ key: 'archive-all' })
   expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
-  expect(await textsOf(ui)).toContain('Archived 1 session · skipped 1 with unmerged work')
+  expect(await textsOf(ui)).toContain('Archived 1 session · skipped 1 with work to keep')
   await ui.press({ key: 'undo-archive' })
   expect(calls.filter(one => one.tool === 'unarchive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
   await ui.unmount()
@@ -221,7 +222,7 @@ test('the terminal Archive all and one-click archive mirror the desktop: no box 
 test('a clean, merged worktree archives in one click; the base is the repo default branch, compared as <default>..HEAD', async ($, on) => {
   const git = { ...BASE, [`${WORKTREE} worktree`]: TREES('branch refs/heads/main'), [`${CLEAN} status`]: '# branch.oid 1111111\n# branch.head feat/clean\n', [`${CLEAN} rev-list`]: '0\n' }
   const { calls, gits } = await started($, on, doneOf('local_clean'), { git, sessions: [session('local_clean', 'clean-work', CLEAN)] })
-  expect(revList(gits, CLEAN)).toContain('rev-list --count main..HEAD')
+  expect(revList(gits, CLEAN)).toContain('rev-list --count refs/heads/main..HEAD')
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_clean')
   expect(await ui.find({ type: 'Text', text: 'Archive' })).toBeDefined()
@@ -244,7 +245,7 @@ test('a session whose tree is unknown fails closed: git state unknown on its row
   await click(ui, 'hit-collapse-local_lost')
   await click(ui, 'hit-archive-all')
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
-  expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 2 with unmerged work' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 2 with work to keep' })).toBeDefined()
   expect(await ui.find({ key: 'face-undo-done' })).toBeUndefined()
   await ui.unmount()
 })
@@ -262,7 +263,7 @@ test('a failed rev-list counts as unknown, not as merged', async ($, on) => {
 test('a detached main checkout still compares against the default branch, and a master repo says master', async ($, on) => {
   const git = { [`${WORKTREE} worktree`]: TREES('detached'), [`${WORKTREE} symbolic-ref`]: 'origin/master\n', [`${WORKTREE} rev-parse --verify --quiet refs/heads/master`]: 'd575596\n', [`${WORKTREE} rev-list`]: '3\n' }
   const { gits } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], state: 'done' }] }, { git })
-  expect(revList(gits, WORKTREE)).toEqual(expect.arrayContaining(['rev-list --count master..HEAD']))
+  expect(revList(gits, WORKTREE)).toEqual(expect.arrayContaining(['rev-list --count refs/heads/master..HEAD']))
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: '3 commits not on master' })).toBeDefined()
   await click(ui, 'hit-row-local_setup')
@@ -276,7 +277,7 @@ test('Archive all with only unmerged work archives nothing and says it skipped t
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-archive-all')
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
-  expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 1 with unmerged work' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 1 with work to keep' })).toBeDefined()
   expect(await ui.find({ key: 'row-local_setup' })).toBeDefined()
   await ui.unmount()
 })
@@ -299,5 +300,100 @@ test('archiving the last row of a group keeps the group heading for the 10 s Und
   const keys = await keysOf(ui)
   expect(keys.indexOf('undo-bar-done')).toBeGreaterThan(keys.indexOf('group-head-done'))
   expect(keys.indexOf('group-head-done')).toBeGreaterThan(-1)
+  await ui.unmount()
+})
+
+const CLEAN_GIT = () => ({ ...BASE, [`${WORKTREE} worktree`]: TREES('branch refs/heads/main'), [`${CLEAN} status`]: '# branch.oid 1111111\n# branch.head feat/clean\n', [`${CLEAN} rev-list`]: '0\n' })
+
+test('losses follow the live cwd: a worker whose board cwd is the main checkout still asks before removing its dirty, unmerged worktree', async ($, on) => {
+  const report = { v: 1, kind: 'status', session: 'local_setup', engineId: 'engine-setup', parent: SELF, seq: 1, at: 3_500_000, run: { isRunning: false }, modelAt: 0, state: 'done', activity: [], commits: [], tests: [], files: [], git: { branch: 'main', dirty: 0, ahead: 0, at: 3_500_000, path: TOOLKIT } }
+  const files = { [`${HOME}/.claude/state/master-session/sessions/local_setup.json`]: JSON.stringify(report) }
+  const { calls, clock } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], state: 'done' }] }, { ...UNMERGED, files })
+  await clock.advance(3_000)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_setup')
+  expect(await ui.find({ type: 'Text', text: 'Archive…' })).toBeDefined()
+  await click(ui, 'hit-archive-local_setup')
+  const texts = await textsOf(ui)
+  for (const word of ['1 uncommitted file in wt-toolkit-setup-ui', '2 commits on its branch that are not on main']) expect(texts).toContain(word)
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  await ui.unmount()
+})
+
+test('a listed worktree whose git status fails stays listed as unknown instead of falling back to the enclosing main checkout', async ($, on) => {
+  const inner = `${TOOLKIT}/.worktrees/inner`
+  const git = { ...BASE, [`${WORKTREE} worktree`]: `${TREES('branch refs/heads/main')}worktree ${inner}\nHEAD 2222222bbbbbbb\nbranch refs/heads/feat/inner\n\n` }
+  const { calls } = await started($, on, doneOf('local_inner'), { git, sessions: [session('local_inner', 'inner-work', inner)] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_inner')
+  expect(await ui.find({ type: 'Text', text: 'Archive…' })).toBeDefined()
+  await click(ui, 'hit-archive-local_inner')
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['git state unknown', 'the worktree folder itself']))
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  await ui.unmount()
+})
+
+test('a clean merged done row reads merged to main in the muted regular line', async ($, on) => {
+  await started($, on, doneOf('local_clean'), { git: CLEAN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN)] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const line = await ui.find({ type: 'Text', text: 'merged to main' })
+  expect(line?.props.color).toBe(C.muted)
+  expect(line?.props.weight).toBeUndefined()
+  await ui.unmount()
+})
+
+test('archive checks again before it acts: work that appeared since the render opens the box instead of archiving', async ($, on) => {
+  const git: Record<string, string> = CLEAN_GIT()
+  const { calls } = await started($, on, doneOf('local_clean'), { git, sessions: [session('local_clean', 'clean-work', CLEAN)] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_clean')
+  expect(await ui.find({ type: 'Text', text: 'Archive' })).toBeDefined()
+  git[`${CLEAN} status`] = '# branch.oid 1111111\n# branch.head feat/clean\n? new.sh\n'
+  await click(ui, 'hit-archive-local_clean')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  expect(await ui.find({ key: 'confirm-local_clean' })).toBeDefined()
+  expect(await textsOf(ui)).toContain('1 uncommitted file in wt-toolkit-clean')
+  await click(ui, 'hit-archive-yes-local_clean')
+  expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_clean'])
+  await ui.unmount()
+})
+
+test('Archive all checks again before it acts: a row with new work moves into skipped', async ($, on) => {
+  const git: Record<string, string> = CLEAN_GIT()
+  const { calls } = await started($, on, doneOf('local_conductor', 'local_clean'), { git, sessions: [CONDUCTOR, session('local_clean', 'clean-work', CLEAN)] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  git[`${CLEAN} status`] = '# branch.oid 1111111\n# branch.head feat/clean\n? new.sh\n'
+  await click(ui, 'hit-archive-all')
+  expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
+  expect(await ui.find({ type: 'Text', text: 'Archived 1 session · skipped 2 with work to keep' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the Undo bar takes the archived row’s place in its group', async ($, on) => {
+  await started($, on, doneOf('local_conductor'), UNMERGED)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const before = await keysOf(ui)
+  expect(before.indexOf('row-local_setup')).toBeLessThan(before.indexOf('row-local_conductor'))
+  await click(ui, 'hit-row-local_conductor')
+  await click(ui, 'hit-archive-local_conductor')
+  const after = await keysOf(ui)
+  expect(after.indexOf('undo-bar-done')).toBeGreaterThan(after.indexOf('row-local_setup'))
+  expect(after.indexOf('group-head-done')).toBeLessThan(after.indexOf('row-local_setup'))
+  await ui.unmount()
+})
+
+test('a repo with no origin/HEAD, no main and no master is unknown: the row says so, Archive… asks, Archive all skips', async ($, on) => {
+  const { calls } = await started($, on, doneOf())
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: 'git state unknown' })).toBeDefined()
+  await click(ui, 'hit-row-local_setup')
+  await click(ui, 'hit-archive-local_setup')
+  expect(await ui.find({ key: 'confirm-local_setup' })).toBeDefined()
+  expect(await textsOf(ui)).toContain('git state unknown')
+  await click(ui, 'hit-archive-no-local_setup')
+  await click(ui, 'hit-collapse-local_setup')
+  await click(ui, 'hit-archive-all')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 1 with work to keep' })).toBeDefined()
   await ui.unmount()
 })

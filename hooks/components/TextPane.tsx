@@ -31,7 +31,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
   const undoLine = () =>
     undone ? (
       <Box key="undo" flexDirection="row" gap="sm">
-        <Text dimColor>{undone.name ? `${undone.name} archived, worktree removed` : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with unmerged work` : ''}`}</Text>
+        <Text dimColor>{undone.name ? `${undone.name} archived, worktree removed` : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with work to keep` : ''}`}</Text>
         {undone.ids.length ? <Button key="undo-archive" plain label="Undo" onPress={actions.undo} /> : null}
       </Box>
     ) : null
@@ -107,8 +107,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
           <Box flexGrow={1} />
           {one.id === 'done' && idle.length && !isReadOnly ? <Button key="archive-all" plain label="Archive all" onPress={() => archiveAll(idle)} /> : null}
         </Box>
-        {undone?.group === one.id ? undoLine() : null}
-        {one.items.map(row)}
+        {undone?.group === one.id ? [...one.items.slice(0, undone.index).map(row), undoLine(), ...one.items.slice(undone.index).map(row)] : one.items.map(row)}
       </Box>
     )
   }

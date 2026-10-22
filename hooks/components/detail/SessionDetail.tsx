@@ -33,8 +33,8 @@ function ActionRow(ui: Ui, props: ActionRowProps) {
   const isRunning = !!row.live?.isRunning
   const isNeeds = row.state === 'needs-you'
   const canArchive = !!row.live && !isRunning && !isNeeds && !props.isReadOnly
-  const archive = () => (losses.length ? actions.confirm(`archive:${id}`) : actions.archive([row]))
-  if (props.isAsking && canArchive) return ArchiveBox(ui, { id, name: row.name, losses, width, onCancel: () => actions.confirm(''), onArchive: () => actions.archive([row]) })
+  const archive = () => (losses.length ? actions.confirm(`archive:${id}`) : actions.archive([row], undefined, losses))
+  if (props.isAsking && canArchive) return ArchiveBox(ui, { id, name: row.name, losses, width, onCancel: () => actions.confirm(''), onArchive: () => actions.archive([row], undefined, losses) })
   const second =
     isRunning && !isNeeds
       ? ActionButton(ui, { id: `stop-${id}`, kind: 'secondary', icon: 'stop', label: 'Stop', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.stop(id, row.name) })

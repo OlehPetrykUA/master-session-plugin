@@ -43,12 +43,14 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
     if (item.kind === 'subagent') return SubagentDetail(ui, { agent: item.agent, at: data.at, onCollapse: collapse(item.id) })
     return SessionDetail(ui, { row: item.row, trees: data.trees, home: data.home, at: data.at, asking: data.asking, isReadOnly, innerWidth, actions })
   }
-  const items = (group: ListGroup) =>
-    group.items.map(item => {
+  const items = (group: ListGroup) => {
+    const drawn = group.items.map(item => {
       if (data.open.includes(item.id)) return detailOf(item)
       const name = item.kind === 'session' ? item.row.name : item.id
       return Row(ui, { item, trees: data.trees, home: data.home, at: data.at, isNarrow: view.isNarrow, width, onOpen: () => actions.toggle(item.id), onChat: () => actions.open(item.id, name) })
     })
+    return undone?.group === group.id ? [...drawn.slice(0, undone.index), undoBar(), ...drawn.slice(undone.index)] : drawn
+  }
   const idleSessions = (group: ListGroup) =>
     group.items.flatMap((item): SessionRow[] => (item.kind === 'session' && isArchivable(item.row.board ?? { state: item.row.state }, item.row.live) ? [item.row] : []))
   const undone = data.undone
@@ -57,7 +59,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       ? UndoBar(ui, {
           id: undone.group,
           name: undone.name || undefined,
-          text: undone.name ? 'archived, worktree removed' : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with unmerged work` : ''}`,
+          text: undone.name ? 'archived, worktree removed' : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with work to keep` : ''}`,
           onUndo: undone.ids.length ? actions.undo : undefined,
         })
       : null
@@ -93,7 +95,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       tone: TONE[group.id],
       isPinned: group.isPinned,
       action: idle.length && !isReadOnly ? { id: 'archive-all', icon: 'archive', label: 'Archive all', onPress: () => archiveAll(idle) } : undefined,
-      children: [...(undone?.group === group.id ? [undoBar()] : []), ...items(group)],
+      children: items(group),
     })
   }
   const archived = view.groups.find(group => group.id === 'archived')

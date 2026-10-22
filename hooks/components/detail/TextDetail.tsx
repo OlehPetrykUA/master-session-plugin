@@ -1,4 +1,5 @@
 import type { RenderChildren } from 'claude-code'
+
 import type { AgentRecord, Repo } from '../../../types'
 
 import type { WorkflowRun } from '../../lib/agents'
@@ -81,7 +82,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
           ))}
           <Box flexDirection="row" gap="sm">
             <Button key={`archive-no-${row.id}`} label="Cancel" onPress={() => actions.confirm('')} />
-            <Button key={`archive-yes-${row.id}`} variant="primary" label="Archive and remove" onPress={() => actions.archive([row])} />
+            <Button key={`archive-yes-${row.id}`} variant="primary" label="Archive and remove" onPress={() => actions.archive([row], undefined, losses)} />
           </Box>
         </Box>
       ) : (
@@ -89,7 +90,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
           {now && facts?.needsYou ? <Button key={`chat-${row.id}`} variant="primary" label="Open chat" onPress={() => actions.open(row.id, row.name)} /> : null}
           <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} />
           {isStoppable ? <Button key={`stop-${row.id}`} label="Stop" onPress={() => actions.stop(row.id, row.name)} /> : null}
-          {canArchive ? <Button key={`archive-${row.id}`} label={losses.length ? 'Archive…' : 'Archive'} onPress={() => (losses.length ? actions.confirm(`archive:${row.id}`) : actions.archive([row]))} /> : null}
+          {canArchive ? <Button key={`archive-${row.id}`} label={losses.length ? 'Archive…' : 'Archive'} onPress={() => (losses.length ? actions.confirm(`archive:${row.id}`) : actions.archive([row], undefined, losses))} /> : null}
         </Box>
       ),
   })

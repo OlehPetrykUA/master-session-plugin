@@ -6,7 +6,7 @@ export type ArchiveView = 'closed' | 'open' | 'all'
 
 export type Asked = { at: number; count: number }
 
-export type Undone = { ids: string[]; name: string; skipped: number; group: SessionState; at: number }
+export type Undone = { ids: string[]; name: string; skipped: number; group: SessionState; index: number; at: number }
 
 export type BoardSession = {
   id: string

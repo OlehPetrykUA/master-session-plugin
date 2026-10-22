@@ -9,7 +9,7 @@ import { badge, gitPill, ring } from '../../theme/icons'
 import type { IconName } from '../../theme/icons'
 import { C, LABEL } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
-import { lossLineOf } from '../detail/losses'
+import { lossLineOf, mergedLineOf } from '../detail/losses'
 import { Hit } from '../Hit'
 import { Icon } from '../Icon'
 import type { Ui } from '../types'
@@ -37,6 +37,7 @@ export function Row(ui: Ui, props: RowProps) {
   const git = dirty ? gitPill(dirty) : undefined
   const hasRing = !isNeeds && item.kind !== 'subagent'
   const loss = item.kind === 'session' && item.group === 'done' ? lossLineOf(item.row, props.trees) : ''
+  const merged = item.kind === 'session' && item.group === 'done' && !loss ? mergedLineOf(item.row, props.trees) : ''
   const muted = C.muted
   const line = (
     <Box flexDirection="row" alignItems={isNeeds ? 'flex-start' : 'center'} gap={across(4)} minWidth={0}>
@@ -55,7 +56,7 @@ export function Row(ui: Ui, props: RowProps) {
       )}
       <Box flexShrink={1} minWidth={0}>
         <Text size="footnote" weight={text.isAlert || loss ? 'bold' : undefined} color={text.isAlert ? C.red : loss ? C.amber : muted} wrap={isNeeds ? 'wrap' : 'truncate-end'}>
-          {loss || text.line}
+          {loss || merged || text.line}
         </Text>
       </Box>
       {isNarrow && !isNeeds ? (
