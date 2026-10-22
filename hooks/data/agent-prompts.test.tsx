@@ -195,3 +195,27 @@ test("a tracked subagent's finished tool call never closes the worker's own open
   await $.tool.call({ tool: 'Bash', command: 'git push' })
   expect([written.at(-1)?.state, written.at(-1)?.needsYou]).toEqual(['working', undefined])
 })
+
+test("a session prompt stays open through an untracked agent's same-named tool, and a teammate's prompt stays open through the session's own", async ($, on) => {
+  const written: Report[] = []
+  on('fs.write', (_, e) => {
+    if (e.path === reportPath(HOME, 'local_worker')) written.push(JSON.parse(e.text) as Report)
+    return { value: undefined }
+  })
+  loops(on, [])
+  const { clock } = world(on, { parent: MASTER })
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  await $.tool.call({ tool: 'mcp__master-session__report', state: 'working', progress: 'step 2 of 4 — build' })
+  const last = () => [written.at(-1)?.state, written.at(-1)?.needsYou]
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'git push' } })
+  await $.tool.call({ tool: 'Bash', command: 'ls', agentId: 'tm1' })
+  expect(last()).toEqual(['needs-you', 'Allow Bash: git push'])
+  await $.tool.call({ tool: 'Bash', command: 'git push' })
+  expect(last()).toEqual(['working', undefined])
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -rf build' }, agent_id: 'tm1' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  expect(last()).toEqual(['needs-you', 'Allow Bash: rm -rf build'])
+  await $.tool.call({ tool: 'Bash', command: 'rm -rf build', agentId: 'tm1' })
+  expect(last()).toEqual(['working', undefined])
+})

@@ -8,7 +8,7 @@ import type { Report } from './contract'
 import type { ReportAgent, SessionState } from '../../types'
 import { parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
-type Held = { text: string; tool: string; state: SessionState; needsYou?: string }
+type Held = { text: string; tool: string; state: SessionState; needsYou?: string; by?: string }
 
 const MAIN = ''
 
@@ -193,7 +193,7 @@ async function promptOpened($: EngineInterface, text: string, tool: string, agen
   if (!current) return
   const now = await $.clock.now()
   const main = held.get(MAIN)
-  held.set(MAIN, { text, tool, state: main?.state ?? current.state, needsYou: main ? main.needsYou : current.needsYou })
+  held.set(MAIN, { text, tool, state: main?.state ?? current.state, needsYou: main ? main.needsYou : current.needsYou, by: agentId })
   if (current.state === 'needs-you' && current.needsYou === text) return
   await save($, { ...current, state: 'needs-you', needsYou: text, modelAt: now, waits: { since: now, on: 'you' } }, now)
 }
@@ -203,6 +203,7 @@ async function promptClosed($: EngineInterface, tool?: string, agentId?: string)
   const before = held.get(key)
   if (!before || (tool !== undefined && before.tool && before.tool !== tool)) return
   if (key !== MAIN) return agentCleared($, key)
+  if ((tool !== undefined || agentId !== undefined) && before.by !== agentId) return
   if (!current) return
   held.delete(MAIN)
   if (current.state !== 'needs-you' || current.needsYou !== before.text) return
