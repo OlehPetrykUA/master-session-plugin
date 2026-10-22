@@ -1,4 +1,4 @@
-import { across } from '../../lib/layout'
+import { across, tall } from '../../lib/layout'
 import { C } from '../../theme/tokens'
 import type { Ui } from '../types'
 import { Block } from './Block'
@@ -14,7 +14,7 @@ export function Commits(ui: Ui, props: CommitsProps) {
     label: 'Commits',
     children: props.commits.slice(0, 3).map((line, index) => (
       <Box key={`commit-${id}-${index}`} flexDirection="row" alignItems="flex-start" gap={across(8)}>
-        <Box flexShrink={0}>
+        <Box flexDirection="row" alignItems="center" height={tall(20)} flexShrink={0}>
           <Text size="footnote" mono color={C.muted}>
             {line.split(' ')[0] ?? ''}
           </Text>

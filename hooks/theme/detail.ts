@@ -31,7 +31,8 @@ export function phaseStrip(width: number, phases: readonly PhaseShare[]) {
     const share = (count: number) => (phase.total ? (slot * count) / phase.total : 0)
     const good = share(phase.done + phase.running / 2)
     const bad = share(phase.failed)
-    if (good >= 1) green += pill(start, good)
+    if (good >= 1 && phase.isFinished) grey += pill(start, good)
+    else if (good >= 1) green += pill(start, good)
     if (bad >= 1) red += pill(start + good + (good >= 1 ? 2 : 0), bad - (good >= 1 ? 2 : 0))
     if (!phase.running || good < 8) return
     const glow = Math.max(8, good * 0.3)

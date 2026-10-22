@@ -30,7 +30,7 @@ export function ArchivedDetail(ui: Ui, props: ArchivedDetailProps) {
   const isGone = !locate(one.cwd, context.trees)
   const model = modelOf(one.model, one.effort)
   const width = props.innerWidth
-  const half = (key: string, icon: Parameters<typeof Block>[1]['icon'], text: string, children: Parameters<typeof Block>[1]['children']) => Block(ui, { id: `${key}-${id}`, icon, label: text, isHalf: true, children })
+  const half = (key: string, icon: Parameters<typeof Block>[1]['icon'], text: string, children: Parameters<typeof Block>[1]['children'], gap?: number) => Block(ui, { id: `${key}-${id}`, icon, label: text, isHalf: true, children, gap })
   const cancel = faceWidth('Cancel', 'b40') + 1
   const confirm = (
     <Box key={`unarchive-ask-${id}`} flexDirection="column" gap={down(8)} paddingX={across(11)} paddingY={down(11)} borderStyle="round" borderColor={C.clear} backgroundColor={C.inset}>
@@ -76,7 +76,7 @@ export function ArchivedDetail(ui: Ui, props: ArchivedDetailProps) {
       Pair(ui, {
         id: `pair-git-${id}`,
         left: half('git', 'git', 'Git', [Strong(ui, { text: board?.git || '—', isFull: true }), board?.sha ? Quiet(ui, { text: board.sha, isFull: true }) : null]),
-        right: half('model', 'modelChip', 'Model', ModelValue(ui, { id, model: one.model, text: model || '—' })),
+        right: half('model', 'modelChip', 'Model', ModelValue(ui, { id, model: one.model, text: model || '—' }), 8),
       }),
       isAsking ? confirm : buttons,
     ],

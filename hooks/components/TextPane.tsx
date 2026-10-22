@@ -2,8 +2,8 @@ import { isArchivable } from '../data/contract'
 import { TITLE } from '../lib/constants'
 import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, plural, shownArchived, stepsOfItem } from '../lib/list'
-import type { Agent, Context, ListGroup, ListItem, RowItem } from '../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, displayNameOf, sessionOfAgent, elapsedOfItem, lineOf, lineTextOf, nameText, plural, shownArchived, stepsOfItem } from '../lib/list'
+import type { Context, ListGroup, ListItem, RowItem } from '../lib/list'
 import type { Row } from '../lib/rows'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
 import { TERMINAL_COLOR } from '../theme/tokens'
@@ -28,7 +28,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
   const chatOf = (item: RowItem) => {
     if (item.status !== 'needs') return undefined
     if (item.kind === 'session') return item.row
-    return item.kind === 'subagent' ? data.rows.find(one => one.id === (item.agent as Agent).parentSessionId) : undefined
+    return item.kind === 'subagent' ? sessionOfAgent(item.agent, data) : undefined
   }
 
   const undone = data.undone

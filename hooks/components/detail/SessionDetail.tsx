@@ -70,7 +70,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
   const files = facts?.files ?? []
   const losses = lossesOf(row, trees, context.sessions)
   const idle = now ? at - now.lastActivityAt : 0
-  const half = (label: string, icon: IconName, children: Parameters<typeof Block>[1]['children'], id: string) => Block(ui, { id: `${id}-${row.id}`, icon, label, children, isHalf: true })
+  const half = (label: string, icon: IconName, children: Parameters<typeof Block>[1]['children'], id: string, gap?: number) => Block(ui, { id: `${id}-${row.id}`, icon, label, children, isHalf: true, gap })
   const base = found?.repo.base ?? 'main'
   const callout =
     item.status === 'ready'
@@ -157,8 +157,9 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
                 Strong(ui, { text: '—', isFull: true })
               ),
               'permission',
+              8,
             ),
-            right: half('Model', 'modelChip', ModelValue(ui, { id: row.id, model: now?.model, text: model || '—' }), 'model'),
+            right: half('Model', 'modelChip', ModelValue(ui, { id: row.id, model: now?.model, text: model || '—' }), 'model', 8),
           })
         : null,
       facts?.risk ? Block(ui, { id: `risk-${row.id}`, icon: 'blocker', label: 'Risk', children: Strong(ui, { text: facts.risk, isFull: true }) }) : null,

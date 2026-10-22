@@ -2,8 +2,8 @@ import type { RenderChildren } from 'claude-code'
 
 import { isArchivable } from '../../data/contract'
 import { bodyWidthOf, across, down } from '../../lib/layout'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, plural, shownArchived } from '../../lib/list'
-import type { Agent, Context, ListGroup, RowItem } from '../../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, plural, sessionOfAgent, shownArchived } from '../../lib/list'
+import type { Context, ListGroup, RowItem } from '../../lib/list'
 import type { Row as SessionRow } from '../../lib/rows'
 import type { PaneView } from '../../lib/view'
 import type { Tone } from '../../theme/tokens'
@@ -46,7 +46,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
     if (item.status !== 'needs') return undefined
     if (item.kind === 'session') return { label: 'Open chat', onPress: () => actions.open(item.row.id, item.row.name) }
     if (item.kind !== 'subagent') return undefined
-    const parent = data.rows.find(row => row.id === (item.agent as Agent).parentSessionId)
+    const parent = sessionOfAgent(item.agent, data)
     return parent ? { label: 'Open chat', onPress: () => actions.open(parent.id, parent.name) } : undefined
   }
   const isOpen = (item: RowItem) => data.open.includes(item.id) || (item.kind === 'workflow' && item.run.agents.some(agent => data.open.includes(agent.id)))
@@ -93,7 +93,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
         id: 'archived',
         label: GROUP_LABEL.archived,
         count: group.archived.length,
-        icon: 'archive',
+        tone: 'grey',
         isPinned: false,
         action,
         children: group.isOpen ? shownArchived(group, data.archiveView, data.chosen).map(one => itemOf(archivedItemOf(one, data.board), width)) : [],

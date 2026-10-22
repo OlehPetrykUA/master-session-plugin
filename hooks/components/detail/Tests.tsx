@@ -18,7 +18,7 @@ export function Tests(ui: Ui, props: TestsProps) {
         {props.tests.map((test, index) => (
           <Box key={`test-${id}-${index}`} flexDirection="row" alignItems="center" gap={across(4)} height={tall(24)} paddingLeft={across(5)} paddingRight={across(7)} paddingY={0} borderStyle="round" borderColor={C.clear} backgroundColor={C.greenTint}>
             {Icon(ui, { id: `test-icon-${id}-${index}`, name: 'check', size: 12, tone: 'green', weight: 2.6 })}
-            <Text size="footnote" weight="semibold" color={C.green}>
+            <Text size="footnote" weight="semibold" color={C.text}>
               {test}
             </Text>
           </Box>

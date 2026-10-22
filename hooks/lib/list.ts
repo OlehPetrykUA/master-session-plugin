@@ -115,7 +115,7 @@ export function sessionStatusOf(row: Row, trees: readonly Repo[] = [], sessions:
   if (row.state === 'needs-you') return 'needs'
   const isRunning = row.live?.isRunning
   if (row.state === 'working') return isRunning === false ? 'idle' : 'working'
-  if (row.state === 'waiting') return !isRunning && (!row.board?.now || row.board.now.startsWith('idle')) ? 'idle' : 'waiting'
+  if (row.state === 'waiting') return !isRunning && (!row.board?.now || /^idle\b/i.test(row.board.now)) ? 'idle' : 'waiting'
   if (mergedLineOf(row, trees) && !lossLineOf(row, trees, sessions)) return 'merged'
   if (row.board?.verified) return 'verified'
   if (row.board?.sha) return 'ready'
@@ -204,6 +204,18 @@ export function parentsOf(item: RowItem, context: Context): Name[] {
   return names
 }
 
+export function sessionOfAgent(agent: Agent, context: Pick<Context, 'agents' | 'rows'>): Row | undefined {
+  const seen = new Set<string>()
+  let one: Agent | undefined = agent
+  while (one && !seen.has(one.id)) {
+    seen.add(one.id)
+    if (one.parentSessionId) return context.rows.find(row => row.id === one?.parentSessionId)
+    const parentId: string | undefined = one.parentAgentId
+    one = parentId ? (context.agents.find(other => other.id === parentId) as Agent | undefined) : undefined
+  }
+  return undefined
+}
+
 export function chainOf(item: RowItem, context: Context) {
   if (item.kind !== 'subagent') return ''
   const names = parentsOf(item, context)
@@ -211,11 +223,14 @@ export function chainOf(item: RowItem, context: Context) {
   return last ? `${names.length > 1 ? '… › ' : ''}${last.persona} ›` : ''
 }
 
-export const spanOf = (startedAt: number, endedAt: number | undefined, at: number) => compactOf((endedAt ?? at) - startedAt)
+export function spanOf(startedAt: number, endedAt: number | undefined, at: number) {
+  const ms = (endedAt ?? at) - startedAt
+  return ms < 60_000 ? `${Math.max(0, Math.floor(ms / 1000))}s` : compactOf(ms)
+}
 
 function sessionLineOf(row: Row, status: Status, context: Context): Line {
   const board = row.board
-  const loss = status === 'ready' || status === 'verified' || status === 'done' ? lossLineOf(row, context.trees, context.sessions) : ''
+  const loss = status === 'done' ? lossLineOf(row, context.trees, context.sessions) : ''
   const plain = (text: string): Line => ({ chain: '', text, isQuestion: false })
   const worded = (word: Status, text: string, label = STATUS[word].word): Line => ({ chain: '', word: { status: word, text: label }, text, isQuestion: false })
   if (status === 'needs') return { chain: '', text: board?.needsYou || 'needs you', isQuestion: true }
@@ -223,7 +238,7 @@ function sessionLineOf(row: Row, status: Status, context: Context): Line {
   if (status === 'working') return plain(stepOf(board?.progress)?.label || board?.now || 'running')
   if (status === 'idle') return worded('idle', activityOf(row)[0] ? `last: ${activityOf(row)[0]?.text}` : '')
   if (status === 'waiting') return worded('waiting', board?.now ?? '')
-  if (status === 'ready') return worded('ready', board?.now || board?.done || board?.sha || '')
+  if (status === 'ready') return worded('ready', board?.done || board?.now || board?.sha || '')
   if (status === 'verified') return worded('verified', board?.verified ?? '')
   if (status === 'merged') return worded('merged', board?.sha ?? whereOf(row, context.trees)?.tree.sha ?? '', mergedLineOf(row, context.trees))
   return worded('done', board?.done || 'unverified')

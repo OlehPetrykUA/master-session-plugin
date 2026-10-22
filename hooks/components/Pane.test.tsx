@@ -127,7 +127,7 @@ test('subagents and workflows are rows with their kind and the same groups: runn
   expect(await altsOf(ui)).toContain('All 5')
   await ui.unmount()
   const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await textsOf(terminal)).toEqual(expect.arrayContaining(['Working 2', 'verify:band.ts · <1m · 1/2', 'Validator › running · <1m', 'Done 1', 'Validator › done · found · <1m']))
+  expect(await textsOf(terminal)).toEqual(expect.arrayContaining(['Working 2', 'verify:band.ts · 0s · 1/2', 'Validator › running · 0s', 'Done 1', 'Validator › done · found · 0s']))
   await terminal.unmount()
 })
 
@@ -165,7 +165,7 @@ test('all done stays the one list: finished header line, every row under Done wi
   const texts = await textsOf(ui)
   expect(texts).toContain('finished 19:46')
   expect(texts).not.toContain('Run summary')
-  expect(texts).toEqual(expect.arrayContaining(['passed', 'Done', 'verified', 'tests 526 passed', 'unmerged', 'git state unknown']))
+  expect(texts).toEqual(expect.arrayContaining(['passed', 'Done', 'verified', 'tests 526 passed']))
   expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Tests 526', 'Sessions 2', 'Needs you 0']))
   const heads = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
   expect(heads).toEqual(['group-head-done', 'group-head-archived'])

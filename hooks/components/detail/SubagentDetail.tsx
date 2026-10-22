@@ -1,5 +1,5 @@
 import { across, tall } from '../../lib/layout'
-import { ageOf, clockOf, displayNameOf, modelFamilyOf, nameText, parentsOf } from '../../lib/list'
+import { clockOf, displayNameOf, modelFamilyOf, nameText, parentsOf, sessionOfAgent, spanOf } from '../../lib/list'
 import type { Agent, Context, RowItem, RunAgent } from '../../lib/list'
 import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
@@ -25,8 +25,7 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
   const at = context.at
   const end = agent.endedAt ?? at
   const parents = parentsOf(item, context)
-  const sessionId = item.kind === 'subagent' ? item.agent.parentSessionId : undefined
-  const parent = context.rows.find(row => row.id === sessionId)
+  const parent = item.kind === 'subagent' ? sessionOfAgent(item.agent, context) : undefined
   const parentName = parent ? nameText(displayNameOf({ kind: 'session', id: parent.id, group: parent.state, status: 'working', row: parent })) : ''
   const mode = parent?.live?.permissionMode
   const type = 'type' in agent ? agent.type : ''
@@ -38,11 +37,11 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
   const how =
     item.kind === 'agent'
       ? `workflow agent ${item.agent.index} of ${item.run.counts.total}`
-      : [item.agent.isBackground ? 'background' : 'foreground', item.agent.isFork ? 'a fork' : item.agent.name ? `named ${item.agent.name}` : ''].filter(Boolean).join(' · ')
+      : [item.agent.isBackground ? 'background' : 'foreground', parents.length > 1 ? `${parents.length} deep` : ''].filter(Boolean).join(' · ')
   const chain = parents.map(nameText)
-  const asked = agent.asking ? `asked ${ageOf(at - agent.asking.since)}` : ''
+  const asked = agent.asking ? `asked ${spanOf(agent.asking.since, undefined, at)} ago` : ''
   const waitsIn = parent ? `the prompt waits in ${parentName}’s chat` : 'the prompt waits in this chat'
-  const half = (key: string, icon: Parameters<typeof Block>[1]['icon'], label: string, children: Parameters<typeof Block>[1]['children']) => Block(ui, { id: `${key}-${id}`, icon, label, isHalf: true, children })
+  const half = (key: string, icon: Parameters<typeof Block>[1]['icon'], label: string, children: Parameters<typeof Block>[1]['children'], gap?: number) => Block(ui, { id: `${key}-${id}`, icon, label, isHalf: true, children, gap })
   const started = (
     <Text key={`started-text-${id}`} wrap="wrap">
       {chain.map((name, index) => (index === chain.length - 1 ? <Text weight="semibold">{name}</Text> : `${name} › `))}
@@ -53,7 +52,7 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
     : isRunning
       ? [Strong(ui, { text: `running ${durationOf(at - agent.startedAt)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
       : [Strong(ui, { text: `took ${durationOf(end - agent.startedAt)}`, isFull: true }), Quiet(ui, { text: `${clockOf(agent.startedAt)} – ${clockOf(end)}`, isFull: true })]
-  const modelBlock = half('model', 'modelChip', 'Model', [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), type ? Quiet(ui, { text: type, isMono: true, isFull: true }) : null])
+  const modelBlock = half('model', 'modelChip', 'Model', [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), type ? Quiet(ui, { text: type, isMono: true, isFull: true }) : null], 8)
   return Card(ui, {
     ...props.rowProps,
     children: [
@@ -80,10 +79,11 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
                   {mode}
                 </Text>
               </Box>,
+              8,
             ),
             right: modelBlock,
           })
-        : Block(ui, { id: `model-${id}`, icon: 'modelChip', label: 'Model', children: [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), type ? Quiet(ui, { text: type, isMono: true, isFull: true }) : null] }),
+        : Block(ui, { id: `model-${id}`, icon: 'modelChip', label: 'Model', gap: 8, children: [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), type ? Quiet(ui, { text: type, isMono: true, isFull: true }) : null] }),
       Pair(ui, {
         id: `pair-start-${id}`,
         left: half('started', item.kind === 'agent' ? 'flow' : 'agent', 'Started by', [started, how ? Quiet(ui, { text: how, isFull: true }) : null]),
