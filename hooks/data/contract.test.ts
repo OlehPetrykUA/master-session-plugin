@@ -222,3 +222,17 @@ test('persona: the report tool takes it, a report file keeps it with its agents,
   expect(merge(boardOf(80 * MIN, row()), [report({ persona: 'Implementer' })], live, NOW).sessions[0]?.persona).toBe('Implementer')
   expect(merge(boardOf(95 * MIN, row({ persona: 'Reviewer' })), [report()], live, NOW).sessions[0]?.persona).toBe('Reviewer')
 })
+
+test("an asking agent in a working report makes the row and the reports tool needs-you with the agent's prompt, over a stale needsYou", () => {
+  const asking = [{ id: 'a2', type: 'Explore', description: 'Check one caller', state: 'running' as const, startedAt: 1, asking: { text: 'Allow Bash: rm -rf build', since: 2 } }]
+  const stale = applyIntent(report({ state: 'needs-you', needsYou: 'old blocker' }), { state: 'working', needsYou: 'old blocker', activity: [], files: [] }, 90 * MIN)
+  expect([stale.state, stale.needsYou]).toEqual(['working', 'old blocker'])
+  const live = liveOf(liveOne('local_a', true))
+  const merged = merge(boardOf(80 * MIN, row()), [{ ...stale, agents: asking }], live, NOW).sessions[0]
+  expect([merged?.state, merged?.needsYou]).toEqual(['needs-you', 'Allow Bash: rm -rf build'])
+  const own = merge(boardOf(80 * MIN, row()), [report({ state: 'needs-you', needsYou: 'approve settings.json', agents: asking })], live, NOW).sessions[0]
+  expect(own?.needsYou).toBe('approve settings.json')
+  const view = reportsView(null, [{ ...stale, agents: asking }], live, NOW).sessions[0]
+  expect([view?.state, view?.needsYou]).toEqual(['needs-you', 'Allow Bash: rm -rf build'])
+  expect(merge(boardOf(80 * MIN, row()), [stale], live, NOW).sessions[0]?.state).toBe('working')
+})

@@ -227,10 +227,12 @@ function isStoppedOf(report: Report | undefined, live: LiveSession | undefined) 
   return report ? !report.run.isRunning : false
 }
 
+const agentAskOf = (report: Report | undefined) => report?.agents?.find(one => one.state === 'running' && one.asking)?.asking
+
 function mergeOne(id: string, row: BoardSession | undefined, boardAt: number, report: Report | undefined, live: LiveSession | undefined, now: number): Merged {
   const isReportNewer = !!report && (!row || report.modelAt > boardAt)
   const isLiveTurn = !!report && (!!live?.isRunning || report.run.isRunning) && report.run.since !== undefined && report.run.since > boardAt
-  const agentAsk = report?.agents?.find(one => one.state === 'running' && one.asking)?.asking
+  const agentAsk = agentAskOf(report)
   const isAsking = report?.state === 'needs-you' || !!agentAsk
   const picked = (isReportNewer ? (report?.state ?? row?.state) : (row?.state ?? report?.state)) ?? 'working'
   const isWoken = !isAsking && isLiveTurn && (picked === 'done' || picked === 'waiting')
@@ -238,7 +240,7 @@ function mergeOne(id: string, row: BoardSession | undefined, boardAt: number, re
   const reported = isAsking ? 'needs-you' : isWoken ? 'working' : picked
   const isIdle = reported === 'working' && isStoppedOf(report, live)
   const state = isIdle ? 'waiting' : reported
-  const needsYou = isAsking ? (report?.needsYou ?? agentAsk?.text ?? row?.needsYou) : state === 'needs-you' ? pick(report?.needsYou, row?.needsYou) : undefined
+  const needsYou = isAsking ? ((report?.state === 'needs-you' ? report.needsYou : agentAsk?.text) ?? row?.needsYou) : state === 'needs-you' ? pick(report?.needsYou, row?.needsYou) : undefined
   const isVerified = !!row?.verified
   const age = report ? Math.max(0, now - report.at) : undefined
   const isQuiet = !!live?.isRunning && age !== undefined && age >= QUIET_MS
@@ -296,11 +298,11 @@ export function reportsView(board: Board | null, reports: readonly Report[], liv
       title: live.sessions.find(one => one.id === report.session)?.title || rows.get(report.session)?.title || rows.get(report.session)?.name || '',
       at: new Date(report.at).toISOString(),
       ageMinutes: Math.floor(Math.max(0, now - report.at) / 60_000),
-      state: report.state,
+      state: agentAskOf(report) ? 'needs-you' : report.state,
       progress: report.progress && progressText(report.progress),
       now: report.now,
       next: report.next,
-      needsYou: report.needsYou,
+      needsYou: report.state === 'needs-you' ? report.needsYou : (agentAskOf(report)?.text ?? report.needsYou),
     }))
   return { sessions }
 }

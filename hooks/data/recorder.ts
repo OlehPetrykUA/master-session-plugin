@@ -34,6 +34,7 @@ let detecting: Promise<void> | undefined
 let gitCwd = ''
 let held = new Map<string, Held>()
 let outbox: ReportAgent[] = []
+let syncing: Promise<void> = Promise.resolve()
 
 export const roleOf = () => role
 
@@ -85,7 +86,12 @@ async function save($: EngineInterface, next: Report, now: number) {
   await writeReport($, home, current)
 }
 
-export async function syncAgents($: EngineInterface) {
+export function syncAgents($: EngineInterface) {
+  syncing = syncing.then(() => syncOnce($)).catch(() => undefined)
+  return syncing
+}
+
+async function syncOnce($: EngineInterface) {
   if (!current) return
   const agents = reportAgentsOf(await getAgents($))
   const now = await $.clock.now()
@@ -99,6 +105,12 @@ async function agentAsked($: EngineInterface, id: string, text: string, tool: st
   held.set(id, { text, tool, state: 'working' })
   await saveAgents($, agents => asked(agents, id, { text, since: now }))
   await syncAgents($)
+}
+
+async function keyOf($: EngineInterface, agentId: string | undefined) {
+  if (agentId === undefined) return MAIN
+  const isTracked = (await getAgents($)).some(one => one.id === agentId && !one.parentSessionId && one.state === 'running')
+  return isTracked ? agentId : MAIN
 }
 
 async function agentCleared($: EngineInterface, id: string) {
@@ -176,7 +188,8 @@ async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?:
 
 async function promptOpened($: EngineInterface, text: string, tool: string, agentId?: string) {
   await detected($)
-  if (agentId !== undefined) return agentAsked($, agentId, text, tool)
+  const key = await keyOf($, agentId)
+  if (key !== MAIN) return agentAsked($, key, text, tool)
   if (!current) return
   const now = await $.clock.now()
   const main = held.get(MAIN)
@@ -186,9 +199,10 @@ async function promptOpened($: EngineInterface, text: string, tool: string, agen
 }
 
 async function promptClosed($: EngineInterface, tool?: string, agentId?: string) {
-  const before = held.get(agentId ?? MAIN)
+  const key = agentId !== undefined && held.has(agentId) ? agentId : MAIN
+  const before = held.get(key)
   if (!before || (tool !== undefined && before.tool && before.tool !== tool)) return
-  if (agentId !== undefined) return agentCleared($, agentId)
+  if (key !== MAIN) return agentCleared($, key)
   if (!current) return
   held.delete(MAIN)
   if (current.state !== 'needs-you' || current.needsYou !== before.text) return
@@ -266,6 +280,7 @@ export async function startRecorder($: EngineInterface) {
   gitCwd = ''
   held = new Map()
   outbox = []
+  syncing = Promise.resolve()
   void detected($)
 }
 
@@ -295,7 +310,7 @@ export function recorder(on: On) {
   }).catch(($, e, next) => next(e))
 
   on('classic.Notification', async ($, e, next) => {
-    if (ASKING.has(e.notification_type) && !held.has(e.agent_id ?? MAIN)) await promptOpened($, e.message || e.title || 'Claude needs your input', '', e.agent_id).catch(() => undefined)
+    if (ASKING.has(e.notification_type) && !held.has(await keyOf($, e.agent_id))) await promptOpened($, e.message || e.title || 'Claude needs your input', '', e.agent_id).catch(() => undefined)
     if (ANSWERED.has(e.notification_type)) await promptClosed($, undefined, e.agent_id).catch(() => undefined)
     return next(e)
   }).catch(($, e, next) => next(e))

@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import { REPORTS_TOOL, REPORT_TOOL, askText } from './contract'
 import type { Report } from './contract'
-import { commitOf, isTestCommand, recordTurnEnd, recorder, repoOf, roleOf, startRecorder, summaryOf } from './recorder'
+import { commitOf, isTestCommand, recordTurnEnd, recorder, repoOf, roleOf, startRecorder, summaryOf, syncAgents } from './recorder'
 import { boardPath, reportPath } from './status'
 
 const HOME = '/home/me'
@@ -45,10 +45,17 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
   const registered: { name: string; isDeferred?: unknown }[] = []
   const ran: string[][] = []
   const atoms: Record<string, { value: unknown; version: number }> = {}
+  const holding = { now: 0, get: 0 }
+  const waiting: (() => void)[] = []
+  const gated = <T>(kind: 'now' | 'get', value: () => T): Promise<T> => {
+    if (!holding[kind]) return Promise.resolve(value())
+    holding[kind] -= 1
+    return new Promise<T>(resolve => waiting.push(() => resolve(value())))
+  }
   const $ = {
     env: { get: async (name: string) => (name === 'HOME' ? HOME : undefined) },
     session: { id: async () => ENGINE, cwd: async () => HOME },
-    clock: { now: async () => NOW },
+    clock: { now: () => gated('now', () => NOW) },
     mcp: {
       call: async (_server: string, tool: string) => ({
         content: [{ type: 'text', text: JSON.stringify(tool === 'get_session' ? { sessionId: SELF, ...(parent ? { parentSessionId: parent } : {}) } : []) }],
@@ -87,7 +94,7 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
       },
     },
     state: {
-      get: async (ref: { key: string }) => atoms[ref.key] ?? { value: undefined, version: 0 },
+      get: (ref: { key: string }) => gated('get', () => atoms[ref.key] ?? { value: undefined, version: 0 }),
       set: async (ref: { key: string }, value: unknown, options: { ifVersion?: number } = {}) => {
         const version = atoms[ref.key]?.version ?? 0
         if (options.ifVersion !== undefined && options.ifVersion !== version) return { isSet: false, version }
@@ -119,7 +126,15 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
   const bash = (command: string) => fire('tool.call', { tool: 'Bash', tool_use_id: command, command })
   const report = (input: Event) => fire('tool.call', { tool: REPORT_TOOL, tool_use_id: 'report', ...input })
   const receive = (text: string) => fire('session.receive', { origin: { kind: 'peer' }, text })
-  return { fire, start, end, registered, ran, reportNow, bash, report, receive }
+  const hold = (kind: 'now' | 'get') => {
+    holding[kind] += 1
+  }
+  const release = () => waiting.splice(0).forEach(resume => resume())
+  const seed = (key: string, value: unknown) => {
+    atoms[key] = { value, version: 1 }
+  }
+  const sync = () => syncAgents($ as never)
+  return { fire, start, end, registered, ran, reportNow, bash, report, receive, hold, release, seed, sync }
 }
 
 const ended = (turnId: string, patch: Event = {}) => ({ answer: '', durationMs: 1, isAborted: false, turnId, reason: 'answer', ...patch })
@@ -259,4 +274,34 @@ test('an Ask is consumed when the worker is idle or its report fresh, and nudged
   expect((await run.receive(ask)).consumed).toBeDefined()
   expect(await run.receive('hello')).toEqual({ text: 'hello' })
   expect(await run.fire('session.receive', { origin: { kind: 'peer' }, text: ask, agentId: 'sub-1' })).toEqual({ text: ask })
+})
+
+test('an agent sync that began before the answer never writes the old ask back over the cleared one', async () => {
+  const run = world()
+  run.seed('agents', [{ id: 'a2', type: 'Explore', description: 'Check one caller', state: 'running', startedAt: NOW }])
+  await run.start()
+  await run.fire('classic.PermissionRequest', { tool_name: 'Bash', tool_input: { command: 'rm -rf build' }, agent_id: 'a2' })
+  expect(run.reportNow()?.agents?.[0]?.asking?.text).toBe('Allow Bash: rm -rf build')
+  run.hold('now')
+  const background = run.sync()
+  await settle()
+  const answered = run.fire('tool.call', { tool: 'Bash', tool_use_id: 'b', command: 'rm -rf build', agentId: 'a2' })
+  await settle()
+  run.release()
+  await Promise.all([background, answered])
+  await settle()
+  expect(run.reportNow()?.agents?.[0]?.asking).toBeUndefined()
+})
+
+test('a save never drops a change another save made while it waited', async () => {
+  const run = world()
+  await run.start()
+  run.hold('get')
+  const reporting = run.report({ now: 'writing tests' })
+  await settle()
+  await run.fire('turn.start', { text: 'go', turnId: 't1' })
+  run.release()
+  await reporting
+  await settle()
+  expect([run.reportNow()?.now, run.reportNow()?.run.isRunning]).toEqual(['writing tests', true])
 })

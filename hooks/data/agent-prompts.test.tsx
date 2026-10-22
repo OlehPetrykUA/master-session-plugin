@@ -158,3 +158,20 @@ test("the master merges a worker's reported subagents under that worker within o
   expect((await after.find({ key: 'row-local_setup' }))?.props.borderColor).not.toBe('error')
   await after.unmount()
 })
+
+test("a prompt from an agent the session doesn't track, such as a teammate, turns the worker's own report needs-you and clears on the answer", async ($, on) => {
+  const written: Report[] = []
+  on('fs.write', (_, e) => {
+    if (e.path === reportPath(HOME, 'local_worker')) written.push(JSON.parse(e.text) as Report)
+    return { value: undefined }
+  })
+  loops(on, [])
+  const { clock } = world(on, { parent: MASTER })
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  await $.tool.call({ tool: 'mcp__master-session__report', state: 'working', progress: 'step 2 of 4 — build' })
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'git push' }, agent_id: 'tm1' } as never)
+  expect([written.at(-1)?.state, written.at(-1)?.needsYou]).toEqual(['needs-you', 'Allow Bash: git push'])
+  await $.tool.call({ tool: 'Bash', command: 'git push', agentId: 'tm1' })
+  expect([written.at(-1)?.state, written.at(-1)?.needsYou]).toEqual(['working', undefined])
+})
