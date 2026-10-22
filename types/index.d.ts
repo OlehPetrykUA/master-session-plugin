@@ -130,6 +130,7 @@ export type Report = {
   waits?: { since: number; on: string }
   git?: { branch: string; dirty: number; ahead: number; at: number; path?: string }
   agents?: ReportAgent[]
+  runs?: ReportRun[]
 }
 
 export type AgentState = 'running' | 'done' | 'failed'
@@ -169,7 +170,10 @@ export type WorkflowRecord = {
   description?: string
   phases?: string[]
   startedAt: number
+  parentSessionId?: string
 }
+
+export type ReportRun = Pick<WorkflowRecord, 'id' | 'name' | 'phases' | 'startedAt'>
 
 declare module 'claude-code' {
   interface McpToolInputs {

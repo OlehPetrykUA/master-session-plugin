@@ -1,9 +1,9 @@
 import { expect, test } from 'claude-code/testing'
 
-import type { AgentRecord, Board, WorkflowRecord } from '../../types'
+import type { AgentRecord, Board, Report, WorkflowRecord } from '../../types'
 
 import { liveOf } from '../testing/world'
-import { reportAgentsOf, stateCountsOf, subagentsOf, workflowRunsOf } from './agents'
+import { reportAgentsOf, reportRunsOf, stateCountsOf, subagentsOf, withReportedRuns, workflowRunsOf } from './agents'
 import { countsOf, rowsOf } from './rows'
 import { runSummaryOf } from './totals'
 
@@ -99,4 +99,14 @@ test('the report keeps asking agents first, then running ones, newest first, at 
   expect(kept.slice(1, 4).map(one => one.id)).toEqual(['a20', 'a19', 'a17'])
   expect(kept.some(one => one.id === 'r1')).toBe(false)
   expect(kept.at(-1)?.state).toBe('done')
+})
+
+test("a worker's runs travel in its report with their phases and join the master's workflows under that worker, never as the master's own runs", () => {
+  const own: WorkflowRecord = { id: 'wf_1', toolUseId: 't1', name: 'review-changes', phases: ['Scan', 'Check'], startedAt: NOW }
+  const reported = reportRunsOf([own, { ...own, id: 'wf_r', parentSessionId: 'local_x' }])
+  expect(reported).toEqual([{ id: 'wf_1', name: 'review-changes', phases: ['Scan', 'Check'], startedAt: NOW }])
+  const report = { session: 'local_b', runs: [{ id: 'wf_9', name: 'remote', phases: ['A', 'B', 'C'], startedAt: NOW }] } as Report
+  const merged = withReportedRuns([own, { ...own, id: 'wf_stale', parentSessionId: 'local_b' }], [report])
+  expect(merged.map(one => [one.id, one.parentSessionId])).toEqual([['wf_1', undefined], ['wf_9', 'local_b']])
+  expect(workflowRunsOf([], merged).map(one => one.id)).toEqual(['wf_1'])
 })

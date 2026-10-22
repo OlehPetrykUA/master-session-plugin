@@ -2,17 +2,18 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, FoundElement } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import type { Board, BoardSession, Live } from '../../../types'
+import type { Board, BoardSession, Live, WorkflowRecord } from '../../../types'
 
 import { agentCountsOf, bandAction, bandProgress, bandProgressWith, bandViewOf, extrasOf, fitBand, slotWidth } from '../../lib/band'
+import type { AgentCounts } from '../../lib/band'
 import { CH, COLUMN, across, tall } from '../../lib/layout'
 import { freshReport, merge } from '../../data/contract'
 import { progressOf } from '../../lib/board'
 import { rowsOf } from '../../lib/rows'
-import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, dump, started, text } from '../../testing/world'
+import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, dump, started, text, world } from '../../testing/world'
 import { PERCENT } from '../../theme/band'
 import { I } from '../../theme/icons'
-import { dotsWidth, strip } from '../../theme/strip'
+import { barsWidth, dotsWidth, strip } from '../../theme/strip'
 import type { StripItem, StripTone } from '../../theme/strip'
 import { guardSvg } from '../guard'
 import { Band } from './Band'
@@ -381,14 +382,14 @@ test('all done: check, full green fills, counts, and Open board with the board i
 })
 
 const BREAKPOINTS = [
-  { px: 760, working: ['80%', '2 working · 1 waiting', 'Open board'], pill: /^env-e2e-test needs you · commit blocked$/, done: ['4 done · 0 open', 'Open board'], needsDots: false },
-  { px: 560, working: ['80%', '2 working · 1 waiting', 'Board'], pill: /^env-e2e-test needs you$/, done: ['4 done · 0 open', 'Board'], needsDots: false },
-  { px: 390, working: ['80%', 'Board'], pill: /^env-e2e-test needs …$/, done: ['Board'], needsDots: true },
-  { px: 300, working: ['80%', 'Board'], pill: /^env-e2[^ ]*…$/, done: ['Board'], needsDots: true },
+  { px: 760, working: ['80%', '2 working · 1 waiting', 'Open board'], pill: /^env-e2e-test needs you · commit blocked$/, done: ['4 done · 0 open', 'Open board'], needsStrip: 'bars' },
+  { px: 560, working: ['80%', '2 working · 1 waiting', 'Board'], pill: /^env-e2e-test needs you · commit blocked$/, done: ['4 done · 0 open', 'Board'], needsStrip: 'bars' },
+  { px: 390, working: ['80%', 'Board'], pill: /^env-e2e-test needs you$/, done: ['Board'], needsStrip: 'dots' },
+  { px: 300, working: ['80%', 'Board'], pill: /^env-e2e-test needs you$/, done: ['Board'], needsStrip: 'none' },
 ] as const
 
 for (const point of BREAKPOINTS) {
-  test(`${point.px} px: lead and button always; counts only when they fit; the pill drops its reason, then truncates at its end; dots when bars can't get 24 px`, async ($, on) => {
+  test(`${point.px} px: lead and button always; counts only when they fit; the pill drops its reason, then the strip goes before the name truncates; dots when bars can't get 24 px`, async ($, on) => {
     await band($, on, WORKING)
     const columns = Math.round((point.px + 16) / COLUMN)
     const parts = async (sessions: BoardSession[], name: string) => {
@@ -404,12 +405,12 @@ for (const point of BREAKPOINTS) {
     expect(working.icons).toEqual(point.working.length === 3 ? ['pulse', 'panel'] : ['panel'])
     expect(working.width).toBeGreaterThanOrEqual(4 * 24 + 3 * 4)
     const needs = await parts(NEEDS, 'needs-you')
-    expect(needs.texts).toHaveLength(2)
     expect(needs.texts[0]).toMatch(point.pill)
-    expect(needs.texts[1]).toBe('Open chat')
+    expect(needs.texts.slice(1)).toEqual(point.px < 600 ? [] : ['Open chat'])
     expect(needs.icons).toEqual(['needs', 'chat'])
-    expect(needs.width === dotsWidth(sessionsOf(5))).toBe(point.needsDots)
-    expect(needs.width).toBeGreaterThanOrEqual(point.needsDots ? dotsWidth(sessionsOf(5)) : 5 * 24 + 4 * 4)
+    const strip = Number.isNaN(needs.width) ? 'none' : needs.width === dotsWidth(sessionsOf(5)) ? 'dots' : 'bars'
+    expect([point.px, strip]).toEqual([point.px, point.needsStrip])
+    strip === 'bars' && expect(needs.width).toBeGreaterThanOrEqual(5 * 24 + 4 * 4)
     const done = await parts(DONE, 'all-done')
     expect(done.texts).toEqual([...point.done])
     expect(done.icons).toEqual(point.done.length === 2 ? ['check', 'done', 'panel'] : ['check', 'panel'])
@@ -425,8 +426,8 @@ test('more than 8 workers: dots at any width, and the counts still show when the
   expect(await widthOfStrip(ui)).toBe(dotsWidth(sessionsOf(10)))
   expect(await textsOf(ui)).toEqual(['50%', '5 working · 5 waiting', 'Open board'])
   await ui.unmount()
-  expect(fitBand({ room: 70, gap: 12, items: sessionsOf(3), counts: 150 })).toEqual({ pill: '', showCounts: false, isDots: true, strip: dotsWidth(sessionsOf(3)) })
-  expect(fitBand({ room: 400, gap: 12, items: sessionsOf(3), counts: 150 })).toEqual({ pill: '', showCounts: true, isDots: false, strip: 238 })
+  expect(fitBand({ room: 70, gap: 12, items: sessionsOf(3), counts: 150 })).toEqual({ pill: '', showCounts: false, isDots: true, strip: dotsWidth(sessionsOf(3)), isHidden: false })
+  expect(fitBand({ room: 400, gap: 12, items: sessionsOf(3), counts: 150 })).toEqual({ pill: '', showCounts: true, isDots: false, strip: 238, isHidden: false })
 })
 
 test('terminal: text segments, one per worker, and the same pressable action', async ($, on) => {
@@ -534,12 +535,13 @@ test('v2-11 geometry: bar 56 with gap 12, percent 34, pill 34 with 0 12 0 8, but
   await band($, on, NEEDS)
   const boxes = async (ui: Found) => (await ui.findAll({ type: 'Box' })).map(one => one.props)
   const sizes = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true).map(one => [one.props.alt, one.props.width])
-  for (const [px, padLeft, padRight] of [[760, 10, 8], [390, 8, 6]] as const) {
+  for (const [px, padLeft, padRight] of [[760, 8, 8], [390, 8, 6]] as const) {
     const ui = await mount($, Math.round((px + 16) / COLUMN))
     const [bar, pill] = await boxes(ui)
     expect(bar).toEqual(expect.objectContaining({ height: tall(56), gap: across(12), paddingLeft: across(padLeft), paddingRight: across(padRight), borderStyle: 'round' }))
     expect(pill).toEqual(expect.objectContaining({ height: tall(34), gap: across(6), paddingLeft: across(8), paddingRight: across(12), borderStyle: 'round', borderColor: 'error' }))
     expect((await ui.find({ key: 'face-band-chat' }))?.props).toEqual(expect.objectContaining({ height: tall(32), gap: across(4), borderStyle: 'round' }))
+    px < 600 && expect((await ui.find({ key: 'face-band-chat' }))?.props.width).toBe(across(32))
     expect(await sizes(ui)).toEqual([['needs', 15], ['chat', 16]])
     await ui.unmount()
   }
@@ -587,7 +589,7 @@ const CREW = (asking: { own?: boolean; remote?: boolean; flow?: boolean } = {}) 
   }
 }
 
-const viewOf = (sessions: BoardSession[], crew: ReturnType<typeof CREW>, columns = 100) => {
+const viewOf = (sessions: BoardSession[], crew: AgentCounts, columns = 100) => {
   const current = boardOf(sessions)
   const progress = bandProgress(current, liveOf([], sessions))
   if (!progress) throw new Error('no band')
@@ -645,17 +647,57 @@ test('with no worker sessions, running subagents still show the band: their segm
   const crew = crewOf($, on)
   await band($, on, [], false, [])
   const agent = { id: 'a', type: 'general-purpose', description: 'a', startedAt: 0 }
-  expect(bandProgressWith(boardOf([]), liveOf([], []), IDLE)).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [{ ...agent, state: 'done' }], workflows: [] })).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [{ ...agent, state: 'running' }], workflows: [] })?.total).toBe(0)
-  expect(bandProgressWith(boardOf(WORKING), liveOf([], WORKING), IDLE)?.total).toBe(4)
+  expect(bandProgressWith(boardOf([]), liveOf([], []), IDLE, true)).toBeUndefined()
+  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [{ ...agent, state: 'done' }], workflows: [] }, true)).toBeUndefined()
+  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [{ ...agent, state: 'running' }], workflows: [] }, true)?.total).toBe(0)
+  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [{ ...agent, state: 'running' }], workflows: [] }, false)).toBeUndefined()
+  expect(bandProgressWith(boardOf(WORKING), liveOf([], WORKING), IDLE, false)?.total).toBe(4)
   await crew.subagent('docs')
   await crew.subagent('review')
   const ui = await mount($)
   const source = String((await stripOf(ui))?.props.source)
   expect(pathOf(source, 'green').split('M').filter(one => one.includes(',2h')).length).toBe(2)
   expect(pathOf(source, 'track')).toBe('')
-  expect(await textsOf(ui)).toEqual(['0%', '2 subagents', 'Open board'])
-  expect((await stripOf(ui))?.props.alt).toBe('Master session: 0 percent, 2 subagents')
+  expect(await textsOf(ui)).toEqual(['2 subagents', 'Open board'])
+  expect((await stripOf(ui))?.props.alt).toBe('Master session: 2 subagents')
+  await ui.unmount()
+})
+
+test("a worker's run keeps its phases from the worker's report: one piece per phase, drawn before its first agent", () => {
+  const crew = CREW()
+  const workflows: WorkflowRecord[] = [...crew.workflows, { id: 'wf_9', toolUseId: '', name: 'remote-review', phases: ['A', 'B', 'C'], startedAt: 5, parentSessionId: 'local_c' }, { id: 'wf_8', toolUseId: '', phases: ['X', 'Y'], startedAt: 6, parentSessionId: 'local_a' }]
+  const { view } = viewOf(WORKING, { ...crew, workflows })
+  expect(view.items.find(one => one.id === 'wf_9')).toEqual(expect.objectContaining({ pieces: 3, tone: 'green' }))
+  expect(view.items.find(one => one.id === 'wf_8')).toEqual(expect.objectContaining({ pieces: 2, tone: 'green', isRunning: true }))
+  expect(view.items.filter(one => one.kind === 'workflow').map(one => one.id)).toEqual(['wf_8', 'wf_9', 'wf_1'])
+})
+
+test('a run with many phases never gets a piece under 4 px: it takes its own least width and the rest share what is left', () => {
+  const items = [S('green', 0.5), W('green', 0.5, 13), S('amber', 0.5)]
+  expect(barsWidth(items)).toBe(24 + (13 * 4 + 2 * 12) + 24 + 2 * 4)
+  const source = strip(barsWidth(items), items)
+  const widths = [...source.matchAll(/M[\d.]+,0h(-?[\d.]+)a2,2/g)].map(match => Number(match[1]) + 4)
+  expect(widths.length).toBeGreaterThanOrEqual(13)
+  expect(Math.min(...widths)).toBeGreaterThanOrEqual(4)
+})
+
+test('a plain session that runs a subagent, with no board of its own and no workers, gets no band', async ($, on) => {
+  const crew = crewOf($, on)
+  const register = on as unknown as (event: string, ...rest: unknown[]) => unknown
+  const scoped = (event: string, ...rest: unknown[]) => {
+    if (event !== 'mcp.call') return register(event, ...rest)
+    const inner = rest[0] as McpHook
+    return register(event, (context: unknown, call: { tool: string }) => (call.tool === 'list_sessions' ? text([]) : inner(context, call)))
+  }
+  on('ui.render', { component: 'AbovePrompt' }, ($, event) => {
+    const { Text } = $.ui.resolve(event)
+    return <Text>no band</Text>
+  })
+  const { clock } = world(scoped as unknown as On)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  await crew.subagent('docs')
+  const ui = await mount($)
+  expect(await textsOf(ui)).toEqual(['no band'])
   await ui.unmount()
 })

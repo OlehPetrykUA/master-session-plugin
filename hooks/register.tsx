@@ -31,7 +31,7 @@ import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, O
 import { messageOf } from './lib/format'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
-import { getAgents, getLive, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
+import { getAgents, getBoard, getLive, getReports, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
 
 let columns = 0
 let pending: { row: number; at: number } | undefined
@@ -224,7 +224,8 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, event, next) => {
     const { board: current, from } = await boardOf($)
     const agents = agentCountsOf(await getAgents($), await getWorkflows($))
-    const progress = bandProgressWith(current, await getLive($), agents)
+    const isMaster = !!(await getBoard($)) || (await getReports($)).length > 0
+    const progress = bandProgressWith(current, await getLive($), agents, isMaster)
     if (event.props.hasSurvey || !progress) return next(event)
     const table = $.ui.resolve(event)
     const bandColumns = event.props.bodyColumns || 100

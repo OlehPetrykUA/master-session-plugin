@@ -1,4 +1,4 @@
-import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, SessionState, Step } from '../../types'
+import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, ReportRun, SessionState, Step } from '../../types'
 
 import { ORDER, stateOf } from '../lib/board'
 import { compactOf } from '../lib/format'
@@ -192,6 +192,7 @@ export function parseReport(raw: unknown): Report | undefined {
     waits: listOf<NonNullable<Report['waits']>>([data.waits], item => Number.isFinite(item.since))[0],
     git: listOf<NonNullable<Report['git']>>([data.git], item => typeof item.branch === 'string' && Number.isFinite(item.dirty))[0],
     agents: listOf<ReportAgent>(data.agents, isReportAgent),
+    runs: listOf<ReportRun>(data.runs, item => typeof item.id === 'string' && Number.isFinite(item.startedAt)),
   }
 }
 
@@ -290,9 +291,9 @@ export function merge(board: Published | null, reports: readonly Report[], live:
 }
 
 export function liveReportsOf(reports: readonly Report[], live: Live) {
-  if (!live.at || live.error) return [...reports]
+  if (!live.at || (live.error && !live.sessions.length)) return [...reports]
   const known = new Map(live.sessions.map(one => [one.id, one]))
-  return reports.filter(report => known.has(report.session) && !known.get(report.session)?.isArchived)
+  return reports.filter(report => (known.get(report.session)?.isArchived ? false : known.has(report.session) || report.at > live.at))
 }
 
 export function reportsView(board: Board | null, reports: readonly Report[], live: Live, now: number) {

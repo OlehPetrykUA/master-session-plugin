@@ -3,7 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import type { Board, LiveSession, Repo, SessionState, Worktree } from '../../types'
 
 import { familyOf, lossesOf, sideOf } from '../components/detail/losses'
-import { withReported } from '../lib/agents'
+import { withReported, withReportedRuns } from '../lib/agents'
 import { bandProgress } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
 import { ARCHIVE_LIMIT, BOARD_TOOL, LIVE_LIMIT, PANE, TITLE, UNDO_MS } from '../lib/constants'
@@ -12,7 +12,7 @@ import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
 import { rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
-import { getAgents, getBoard, getLive, getReports, getShared, getUndone, getWorkflows, saveAgents, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
+import { getAgents, getBoard, getLive, getReports, getShared, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
 import { keptAgents } from './agents'
 import { roleOf } from './recorder'
@@ -110,6 +110,7 @@ export async function refreshReports($: EngineInterface) {
   const mine = liveReportsOf((await readReports($, home)).filter(one => one.parent === self || onBoard.has(one.session)), await getLive($))
   await saveReports($, () => mine)
   const now = await $.clock.now()
+  await saveWorkflows($, workflows => withReportedRuns(workflows, mine))
   const workflows = await getWorkflows($)
   await saveAgents($, agents => keptAgents(withReported(agents, mine), workflows, now))
 }

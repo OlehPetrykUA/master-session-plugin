@@ -1,4 +1,4 @@
-import type { AgentAsk, AgentRecord, AgentState, Report, ReportAgent, WorkflowRecord } from '../../types'
+import type { AgentAsk, AgentRecord, AgentState, Report, ReportAgent, ReportRun, WorkflowRecord } from '../../types'
 
 const REPORTED_MAX = 20
 
@@ -34,8 +34,9 @@ export function stateCountsOf(agents: readonly { state: AgentState; asking?: Age
   return { total: agents.length, running: count('running'), done: count('done'), failed: count('failed'), asking }
 }
 
-export function workflowRunsOf(all: readonly AgentRecord[], workflows: readonly WorkflowRecord[]): WorkflowRun[] {
+export function workflowRunsOf(all: readonly AgentRecord[], records: readonly WorkflowRecord[]): WorkflowRun[] {
   const agents = all.filter(agent => !agent.parentSessionId)
+  const workflows = records.filter(one => !one.parentSessionId)
   const ids = [...new Set([...workflows.map(one => one.id), ...agents.flatMap(agent => (agent.run ? [agent.run.id] : []))])]
   return ids.map(id => {
     const record = workflows.find(one => one.id === id)
@@ -99,4 +100,15 @@ export const withReported = (agents: AgentRecord[], reports: readonly Report[]):
   ...reports.flatMap(report =>
     (report.agents ?? []).map(({ runId, runIndex, ...one }): AgentRecord => ({ ...one, parentSessionId: report.session, run: runId ? { id: runId, index: runIndex ?? 0 } : undefined })),
   ),
+]
+
+export const reportRunsOf = (workflows: readonly WorkflowRecord[]): ReportRun[] =>
+  workflows
+    .filter(one => !one.parentSessionId)
+    .slice(-REPORTED_MAX)
+    .map(one => ({ id: one.id, name: one.name ? one.name.slice(0, REPORTED_TEXT) : undefined, phases: one.phases?.slice(0, REPORTED_MAX).map(clip), startedAt: one.startedAt }))
+
+export const withReportedRuns = (workflows: WorkflowRecord[], reports: readonly Report[]): WorkflowRecord[] => [
+  ...workflows.filter(one => !one.parentSessionId),
+  ...reports.flatMap(report => (report.runs ?? []).map((one): WorkflowRecord => ({ ...one, toolUseId: '', parentSessionId: report.session }))),
 ]

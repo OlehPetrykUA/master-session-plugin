@@ -8,7 +8,7 @@ import { C, KINDS, LABEL_COLOR } from '../../theme/tokens'
 import type { Kind } from '../../theme/tokens'
 import type { Ui } from '../types'
 
-export type BandButtonProps = { name: BandAction; label: string; art: RenderElement; onPress: () => void; kind: Kind; width: number }
+export type BandButtonProps = { name: BandAction; label: string; art: RenderElement; onPress: () => void; kind: Kind; width: number; isIconOnly?: boolean }
 
 export function BandButton(ui: Ui, props: BandButtonProps) {
   const { Box, Text, Button, Client } = ui
@@ -35,9 +35,11 @@ export function BandButton(ui: Ui, props: BandButtonProps) {
     return (
       <Box key={`face-${key}`} {...shape} justifyContent="center" gap={across(BUTTON.gap)} width={across(props.width)}>
         {art}
-        <Text weight="semibold" color={color.rest} hover={{ color: color.hover }} wrap="truncate-end">
-          {label}
-        </Text>
+        {props.isIconOnly ? null : (
+          <Text weight="semibold" color={color.rest} hover={{ color: color.hover }} wrap="truncate-end">
+            {label}
+          </Text>
+        )}
         <Box position="absolute" top={0} left={0}>
           <Client key={hit} module="../press.tsx" width={cols} height={rows} props={{ id: hit, columns: cols, rows }} />
         </Box>
@@ -53,7 +55,7 @@ export function BandButton(ui: Ui, props: BandButtonProps) {
         <Box position="absolute" display="none" />
         <Button key={key} plain label={label} onPress={onPress} hover={{ backgroundColor: C.clear }}>
           <Text color={color.rest} weight="semibold">
-            {spaces(BUTTON.left + BUTTON.icon + BUTTON.gap - PAD) + label + spaces(BUTTON.right - PAD)}
+            {props.isIconOnly ? spaces(BUTTON.height - 2 * PAD) : spaces(BUTTON.left + BUTTON.icon + BUTTON.gap - PAD) + label + spaces(BUTTON.right - PAD)}
           </Text>
         </Button>
       </Box>

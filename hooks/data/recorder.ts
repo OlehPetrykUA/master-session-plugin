@@ -1,11 +1,11 @@
 import type { EngineInterface, On, ToolCallInput, TurnCompleteInput } from 'claude-code'
 
-import { asked, reportAgentsOf } from '../lib/agents'
+import { asked, reportAgentsOf, reportRunsOf } from '../lib/agents'
 import { expandHome, parseStatus } from '../lib/git'
-import { getAgents, getLive, saveAgents } from '../state/atoms'
+import { getAgents, getLive, getWorkflows, saveAgents } from '../state/atoms'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
-import type { ReportAgent, SessionState } from '../../types'
+import type { ReportAgent, ReportRun, SessionState } from '../../types'
 import { parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
 type Held = { text: string; tool: string; state: SessionState; needsYou?: string; by?: string }
@@ -33,6 +33,7 @@ let detecting: Promise<void> | undefined
 let gitCwd = ''
 let held = new Map<string, Held>()
 let outbox: ReportAgent[] = []
+let runsOut: ReportRun[] = []
 let syncing: Promise<void> = Promise.resolve()
 
 export const roleOf = () => role
@@ -174,7 +175,7 @@ async function callJson($: EngineInterface, server: string, tool: string, args: 
 }
 
 async function save($: EngineInterface, next: Report, now: number) {
-  current = stamped({ ...next, agents: outbox }, now)
+  current = stamped({ ...next, agents: outbox, runs: runsOut }, now)
   await writeReport($, home, current)
 }
 
@@ -186,9 +187,11 @@ export function syncAgents($: EngineInterface) {
 async function syncOnce($: EngineInterface) {
   if (!current) return
   const agents = reportAgentsOf(await getAgents($))
+  const runs = reportRunsOf(await getWorkflows($))
   const now = await $.clock.now()
-  if (!current || JSON.stringify(agents) === JSON.stringify(current.agents ?? [])) return
+  if (!current || (JSON.stringify(agents) === JSON.stringify(current.agents ?? []) && JSON.stringify(runs) === JSON.stringify(current.runs ?? []))) return
   outbox = agents
+  runsOut = runs
   await save($, current, now)
 }
 
@@ -228,6 +231,7 @@ async function detect($: EngineInterface) {
   const now = await $.clock.now()
   const known = await readReport($, home, self)
   outbox = reportAgentsOf(await getAgents($))
+  runsOut = reportRunsOf(await getWorkflows($))
   await $.tool.register(REPORT_SPEC)
   await save($, { ...(known ?? freshReport(self, parent, engineId, now)), parent, engineId }, now)
 }
@@ -380,6 +384,7 @@ export async function startRecorder($: EngineInterface) {
   gitCwd = ''
   held = new Map()
   outbox = []
+  runsOut = []
   syncing = Promise.resolve()
   void detected($)
 }

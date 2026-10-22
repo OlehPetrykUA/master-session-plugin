@@ -29,7 +29,7 @@ export function Band(ui: Ui, props: BandProps) {
     </Box>
   ) : isAllDone ? (
     icon('check', CHECK, 'green', 2.4)
-  ) : (
+  ) : !view.hasLead ? null : (
     <Box flexDirection="row" flexShrink={0} width={across(PERCENT)}>
       <Text weight="semibold" size="heading" tabular>
         {`${view.percent}%`}
@@ -37,7 +37,7 @@ export function Band(ui: Ui, props: BandProps) {
     </Box>
   )
   const counter = showCounts ? (
-    <Box flexDirection="row" alignItems="center" flexShrink={0} gap={across(COUNTS.gap)} paddingLeft={across(COUNTS.left)} paddingRight={across(COUNTS.right)}>
+    <Box flexDirection="row" alignItems="center" flexShrink={0} gap={across(COUNTS.gap)}>
       {icon(isAllDone ? 'done' : 'pulse', COUNTS.icon, 'muted')}
       {counts ? (
         <Text color={C.muted} tabular>
@@ -59,7 +59,7 @@ export function Band(ui: Ui, props: BandProps) {
   return (
     <Box flexDirection="row" alignItems="center" gap={across(view.gap)} height={tall(BAR.height)} paddingLeft={across(view.padLeft)} paddingRight={across(view.padRight)} paddingY={0} borderStyle="round" borderColor={C.border} backgroundColor={C.surface}>
       {lead}
-      {fitted.isDots ? (
+      {fitted.isHidden ? null : fitted.isDots ? (
         <Box flexDirection="row" alignItems="center" gap={across(view.gap)} flexGrow={1} flexShrink={0}>
           <Svg source={strip(stripWidth, items, look, true)} alt={alt} width={stripWidth} height={10} isInteractive />
           {counter}
@@ -70,7 +70,7 @@ export function Band(ui: Ui, props: BandProps) {
         </Box>
       )}
       {fitted.isDots ? null : counter}
-      {action ? BandButton(ui, { name: action.name, label: action.label, art: icon(action.icon, BUTTON.icon, KINDS[kind].tone), onPress: action.press, kind, width: view.actionWidth }) : null}
+      {action ? BandButton(ui, { name: action.name, label: action.label, art: icon(action.icon, BUTTON.icon, KINDS[kind].tone), onPress: action.press, kind, width: view.actionWidth, isIconOnly: action.isIconOnly }) : null}
     </Box>
   )
 }

@@ -155,6 +155,7 @@ export async function recordWorkflow($: EngineInterface, e: { tool_use_id: strin
   const script = e.script ?? (path ? await $.fs.read(path).catch(() => '') : '')
   const phases = phasesOf(script)
   await saveWorkflows($, workflows => launched(workflows, e.tool_use_id, result, phases, now))
+  await syncAgents($)
 }
 
 export async function refreshAgents($: EngineInterface) {

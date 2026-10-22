@@ -41,18 +41,41 @@ const flexOf = (items: readonly StripItem[]) => items.filter(item => item.kind !
 
 export const flexCount = flexOf
 
-export const barsWidth = (items: readonly StripItem[]) => fixedOf(items) + gapsOf(items) + flexOf(items) * SEGMENT
+const leastOf = (item: StripItem) => {
+  const pieces = Math.max(1, item.pieces ?? 1)
+  return item.kind === 'workflow' ? Math.max(SEGMENT, pieces * 4 + CHILD_GAP * (pieces - 1)) : SEGMENT
+}
+
+export const barsWidth = (items: readonly StripItem[]) => fixedOf(items) + gapsOf(items) + items.filter(item => item.kind !== 'subagent').reduce((sum, item) => sum + leastOf(item), 0)
+
+function slotsOf(width: number, items: readonly StripItem[]) {
+  const flex = items.filter(item => item.kind !== 'subagent')
+  const wide = new Set<StripItem>()
+  let room = width - fixedOf(items) - gapsOf(items)
+  let slot = flex.length ? Math.max(0, room / flex.length) : 0
+  for (let pass = 0; pass < flex.length; pass += 1) {
+    const grown = flex.filter(item => !wide.has(item) && leastOf(item) > slot)
+    if (!grown.length) break
+    grown.forEach(item => {
+      wide.add(item)
+      room -= leastOf(item)
+    })
+    const left = flex.length - wide.size
+    slot = left ? Math.max(0, room / left) : 0
+  }
+  return (item: StripItem) => (wide.has(item) ? leastOf(item) : slot)
+}
 
 export const dotsWidth = (items: readonly StripItem[]) => items.reduce((sum, item) => sum + DOT[item.kind], 0) + gapsOf(items)
 
 type Paint = { track: string; fills: Record<string, string>; alert: string; shine: string }
 
 function bars(width: number, items: readonly StripItem[], look: 'live' | 'dim' | 'done', paint: Paint) {
-  const flex = flexOf(items)
-  const slot = flex ? Math.max(0, (width - fixedOf(items) - gapsOf(items)) / flex) : 0
+  const widthOf = slotsOf(width, items)
   let x = 0
   items.forEach((item, index) => {
     x += gapBefore(item, index)
+    const slot = widthOf(item)
     const tone = look === 'done' ? 'green' : FILL[item.tone]
     const target = item.tone === 'red' && look !== 'done' ? 'alert' : tone
     const add = (path: string) => (target === 'alert' ? (paint.alert += path) : (paint.fills[tone] = (paint.fills[tone] ?? '') + path))

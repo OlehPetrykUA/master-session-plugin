@@ -12,6 +12,7 @@ import {
   askTargets,
   askText,
   isArchivable,
+  liveReportsOf,
   fitsSvg,
   freshReport,
   merge,
@@ -245,4 +246,17 @@ test('a merged row shows a new label as stored and an old raw entry with its pas
     { cmd: 'tsc · exit 0', ok: true, summary: '', at: 3 },
   ]
   expect(merge(boardOf(80 * MIN, row()), [report({ tests })], live, NOW).sessions[0]?.tests).toEqual(['npm test · failed', 'pytest -q · passed · 3 passed', 'tsc · exit 0'])
+})
+
+test('live reports: archived ones drop; after a list failure the last good list still filters; a report newer than the list is a new worker and stays', () => {
+  const at = 50 * MIN
+  const live = (sessions: LiveSession[], error = ''): Live => ({ self: MASTER, title: '', sessions, error, at })
+  const reports = [report({ session: 'local_a', at: 40 * MIN }), report({ session: 'local_old', at: 40 * MIN }), report({ session: 'local_new', at: 55 * MIN }), report({ session: 'local_gone', at: 40 * MIN })]
+  const sessions = [liveOne('local_a', true), liveOne('local_old', false, { isArchived: true })]
+  const kept = (value: Live) => liveReportsOf(reports, value).map(one => one.session)
+  expect(kept(live(sessions))).toEqual(['local_a', 'local_new'])
+  expect(kept(live(sessions, 'list_sessions failed'))).toEqual(['local_a', 'local_new'])
+  expect(kept(live([], 'list_sessions failed'))).toEqual(['local_a', 'local_old', 'local_new', 'local_gone'])
+  expect(kept({ ...live(sessions), at: 0 })).toHaveLength(4)
+  expect(parseReport({ ...report(), runs: [{ id: 'wf_9', name: 'review', phases: ['Scan', 'Check'], startedAt: 1 }, { id: 3 }] })?.runs).toEqual([{ id: 'wf_9', name: 'review', phases: ['Scan', 'Check'], startedAt: 1 }])
 })

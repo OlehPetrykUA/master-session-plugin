@@ -111,7 +111,7 @@ export function bandItemsOf(segments: Progress['segments'], current: Board | nul
     const runs = runItems(
       workflowRunsOf(
         remote.map(({ parentSessionId, ...one }) => one),
-        [],
+        workflows.filter(one => one.parentSessionId === segment.id).map(({ parentSessionId, ...one }) => one),
       ),
       { chat },
     )
@@ -147,7 +147,7 @@ export function fitBand({ room, gap, items, counts, full, short }: FitInput) {
     const showCounts = room - counts - gap >= least
     const left = showCounts ? room - counts - gap : room
     const isDots = isForced || left < bars
-    return { pill: '', showCounts, isDots, strip: Math.round(isDots ? dots : left) }
+    return { pill: '', showCounts, isDots, strip: Math.round(isDots ? dots : left), isHidden: false }
   }
   const brief = short ?? full
   const tries = isForced
@@ -155,9 +155,10 @@ export function fitBand({ room, gap, items, counts, full, short }: FitInput) {
     : [{ text: full, isDots: false }, { text: brief, isDots: false }, { text: brief, isDots: true }]
   for (const { text, isDots } of tries) {
     const left = room - PILL_WIDTH - widthOf(text)
-    if (left >= (isDots ? dots : bars)) return { pill: text, showCounts: false, isDots, strip: Math.round(isDots ? dots : left) }
+    if (left >= (isDots ? dots : bars)) return { pill: text, showCounts: false, isDots, strip: Math.round(isDots ? dots : left), isHidden: false }
   }
-  return { pill: fit(brief, room - dots - PILL_WIDTH), showCounts: false, isDots: true, strip: dots }
+  if (room - gap - PILL_WIDTH - widthOf(brief) >= 0) return { pill: brief, showCounts: false, isDots: true, strip: 0, isHidden: true }
+  return { pill: fit(brief, room - gap - PILL_WIDTH), showCounts: false, isDots: true, strip: 0, isHidden: true }
 }
 
 export function bandProgress(current: Board | null, live: Live) {
@@ -170,9 +171,9 @@ export function bandProgress(current: Board | null, live: Live) {
 
 const IDLE_PROGRESS: Progress = { segments: [], percent: 0, done: 0, total: 0 }
 
-export function bandProgressWith(current: Board | null, live: Live, { agents, workflows }: AgentCounts) {
+export function bandProgressWith(current: Board | null, live: Live, { agents, workflows }: AgentCounts, isMaster: boolean) {
   const progress = bandProgress(current, live)
-  if (progress) return progress
+  if (progress || !isMaster) return progress
   const isBusy = agents.some(one => one.state === 'running') || workflowRunsOf(agents, workflows).some(run => run.state === 'running')
   return isBusy ? IDLE_PROGRESS : undefined
 }
@@ -184,7 +185,8 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
   const count = (state: SessionState) => progress.segments.filter(one => one.state === state).length
   const asker = items.find(one => one.asker)?.asker
   const isAllDone = !asker && progress.total > 0 && progress.done === progress.total
-  const percent = progress.total ? progress.percent : Math.round((100 * items.filter(one => !one.isRunning).length) / Math.max(1, items.length))
+  const hasLead = !asker && progress.total > 0
+  const percent = progress.percent
   const digits = String(progress.total).length
   const number = (value: number) => String(value).padStart(digits, ' ')
   const counts = isAllDone ? `${number(progress.total)} done · ${number(0)} open` : progress.total ? `${number(count('working'))} working · ${number(count('waiting'))} waiting` : ''
@@ -196,28 +198,28 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
     ? `Master session: ${headOf(asker)}${asker.reason ? `, ${asker.reason}` : ''}${via}`
     : isAllDone
       ? `Master session: all ${progress.total} done${via}`
-      : `Master session: ${[`${percent} percent`, ...(progress.total ? [`${count('working')} working`, `${count('waiting')} waiting`] : []), ...parts].join(', ')}${via}`
+      : `Master session: ${[...(progress.total ? [`${percent} percent`, `${count('working')} working`, `${count('waiting')} waiting`] : []), ...parts].join(', ')}${via}`
   const chat = asker?.chat
   const action = asker
     ? chat
-      ? { name: 'chat' as const, label: 'Open chat', icon: 'chat' as const, press: () => act.chat(chat.id, chat.name) }
+      ? { name: 'chat' as const, label: 'Open chat', icon: 'chat' as const, isIconOnly: isNarrow, press: () => act.chat(chat.id, chat.name) }
       : undefined
     : isPaneOpen
       ? undefined
-      : { name: 'board' as const, label: isNarrow ? 'Board' : 'Open board', icon: 'panel' as const, press: act.board }
-  const actionWidth = action ? 2 + BUTTON.left + BUTTON.icon + BUTTON.gap + widthOf(action.label) + BUTTON.right : 0
-  const padLeft = asker ? (isNarrow ? 8 : 10) : isNarrow ? 12 : 16
+      : { name: 'board' as const, label: isNarrow ? 'Board' : 'Open board', icon: 'panel' as const, isIconOnly: false, press: act.board }
+  const actionWidth = action ? (action.isIconOnly ? BUTTON.height : 2 + BUTTON.left + BUTTON.icon + BUTTON.gap + widthOf(action.label) + BUTTON.right) : 0
+  const padLeft = asker ? 8 : isNarrow ? 12 : 16
   const padRight = isNarrow ? 6 : 8
   const gap = BAR.gap
-  const leadWidth = asker ? 0 : isAllDone ? CHECK : PERCENT
-  const room = width - padLeft - padRight - 2 - leadWidth - gap - (action ? actionWidth + gap : 0)
+  const leadWidth = isAllDone ? CHECK : hasLead ? PERCENT : 0
+  const room = width - padLeft - padRight - 2 - (asker || isAllDone || hasLead ? leadWidth + gap : 0) - (action ? actionWidth + gap : 0)
   const fitOf = (text: string) => fitBand({ room, gap, items, counts: countsWidthOf(text), full, short: asker ? `${asker.short}${NEEDS}` : undefined })
   const extras = parts.join(' · ')
   const wide = fitOf([counts, extras].filter(Boolean).join(' · '))
   const fitted = wide.showCounts || !extras || !counts ? wide : fitOf(counts)
   const { showCounts } = fitted
   const pillText = fitted.pill
-  return { items, asker, isAllDone, percent, counts, extras: fitted === wide ? extras : '', alt, action, actionWidth, padLeft, padRight, gap, fitted, showCounts, pillText }
+  return { items, asker, isAllDone, hasLead, percent, counts, extras: fitted === wide ? extras : '', alt, action, actionWidth, padLeft, padRight, gap, fitted, showCounts, pillText }
 }
 
 export type BandView = ReturnType<typeof bandViewOf>
