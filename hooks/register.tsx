@@ -13,7 +13,6 @@ import {
   openAsking,
   openPane,
   openSession,
-  openSummary,
   publishBoard,
   refreshAll,
   refreshBoard,
@@ -26,13 +25,13 @@ import {
 import { addFault, clearFaults, clearPresses, hasFaults, nextRetryMs, runPress } from './data/presses'
 import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
 import { recordTurnEnd, recorder, startRecorder } from './data/recorder'
-import { bandAction, bandProgress, bandViewOf } from './lib/band'
+import { agentCountsOf, bandAction, bandProgress, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
 import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
 import { messageOf } from './lib/format'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
-import { getLive, saveBoard } from './state/atoms'
+import { getAgents, getLive, getWorkflows, saveBoard } from './state/atoms'
 
 let columns = 0
 let pending: { row: number; at: number } | undefined
@@ -207,23 +206,23 @@ export const register: Register = on => {
   on('ui.message', { element: /^band-hit-/ }, async ($, event, next) => {
     const action = bandAction(event.element)
     if (!action || typeof (event.data as { press?: unknown } | undefined)?.press !== 'string') return next(event)
-    await (action === 'board' ? openPane($) : action === 'summary' ? openSummary($) : openAsking($))
+    await (action === 'board' ? openPane($) : openAsking($))
     return {}
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, event, next) => {
     const { board: current, from } = await boardOf($)
     const progress = bandProgress(current, await getLive($))
-    if (event.props.hasSurvey || !current || !progress) return next(event)
+    if (event.props.hasSurvey || !progress) return next(event)
     const table = $.ui.resolve(event)
     const bandColumns = event.props.bodyColumns || 100
     const isOpen = await isPaneOpen($)
     const { Box, Button, Text } = table
     const Svg = event.surface !== 'terminal' && 'Svg' in table ? guardSvg(table.Svg, Text) : undefined
     const Client = event.surface === 'desktop' && 'Client' in table && !hasFaults() ? table.Client : undefined
-    const view = bandViewOf(bandColumns, current, progress, from, isOpen, {
+    const agents = agentCountsOf(await getAgents($), await getWorkflows($))
+    const view = bandViewOf(bandColumns, current, progress, from, isOpen, agents, {
       board: () => void openPane($),
-      summary: () => void openSummary($),
       chat: (id, name) => void openSession($, id, name),
     })
     return Svg ? Band({ Box, Text, Button, Svg, Client }, { view, progress }) : TextBand({ Box, Text, Button }, { view, progress, columns: bandColumns })

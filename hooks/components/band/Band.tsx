@@ -1,7 +1,7 @@
-import { PERCENT } from '../../lib/band'
 import type { BandView } from '../../lib/band'
 import type { Progress } from '../../lib/board'
 import { across, tall } from '../../lib/layout'
+import { BAR, BUTTON, CHECK, COUNTS, PERCENT, PILL } from '../../theme/band'
 import { glyph } from '../../theme/icons'
 import type { IconName } from '../../theme/icons'
 import { strip } from '../../theme/strip'
@@ -15,20 +15,20 @@ export type BandProps = { view: BandView; progress: Progress }
 export function Band(ui: Ui, props: BandProps) {
   const { Box, Text, Svg } = ui
   const { view, progress } = props
-  const { segments, asking, isAllDone, counts, alt, action, fitted, showCounts, pillText } = view
+  const { segments, asking, isAllDone, counts, extras, alt, action, fitted, showCounts, pillText } = view
   const icon = (name: IconName, size: number, tone: Tone, weight = 1.9) => <Svg source={glyph(name, size, tone, weight)} alt={name} width={size} height={size} />
   const kind = asking ? 'primary' : 'tint'
   const stripWidth = fitted.strip
   const look = asking ? 'dim' : isAllDone ? 'done' : 'live'
   const lead = asking ? (
-    <Box flexDirection="row" alignItems="center" flexShrink={1} minWidth={0} gap={across(6)} height={tall(34)} paddingLeft={across(9)} paddingRight={across(12)} paddingY={0} borderStyle="round" borderColor="error" backgroundColor={C.redTint}>
-      {icon('needs', 15, 'red', 2)}
+    <Box flexDirection="row" alignItems="center" flexShrink={1} minWidth={0} gap={across(PILL.gap)} height={tall(PILL.height)} paddingLeft={across(PILL.left)} paddingRight={across(PILL.right)} paddingY={0} borderStyle="round" borderColor="error" backgroundColor={C.redTint}>
+      {icon('needs', PILL.icon, 'red', 2)}
       <Text weight="semibold" color="error" wrap="truncate-end">
         {pillText}
       </Text>
     </Box>
   ) : isAllDone ? (
-    icon('check', 18, 'green', 2.4)
+    icon('check', CHECK, 'green', 2.4)
   ) : (
     <Box flexDirection="row" flexShrink={0} width={across(PERCENT)}>
       <Text weight="bold" size="heading" tabular>
@@ -36,26 +36,35 @@ export function Band(ui: Ui, props: BandProps) {
       </Text>
     </Box>
   )
+  const counter = showCounts ? (
+    <Box flexDirection="row" alignItems="center" flexShrink={0} gap={across(COUNTS.gap)} paddingLeft={across(COUNTS.left)} paddingRight={across(COUNTS.right)}>
+      {icon(isAllDone ? 'done' : 'pulse', COUNTS.icon, 'muted')}
+      <Text color={C.muted} tabular>
+        {counts}
+        {extras ? ' · ' : null}
+        {extras ? (
+          <Text color={C.text} weight="semibold">
+            {extras}
+          </Text>
+        ) : null}
+      </Text>
+    </Box>
+  ) : null
   return (
-    <Box flexDirection="row" alignItems="center" gap={across(view.gap)} height={tall(56)} paddingLeft={across(view.padLeft)} paddingRight={across(view.padRight)} paddingY={0} borderStyle="round" borderColor={C.border} backgroundColor={C.surface}>
+    <Box flexDirection="row" alignItems="center" gap={across(view.gap)} height={tall(BAR.height)} paddingLeft={across(view.padLeft)} paddingRight={across(view.padRight)} paddingY={0} borderStyle="round" borderColor={C.border} backgroundColor={C.surface}>
       {lead}
       {fitted.isDots ? (
-        <Svg source={strip(stripWidth, segments, look)} alt={alt} width={stripWidth} height={10} isInteractive />
+        <Box flexDirection="row" alignItems="center" gap={across(view.gap)} flexGrow={1} flexShrink={0}>
+          <Svg source={strip(stripWidth, segments, look)} alt={alt} width={stripWidth} height={10} isInteractive />
+          {counter}
+        </Box>
       ) : (
         <Box flexDirection="column" alignItems="stretch" flexGrow={1} flexShrink={1} width={0} minWidth={0}>
           <Svg source={strip(stripWidth, segments, look)} alt={alt} height={10} isInteractive />
         </Box>
       )}
-      {showCounts ? (
-        <Box flexDirection="row" alignItems="center" flexShrink={0} gap={across(6)} paddingLeft={across(6)} paddingRight={across(8)}>
-          {icon(isAllDone ? 'done' : 'pulse', 15, 'muted')}
-          <Text color={C.muted} tabular>
-            {counts}
-          </Text>
-        </Box>
-      ) : null}
-      {fitted.isDots ? <Box flexGrow={1} /> : null}
-      {action ? BandButton(ui, { name: action.name, label: action.label, art: icon(action.icon, 15, KINDS[kind].tone), onPress: action.press, kind, width: view.actionWidth, left: view.left, right: view.right }) : null}
+      {fitted.isDots ? null : counter}
+      {action ? BandButton(ui, { name: action.name, label: action.label, art: icon(action.icon, BUTTON.icon, KINDS[kind].tone), onPress: action.press, kind, width: view.actionWidth }) : null}
     </Box>
   )
 }

@@ -3,15 +3,16 @@ import type { RenderElement } from 'claude-code'
 import { HIT } from '../../lib/band'
 import type { BandAction } from '../../lib/band'
 import { CH, LH, PAD, across, spaces, tall } from '../../lib/layout'
+import { BUTTON } from '../../theme/band'
 import { C, KINDS, LABEL_COLOR } from '../../theme/tokens'
 import type { Kind } from '../../theme/tokens'
 import type { Ui } from '../types'
 
-export type BandButtonProps = { name: BandAction; label: string; art: RenderElement; onPress: () => void; kind: Kind; width: number; left: number; right: number }
+export type BandButtonProps = { name: BandAction; label: string; art: RenderElement; onPress: () => void; kind: Kind; width: number }
 
 export function BandButton(ui: Ui, props: BandButtonProps) {
   const { Box, Text, Button, Client } = ui
-  const { name, label, art, onPress, kind, left, right } = props
+  const { name, label, art, onPress, kind } = props
   const one = KINDS[kind]
   const color = LABEL_COLOR[kind]
   const key = `band-${name}`
@@ -19,7 +20,7 @@ export function BandButton(ui: Ui, props: BandButtonProps) {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 0,
-    height: tall(36),
+    height: tall(BUTTON.height),
     paddingX: 0,
     paddingY: 0,
     borderStyle: 'round',
@@ -30,9 +31,9 @@ export function BandButton(ui: Ui, props: BandButtonProps) {
   if (Client) {
     const hit = `${HIT}${name}`
     const cols = Math.ceil(props.width / CH)
-    const rows = Math.ceil(36 / LH)
+    const rows = Math.ceil(BUTTON.height / LH)
     return (
-      <Box key={`face-${key}`} {...shape} justifyContent="center" gap={across(6)} width={across(props.width)}>
+      <Box key={`face-${key}`} {...shape} justifyContent="center" gap={across(BUTTON.gap)} width={across(props.width)}>
         {art}
         <Text weight="semibold" color={color.rest} hover={{ color: color.hover }} wrap="truncate-end">
           {label}
@@ -45,14 +46,14 @@ export function BandButton(ui: Ui, props: BandButtonProps) {
   }
   return (
     <Box key={`face-${key}`} {...shape}>
-      <Box position="absolute" top={0} bottom={0} left={0} paddingLeft={across(left)} flexDirection="row" alignItems="center">
+      <Box position="absolute" top={0} bottom={0} left={0} paddingLeft={across(BUTTON.left)} flexDirection="row" alignItems="center">
         {art}
       </Box>
       <Box flexDirection="row" alignItems="center">
         <Box position="absolute" display="none" />
         <Button key={key} plain label={label} onPress={onPress} hover={{ backgroundColor: C.clear }}>
           <Text color={color.rest} weight="semibold">
-            {spaces(left + 15 + 6 - PAD) + label + spaces(right - PAD)}
+            {spaces(BUTTON.left + BUTTON.icon + BUTTON.gap - PAD) + label + spaces(BUTTON.right - PAD)}
           </Text>
         </Button>
       </Box>
