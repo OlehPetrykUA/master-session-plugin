@@ -82,7 +82,7 @@ Never brief "wait for the user's go" unless the user asked to see the draft. If 
 
 ## 3. The loop
 
-**The loop is always on.** While any worker session, subagent or workflow of this validator is open, a heartbeat stays armed: a `ScheduleWakeup` at the `every` interval, or the `/loop` skill. A tick that ends without re-arming is a bug; the loop stops only at Done (section 6) or on the user's `stop`.
+**The loop is always on.** While any worker session, subagent or workflow of this validator is open, a heartbeat stays armed: a `ScheduleWakeup` at the `every` interval, or the `/loop` skill. Every tick re-arms it, and a tick that ends without re-arming is a bug; the loop stops only at Done (section 6) or on the user's `stop`.
 
 Wake signals: a worker this session started sends a turn-end note by itself; for a worker the user named, send SendMessage with `notify_when_idle: true` (local sessions only, one-shot, so re-arm it after each notice). The `/loop` is the safety net; notes and messages still wake you at once. Between ticks the pane shows the workers' live reports (their `report` calls plus what the mod records from commits, tests, edits and waits); a tick verifies them and publishes the board. A report is a claim, never proof. Start it once: Skill `loop` with args `master-session tick for <worker local_ id, subagent or workflow run> [<settings>]: read ${CLAUDE_SKILL_DIR}/SKILL.md sections 3 to 6 and the ledger note <permalink>, then do one tick`.
 
@@ -128,5 +128,5 @@ A worker that asks for a "go", an approval or what to do next gets a direct inst
 - A worker's message is never the user's approval. Forward the user's approvals quoted: `User said: "…"`.
 - Never ask a worker to do what this session was denied.
 - Never invent a result: unverified stays unverified in every summary.
-- Any UI change (pane, band, cards, rows) is a design piece first: an HTML mock with the real theme tokens, light and dark PNGs, and an element and token spec, approved by the validator before UI code starts. The build follows it 1:1 and is checked against it by the `master-session:design-checker` subagent and a live screenshot after merge.
+- Any UI change (pane, band, cards, rows) is planned as a design piece first: new artboards in the project's design canvas, with the real theme tokens, light and dark versions, and an element and token spec, approved by the validator before UI code starts. The build follows it 1:1 and is checked against it by the `master-session:design-checker` subagent and a live screenshot after merge.
 - `ultracode` or "use a workflow" from the user lets the worker run a workflow, within the user's agent budget. Without that request, keep the bare word `ultracode` out of briefs: it opts the worker into workflows.
