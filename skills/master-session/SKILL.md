@@ -52,7 +52,7 @@ Workers come from `worker` and `new`, or the user's words. Find a named one in t
 
 ## 2. Brief the worker
 
-Plan first: split the goal into pieces with one concrete deliverable each, and pick a persona per piece from [personas.md](personas.md). Send one complete prompt: SendMessage to an existing worker, or `start_session` with `title` and `name` (Names below), `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: true`, a `background` of 80+ characters and the permission mode from section 5 for a new one. Every brief starts with `You are a worker session of master session <validator local_id>. Read ${CLAUDE_SKILL_DIR}/worker.md first.` ([worker.md](worker.md) is the child protocol: its own worktree, live status through `mcp__master-session__report`, talking to the parent, the `ready <sha>` gate.) Then the persona's section from personas.md, then these headings, in this order, each short:
+Plan first: split the goal into pieces with one concrete deliverable each, and pick a persona per piece from [personas.md](personas.md). Send one complete prompt: SendMessage to an existing worker, or `start_session` with `title` and `name` (Names below), `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: true`, a `background` of 80+ characters and the permission mode from section 5 for a new one. Every brief starts with `You are a worker session of master session <validator local_id>. Load the master-session:worker and master-session:<persona> skills first.` ([`master-session:worker`](../worker/SKILL.md) is the child protocol: its own worktree, live status through `mcp__master-session__report`, talking to the parent, the `ready <sha>` gate. The persona skill holds its mission, inputs, output, gate and must-not.) Then these headings, in this order, each short:
 ```
 ## Task          one paragraph; the user's words quoted: User said: "…"
 ## Steps         3 to 7 numbered steps
@@ -72,7 +72,7 @@ Changed:  ready <sha> on <branch>, or <commits / files, one line each>
 Evidence: <gate command → result tail, FF-OK, doc sources>
 Open:     <questions for the validator, or "none">
 ```
-Never brief "wait for the user's go" unless the user asked to see the draft. If `start_session` fails (for example over Remote Control), run the same brief as a background subagent (Agent tool) and tell the user. Write the ledger note (section 6) right after the brief.
+Never brief "wait for the user's go" unless the user asked to see the draft. If `start_session` fails (for example over Remote Control), run the same brief as a background subagent of the persona's own type (`Agent` `subagent_type: "master-session:<persona>"`) and tell the user. Write the ledger note (section 6) right after the brief.
 
 **Names.** Both names describe the deliverable, never the team, the tool or a person.
 - `title`: a short noun phrase a person would say, sentence case, about 3 to 6 words, under 60 chars, no colon-and-plus lists. Good: "Pinned pane header", "Idle worker states", "Skill roles and personas". Bad: "Status mod UI: design v9 1:1 + native clicks", "Worker 3", "Fix stuff".
