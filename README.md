@@ -2,8 +2,6 @@
 
 A Claude Code plugin that turns one session into a **validator** for a team of worker sessions. The validator plans the work, briefs a worker session per piece, watches them, answers their questions, verifies every `ready <sha>` in a clean worktree and merges it fast-forward only. You get a live status board instead of a scrolling chat.
 
-![Master session status pane](docs/pane.png)
-
 ## What's inside
 
 | Part | What it does |
