@@ -1,0 +1,12 @@
+{
+  "name": "master-session",
+  "displayName": "Master session",
+  "version": "1.0.0",
+  "description": "A validator session that briefs worker sessions, verifies what they deliver and merges it, with a live status pane, a band above the prompt and four persona subagents.",
+  "author": {
+    "name": "Oleh Petryk"
+  },
+  "license": "MIT",
+  "keywords": ["orchestration", "sessions", "validator", "status", "mod"],
+  "types": "./types/index.d.ts"
+}
