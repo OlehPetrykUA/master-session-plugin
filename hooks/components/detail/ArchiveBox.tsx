@@ -33,7 +33,7 @@ export function ArchiveBox(ui: Ui, props: ArchiveBoxProps) {
         ))}
       </Box>
       <Box key={`confirm-buttons-${id}`} flexDirection="row" gap={across(8)} marginTop={down(4)}>
-        {ActionButton(ui, { id: `archive-no-${id}`, kind: 'secondary', icon: 'close', label: 'Cancel', size: 'b40', iconSize: 16, onPress: props.onCancel })}
+        {ActionButton(ui, { id: `archive-no-${id}`, kind: 'secondary', icon: 'fail', label: 'Cancel', size: 'b40', iconSize: 16, onPress: props.onCancel })}
         <Box flexDirection="row" flexGrow={1} flexShrink={1} minWidth={0}>
           {ActionButton(ui, { id: `archive-yes-${id}`, kind: 'primary', icon: 'archive', label: 'Archive and remove', size: 'b40', iconSize: 16, wide: props.width - 24 - cancel - 8, onPress: props.onArchive })}
         </Box>

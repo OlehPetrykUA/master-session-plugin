@@ -1,9 +1,11 @@
 import { expect, test } from 'claude-code/testing'
 
-import type { AgentRecord, Board, LiveSession, WorkflowRecord } from '../../types'
+import type { AgentRecord, Board, LiveSession, Repo, WorkflowRecord } from '../../types'
 
 import { liveOf } from '../testing/world'
-import { ARCHIVED_PEEK, ageOf, blocksOf, countsOfItems, groupsOf, isAllDone, itemsOf, kindOfType, modelFamilyOf, rowTextOf, shownArchived } from './list'
+import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, countsOfItems, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, lineOf, lineTextOf, modelFamilyOf, nameText, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived } from './list'
+import type { Agent, Context, RowItem } from './list'
+import type { Row } from './rows'
 import { countsOf, rowsOf } from './rows'
 import { runSummaryOf } from './totals'
 
@@ -77,18 +79,82 @@ test('groups: All lists Needs you, Working, Waiting, Done and a closed Archived;
   expect(shownArchived(open!, 'closed', 'archived').length).toBe(5)
 })
 
-test('row text: the kind, the line and the time for each kind; a needs line is the blocker, a workflow names its running agent and its failures', () => {
-  const text = (id: string) => rowTextOf(items.find(item => item.id === id)!, NOW)
-  expect(text('a')).toEqual(expect.objectContaining({ title: 'env-e2e-test', kind: 'Session', line: 'Commit blocked', isAlert: true }))
-  expect(text('b')).toEqual(expect.objectContaining({ kind: 'Session', line: 'build pane', step: { done: 3, total: 5 } }))
-  expect(text('c').line).toBe('waiting on PR review')
-  expect(text('d').line).toBe('merged to main')
-  expect(text('wf_1')).toEqual({ title: 'review-changes', kind: 'Workflow', line: 'verify:atoms.ts · 1 failed', isAlert: true, elapsed: '6m', step: { done: 1, total: 3 } })
-  expect(text('x1')).toEqual({ title: 'Review auth flow', kind: 'Explore', line: 'haiku', isAlert: false, elapsed: '3m' })
-  expect(text('x2')).toEqual(expect.objectContaining({ title: 'token-finder', kind: 'researcher', line: 'sonnet', elapsed: '2m' }))
+const context: Context = { at: NOW, trees: [], sessions: [], agents, rows: rowsOf(board, liveOf()) }
+
+const said = (item: RowItem, at = context) => [item.status, nameText(displayNameOf(item)), lineTextOf(lineOf(item, at))]
+
+test('every kind names itself persona · task and says its state word and current line; a needs line is the question', () => {
+  const of = (id: string) => items.find(item => item.id === id)!
+  expect(['a', 'b', 'c', 'd', 'wf_1', 'x1', 'x2'].map(id => said(of(id)))).toEqual([
+    ['needs', 'Session · env-e2e-test', 'Commit blocked'],
+    ['working', 'Session · mod', 'build pane'],
+    ['waiting', 'Session · pr', 'waiting · waiting on PR review'],
+    ['done', 'Session · done', 'unmerged · git state unknown'],
+    ['working', 'Workflow · review-changes', 'verify:atoms.ts'],
+    ['working', 'Explore · Review auth flow', 'Validator › running'],
+    ['done', 'Researcher · Find token usages', 'Validator › done'],
+  ])
+  expect(lineOf(of('a'), context).isQuestion).toBe(true)
+  const run = items.find(item => item.kind === 'workflow')
+  expect(run?.kind === 'workflow' ? runAgentsOf(run.run, agents).map(one => said(one)) : []).toEqual([
+    ['done', 'Agent · review:bugs', 'done'],
+    ['failed', 'Agent · verify:band.ts', 'failed'],
+    ['working', 'Agent · verify:atoms.ts', 'running'],
+  ])
   const done = itemsOf([], agents.map(agent => ({ ...agent, state: 'done' as const, endedAt: agent.endedAt ?? NOW })), workflows).find(item => item.kind === 'workflow')
-  expect(rowTextOf(done!, NOW).line).toBe('3 phases')
+  expect(said(done!)).toEqual(['done', 'Workflow · review-changes', 'done · 3 of 3 agents'])
   expect([kindOfType('a:b:c'), kindOfType('Explore'), modelFamilyOf('claude-opus-5-5'), modelFamilyOf('haiku'), modelFamilyOf(undefined)]).toEqual(['c', 'Explore', 'opus', 'haiku', ''])
+})
+
+test('a session reads idle, ready, verified or merged from its live state, board and worktree; a persona on the board or the title names it', () => {
+  const live = { id: 's', name: 's', title: 'Implementer · Savvy removal', cwd: '/r/wt', isRunning: false, isArchived: false, lastActivityAt: 0 }
+  const row = (state: Row['state'], board: Partial<NonNullable<Row['board']>> = {}): Row => ({ id: 's', name: 's', title: '', state, board: { id: 's', name: 's', state, ...board }, live })
+  const tree = (unmerged: number, dirty = 0): Repo[] => [{ path: '/r', name: 'r', localOnly: 0, base: 'main', worktrees: [{ path: '/r/wt', branch: 'b', sha: 'abc', isMain: false, dirty, paths: [], upstream: '', ahead: 0, behind: 0, unmerged }] }]
+  expect([
+    sessionStatusOf(row('working')),
+    sessionStatusOf(row('waiting', { now: 'idle since 11:02' })),
+    sessionStatusOf(row('waiting', { now: 'waiting on review' })),
+    sessionStatusOf(row('done', { sha: 'abc' })),
+    sessionStatusOf(row('done', { sha: 'abc', verified: 'PASS' })),
+    sessionStatusOf(row('done', { sha: 'abc' }), tree(0)),
+    sessionStatusOf(row('done', { sha: 'abc' }), tree(2)),
+    sessionStatusOf(row('done', { sha: 'abc' }), tree(0, 1)),
+    sessionStatusOf(row('done')),
+  ]).toEqual(['idle', 'idle', 'waiting', 'ready', 'verified', 'merged', 'ready', 'ready', 'done'])
+  const item = (one: Row, trees: Repo[] = []): RowItem => ({ kind: 'session', id: 's', group: one.state, status: sessionStatusOf(one, trees), row: one })
+  expect(said(item(row('done', { sha: 'abc' }), tree(0)), { ...context, trees: tree(0) })).toEqual(['merged', 'Implementer · Savvy removal', 'merged to main · abc'])
+  expect(displayNameOf(item({ ...row('working', { persona: 'Designer' } as object), live: { ...live, title: 'canvas v3' } }))).toEqual({ persona: 'Designer', task: 'canvas v3' })
+  expect(displayNameOf({ kind: 'master' })).toEqual({ persona: 'Validator', task: '' })
+})
+
+test('subagents name their parent chain: the parent session by persona, an earlier parent folds into …; a parent-less agent belongs to the Validator', () => {
+  const rows: Row[] = [{ id: 'w', name: 'w', title: 'Implementer · Row details', state: 'working' }]
+  const tree: Agent[] = [
+    { id: 'p', type: 'master-session:qa-verifier', description: 'verify a38c72e', state: 'running', startedAt: NOW - 60_000, parentSessionId: 'w' },
+    { id: 'k', type: 'master-session:reviewer', description: 'review a38c72e', state: 'running', startedAt: NOW - 30_000, parentAgentId: 'p', asking: { text: 'Allow Bash: rm -rf dist?', since: NOW - 40_000 } },
+  ]
+  const nested: Context = { ...context, rows, agents: tree }
+  const list = itemsOf(rows, tree, [], {})
+  const line = (id: string) => lineOf(list.find(item => item.id === id)!, nested)
+  expect([list.find(item => item.id === 'p')?.status, line('p')]).toEqual(['waiting', { chain: 'Implementer ›', word: { status: 'waiting', text: 'waiting' }, text: 'on Reviewer · review a38c72e', isQuestion: false }])
+  expect([list.find(item => item.id === 'k')?.status, line('k')]).toEqual(['needs', { chain: '… › QA verifier ›', text: 'Allow Bash: rm -rf dist?', isQuestion: true }])
+})
+
+test('a run with an agent asking turns needs-you, names the asking agent with its question and reds that agent row; counts.asking alone also flags it', () => {
+  const [run] = itemsOf([], agents, workflows).filter(item => item.kind === 'workflow')
+  if (run?.kind !== 'workflow') throw new Error('no run')
+  const asking = { ...run.run, agents: run.run.agents.map(one => (one.index === 3 ? { ...one, type: 'master-session:reviewer', asking: { text: 'Allow Bash: rm -rf dist?', since: NOW } } : one)) }
+  const item: RowItem = { ...run, status: runStatusOf(asking), run: asking }
+  expect(said(item)).toEqual(['needs', 'Workflow · review-changes', 'Reviewer asks: Allow Bash: rm -rf dist?'])
+  expect(runAgentsOf(asking, agents).map(one => one.status)).toEqual(['done', 'failed', 'needs'])
+  expect(runStatusOf({ ...run.run, counts: { ...run.run.counts, asking: 1 } as typeof run.run.counts })).toBe('needs')
+})
+
+test('an archived session names itself from its board entry and says when it was archived and that its worktree is gone', () => {
+  const one: LiveSession = { id: 'z', name: 'z', title: 'old title', cwd: '/r/wt', isRunning: false, isArchived: true, lastActivityAt: NOW - 7_200_000 }
+  const item = archivedItemOf(one, { ...board, sessions: [{ id: 'z', name: 'z', state: 'done', title: 'Implementer · Savvy removal' }] })
+  expect(said(item)).toEqual(['archived', 'Implementer · Savvy removal', 'archived 2h ago · worktree removed'])
+  expect(said(archivedItemOf(one))).toEqual(['archived', 'Session · old title', 'archived 2h ago · worktree removed'])
 })
 
 test('summary blocks read the run totals as the design words them, zeros and dashes before any work', () => {

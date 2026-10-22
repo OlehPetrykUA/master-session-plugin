@@ -1,6 +1,7 @@
 import type { SessionState } from '../../types'
 
 import { escape, textWidth } from '../lib/layout'
+import { C } from './tokens'
 import type { Tone } from './tokens'
 
 const LIGHT =
@@ -39,13 +40,38 @@ export const I = {
   tests: 'M9 3h6 M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3',
   files: 'M6 3h8l4 4v14H6Z M14 3v4h4',
   permission: 'M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6Z',
-  model: 'M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5Z',
   pulse: 'M3 12h4l3-7 4 14 3-7h4',
+  idle: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M10 9v6 M14 9v6',
+  ready: 'M5 21V4 M5 4h12l-2.5 4L17 12H5',
+  verified: 'M2 12.5l4.5 4.5L15.5 8 M10 15.5l1.5 1.5L21 8',
+  merged: 'M6 4a2 2 0 1 0 0 4a2 2 0 0 0 0-4Z M6 8v12 M6 9c0 4 3.5 6 9 6 M18 13a2 2 0 1 0 0 4a2 2 0 0 0 0-4Z',
+  failed: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M9 9l6 6 M15 9l-6 6',
+  queued: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M8 12h.01 M12 12h.01 M16 12h.01',
+  unmerged: 'M6 4a2 2 0 1 0 0 4a2 2 0 0 0 0-4Z M6 8v12 M18 16a2 2 0 1 0 0 4a2 2 0 0 0 0-4Z M18 16V9a3 3 0 0 0-3-3h-4 M13 4l-2 2 2 2',
+  elapsed: 'M12 8a7 7 0 1 0 0 14a7 7 0 0 0 0-14Z M12 11.5V15 M10 2h4 M12 2v3 M18.5 6.5l1.5-1.5',
+  usage: 'M5 20v-8 M10 20V6 M15 20v-9 M20 20v-4',
+  offline: 'M3 3l18 18 M8.6 8.6A8 8 0 0 0 5 11 M12.5 5a12 12 0 0 1 7.5 3 M8.5 14.5a5 5 0 0 1 6.2-.5 M12 18.5h.01',
+  info: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M12 11v5 M12 7.6v.1',
+  stop: 'M7 7h10v10H7Z',
+  undo: 'M9 14L4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-3',
+  opus: 'M7 4h10l4 5-9 11L3 9Z M3 9h18 M9.5 9L12 20l2.5-11',
+  sonnet: 'M19 5C11 5 6 10 5 19 M5 19c8-1 13-6 14-14 M9 15h5 M12 11h4',
+  haiku: 'M5 7h9 M5 12h14 M5 17h9',
+  fable: 'M3 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0Z M12 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0Z',
+  modelChip: 'M7 7h10v10H7Z M10 3v4 M14 3v4 M10 17v4 M14 17v4 M3 10h4 M3 14h4 M17 10h4 M17 14h4',
+  implementer: 'M14.5 4.5a4.5 4.5 0 0 0-4.2 6.1L4 16.9V20h3.1l6.3-6.3a4.5 4.5 0 0 0 6.1-4.2l-2.8 2.8-2.6-.5-.5-2.6Z',
+  refactorer: 'M4 8h13 M14 5l3 3-3 3 M20 16H7 M10 13l-3 3 3 3',
+  reviewer: 'M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Z M20 20l-4.8-4.8 M7.8 10.6l1.9 1.9 3.6-3.6',
+  verifier: 'M9 3h6v4H9Z M9 5H6v16h12V5h-3 M9 13.5l2 2 4-4',
+  designChecker: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z M12 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6Z',
+  researcher: 'M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5Z M5 19.5A1.5 1.5 0 0 0 6.5 21H19 M9 7h6',
+  designer: 'M15 4l5 5L9 20H4v-5Z M13 6l5 5',
+  validator: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5Z',
   session: 'M3 5h18v14H3Z M7 10l3 2-3 2 M12 14h5',
   agent: 'M6 8h12v11H6Z M12 4v4 M9.5 12.5v1 M14.5 12.5v1 M9.5 16h5',
   flow: 'M4 4h6v6H4Z M14 14h6v6h-6Z M7 10v4a3 3 0 0 0 3 3h4',
   expand: 'M6 9l6 6 6-6',
-  close: 'M6 6l12 12 M18 6L6 18',
+  fail: 'M6 6l12 12 M18 6L6 18',
 } as const
 
 export type IconName = keyof typeof I
@@ -65,6 +91,25 @@ export const STATE: Record<SessionState, { icon: IconName; tone: Tone; tint: str
   done: { icon: 'done', tone: 'grey', tint: 'greyTint', word: 'done' },
 }
 
+export type Status = 'needs' | 'working' | 'waiting' | 'idle' | 'ready' | 'verified' | 'merged' | 'done' | 'failed' | 'archived' | 'queued' | 'unmerged'
+
+export const STATUS: Record<Status, { icon: IconName; tone: Tone; tint: string; color: string; box: string; word: string }> = {
+  needs: { icon: 'needs', tone: 'red', tint: 'redTint', color: C.red, box: C.redTint, word: 'needs you' },
+  working: { icon: 'working', tone: 'green', tint: 'greenTint', color: C.green, box: C.greenTint, word: 'working' },
+  waiting: { icon: 'clock', tone: 'amber', tint: 'amberTint', color: C.amber, box: C.amberTint, word: 'waiting' },
+  idle: { icon: 'idle', tone: 'grey', tint: 'greyTint', color: C.grey, box: C.greyTint, word: 'idle' },
+  ready: { icon: 'ready', tone: 'amber', tint: 'amberTint', color: C.amber, box: C.amberTint, word: 'ready for verify' },
+  verified: { icon: 'verified', tone: 'green', tint: 'greenTint', color: C.green, box: C.greenTint, word: 'verified' },
+  merged: { icon: 'merged', tone: 'green', tint: 'greenTint', color: C.green, box: C.greenTint, word: 'merged to main' },
+  done: { icon: 'done', tone: 'grey', tint: 'greyTint', color: C.grey, box: C.greyTint, word: 'done' },
+  failed: { icon: 'failed', tone: 'red', tint: 'redTint', color: C.red, box: C.redTint, word: 'failed' },
+  archived: { icon: 'archive', tone: 'grey', tint: 'greyTint', color: C.grey, box: C.greyTint, word: 'archived' },
+  queued: { icon: 'queued', tone: 'grey', tint: 'greyTint', color: C.grey, box: C.greyTint, word: 'queued' },
+  unmerged: { icon: 'unmerged', tone: 'amber', tint: 'amberTint', color: C.amber, box: C.amberTint, word: 'unmerged' },
+}
+
+export const statusBadge = (status: Status, size: 28 | 32) => square(STATUS[status].icon, STATUS[status].tone, STATUS[status].tint, size, size === 28 ? 8 : 10, size === 28 ? 16 : 18, 1.75)
+
 export function badge(state: SessionState, size = 32, radius = 10, iconSize = 18) {
   const one = STATE[state]
   const at = (size - iconSize) / 2
@@ -82,9 +127,10 @@ export function square(name: IconName, tone: Tone, tint: string, size: number, r
 
 const RING = 2 * Math.PI * 14
 
-export function ring(done: number, total: number, state: SessionState) {
+export const ring = (done: number, total: number, state: SessionState) => toneRing(done, total, STATE[state].tone)
+
+export function toneRing(done: number, total: number, tone: Tone) {
   const share = total ? Math.min(done / total, 1) : 0
-  const tone = STATE[state].tone
   return svg(
     34,
     34,

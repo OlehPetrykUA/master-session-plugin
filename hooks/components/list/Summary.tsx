@@ -25,7 +25,7 @@ export function Summary(ui: Ui, props: SummaryProps) {
         borderColor={one.isAlert ? C.red : C.border}
         backgroundColor={one.isAlert ? C.redTint : C.surface}
       >
-        <Text size="caption" weight="bold" color={muted} wrap="truncate-end">
+        <Text size="caption" weight="semibold" color={muted} wrap="truncate-end">
           {one.label}
         </Text>
         <Svg key={`block-value-${one.key}`} source={value.source} alt={`${one.label} ${one.value}`} width={value.width} height={24} />
@@ -34,7 +34,7 @@ export function Summary(ui: Ui, props: SummaryProps) {
             {one.dots.map(mark => (
               <Box key={`block-${one.key}-${mark.tone}`} flexDirection="row" alignItems="center" gap={across(2)}>
                 <Svg key={`block-dot-${one.key}-${mark.tone}`} source={dot(mark.tone, 6)} alt={mark.tone} width={6} height={6} />
-                <Text size="caption" weight="bold" color={muted} tabular>
+                <Text size="caption" weight="semibold" color={muted} tabular>
                   {String(mark.count)}
                 </Text>
               </Box>

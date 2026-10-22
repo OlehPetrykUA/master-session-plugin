@@ -20,7 +20,7 @@ export function Group(ui: Ui, props: GroupProps) {
       <Box key={`group-head-${props.id}`} flexDirection="row" alignItems="center" gap={across(8)} height={tall(32)}>
         {props.tone ? <Svg key={`group-dot-${props.id}`} source={dot(props.tone, 8)} alt={props.label} width={8} height={8} /> : null}
         {props.icon ? Icon(ui, { id: `group-icon-${props.id}`, name: props.icon, size: 14, tone: 'muted' }) : null}
-        <Text weight="bold">{props.label}</Text>
+        <Text weight="semibold">{props.label}</Text>
         <Text color={C.muted} tabular>
           {String(props.count)}
         </Text>

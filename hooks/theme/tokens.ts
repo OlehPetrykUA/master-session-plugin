@@ -13,7 +13,8 @@ export const C = {
   borderStrong: 'rgba(131,131,130,0.507)',
   accentRing: 'rgba(217,119,87,0.6)',
   pressBg: 'rgba(170,159,114,0.26)',
-  amberTint: 'rgba(232,176,75,0.14)',
+  amberTint: 'rgba(183,121,31,0.12)',
+  greyTint: 'rgba(135,134,127,0.14)',
   redTint: 'rgba(211,119,114,0.139)',
   greenTint: 'rgba(114,158,107,0.164)',
   accent: 'claude',
@@ -26,6 +27,7 @@ export const C = {
   red: 'error',
   green: 'success',
   amber: 'warning',
+  grey: 'subtle',
 } as const
 
 

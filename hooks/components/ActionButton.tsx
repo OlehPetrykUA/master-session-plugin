@@ -1,17 +1,16 @@
 import { across, faceWidth, tall, widthOf } from '../lib/layout'
 import { buttonFace } from '../theme/icons'
-import type { FaceLook } from '../theme/icons'
+import type { FaceLook, IconName } from '../theme/icons'
 import { C, KINDS, LABEL_COLOR, SIZES } from '../theme/tokens'
 import type { Kind, Size, Tone } from '../theme/tokens'
 import { Hit } from './Hit'
-import { Icon, isIcon } from './Icon'
-import type { Glyph } from './Icon'
+import { Icon } from './Icon'
 import type { Ui } from './types'
 
 export type ActionButtonProps = {
   id: string
   kind: Kind
-  icon: Glyph
+  icon: IconName
   label: string
   onPress: () => void
   size?: Size
@@ -37,7 +36,7 @@ export function ActionButton(ui: Ui, props: ActionButtonProps) {
   const labelColor = props.isQuiet ? C.faint : props.isPressed ? C.text : color.rest
   const look = props.kind === 'primary' ? PRIMARY : props.kind === 'link' ? LINK : undefined
   const isWide = props.wide !== undefined && !props.isIconOnly
-  if (look && ui.Client && (props.kind === 'primary' || !isWide) && isIcon(props.icon)) {
+  if (look && ui.Client && (props.kind === 'primary' || !isWide)) {
     const [, start] = SIZES[props.size ?? 's']
     const text = props.isIconOnly ? '' : props.label
     const left = isWide ? Math.max(start, (width - iconSize - gap - widthOf(props.label) * 1.08) / 2) : start
@@ -81,7 +80,7 @@ export function ActionButton(ui: Ui, props: ActionButtonProps) {
         icon(rest, 'icon')
       )}
       {ui.Client && props.isIconOnly ? null : ui.Client ? (
-        <Text weight="bold" color={labelColor} hover={props.kind === 'link' ? { color: color.hover, underline: true } : { color: props.isQuiet ? C.faint : color.hover }} wrap="truncate-end">
+        <Text weight="semibold" color={labelColor} hover={props.kind === 'link' ? { color: color.hover, underline: true } : { color: props.isQuiet ? C.faint : color.hover }} wrap="truncate-end">
           {props.label}
         </Text>
       ) : (

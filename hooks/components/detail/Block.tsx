@@ -3,10 +3,10 @@ import type { RenderChildren } from 'claude-code'
 import { across, down } from '../../lib/layout'
 import { C } from '../../theme/tokens'
 import { Icon } from '../Icon'
-import type { Glyph } from '../Icon'
+import type { IconName } from '../../theme/icons'
 import type { Ui } from '../types'
 
-export type BlockProps = { id: string; icon: Glyph; label: string; children: RenderChildren; isHalf?: boolean; gap?: number }
+export type BlockProps = { id: string; icon: IconName; label: string; children: RenderChildren; isHalf?: boolean; gap?: number }
 
 export function Block(ui: Ui, props: BlockProps) {
   const { Box, Text } = ui

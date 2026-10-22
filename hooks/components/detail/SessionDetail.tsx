@@ -1,30 +1,30 @@
-import type { LiveSession, Repo } from '../../../types'
-
-import { stepOf } from '../../lib/board'
 import { compactOf, modelOf } from '../../lib/format'
 import { across, tall } from '../../lib/layout'
-import { clockOf } from '../../lib/list'
-import { activityOf, elapsedOf, headOf, othersOf, syncOf, titleOf, whereOf } from '../../lib/rows'
+import { clockOf, shortNameOf } from '../../lib/list'
+import type { Context, ListItem } from '../../lib/list'
+import { activityOf, headOf, othersOf, syncOf, whereOf } from '../../lib/rows'
 import type { Row } from '../../lib/rows'
-import { C, LABEL } from '../../theme/tokens'
+import type { IconName } from '../../theme/icons'
+import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
+import { Card } from '../list/Card'
+import type { RowProps } from '../list/Row'
 import { Quiet } from '../Quiet'
 import { Strong } from '../Strong'
 import type { Actions, Ui } from '../types'
 import { Activity } from './Activity'
 import { ArchiveBox } from './ArchiveBox'
 import { Block } from './Block'
-import { Blocker } from './Blocker'
+import { Callout } from './Callout'
 import { Commits } from './Commits'
-import { DetailCard } from './DetailCard'
-import { DetailHeader } from './DetailHeader'
 import { lossesOf } from './losses'
+import { ModelValue } from './Model'
 import { Pair } from './Pair'
 import { Tests } from './Tests'
 
-export type SessionDetailProps = { row: Row; trees: readonly Repo[]; sessions: readonly LiveSession[]; home: string; at: number; asking: string; isReadOnly: boolean; innerWidth: number; actions: Actions }
+export type SessionDetailProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; rowProps: RowProps; home: string; asking: string; isReadOnly: boolean; innerWidth: number; actions: Actions }
 
-type ActionRowProps = { row: Row; losses: readonly string[]; width: number; isAsking: boolean; isReadOnly: boolean; actions: Actions }
+type ActionRowProps = { row: Row; name: string; losses: readonly string[]; width: number; isAsking: boolean; isReadOnly: boolean; actions: Actions }
 
 function ActionRow(ui: Ui, props: ActionRowProps) {
   const { Box } = ui
@@ -34,18 +34,7 @@ function ActionRow(ui: Ui, props: ActionRowProps) {
   const isNeeds = row.state === 'needs-you'
   const canArchive = !!row.live && !isRunning && !isNeeds && !props.isReadOnly
   const archive = () => (losses.length ? actions.confirm(`archive:${id}`) : actions.archive([row], undefined, losses))
-  if (props.isAsking && canArchive) return ArchiveBox(ui, { id, name: row.name, losses, width, onCancel: () => actions.confirm(''), onArchive: () => actions.archive([row], undefined, losses) })
-  if (isNeeds && !row.board?.needsYou && row.live)
-    return (
-      <Box key={`actions-${id}`} flexDirection="row" gap={across(8)}>
-        <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
-          {ActionButton(ui, { id: `chat-${id}`, kind: 'primary', icon: 'chat', label: 'Open chat', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.open(id, row.name) })}
-        </Box>
-        <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
-          {ActionButton(ui, { id: `open-${id}`, kind: 'secondary', icon: 'open', label: 'Open', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.open(id, row.name) })}
-        </Box>
-      </Box>
-    )
+  if (props.isAsking && canArchive) return ArchiveBox(ui, { id, name: props.name, losses, width, onCancel: () => actions.confirm(''), onArchive: () => actions.archive([row], undefined, losses) })
   const second =
     isRunning && !isNeeds
       ? ActionButton(ui, { id: `stop-${id}`, kind: 'secondary', icon: 'stop', label: 'Stop', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.stop(id, row.name) })
@@ -68,45 +57,31 @@ function ActionRow(ui: Ui, props: ActionRowProps) {
 
 export function SessionDetail(ui: Ui, props: SessionDetailProps) {
   const { Box, Text } = ui
-  const { row, trees, home, at, actions } = props
+  const { item, context, home, actions } = props
+  const { row } = item
+  const { trees, at } = context
   const facts = row.board
   const now = row.live
-  const step = stepOf(facts?.progress)
   const found = whereOf(row, trees)
   const where = found?.tree
   const others = othersOf(row, where, trees, home)
   const model = modelOf(now?.model, now?.effort)
   const activity = activityOf(row)
   const files = facts?.files ?? []
-  const losses = lossesOf(row, trees, props.sessions)
+  const losses = lossesOf(row, trees, context.sessions)
   const idle = now ? at - now.lastActivityAt : 0
-  const open = () => actions.open(row.id, row.name)
-  const half = (label: string, icon: Parameters<typeof Block>[1]['icon'], children: Parameters<typeof Block>[1]['children'], id: string) => Block(ui, { id: `${id}-${row.id}`, icon, label, children, isHalf: true })
-
-  return DetailCard(ui, {
-    id: row.id,
-    isNeeds: row.state === 'needs-you',
+  const half = (label: string, icon: IconName, children: Parameters<typeof Block>[1]['children'], id: string) => Block(ui, { id: `${id}-${row.id}`, icon, label, children, isHalf: true })
+  const base = found?.repo.base ?? 'main'
+  const callout =
+    item.status === 'ready'
+      ? Callout(ui, { id: row.id, status: 'ready', label: 'Ready for verify', lines: [{ text: [`ready ${facts?.sha ?? ''}`.trim(), where?.branch ? `on ${where.branch}` : ''].filter(Boolean).join(' '), isStrong: true }, ...(facts?.tests?.length ? [{ text: `gate: ${facts.tests.join(', ')}`, isStrong: false }] : [])] })
+      : item.status === 'verified'
+        ? Callout(ui, { id: row.id, status: 'verified', label: 'Verified', lines: [{ text: facts?.verified ?? '', isStrong: true }, { text: `merge to ${base} pending`, isStrong: false }] })
+        : null
+  return Card(ui, {
+    ...props.rowProps,
     children: [
-      DetailHeader(ui, {
-        id: row.id,
-        state: row.state,
-        title: titleOf(row),
-        word: LABEL[row.state],
-        parts: [step ? `step ${step.done} of ${step.total}${step.label ? `: ${step.label}` : ''}` : '', elapsedOf(row, at)],
-        steps: step ? { done: step.done, total: step.total } : { done: 0, total: 0 },
-        onCollapse: () => actions.collapse(row.id),
-      }),
-      facts?.needsYou
-        ? Blocker(ui, {
-            id: row.id,
-            label: 'Blocker',
-            lines: [
-              { text: facts.needsYou, isStrong: true },
-              { text: 'waiting for your answer', isStrong: false },
-            ],
-            chat: now ? { width: props.innerWidth - 24, onPress: open } : undefined,
-          })
-        : null,
+      callout,
       Pair(ui, {
         id: `pair-now-${row.id}`,
         left: half('Now', 'now', Strong(ui, { text: facts?.now || '—', isFull: true }), 'now'),
@@ -142,7 +117,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
         ),
         right: half(
           'Time',
-          'clock',
+          'elapsed',
           now
             ? [
                 Strong(ui, { text: now.createdAt !== undefined ? `started ${clockOf(now.createdAt)}` : (facts?.time ?? '—'), isFull: true }),
@@ -183,12 +158,11 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
               ),
               'permission',
             ),
-            right: half('Model', 'model', Strong(ui, { text: model || '—', isFull: true }), 'model'),
+            right: half('Model', 'modelChip', ModelValue(ui, { id: row.id, model: now?.model, text: model || '—' }), 'model'),
           })
         : null,
-      facts?.verified ? Block(ui, { id: `verified-${row.id}`, icon: 'check', label: 'Verified', children: Strong(ui, { text: facts.verified, isFull: true }) }) : null,
       facts?.risk ? Block(ui, { id: `risk-${row.id}`, icon: 'blocker', label: 'Risk', children: Strong(ui, { text: facts.risk, isFull: true }) }) : null,
-      ActionRow(ui, { row, losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, isReadOnly: props.isReadOnly, actions }),
+      ActionRow(ui, { row, name: shortNameOf(item), losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, isReadOnly: props.isReadOnly, actions }),
     ],
   })
 }

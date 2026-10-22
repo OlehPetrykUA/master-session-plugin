@@ -1,21 +1,39 @@
-import type { AgentRecord, ArchiveView, Filter, LiveSession, SessionState, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Board, BoardSession, Filter, LiveSession, Repo, SessionState, WorkflowRecord } from '../../types'
 
+import { lossLineOf, mergedLineOf } from '../components/detail/losses'
+import { STATUS } from '../theme/icons'
+import type { IconName, Status } from '../theme/icons'
 import { subagentsOf, workflowRunsOf } from './agents'
-import type { WorkflowRun } from './agents'
+import type { WorkflowAgent, WorkflowRun } from './agents'
 import { stepOf } from './board'
 import { compactOf } from './format'
-import type { RunSummary } from './totals'
-import { elapsedOf, titleOf } from './rows'
+import { activityOf, elapsedOf, titleOf, whereOf } from './rows'
 import type { Row } from './rows'
+import type { RunSummary } from './totals'
+
+export type Ask = { text: string; since: number }
+
+export type Agent = AgentRecord & { asking?: Ask; parentAgentId?: string; parentSessionId?: string }
+
+export type RunAgent = WorkflowAgent & { asking?: Ask }
 
 export type ListItem =
-  | { kind: 'session'; id: string; group: SessionState; row: Row }
-  | { kind: 'workflow'; id: string; group: SessionState; run: WorkflowRun }
-  | { kind: 'subagent'; id: string; group: SessionState; agent: AgentRecord }
+  | { kind: 'session'; id: string; group: SessionState; status: Status; row: Row }
+  | { kind: 'workflow'; id: string; group: SessionState; status: Status; run: WorkflowRun }
+  | { kind: 'subagent'; id: string; group: SessionState; status: Status; agent: Agent }
+
+export type RowItem =
+  | ListItem
+  | { kind: 'agent'; id: string; group: SessionState; status: Status; run: WorkflowRun; agent: RunAgent }
+  | { kind: 'archived'; id: string; group: SessionState; status: Status; one: LiveSession; board?: BoardSession }
 
 export type ListGroup = { id: SessionState | 'archived'; items: readonly ListItem[]; archived: readonly LiveSession[]; isPinned: boolean; isOpen: boolean }
 
-export type RowText = { title: string; kind: string; line: string; isAlert: boolean; elapsed: string; step?: { done: number; total: number } }
+export type Context = { at: number; trees: readonly Repo[]; sessions: readonly LiveSession[]; agents: readonly AgentRecord[]; rows: readonly Row[] }
+
+export type Name = { persona: string; task: string }
+
+export type Line = { chain: string; word?: { status: Status; text: string }; text: string; isQuestion: boolean }
 
 export const GROUPS: readonly SessionState[] = ['needs-you', 'working', 'waiting', 'done']
 
@@ -27,14 +45,121 @@ const KIND_ORDER = { session: 0, workflow: 1, subagent: 2 }
 
 export const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 
-const agentGroup = (state: AgentRecord['state']): SessionState => (state === 'running' ? 'working' : 'done')
-
-export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]): ListItem[] {
-  const sessions = rows.map((row): ListItem => ({ kind: 'session', id: row.id, group: row.state, row }))
-  const runs = workflowRunsOf(agents, workflows).map((run): ListItem => ({ kind: 'workflow', id: run.id, group: agentGroup(run.state), run }))
-  const helpers = subagentsOf(agents).map((agent): ListItem => ({ kind: 'subagent', id: agent.id, group: agentGroup(agent.state), agent }))
-  return [...sessions, ...runs, ...helpers].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
+export const GROUP_OF: Record<Status, SessionState> = {
+  needs: 'needs-you',
+  working: 'working',
+  queued: 'working',
+  waiting: 'waiting',
+  idle: 'waiting',
+  ready: 'waiting',
+  verified: 'done',
+  merged: 'done',
+  done: 'done',
+  failed: 'done',
+  archived: 'done',
+  unmerged: 'done',
 }
+
+const PERSONA: Record<string, string> = {
+  implementer: 'Implementer',
+  refactorer: 'Refactorer',
+  reviewer: 'Reviewer',
+  'qa-verifier': 'QA verifier',
+  'design-checker': 'Design checker',
+  researcher: 'Researcher',
+  designer: 'Designer',
+  validator: 'Validator',
+}
+
+export const PERSONA_GLYPH: Record<string, IconName> = {
+  Implementer: 'implementer',
+  Refactorer: 'refactorer',
+  Reviewer: 'reviewer',
+  'QA verifier': 'verifier',
+  'Design checker': 'designChecker',
+  Researcher: 'researcher',
+  Designer: 'designer',
+  Validator: 'validator',
+}
+
+const GENERIC = ['general-purpose', 'workflow-subagent']
+
+export const MASTER = 'Validator'
+
+export const kindOfType = (type: string) => type.split(':').at(-1) ?? type
+
+export const personaOfType = (type: string) => PERSONA[kindOfType(type)] ?? (kindOfType(type) || 'Subagent')
+
+export const modelFamilyOf = (model: string | undefined) => (model ? (model.replace(/^claude-/, '').split('-')[0] ?? model) : '')
+
+const firstLine = (text: string | undefined) => (text ?? '').split('\n').find(line => line.trim())?.trim() ?? ''
+
+function sessionNameOf(title: string, persona: string | undefined): Name {
+  const cut = title.indexOf(' · ')
+  const prefix = cut > 0 ? title.slice(0, cut) : ''
+  return { persona: persona || prefix || 'Session', task: cut > 0 ? title.slice(cut + 3) : title }
+}
+
+export function displayNameOf(item: RowItem | { kind: 'master' }): Name {
+  if (item.kind === 'master') return { persona: MASTER, task: '' }
+  if (item.kind === 'session') return sessionNameOf(titleOf(item.row), (item.row.board as { persona?: string } | undefined)?.persona)
+  if (item.kind === 'archived') return sessionNameOf(item.board?.title || item.one.title || item.one.name, (item.board as { persona?: string } | undefined)?.persona)
+  if (item.kind === 'workflow') return { persona: 'Workflow', task: item.run.name }
+  if (item.kind === 'agent') return { persona: GENERIC.includes(item.agent.type) ? 'Agent' : personaOfType(item.agent.type), task: item.agent.label }
+  return { persona: personaOfType(item.agent.type), task: item.agent.description }
+}
+
+export const nameText = (name: Name) => (name.task ? `${name.persona} · ${name.task}` : name.persona)
+
+export function sessionStatusOf(row: Row, trees: readonly Repo[] = [], sessions: readonly LiveSession[] = []): Status {
+  if (row.state === 'needs-you') return 'needs'
+  const isRunning = row.live?.isRunning
+  if (row.state === 'working') return isRunning === false ? 'idle' : 'working'
+  if (row.state === 'waiting') return !isRunning && (!row.board?.now || row.board.now.startsWith('idle')) ? 'idle' : 'waiting'
+  if (mergedLineOf(row, trees) && !lossLineOf(row, trees, sessions)) return 'merged'
+  if (row.board?.verified) return 'verified'
+  if (row.board?.sha) return 'ready'
+  return 'done'
+}
+
+const hasRunningChild = (agent: Agent, agents: readonly AgentRecord[]) => agents.some(one => (one as Agent).parentAgentId === agent.id && one.state === 'running')
+
+export function agentStatusOf(agent: Agent | RunAgent, agents: readonly AgentRecord[] = []): Status {
+  if (agent.state === 'running' && agent.asking) return 'needs'
+  if (agent.state === 'running') return 'id' in agent && hasRunningChild(agent as Agent, agents) ? 'waiting' : 'working'
+  return agent.state === 'failed' ? 'failed' : 'done'
+}
+
+export function runStatusOf(run: WorkflowRun): Status {
+  if ((run.counts as { asking?: number }).asking || run.agents.some(agent => (agent as RunAgent).asking && agent.state === 'running')) return 'needs'
+  if (run.state === 'running') return 'working'
+  return run.state === 'failed' ? 'failed' : 'done'
+}
+
+export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'trees' | 'sessions'>> = {}): ListItem[] {
+  const session = (row: Row): ListItem => {
+    const status = sessionStatusOf(row, context.trees, context.sessions)
+    return { kind: 'session', id: row.id, group: GROUP_OF[status], status, row }
+  }
+  const run = (one: WorkflowRun): ListItem => {
+    const status = runStatusOf(one)
+    return { kind: 'workflow', id: one.id, group: GROUP_OF[status], status, run: one }
+  }
+  const helper = (agent: Agent): ListItem => {
+    const status = agentStatusOf(agent, agents)
+    return { kind: 'subagent', id: agent.id, group: GROUP_OF[status], status, agent }
+  }
+  return [...rows.map(session), ...workflowRunsOf(agents, workflows).map(run), ...subagentsOf(agents).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
+}
+
+export function runAgentsOf(run: WorkflowRun, agents: readonly AgentRecord[] = []): RowItem[] {
+  return run.agents.map(agent => {
+    const status = agentStatusOf(agent, agents)
+    return { kind: 'agent', id: agent.id, group: GROUP_OF[status], status, run, agent }
+  })
+}
+
+export const archivedItemOf = (one: LiveSession, board?: Board | null): Extract<RowItem, { kind: 'archived' }> => ({ kind: 'archived', id: one.id, group: 'done', status: 'archived', one, board: board?.sessions.find(entry => entry.id === one.id) })
 
 export function countsOfItems(items: readonly ListItem[], archived: number): Record<Filter, number> {
   const count = (group: SessionState) => items.filter(item => item.group === group).length
@@ -56,37 +181,105 @@ export function groupsOf(items: readonly ListItem[], archived: readonly LiveSess
 export const shownArchived = (group: ListGroup, archiveView: ArchiveView, chosen: Filter) =>
   chosen === 'archived' || archiveView === 'all' ? group.archived : group.archived.slice(0, ARCHIVED_PEEK)
 
-export const kindOfType = (type: string) => type.split(':').at(-1) ?? type
+const sessionOfId = (id: string | undefined, context: Context) => context.rows.find(row => row.id === id)
 
-export const modelFamilyOf = (model: string | undefined) => (model ? (model.replace(/^claude-/, '').split('-')[0] ?? model) : '')
-
-const sessionLine = (row: Row) => {
-  if (row.state === 'needs-you') return row.board?.needsYou || 'needs you'
-  if (row.board?.note) return row.board.note
-  const step = stepOf(row.board?.progress)?.label
-  if (row.state === 'done') return row.board?.done || step || 'done'
-  return step || row.board?.now || (row.live?.isRunning ? 'running' : 'idle')
+export function parentsOf(item: RowItem, context: Context): Name[] {
+  if (item.kind === 'agent') return [{ persona: 'Workflow', task: item.run.name }]
+  if (item.kind !== 'subagent') return []
+  const names: Name[] = []
+  let agent: Agent | undefined = item.agent
+  const seen = new Set<string>()
+  while (agent && !seen.has(agent.id)) {
+    seen.add(agent.id)
+    const parent: Agent | undefined = agent.parentAgentId ? (context.agents.find(one => one.id === agent?.parentAgentId) as Agent | undefined) : undefined
+    if (parent) {
+      names.unshift(displayNameOf({ kind: 'subagent', id: parent.id, group: 'working', status: 'working', agent: parent }))
+      agent = parent
+      continue
+    }
+    const row = sessionOfId(agent.parentSessionId, context)
+    names.unshift(row ? displayNameOf({ kind: 'session', id: row.id, group: row.state, status: 'working', row }) : { persona: MASTER, task: '' })
+    agent = undefined
+  }
+  return names
 }
 
-const runLine = (run: WorkflowRun) => {
-  const current = [...run.agents].reverse().find(agent => agent.state === 'running')?.label
-  const lead = current ?? (run.state === 'running' ? run.description || 'starting' : run.phases.length ? plural(run.phases.length, 'phase') : run.description || run.state)
-  return [lead, run.counts.failed ? `${run.counts.failed} failed` : ''].filter(Boolean).join(' · ')
+export function chainOf(item: RowItem, context: Context) {
+  if (item.kind !== 'subagent') return ''
+  const names = parentsOf(item, context)
+  const last = names.at(-1)
+  return last ? `${names.length > 1 ? '… › ' : ''}${last.persona} ›` : ''
 }
 
-const spanText = (startedAt: number, endedAt: number | undefined, at: number) => compactOf((endedAt ?? at) - startedAt)
+export const spanOf = (startedAt: number, endedAt: number | undefined, at: number) => compactOf((endedAt ?? at) - startedAt)
 
-export function rowTextOf(item: ListItem, at: number): RowText {
+function sessionLineOf(row: Row, status: Status, context: Context): Line {
+  const board = row.board
+  const loss = status === 'ready' || status === 'verified' || status === 'done' ? lossLineOf(row, context.trees, context.sessions) : ''
+  const plain = (text: string): Line => ({ chain: '', text, isQuestion: false })
+  const worded = (word: Status, text: string, label = STATUS[word].word): Line => ({ chain: '', word: { status: word, text: label }, text, isQuestion: false })
+  if (status === 'needs') return { chain: '', text: board?.needsYou || 'needs you', isQuestion: true }
+  if (loss) return worded('unmerged', loss)
+  if (status === 'working') return plain(stepOf(board?.progress)?.label || board?.now || 'running')
+  if (status === 'idle') return worded('idle', activityOf(row)[0] ? `last: ${activityOf(row)[0]?.text}` : '')
+  if (status === 'waiting') return worded('waiting', board?.now ?? '')
+  if (status === 'ready') return worded('ready', board?.now || board?.done || board?.sha || '')
+  if (status === 'verified') return worded('verified', board?.verified ?? '')
+  if (status === 'merged') return worded('merged', board?.sha ?? whereOf(row, context.trees)?.tree.sha ?? '', mergedLineOf(row, context.trees))
+  return worded('done', board?.done || 'unverified')
+}
+
+function agentLineOf(agent: Agent | RunAgent, status: Status, chain: string, context: Context): Line {
+  const result = firstLine(agent.result)
+  if (status === 'needs') return { chain, text: agent.asking?.text || 'needs you', isQuestion: true }
+  if (status === 'waiting') {
+    const child = context.agents.find(one => (one as Agent).parentAgentId === agent.id && one.state === 'running')
+    const name = child ? displayNameOf({ kind: 'subagent', id: child.id, group: 'working', status: 'working', agent: child }) : undefined
+    return { chain, word: { status, text: STATUS.waiting.word }, text: name ? `on ${nameText(name)}` : '', isQuestion: false }
+  }
+  if (status === 'working') return { chain, text: 'running', isQuestion: false }
+  return { chain, word: { status, text: STATUS[status].word }, text: result, isQuestion: false }
+}
+
+function runLineOf(run: WorkflowRun, status: Status): Line {
+  if (status === 'needs') {
+    const asking = run.agents.find(agent => (agent as RunAgent).asking && agent.state === 'running') as RunAgent | undefined
+    const persona = asking ? displayNameOf({ kind: 'agent', id: asking.id, group: 'needs-you', status: 'needs', run, agent: asking }).persona : 'An agent'
+    return { chain: '', text: `${persona} asks: ${asking?.asking?.text ?? ''}`, isQuestion: true }
+  }
+  if (status === 'working') return { chain: '', text: [...run.agents].reverse().find(agent => agent.state === 'running')?.label ?? (run.description || 'starting'), isQuestion: false }
+  if (status === 'failed') return { chain: '', word: { status, text: STATUS.failed.word }, text: `${plural(run.counts.failed, 'agent')} failed`, isQuestion: false }
+  return { chain: '', word: { status, text: STATUS.done.word }, text: `${run.counts.done} of ${run.counts.total} agents`, isQuestion: false }
+}
+
+export function lineOf(item: RowItem, context: Context): Line {
+  if (item.kind === 'session') return sessionLineOf(item.row, item.status, context)
+  if (item.kind === 'workflow') return runLineOf(item.run, item.status)
+  if (item.kind === 'archived') return { chain: '', word: { status: 'archived', text: `archived ${ageOf(context.at - item.one.lastActivityAt)}` }, text: 'worktree removed', isQuestion: false }
+  return agentLineOf(item.agent, item.status, chainOf(item, context), context)
+}
+
+export const lineTextOf = (line: Line) => `${line.chain ? `${line.chain} ` : ''}${[line.word?.text, line.text].filter(Boolean).join(' · ')}`
+
+export const shortNameOf = (item: RowItem) => {
+  const name = displayNameOf(item)
+  return name.task || name.persona
+}
+
+export function elapsedOfItem(item: RowItem, at: number) {
+  if (item.kind === 'session') return elapsedOf(item.row, at)
+  if (item.kind === 'workflow') return spanOf(item.run.startedAt, item.run.endedAt, at)
+  if (item.kind === 'archived') return item.one.createdAt === undefined ? '' : spanOf(item.one.createdAt, item.one.lastActivityAt, at)
+  return spanOf(item.agent.startedAt, item.agent.endedAt, at)
+}
+
+export function stepsOfItem(item: RowItem) {
   if (item.kind === 'session') {
     const step = stepOf(item.row.board?.progress)
-    return { title: titleOf(item.row), kind: 'Session', line: sessionLine(item.row), isAlert: item.group === 'needs-you', elapsed: elapsedOf(item.row, at), step: step ? { done: step.done, total: step.total } : undefined }
+    return step ? { done: step.done, total: step.total } : undefined
   }
-  if (item.kind === 'workflow') {
-    const { run } = item
-    return { title: run.name, kind: 'Workflow', line: runLine(run), isAlert: run.counts.failed > 0, elapsed: spanText(run.startedAt, run.endedAt, at), step: { done: run.counts.done, total: run.counts.total } }
-  }
-  const { agent } = item
-  return { title: agent.name || agent.description, kind: kindOfType(agent.type), line: modelFamilyOf(agent.requestedModel || agent.model), isAlert: false, elapsed: spanText(agent.startedAt, agent.endedAt, at) }
+  if (item.kind === 'workflow') return { done: item.run.counts.done, total: item.run.counts.total }
+  return undefined
 }
 
 export function ageOf(ms: number) {

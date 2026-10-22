@@ -1,25 +1,19 @@
 import type { RenderChildren } from 'claude-code'
 
-import type { AgentRecord, LiveSession, Repo } from '../../../types'
-
-import type { WorkflowRun } from '../../lib/agents'
-import { stepOf } from '../../lib/board'
 import { compactOf, modelOf } from '../../lib/format'
-import { clockOf, kindOfType, modelFamilyOf, plural } from '../../lib/list'
-import { elapsedOf, headOf, syncOf, titleOf, whereOf } from '../../lib/rows'
-import type { Row } from '../../lib/rows'
-import { AGENT } from '../../theme/detail'
-import { CARD_BORDER, LABEL, TERMINAL_COLOR } from '../../theme/tokens'
+import { clockOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, modelFamilyOf, nameText, parentsOf, plural, runAgentsOf, shortNameOf } from '../../lib/list'
+import type { Context, ListItem, RowItem } from '../../lib/list'
+import { headOf, syncOf, whereOf } from '../../lib/rows'
+import { STATUS } from '../../theme/icons'
+import { CARD_BORDER, TERMINAL_COLOR } from '../../theme/tokens'
 import type { Actions, TextUi } from '../types'
 import { LOST } from './ArchiveBox'
-import { SEEN, WORD, durationOf, tokensOf } from './format'
+import { durationOf, tokensOf } from './format'
 import { lossesOf } from './losses'
 
 type Line = { text: string; color?: string }
 
 type TextCardProps = { id: string; title: string; head: Line; lines: readonly (Line | string)[]; isNeeds?: boolean; onCollapse: () => void; actions?: RenderChildren }
-
-const MARK = { running: '●', done: '✓', failed: '✗' } as const
 
 function TextCard(ui: TextUi, props: TextCardProps) {
   const { Box, Text, Button } = ui
@@ -37,27 +31,31 @@ function TextCard(ui: TextUi, props: TextCardProps) {
   )
 }
 
-export type TextSessionProps = { row: Row; trees: readonly Repo[]; sessions: readonly LiveSession[]; at: number; asking: string; isReadOnly: boolean; actions: Actions }
+export const colorOf = (item: RowItem) => (item.status === 'archived' ? 'subtle' : TERMINAL_COLOR[item.group])
+
+const headOfItem = (item: RowItem, context: Context): Line => ({ text: [lineTextOf(lineOf(item, context)), elapsedOfItem(item, context.at)].filter(Boolean).join(' · '), color: colorOf(item) })
+
+export type TextSessionProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; asking: string; isReadOnly: boolean; actions: Actions }
 
 export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
   const { Box, Text, Button } = ui
-  const { row, at, actions } = props
+  const { item, context, actions } = props
+  const { row } = item
+  const at = context.at
   const facts = row.board
   const now = row.live
-  const step = stepOf(facts?.progress)
-  const where = whereOf(row, props.trees)?.tree
+  const where = whereOf(row, context.trees)?.tree
   const files = facts?.files ?? []
   const model = modelOf(now?.model, now?.effort)
-  const losses = lossesOf(row, props.trees, props.sessions)
+  const losses = lossesOf(row, context.trees, context.sessions)
   const canArchive = !!now && !now.isRunning && row.state !== 'needs-you' && !props.isReadOnly
   const isStoppable = !!now?.isRunning && row.state !== 'needs-you'
   return TextCard(ui, {
     id: row.id,
-    title: titleOf(row),
-    isNeeds: row.state === 'needs-you',
-    head: { text: [LABEL[row.state], step ? `step ${step.done} of ${step.total}${step.label ? `: ${step.label}` : ''}` : '', elapsedOf(row, at)].filter(Boolean).join(' · '), color: TERMINAL_COLOR[row.state] },
+    title: nameText(displayNameOf(item)),
+    isNeeds: item.status === 'needs',
+    head: headOfItem(item, context),
     lines: [
-      ...(facts?.needsYou ? [{ text: `Blocker: ${facts.needsYou}`, color: 'error' }, 'waiting for your answer'] : []),
       facts?.now ? `Now: ${facts.now}` : '',
       facts?.next ? `Next: ${facts.next}` : '',
       ...(facts?.activity ?? []).slice(0, 3).map(line => `• ${line}`),
@@ -75,7 +73,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
     actions:
       props.asking === `archive:${row.id}` && canArchive ? (
         <Box key={`confirm-${row.id}`} flexDirection="column">
-          <Text weight="semibold">{`Archive ${row.name}?`}</Text>
+          <Text weight="semibold">{`Archive ${shortNameOf(item)}?`}</Text>
           <Text dimColor>{LOST}</Text>
           {losses.map(loss => (
             <Text color="error">{`• ${loss}`}</Text>
@@ -87,8 +85,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
         </Box>
       ) : (
         <Box key={`actions-${row.id}`} flexDirection="row" gap="sm">
-          {now && row.state === 'needs-you' ? <Button key={`chat-${row.id}`} variant="primary" label="Open chat" onPress={() => actions.open(row.id, row.name)} /> : null}
-          <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} />
+                    <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} />
           {isStoppable ? <Button key={`stop-${row.id}`} label="Stop" onPress={() => actions.stop(row.id, row.name)} /> : null}
           {canArchive ? <Button key={`archive-${row.id}`} label={losses.length ? 'Archive…' : 'Archive'} onPress={() => (losses.length ? actions.confirm(`archive:${row.id}`) : actions.archive([row], undefined, losses))} /> : null}
         </Box>
@@ -96,21 +93,24 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
   })
 }
 
-export type TextWorkflowProps = { run: WorkflowRun; at: number; onCollapse: () => void }
+export type TextWorkflowProps = { item: Extract<ListItem, { kind: 'workflow' }>; context: Context; onCollapse: () => void }
 
 export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
-  const { run, at } = props
+  const { item, context } = props
+  const { run } = item
   const { counts } = run
+  const at = context.at
   const end = run.endedAt ?? at
   const failed = run.agents.filter(agent => agent.state === 'failed')
   return TextCard(ui, {
     id: run.id,
-    title: run.name,
-    head: { text: [WORD[run.state], plural(counts.total, 'agent'), durationOf(end - run.startedAt)].join(' · '), color: TERMINAL_COLOR[SEEN[run.state]] },
+    title: nameText(displayNameOf(item)),
+    isNeeds: item.status === 'needs',
+    head: headOfItem(item, context),
     lines: [
-      `Workflow · run ${run.id} · ${counts.done}/${counts.total} done`,
+      `run ${run.id} · ${counts.done}/${counts.total} done`,
       ...failed.map(agent => ({ text: `Failed: ${agent.label}${agent.result ? ` — ${agent.result}` : ''}`, color: 'error' })),
-      ...run.agents.map(agent => `${MARK[agent.state]} ${agent.label} · ${AGENT[agent.state].word} · ${durationOf((agent.endedAt ?? at) - agent.startedAt)}`),
+      ...runAgentsOf(run, context.agents).map(agent => ({ text: `${nameText(displayNameOf(agent))} · ${lineTextOf(lineOf(agent, context))} · ${elapsedOfItem(agent, at)}`, color: agent.status === 'needs' ? 'error' : undefined })),
       run.state === 'running' ? `Time: running ${durationOf(at - run.startedAt)} · started ${clockOf(run.startedAt)}` : `Time: took ${durationOf(end - run.startedAt)} · ${clockOf(run.startedAt)} – ${clockOf(end)}`,
       `Usage: ${plural(counts.total, 'agent')}${run.tokens ? ` · ${tokensOf(run.tokens)}` : ''}`,
     ],
@@ -118,22 +118,26 @@ export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
   })
 }
 
-export type TextSubagentProps = { agent: AgentRecord; at: number; onCollapse: () => void }
+export type TextSubagentProps = { item: Extract<ListItem, { kind: 'subagent' }>; context: Context; onCollapse: () => void }
 
 export function TextSubagentDetail(ui: TextUi, props: TextSubagentProps) {
-  const { agent, at } = props
+  const { item, context } = props
+  const { agent } = item
+  const at = context.at
   const end = agent.endedAt ?? at
-  const model = modelFamilyOf(agent.model)
+  const model = modelFamilyOf(agent.requestedModel || agent.model)
   const isRunning = agent.state === 'running'
   return TextCard(ui, {
     id: agent.id,
-    title: agent.name || agent.description,
-    head: { text: [WORD[agent.state], kindOfType(agent.type), model, durationOf(end - agent.startedAt)].filter(Boolean).join(' · '), color: TERMINAL_COLOR[SEEN[agent.state]] },
+    title: nameText(displayNameOf(item)),
+    isNeeds: item.status === 'needs',
+    head: headOfItem(item, context),
     lines: [
+      ...(item.status === 'needs' && agent.asking ? [{ text: `Permission: ${agent.asking.text}`, color: 'error' }] : []),
       `Task: ${agent.description}`,
       agent.prompt ?? '',
-      `Agent type: ${agent.type} · Model: ${model || '—'}`,
-      `Started by: ${agent.spawnedBy ? `${agent.spawnedBy} plugin` : 'main chat'} · ${agent.isBackground ? 'background' : 'foreground'}`,
+      `Model: ${model || '—'} · ${agent.type}`,
+      `Started by: ${parentsOf(item, context).map(nameText).join(' › ')} · ${agent.isBackground ? 'background' : 'foreground'}`,
       isRunning ? `Time: running ${durationOf(at - agent.startedAt)} · started ${clockOf(agent.startedAt)}` : `Time: took ${durationOf(end - agent.startedAt)} · ${clockOf(agent.startedAt)} – ${clockOf(end)}`,
       !isRunning && agent.result ? `${agent.state === 'failed' ? 'Error' : 'Result'}: ${agent.result}` : '',
       !isRunning && agent.tokens ? tokensOf(agent.tokens) : '',

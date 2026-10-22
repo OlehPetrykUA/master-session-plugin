@@ -12,8 +12,8 @@ export function EmptyBox(ui: Ui, props: EmptyBoxProps) {
   const [before, after] = props.command ? props.body.split(props.command) : [props.body, '']
   return (
     <Box key={`empty-${props.id}`} flexDirection="column" alignItems="center" gap={down(8)} paddingTop={down(24)} paddingBottom={down(24)} paddingX={across(16)} borderStyle="dashed" borderColor={C.borderStrong}>
-      {Icon(ui, { id: `empty-icon-${props.id}`, name: props.icon, size: 24, tone: 'faint' })}
-      <Text weight="bold">{props.title}</Text>
+      {Icon(ui, { id: `empty-icon-${props.id}`, name: props.icon, size: 24, tone: 'faint', weight: 1.75 })}
+      <Text weight="semibold">{props.title}</Text>
       <Text size="footnote" color={C.muted}>
         {before}
         {props.command ? <Text mono>{props.command}</Text> : null}

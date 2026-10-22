@@ -14,7 +14,7 @@ export function UndoBar(ui: Ui, props: UndoBarProps) {
       {Icon(ui, { id: `undo-icon-${id}`, name: 'archive', size: 14, tone: 'muted' })}
       <Box flexGrow={1} flexShrink={1} minWidth={0}>
         <Text wrap="wrap">
-          {props.name ? <Text weight="bold">{props.name}</Text> : null}
+          {props.name ? <Text weight="semibold">{props.name}</Text> : null}
           {props.name ? ` ${props.text}` : props.text}
         </Text>
       </Box>

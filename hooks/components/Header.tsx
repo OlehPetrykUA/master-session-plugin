@@ -16,7 +16,7 @@ export function Header(ui: Ui, props: HeaderProps) {
   const title = (
     <Box key="header-title" flexDirection="column" gap={down(2)} minWidth={0} flexShrink={1}>
       <Box flexDirection="row" alignItems="center" gap={across(8)}>
-        <Text weight="bold" size="heading" wrap="truncate-end">
+        <Text weight="semibold" size="heading" wrap="truncate-end">
           {props.title}
         </Text>
         <Svg key="live" source={liveDot(props.isLive ? 'green' : 'amber')} alt={props.isLive ? 'live' : 'live data unavailable'} width={14} height={14} />

@@ -1,29 +1,35 @@
+import type { RenderChildren } from 'claude-code'
+
 import { isArchivable } from '../../data/contract'
 import { bodyWidthOf, across, down } from '../../lib/layout'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, plural, shownArchived } from '../../lib/list'
-import type { ListGroup, ListItem } from '../../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, plural, shownArchived } from '../../lib/list'
+import type { Agent, Context, ListGroup, RowItem } from '../../lib/list'
 import type { Row as SessionRow } from '../../lib/rows'
 import type { PaneView } from '../../lib/view'
 import type { Tone } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
+import { ArchivedDetail } from '../detail/ArchivedDetail'
 import { familyOf, lossesOf } from '../detail/losses'
 import { SessionDetail } from '../detail/SessionDetail'
 import { SubagentDetail } from '../detail/SubagentDetail'
 import { UndoBar } from '../detail/UndoBar'
 import { WorkflowDetail } from '../detail/WorkflowDetail'
 import type { PaneData, Ui } from '../types'
-import { ArchivedRow } from './ArchivedRow'
 import { EmptyBox } from './EmptyBox'
 import { Group } from './Group'
 import { Row } from './Row'
+import type { RowChat } from './Row'
 
 const TONE: Record<ListGroup['id'], Tone | undefined> = { 'needs-you': 'red', working: 'green', waiting: 'amber', done: 'grey', archived: undefined }
+
+const CARD_INSET = 2 + 24
 
 export function List(ui: Ui, data: PaneData, view: PaneView) {
   const { Box } = ui
   const { actions } = data
   const isReadOnly = !!data.from
   const width = bodyWidthOf(data.columns)
+  const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows }
   const empty = (id: string) => {
     const text = EMPTY_TEXT[data.chosen]
     const isAll = data.chosen === 'all'
@@ -36,19 +42,26 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       onShowAll: isAll ? undefined : () => actions.filter('all'),
     })
   }
-  const innerWidth = width - 2 - 24
-  const collapse = (id: string) => () => actions.collapse(id)
-  const detailOf = (item: ListItem) => {
-    if (item.kind === 'workflow') return WorkflowDetail(ui, { run: item.run, at: data.at, innerWidth, onCollapse: collapse(item.id) })
-    if (item.kind === 'subagent') return SubagentDetail(ui, { agent: item.agent, at: data.at, onCollapse: collapse(item.id) })
-    return SessionDetail(ui, { row: item.row, trees: data.trees, sessions: familyOf(data.live), home: data.home, at: data.at, asking: data.asking, isReadOnly, innerWidth, actions })
+  const chatOf = (item: RowItem): RowChat | undefined => {
+    if (item.status !== 'needs') return undefined
+    if (item.kind === 'session') return { label: 'Open chat', onPress: () => actions.open(item.row.id, item.row.name) }
+    if (item.kind !== 'subagent') return undefined
+    const parent = data.rows.find(row => row.id === (item.agent as Agent).parentSessionId)
+    return parent ? { label: 'Open chat', onPress: () => actions.open(parent.id, parent.name) } : undefined
+  }
+  const isOpen = (item: RowItem) => data.open.includes(item.id) || (item.kind === 'workflow' && item.run.agents.some(agent => data.open.includes(agent.id)))
+  const itemOf = (item: RowItem, room: number): RenderChildren => {
+    const onOpen = () => (item.kind === 'agent' && data.open.includes(item.id) ? actions.toggle(item.run.id) : actions.toggle(item.id))
+    const rowProps = { item, context, home: data.home, width: room, isNarrow: view.isNarrow, onOpen, chat: chatOf(item) }
+    if (!isOpen(item)) return Row(ui, rowProps)
+    const innerWidth = room - CARD_INSET
+    if (item.kind === 'workflow') return WorkflowDetail(ui, { item, context, rowProps, innerWidth, agentOf: agent => itemOf(agent, innerWidth - 24) })
+    if (item.kind === 'subagent' || item.kind === 'agent') return SubagentDetail(ui, { item, context, rowProps, innerWidth, actions })
+    if (item.kind === 'archived') return ArchivedDetail(ui, { item, context, rowProps, asking: data.asking, isReadOnly, innerWidth, actions })
+    return SessionDetail(ui, { item, context, rowProps, home: data.home, asking: data.asking, isReadOnly, innerWidth, actions })
   }
   const items = (group: ListGroup) => {
-    const drawn = group.items.map(item => {
-      if (data.open.includes(item.id)) return detailOf(item)
-      const name = item.kind === 'session' ? item.row.name : item.id
-      return Row(ui, { item, trees: data.trees, sessions: familyOf(data.live), home: data.home, at: data.at, isNarrow: view.isNarrow, width, onOpen: () => actions.toggle(item.id), onChat: () => actions.open(item.id, name) })
-    })
+    const drawn = group.items.map(item => itemOf(item, width))
     return undone?.group === group.id ? [...drawn.slice(0, undone.index), undoBar(), ...drawn.slice(undone.index)] : drawn
   }
   const idleSessions = (group: ListGroup) =>
@@ -83,7 +96,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
         icon: 'archive',
         isPinned: false,
         action,
-        children: group.isOpen ? shownArchived(group, data.archiveView, data.chosen).map(one => ArchivedRow(ui, { one, at: data.at, asking: data.asking, isReadOnly, actions })) : [],
+        children: group.isOpen ? shownArchived(group, data.archiveView, data.chosen).map(one => itemOf(archivedItemOf(one, data.board), width)) : [],
       })
     }
     if (!group.items.length && undone?.group !== group.id) return empty(`group-${group.id}`)

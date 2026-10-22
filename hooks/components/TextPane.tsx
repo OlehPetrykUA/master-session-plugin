@@ -1,17 +1,14 @@
-import type { LiveSession } from '../../types'
-
 import { isArchivable } from '../data/contract'
 import { TITLE } from '../lib/constants'
 import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, ageOf, plural, rowTextOf, shownArchived } from '../lib/list'
-import type { ListGroup, ListItem } from '../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, plural, shownArchived, stepsOfItem } from '../lib/list'
+import type { Agent, Context, ListGroup, ListItem, RowItem } from '../lib/list'
 import type { Row } from '../lib/rows'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
 import { TERMINAL_COLOR } from '../theme/tokens'
 import { familyOf, lossesOf } from './detail/losses'
-import { TextSessionDetail, TextSubagentDetail, TextWorkflowDetail } from './detail/TextDetail'
-import { badgeStateOf } from './list/Row'
+import { TextSessionDetail, TextSubagentDetail, TextWorkflowDetail, colorOf } from './detail/TextDetail'
 import type { PaneData, TextUi } from './types'
 import { UnarchiveConfirm } from './UnarchiveConfirm'
 
@@ -19,12 +16,19 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
   const { Box, Text, Button } = ui
   const isReadOnly = !!data.from
   const { actions, asking, at, trees } = data
+  const context: Context = { at, trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows }
 
   const detail = (item: ListItem) => {
     const collapse = () => actions.collapse(item.id)
-    if (item.kind === 'workflow') return TextWorkflowDetail(ui, { run: item.run, at, onCollapse: collapse })
-    if (item.kind === 'subagent') return TextSubagentDetail(ui, { agent: item.agent, at, onCollapse: collapse })
-    return TextSessionDetail(ui, { row: item.row, trees, sessions: familyOf(data.live), at, asking, isReadOnly, actions })
+    if (item.kind === 'workflow') return TextWorkflowDetail(ui, { item, context, onCollapse: collapse })
+    if (item.kind === 'subagent') return TextSubagentDetail(ui, { item, context, onCollapse: collapse })
+    return TextSessionDetail(ui, { item, context, asking, isReadOnly, actions })
+  }
+
+  const chatOf = (item: RowItem) => {
+    if (item.status !== 'needs') return undefined
+    if (item.kind === 'session') return item.row
+    return item.kind === 'subagent' ? data.rows.find(one => one.id === (item.agent as Agent).parentSessionId) : undefined
   }
 
   const undone = data.undone
@@ -41,38 +45,39 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
     actions.archive(clean, { group: 'done', skipped: rows.length - clean.length })
   }
 
-  const row = (item: ListItem) => {
-    if (data.open.includes(item.id)) return detail(item)
-    const text = rowTextOf(item, at)
-    const isNeeds = item.group === 'needs-you'
-    const tail = [text.kind, text.line, isNeeds ? '' : text.elapsed, text.step && !isNeeds ? `${text.step.done}/${text.step.total}` : ''].filter(Boolean).join(' · ')
+  const line = (item: RowItem) => {
+    const steps = stepsOfItem(item)
+    const chat = chatOf(item)
+    const isNeeds = item.status === 'needs'
+    const tail = [lineTextOf(lineOf(item, context)), isNeeds ? '' : elapsedOfItem(item, at), steps && !isNeeds ? `${steps.done}/${steps.total}` : ''].filter(Boolean).join(' · ')
     return (
       <Box key={`row-${item.id}`} flexDirection="row" gap="sm">
-        <Text color={TERMINAL_COLOR[badgeStateOf(item)]}>●</Text>
-        <Button key={`row-open-${item.id}`} plain label={text.title} onPress={() => actions.toggle(item.id)} />
-        <Text color={text.isAlert ? 'error' : undefined} dimColor={!text.isAlert || undefined} wrap="truncate-end">
+        <Text color={colorOf(item)}>●</Text>
+        <Button key={`row-open-${item.id}`} plain label={nameText(displayNameOf(item))} onPress={() => actions.toggle(item.id)} />
+        <Text color={isNeeds ? 'error' : undefined} dimColor={!isNeeds || undefined} wrap="truncate-end">
           {tail}
         </Text>
         <Box flexGrow={1} />
-        {isNeeds && item.kind === 'session' ? <Button key={`chat-${item.id}`} variant="primary" label="Open chat" onPress={() => actions.open(item.id, item.row.name)} /> : null}
+        {chat ? <Button key={`chat-${item.id}`} variant="primary" label="Open chat" onPress={() => actions.open(chat.id, chat.name)} /> : null}
       </Box>
     )
   }
 
-  const archivedRow = (one: LiveSession) => (
-    <Box key={`archived-${one.id}`} flexDirection="column">
-      <Box flexDirection="row" gap="sm">
-        <Text weight="semibold" wrap="truncate-end">
-          {one.title || one.name}
-        </Text>
-        <Text dimColor>archived {ageOf(at - one.lastActivityAt)}</Text>
-        <Box flexGrow={1} />
-        {isReadOnly ? null : <Button key={`unarchive-${one.id}`} label="Unarchive" onPress={() => actions.confirm(`unarchive:${one.id}`)} />}
-        <Button key={`archived-open-${one.id}`} label="Open" onPress={() => actions.open(one.id, one.name || one.title)} />
+  const row = (item: ListItem) => (data.open.includes(item.id) ? detail(item) : line(item))
+
+  const archivedRow = (item: Extract<RowItem, { kind: 'archived' }>) => {
+    const { one } = item
+    return (
+      <Box key={`archived-${one.id}`} flexDirection="column">
+        <Box flexDirection="row" gap="sm">
+          {line(item)}
+          {isReadOnly ? null : <Button key={`unarchive-${one.id}`} label="Unarchive" onPress={() => actions.confirm(`unarchive:${one.id}`)} />}
+          <Button key={`archived-open-${one.id}`} label="Open" onPress={() => actions.open(one.id, one.name || one.title)} />
+        </Box>
+        {asking === `unarchive:${one.id}` ? UnarchiveConfirm(ui, { item, actions }) : null}
       </Box>
-      {asking === `unarchive:${one.id}` ? UnarchiveConfirm(ui, { one, actions }) : null}
-    </Box>
-  )
+    )
+  }
 
   const empty = (id: string) => (
     <Box key={`empty-${id}`} flexDirection="column">
@@ -92,7 +97,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
             <Box flexGrow={1} />
             {data.chosen === 'all' ? <Button key="archived-toggle" plain label={one.isOpen ? 'Hide' : 'Show'} onPress={() => actions.archiveView(one.isOpen ? 'closed' : 'open')} /> : null}
           </Box>
-          {one.isOpen ? shownArchived(one, data.archiveView, data.chosen).map(archivedRow) : null}
+          {one.isOpen ? shownArchived(one, data.archiveView, data.chosen).map(entry => archivedRow(archivedItemOf(entry, data.board))) : null}
           {view.hasMore ? <Button key="archived-more" plain label={`Show ${one.archived.length - ARCHIVED_PEEK} more`} onPress={() => actions.archiveView('all')} /> : null}
         </Box>
       )
