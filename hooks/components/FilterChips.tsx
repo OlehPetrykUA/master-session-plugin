@@ -2,8 +2,8 @@ import type { Filter } from '../../types'
 
 import { across, down, tall } from '../lib/layout'
 import { chipWidthOf } from '../lib/sections'
-import { dot } from '../theme/icons'
-import type { IconName } from '../theme/icons'
+import { chipFace, dot } from '../theme/icons'
+import type { FaceLook, IconName } from '../theme/icons'
 import { C } from '../theme/tokens'
 import type { Tone } from '../theme/tokens'
 import { Hit } from './Hit'
@@ -13,6 +13,8 @@ import type { Ui } from './types'
 export type Chip = { id: Filter; label: string; count: number; tone?: Tone; icon?: IconName }
 
 export type FilterChipsProps = { chips: readonly Chip[]; chosen: Filter; onFilter: (id: Filter) => void }
+
+const SELECTED: { rest: FaceLook; hover: FaceLook } = { rest: { fill: 'accentTint', stroke: 'accentBtn', ink: 'accentText' }, hover: { fill: 'accentTint2', stroke: 'accentBtn', ink: 'accentText' } }
 
 export const markWidthOf = (chip: Chip) => (chip.tone ? 8 : chip.icon ? 14 : 0)
 
@@ -25,6 +27,18 @@ export function FilterChips(ui: Ui, props: FilterChipsProps) {
         const markWidth = markWidthOf(chip)
         const width = chipWidthOf({ label: chip.label, count: chip.count, hasMark: !!markWidth, markWidth })
         const press = () => props.onFilter(chip.id)
+        if (isOn && ui.Client) {
+          const mark = chip.tone ? { dot: chip.tone } : chip.icon ? { icon: chip.icon } : undefined
+          return (
+            <Box key={`chip-${chip.id}`} flexDirection="row" flexShrink={0} width={across(width)} height={tall(32)} paddingX={0} paddingY={0}>
+              <Svg key={`chip-face-${chip.id}`} source={chipFace(width, 32, mark, chip.label, String(chip.count), SELECTED.rest)} alt={`${chip.label} ${chip.count}`} width={width} height={32} />
+              <Box position="absolute" top={0} left={0} display="none" hover={{ display: 'flex' }}>
+                <Svg key={`chip-face-hot-${chip.id}`} source={chipFace(width, 32, mark, chip.label, String(chip.count), SELECTED.hover)} alt={`${chip.label} ${chip.count}`} width={width} height={32} />
+              </Box>
+              {Hit(ui, { id: `chip-${chip.id}`, width, height: 32, onPress: press })}
+            </Box>
+          )
+        }
         return (
           <Box
             key={`chip-${chip.id}`}

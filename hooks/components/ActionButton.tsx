@@ -1,5 +1,6 @@
 import { across, faceWidth, tall } from '../lib/layout'
-import type { IconName } from '../theme/icons'
+import { buttonFace } from '../theme/icons'
+import type { FaceLook, IconName } from '../theme/icons'
 import { C, KINDS, LABEL_COLOR, SIZES } from '../theme/tokens'
 import type { Kind, Size, Tone } from '../theme/tokens'
 import { Hit } from './Hit'
@@ -20,8 +21,12 @@ export type ActionButtonProps = {
   isIconOnly?: boolean
 }
 
+const PRIMARY: { rest: FaceLook; hover: FaceLook } = { rest: { fill: 'accentBtn', ink: 'onAccent' }, hover: { fill: 'accentBtnHover', ink: 'onAccent' } }
+
+const LINK: { rest: FaceLook; hover: FaceLook } = { rest: { ink: 'accentText' }, hover: { fill: 'hoverBg', ink: 'accentText', isUnderlined: true } }
+
 export function ActionButton(ui: Ui, props: ActionButtonProps) {
-  const { Box, Text, Button } = ui
+  const { Box, Text, Button, Svg } = ui
   const [height, , , gap] = SIZES[props.size ?? 's']
   const one = KINDS[props.kind]
   const color = LABEL_COLOR[props.kind]
@@ -29,6 +34,20 @@ export function ActionButton(ui: Ui, props: ActionButtonProps) {
   const width = props.isIconOnly ? height : (props.wide ?? faceWidth(props.label, props.size) + iconSize - 15)
   const rest: Tone = props.isQuiet ? 'faint' : props.isPressed ? 'text' : one.tone
   const labelColor = props.isQuiet ? C.faint : props.isPressed ? C.text : color.rest
+  const look = props.kind === 'primary' ? PRIMARY : props.kind === 'link' ? LINK : undefined
+  if (look && ui.Client && props.wide === undefined) {
+    const [, left] = SIZES[props.size ?? 's']
+    const text = props.isIconOnly ? '' : props.label
+    return (
+      <Box key={`face-${props.id}`} flexDirection="row" flexShrink={0} width={across(width)} height={tall(height)} paddingX={0} paddingY={0}>
+        <Svg key={`${props.id}-face`} source={buttonFace(width, height, props.icon, text, look.rest, left, gap, iconSize)} alt={props.label} width={width} height={height} />
+        <Box position="absolute" top={0} left={0} display="none" hover={{ display: 'flex' }}>
+          <Svg key={`${props.id}-face-hot`} source={buttonFace(width, height, props.icon, text, look.hover, left, gap, iconSize)} alt={props.label} width={width} height={height} />
+        </Box>
+        {Hit(ui, { id: props.id, width, height, onPress: props.onPress })}
+      </Box>
+    )
+  }
   const icon = (tone: Tone, suffix: string) => Icon(ui, { id: `${props.id}-${suffix}`, name: props.icon, size: iconSize, tone, weight: 1.9, alt: props.isIconOnly ? props.label : props.icon })
   return (
     <Box

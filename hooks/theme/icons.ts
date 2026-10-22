@@ -4,9 +4,9 @@ import { escape, textWidth } from '../lib/layout'
 import type { Tone } from './tokens'
 
 const LIGHT =
-  '--text:#141413;--muted:#5E5D59;--faint:#87867F;--accentBtn:#B85335;--onAccent:#FFFFFF;--accentText:#9A4429;--red:#C2413B;--redTint:rgba(194,65,59,0.10);--amber:#B7791F;--amberTint:rgba(183,121,31,0.12);--green:#3F7A35;--greenTint:rgba(63,122,53,0.12);--grey:#87867F;--greyTint:rgba(135,134,127,0.14);--track:rgba(31,30,29,0.10);--surface2:#F5F4ED;--redT:rgba(194,65,59,.10);--amberT:rgba(183,121,31,.12);--greenT:rgba(63,122,53,.12);--greyT:rgba(135,134,127,.14)'
+  '--text:#141413;--muted:#5E5D59;--faint:#87867F;--accentBtn:#B85335;--onAccent:#FFFFFF;--accentText:#9A4429;--red:#C2413B;--redTint:rgba(194,65,59,0.10);--amber:#B7791F;--amberTint:rgba(183,121,31,0.12);--green:#3F7A35;--greenTint:rgba(63,122,53,0.12);--grey:#87867F;--greyTint:rgba(135,134,127,0.14);--track:rgba(31,30,29,0.10);--surface2:#F5F4ED;--redT:rgba(194,65,59,.10);--amberT:rgba(183,121,31,.12);--greenT:rgba(63,122,53,.12);--greyT:rgba(135,134,127,.14);--accentBtnHover:#A64A2E;--accentTint:rgba(217,119,87,0.14);--accentTint2:rgba(217,119,87,0.22);--hoverBg:#F0EEE6'
 const DARK =
-  '--text:#FAF9F5;--muted:#B0AEA5;--faint:#9C9A92;--accentBtn:#D97757;--onAccent:#141413;--accentText:#F0A58A;--red:#F06A60;--redTint:rgba(240,106,96,0.14);--amber:#E8B04B;--amberTint:rgba(232,176,75,0.14);--green:#7BC46A;--greenTint:rgba(123,196,106,0.14);--grey:#9C9A92;--greyTint:rgba(156,154,146,0.16);--track:rgba(250,249,245,0.12);--surface2:#30302E;--redT:rgba(240,106,96,.14);--amberT:rgba(232,176,75,.14);--greenT:rgba(123,196,106,.14);--greyT:rgba(156,154,146,.16)'
+  '--text:#FAF9F5;--muted:#B0AEA5;--faint:#9C9A92;--accentBtn:#D97757;--onAccent:#141413;--accentText:#F0A58A;--red:#F06A60;--redTint:rgba(240,106,96,0.14);--amber:#E8B04B;--amberTint:rgba(232,176,75,0.14);--green:#7BC46A;--greenTint:rgba(123,196,106,0.14);--grey:#9C9A92;--greyTint:rgba(156,154,146,0.16);--track:rgba(250,249,245,0.12);--surface2:#30302E;--redT:rgba(240,106,96,.14);--amberT:rgba(232,176,75,.14);--greenT:rgba(123,196,106,.14);--greyT:rgba(156,154,146,.16);--accentBtnHover:#E3896B;--accentTint:rgba(217,119,87,0.18);--accentTint2:rgba(217,119,87,0.26);--hoverBg:#30302E'
 const FONT = "'Anthropic Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif"
 const MOTION =
   '@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}@keyframes tw{0%,100%{opacity:1}50%{opacity:.3}}@keyframes glow{0%,100%{opacity:1}50%{opacity:.8}}' +
@@ -109,4 +109,29 @@ export function gitPill(count: number) {
 export function numeral(value: string, tone: Tone) {
   const width = Math.ceil(textWidth(value, 18) * 1.25) + 4
   return { source: svg(width, 24, `<text x="0" y="18" style="fill:var(--${tone});font-size:18px;font-weight:600">${escape(value)}</text>`), width }
+}
+
+export type FaceLook = { fill?: string; stroke?: string; ink: Tone; isUnderlined?: boolean }
+
+const shell = (width: number, height: number, look: FaceLook) =>
+  `<rect x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" rx="9.5" style="fill:${look.fill ? `var(--${look.fill})` : 'none'};stroke:${look.stroke ? `var(--${look.stroke})` : 'none'}"/>`
+
+const label = (text: string, x: number, height: number, ink: Tone, weight: number, isUnderlined = false) =>
+  `<text x="${x}" y="${(height / 2 + 4.5).toFixed(1)}" style="fill:var(--${ink});font-size:13px;font-weight:${weight}${isUnderlined ? ';text-decoration:underline' : ''}">${escape(text)}</text>`
+
+const glyphAt = (name: IconName, x: number, height: number, size: number, ink: Tone) =>
+  `<g transform="translate(${x} ${(height - size) / 2}) scale(${size / 24})">${stroke(I[name], ink, 1.9)}</g>`
+
+export function buttonFace(width: number, height: number, icon: IconName, text: string, look: FaceLook, left: number, gap: number, size = 16) {
+  if (!text) return svg(width, height, shell(width, height, look) + glyphAt(icon, (width - size) / 2, height, size, look.ink))
+  return svg(width, height, shell(width, height, look) + glyphAt(icon, left + 1, height, size, look.ink) + label(text, left + 1 + size + gap, height, look.ink, 600, look.isUnderlined))
+}
+
+export type ChipMark = { dot: Tone } | { icon: IconName } | undefined
+
+export function chipFace(width: number, height: number, mark: ChipMark, text: string, count: string, look: FaceLook) {
+  const markWidth = mark ? ('dot' in mark ? 8 : 14) : 0
+  const markSvg = !mark ? '' : 'dot' in mark ? `<circle cx="17" cy="${height / 2}" r="4" style="fill:var(--${mark.dot})"/>` : glyphAt(mark.icon, 13, height, 14, look.ink)
+  const textX = 13 + (markWidth ? markWidth + 8 : 0)
+  return svg(width, height, shell(width, height, look) + markSvg + label(text, textX, height, look.ink, 600) + label(count, textX + Math.ceil(textWidth(text, 13) * 1.08) + 8, height, look.ink, 600))
 }
