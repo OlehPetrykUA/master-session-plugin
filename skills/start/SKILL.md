@@ -21,8 +21,8 @@ R does the work, A owns the outcome (exactly one per row), C is asked before, I 
 | Docs-first lookups with citations | | A | R | R Researcher |
 | Implement in its own worktree, own files only | | A | R | |
 | Rebase onto master, run the gate, report `ready <sha>` with FF-OK | | A | R | |
-| Verify `ready <sha>` in a clean detached worktree; review the diff against the rules | | A/R | I | C Reviewer, QA verifier |
-| Live check: reload, screenshot, click trace, design fidelity | I | A/R | I | C QA verifier, Design checker |
+| Verify `ready <sha>`: gate at the sha, diff review, design fidelity for UI | | A | I | R QA verifier, Reviewer, Design checker |
+| Live check after a UI merge: reload, screenshot, click trace | I | A/R | I | R QA verifier, when given the window id |
 | Merge `--ff-only`; send anything else back | I | A/R | R rebase | |
 | Loop, board, ledger | I | A/R | C report tool | |
 
@@ -46,7 +46,7 @@ Tell the user, in 5 to 8 lines:
 - This session is now the validator. It never implements, fixes, rebases or writes skills; it only merges verified work with `--ff-only`.
 - All work goes to a worker session: one you name, or a new one I start when you ask.
 - I plan the whole run now and start every worker in this turn; each one starts on its dependency, rebases and cleans up by itself.
-- I brief the worker, wake when it finishes, writes to me or moves its branch (a 2-minute loop catches stalls and prompts), and verify everything with my own tools.
+- I brief the worker, wake when it finishes, writes to me or moves its branch (a 2-minute loop catches stalls and prompts), and have the QA verifier, Reviewer and, for UI, Design checker personas verify everything before I merge.
 - I answer the worker's questions and drafts myself, send it concrete fixes, and bring you only the decisions that are yours.
 - You get a status board. Nothing outside git gets deleted without your yes.
 
@@ -91,8 +91,12 @@ Wake signals: a worker this session started sends a turn-end note by itself; for
 
 On every wake (note, idle notice, worker message, branch move, heartbeat), do one tick:
 1. Re-read the ledger note (section 6). `get_session <id>` for `isRunning`, `lastActivityAt` and `permissionMode` (section 5); `list_events <id>` (limit 10) for what it did and said.
-2. Verify each `ready <sha>` yourself, in two stages, in a clean detached worktree: `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-verify-<short sha>" <sha>`, removed after. **Spec:** does the result match the brief and the user's quoted words, nothing missing and nothing extra? **Quality:** run the gate there (tsc, plugin validate, tests), review `git diff master...<sha>` against the rules (commit format, the user's rules; grep plain and case-insensitive, `grep -rni`, never with `\b`, which once missed "FastMCP"), and reject third-party claims without a doc citation. Hand the review to the `master-session:reviewer` and the gate to the `master-session:qa-verifier` subagent when that saves context. Re-verify after every fix, however small.
-   - A mod or other UI change is verified on the real app, not only by unit tests: a desktop Button once drew its coloured Text white while every test passed. Force a mod reload by touching its changed files, then calling one of its tools. Screenshot the Claude window read-only with `screencapture -x -o -l <window id>`, the id from CoreGraphics `CGWindowListCopyWindowInfo` (owner "Claude", layer 0, on screen), and read the mod's click trace when it has one. Computer use can't see the Claude app, so never try to drive it. Compare against the design with the `master-session:design-checker` subagent.
+2. Verify each `ready <sha>` through the personas, all at once: one background `Agent` call per persona (`subagent_type: "master-session:<persona>"`, `run_in_background: true`), or, when the user asked for workflows (Rules), one small Workflow with an `agent(…, { agentType: "master-session:<persona>" })` each. Each prompt names the repo, the exact sha and the brief with the user's quoted words, and asks for the persona's output ending in `PASS` or `FAIL`.
+   - **QA verifier:** re-runs the brief's Done-when gate at the sha in a clean detached worktree, `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-verify-<short sha>" <sha>`, removed after. Give it the gate commands and the engine path (last bullet).
+   - **Reviewer:** **Spec**, does the result match the brief and the user's quoted words, nothing missing and nothing extra? **Quality**, `git diff master...<sha>` against the rules (commit format, the user's rules; grep plain and case-insensitive, `grep -rni`, never with `\b`, which once missed "FastMCP"), and no third-party claim without a doc citation.
+   - **Design checker,** for UI: compares the build with the design canvas, artboard by artboard, 1:1. Give it the canvas link, the artboard names and the worker's screenshots.
+   - Read each verdict and its evidence, then decide: all `PASS` goes to step 3, any `FAIL` or uncited finding to step 4. A verdict is a claim, never proof. Run a check yourself only when its persona is unavailable or the change is a one-line docs edit. Re-verify after every fix, however small.
+   - A mod or other UI change is also checked on the real app after its merge, not only by unit tests: a desktop Button once drew its coloured Text white while every test passed. Force a mod reload by touching its changed files, then calling one of its tools. Screenshot the Claude window read-only with `screencapture -x -o -l <window id>`, the id from CoreGraphics `CGWindowListCopyWindowInfo` (owner "Claude", layer 0, on screen), and read the mod's click trace when it has one. This live check stays with you, since it needs the window id; or hand it, with the id, to the QA verifier. Computer use can't see the Claude app, so never try to drive it.
    - Run plugin checks with the engine the session runs: on macOS, the desktop's bundled `~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude`, not a `claude` on your PATH, which can lag behind.
 3. Merge a verified sha with `git -C <live repo> merge --ff-only <sha>` (a clean tree only). Not a fast-forward, or master moved: leave it, since the worker watches master, rebases itself and reports `ready <new sha>`. Never rebase or merge it yourself.
 4. Problem found: one SendMessage per worker per round, with every problem, its evidence and the exact fix bundled, and log them in the ledger. Nothing else goes to the worker (section 4). A message waits until the worker's current turn ends; never resend. If one is ignored, check whether a permission-mode hold is keeping it. After 3 failed fix rounds on the same finding, stop resending: propose a fresh worker with a full brief, or escalate to the user.
