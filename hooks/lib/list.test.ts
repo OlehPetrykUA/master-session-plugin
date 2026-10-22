@@ -4,7 +4,7 @@ import type { AgentRecord, Board, LiveSession, Repo, WorkflowRecord } from '../.
 
 import { liveOf } from '../testing/world'
 import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, countsOfItems, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, lineOf, lineTextOf, modelFamilyOf, nameText, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived } from './list'
-import type { Agent, Context, RowItem } from './list'
+import type { Context, RowItem } from './list'
 import type { Row } from './rows'
 import { countsOf, rowsOf } from './rows'
 import { runSummaryOf } from './totals'
@@ -129,7 +129,7 @@ test('a session reads idle, ready, verified or merged from its live state, board
 
 test('subagents name their parent chain: the parent session by persona, an earlier parent folds into …; a parent-less agent belongs to the Validator', () => {
   const rows: Row[] = [{ id: 'w', name: 'w', title: 'Implementer · Row details', state: 'working' }]
-  const tree: Agent[] = [
+  const tree: AgentRecord[] = [
     { id: 'p', type: 'master-session:qa-verifier', description: 'verify a38c72e', state: 'running', startedAt: NOW - 60_000, parentSessionId: 'w' },
     { id: 'k', type: 'master-session:reviewer', description: 'review a38c72e', state: 'running', startedAt: NOW - 30_000, parentAgentId: 'p', asking: { text: 'Allow Bash: rm -rf dist?', since: NOW - 40_000 } },
   ]

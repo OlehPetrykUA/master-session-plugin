@@ -3,7 +3,7 @@ import type { AgentRecord, ArchiveView, Board, BoardSession, Filter, LiveSession
 import { lossLineOf, mergedLineOf } from '../components/detail/losses'
 import { STATUS } from '../theme/icons'
 import type { IconName, Status } from '../theme/icons'
-import { subagentsOf, workflowRunsOf } from './agents'
+import { workflowRunsOf } from './agents'
 import type { WorkflowAgent, WorkflowRun } from './agents'
 import { stepOf } from './board'
 import { compactOf } from './format'
@@ -11,20 +11,14 @@ import { activityOf, elapsedOf, titleOf, whereOf } from './rows'
 import type { Row } from './rows'
 import type { RunSummary } from './totals'
 
-export type Ask = { text: string; since: number }
-
-export type Agent = AgentRecord & { asking?: Ask; parentAgentId?: string; parentSessionId?: string }
-
-export type RunAgent = WorkflowAgent & { asking?: Ask }
-
 export type ListItem =
   | { kind: 'session'; id: string; group: SessionState; status: Status; row: Row }
   | { kind: 'workflow'; id: string; group: SessionState; status: Status; run: WorkflowRun }
-  | { kind: 'subagent'; id: string; group: SessionState; status: Status; agent: Agent }
+  | { kind: 'subagent'; id: string; group: SessionState; status: Status; agent: AgentRecord }
 
 export type RowItem =
   | ListItem
-  | { kind: 'agent'; id: string; group: SessionState; status: Status; run: WorkflowRun; agent: RunAgent }
+  | { kind: 'agent'; id: string; group: SessionState; status: Status; run: WorkflowRun; agent: WorkflowAgent }
   | { kind: 'archived'; id: string; group: SessionState; status: Status; one: LiveSession; board?: BoardSession }
 
 export type ListGroup = { id: SessionState | 'archived'; items: readonly ListItem[]; archived: readonly LiveSession[]; isPinned: boolean; isOpen: boolean }
@@ -102,8 +96,8 @@ function sessionNameOf(title: string, persona: string | undefined): Name {
 
 export function displayNameOf(item: RowItem | { kind: 'master' }): Name {
   if (item.kind === 'master') return { persona: MASTER, task: '' }
-  if (item.kind === 'session') return sessionNameOf(titleOf(item.row), (item.row.board as { persona?: string } | undefined)?.persona)
-  if (item.kind === 'archived') return sessionNameOf(item.board?.title || item.one.title || item.one.name, (item.board as { persona?: string } | undefined)?.persona)
+  if (item.kind === 'session') return sessionNameOf(titleOf(item.row), item.row.board?.persona)
+  if (item.kind === 'archived') return sessionNameOf(item.board?.title || item.one.title || item.one.name, item.board?.persona)
   if (item.kind === 'workflow') return { persona: 'Workflow', task: item.run.name }
   if (item.kind === 'agent') return { persona: GENERIC.includes(item.agent.type) ? 'Agent' : personaOfType(item.agent.type), task: item.agent.label }
   return { persona: personaOfType(item.agent.type), task: item.agent.description }
@@ -122,16 +116,16 @@ export function sessionStatusOf(row: Row, trees: readonly Repo[] = [], sessions:
   return 'done'
 }
 
-const hasRunningChild = (agent: Agent, agents: readonly AgentRecord[]) => agents.some(one => (one as Agent).parentAgentId === agent.id && one.state === 'running')
+const hasRunningChild = (agent: { id: string }, agents: readonly AgentRecord[]) => agents.some(one => one.parentAgentId === agent.id && one.state === 'running')
 
-export function agentStatusOf(agent: Agent | RunAgent, agents: readonly AgentRecord[] = []): Status {
+export function agentStatusOf(agent: AgentRecord | WorkflowAgent, agents: readonly AgentRecord[] = []): Status {
   if (agent.state === 'running' && agent.asking) return 'needs'
-  if (agent.state === 'running') return 'id' in agent && hasRunningChild(agent as Agent, agents) ? 'waiting' : 'working'
+  if (agent.state === 'running') return 'id' in agent && hasRunningChild(agent, agents) ? 'waiting' : 'working'
   return agent.state === 'failed' ? 'failed' : 'done'
 }
 
 export function runStatusOf(run: WorkflowRun): Status {
-  if ((run.counts as { asking?: number }).asking || run.agents.some(agent => (agent as RunAgent).asking && agent.state === 'running')) return 'needs'
+  if (run.counts.asking || run.agents.some(agent => agent.asking && agent.state === 'running')) return 'needs'
   if (run.state === 'running') return 'working'
   return run.state === 'failed' ? 'failed' : 'done'
 }
@@ -145,11 +139,11 @@ export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], wo
     const status = runStatusOf(one)
     return { kind: 'workflow', id: one.id, group: GROUP_OF[status], status, run: one }
   }
-  const helper = (agent: Agent): ListItem => {
+  const helper = (agent: AgentRecord): ListItem => {
     const status = agentStatusOf(agent, agents)
     return { kind: 'subagent', id: agent.id, group: GROUP_OF[status], status, agent }
   }
-  return [...rows.map(session), ...workflowRunsOf(agents, workflows).map(run), ...subagentsOf(agents).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
+  return [...rows.map(session), ...workflowRunsOf(agents, workflows).map(run), ...agents.filter(agent => !agent.run).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
 }
 
 export function runAgentsOf(run: WorkflowRun, agents: readonly AgentRecord[] = []): RowItem[] {
@@ -187,11 +181,11 @@ export function parentsOf(item: RowItem, context: Context): Name[] {
   if (item.kind === 'agent') return [{ persona: 'Workflow', task: item.run.name }]
   if (item.kind !== 'subagent') return []
   const names: Name[] = []
-  let agent: Agent | undefined = item.agent
+  let agent: AgentRecord | undefined = item.agent
   const seen = new Set<string>()
   while (agent && !seen.has(agent.id)) {
     seen.add(agent.id)
-    const parent: Agent | undefined = agent.parentAgentId ? (context.agents.find(one => one.id === agent?.parentAgentId) as Agent | undefined) : undefined
+    const parent: AgentRecord | undefined = agent.parentAgentId ? context.agents.find(one => one.id === agent?.parentAgentId) : undefined
     if (parent) {
       names.unshift(displayNameOf({ kind: 'subagent', id: parent.id, group: 'working', status: 'working', agent: parent }))
       agent = parent
@@ -204,14 +198,14 @@ export function parentsOf(item: RowItem, context: Context): Name[] {
   return names
 }
 
-export function sessionOfAgent(agent: Agent, context: Pick<Context, 'agents' | 'rows'>): Row | undefined {
+export function sessionOfAgent(agent: AgentRecord, context: Pick<Context, 'agents' | 'rows'>): Row | undefined {
   const seen = new Set<string>()
-  let one: Agent | undefined = agent
+  let one: AgentRecord | undefined = agent
   while (one && !seen.has(one.id)) {
     seen.add(one.id)
     if (one.parentSessionId) return context.rows.find(row => row.id === one?.parentSessionId)
     const parentId: string | undefined = one.parentAgentId
-    one = parentId ? (context.agents.find(other => other.id === parentId) as Agent | undefined) : undefined
+    one = parentId ? context.agents.find(other => other.id === parentId) : undefined
   }
   return undefined
 }
@@ -244,11 +238,11 @@ function sessionLineOf(row: Row, status: Status, context: Context): Line {
   return worded('done', board?.done || 'unverified')
 }
 
-function agentLineOf(agent: Agent | RunAgent, status: Status, chain: string, context: Context): Line {
+function agentLineOf(agent: AgentRecord | WorkflowAgent, status: Status, chain: string, context: Context): Line {
   const result = firstLine(agent.result)
   if (status === 'needs') return { chain, text: agent.asking?.text || 'needs you', isQuestion: true }
   if (status === 'waiting') {
-    const child = context.agents.find(one => (one as Agent).parentAgentId === agent.id && one.state === 'running')
+    const child = context.agents.find(one => one.parentAgentId === agent.id && one.state === 'running')
     const name = child ? displayNameOf({ kind: 'subagent', id: child.id, group: 'working', status: 'working', agent: child }) : undefined
     return { chain, word: { status, text: STATUS.waiting.word }, text: name ? `on ${nameText(name)}` : '', isQuestion: false }
   }
@@ -258,7 +252,7 @@ function agentLineOf(agent: Agent | RunAgent, status: Status, chain: string, con
 
 function runLineOf(run: WorkflowRun, status: Status): Line {
   if (status === 'needs') {
-    const asking = run.agents.find(agent => (agent as RunAgent).asking && agent.state === 'running') as RunAgent | undefined
+    const asking = run.agents.find(agent => agent.asking && agent.state === 'running')
     const persona = asking ? displayNameOf({ kind: 'agent', id: asking.id, group: 'needs-you', status: 'needs', run, agent: asking }).persona : 'An agent'
     return { chain: '', text: `${persona} asks: ${asking?.asking?.text ?? ''}`, isQuestion: true }
   }

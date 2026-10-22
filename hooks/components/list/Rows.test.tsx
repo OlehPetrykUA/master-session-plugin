@@ -1,7 +1,9 @@
 import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import type { Agent } from '../../lib/list'
+import type { AgentRecord } from '../../../types'
+
+import { phaseStrip } from '../../theme/detail'
 import { C } from '../../theme/tokens'
 import { BOARD, PANE, altsOf, click, hitsOf, started, textsOf } from '../../testing/world'
 
@@ -9,14 +11,14 @@ const NOW = 3_600_000
 
 const ASK = { text: 'Allow Bash: rm -rf dist?', since: NOW - 10_000 }
 
-function seeded(on: On, agents: Agent[]) {
+function seeded(on: On, agents: AgentRecord[]) {
   on('state.get', async (_, e, next) => {
     const real = (await next(e)) as { value: { value: unknown; version: number } }
     return (e.key === 'agents' ? { value: { ...real.value, value: agents } } : real) as never
   })
 }
 
-const agent = (id: string, more: Partial<Agent>): Agent => ({ id, type: 'master-session:reviewer', description: `review ${id}`, prompt: 'Run the gate.', state: 'running', startedAt: NOW - 60_000, ...more })
+const agent = (id: string, more: Partial<AgentRecord>): AgentRecord => ({ id, type: 'master-session:reviewer', description: `review ${id}`, prompt: 'Run the gate.', state: 'running', startedAt: NOW - 60_000, ...more })
 
 test('a subagent waiting on a prompt in a worker chat: a red row with its parent and question, Open chat opens that worker, its card says where the prompt waits', async ($, on) => {
   seeded(on, [agent('a1', { asking: ASK, parentSessionId: 'local_setup' })])
@@ -94,4 +96,12 @@ test('an archived card shows Last, Time, Worktree, Git and Model, then Open and 
   await click(ui, 'hit-unarchive-no-local_old')
   expect(await hitsOf(ui)).toContain('hit-unarchive-local_old')
   await ui.unmount()
+})
+
+test('a finished run’s strip greys its done share and keeps failures red; a running run fills green', () => {
+  const finished = phaseStrip(300, [{ done: 5, running: 0, failed: 1, total: 6, isFinished: true }])
+  expect(finished).toContain('fill:var(--grey)')
+  expect(finished).toContain('fill:var(--red)')
+  expect(finished).not.toContain('fill:var(--green)')
+  expect(phaseStrip(300, [{ done: 1, running: 1, failed: 0, total: 3, isFinished: false }])).toContain('fill:var(--green)')
 })

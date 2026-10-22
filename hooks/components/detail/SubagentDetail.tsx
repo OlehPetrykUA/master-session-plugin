@@ -1,6 +1,6 @@
 import { across, tall } from '../../lib/layout'
 import { clockOf, displayNameOf, modelFamilyOf, nameText, parentsOf, sessionOfAgent, spanOf } from '../../lib/list'
-import type { Agent, Context, RowItem, RunAgent } from '../../lib/list'
+import type { Context, RowItem } from '../../lib/list'
 import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
 import { Icon } from '../Icon'
@@ -20,7 +20,7 @@ export type SubagentDetailProps = { item: Extract<RowItem, { kind: 'subagent' | 
 export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
   const { Box, Text } = ui
   const { item, context, actions } = props
-  const agent: Agent | RunAgent = item.agent
+  const agent = item.agent
   const id = item.id
   const at = context.at
   const end = agent.endedAt ?? at
