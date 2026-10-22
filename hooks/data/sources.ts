@@ -11,7 +11,7 @@ import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
 import { rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
-import { getAgents, getBoard, getLive, getReports, getRepos, getShared, getUndone, getWorkflows, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
+import { getAgents, getBoard, getLive, getReports, getShared, getUndone, getWorkflows, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, merge } from './contract'
 import { roleOf } from './recorder'
 import { askForUpdates, readBoard, readReports, writeBoard } from './status'
@@ -180,7 +180,7 @@ async function baseOf($: EngineInterface, path: string) {
 }
 
 async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined): Promise<Worktree> {
-  const status = await git($, tree.path, ['status', '--porcelain=v2', '--branch']).catch(() => undefined)
+  const status = await git($, tree.path, ['status', '--porcelain=v2', '--branch', '--untracked-files=all', '--ignore-submodules=none']).catch(() => undefined)
   const count = !status ? '' : tree.isMain ? '0' : base ? (await git($, tree.path, ['rev-list', '--count', `refs/heads/${base}..HEAD`]).catch(() => '')).trim() : ''
   const known = status ? parseStatus(status) : { dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }
   return { path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...known, unmerged: /^\d+$/.test(count) ? Number(count) : undefined }
@@ -211,12 +211,20 @@ async function refreshRepos($: EngineInterface) {
     ...(current?.sessions ?? []).flatMap(one => (one.worktrees ?? []).map(path => expandHome(path, home))),
   ].filter(path => path.startsWith('/'))
   const found = new Map<string, Repo>()
+  const failed: string[] = []
   for (const path of new Set(paths)) {
-    if (locate(path, [...found.values()])) continue
+    if ([...found.values()].some(repo => repo.worktrees.some(tree => tree.path === path))) continue
     const repo = await repoOf($, path).catch(() => undefined)
     if (repo) found.set(repo.path, repo)
+    else failed.push(path)
   }
-  await saveRepos($, () => [...found.values()])
+  for (const path of failed) {
+    const outer = locate(path, [...found.values()])
+    if (outer && outer.tree.path !== path) found.set(outer.repo.path, { ...outer.repo, worktrees: [...outer.repo.worktrees, { path, branch: '', sha: '', isMain: false, dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }] })
+  }
+  const repos = [...found.values()]
+  await saveRepos($, () => repos)
+  return repos
 }
 
 export async function isPaneOpen($: EngineInterface) {
@@ -269,9 +277,13 @@ async function archiveOne($: EngineInterface, id: string, name: string) {
 export async function archive($: EngineInterface, rows: readonly Row[], all?: { group: SessionState; skipped: number }, confirmed: readonly string[] = []) {
   await setConfirming($, '')
   await refreshLive($).catch(() => undefined)
-  await refreshRepos($).catch(() => undefined)
-  const trees = await getRepos($)
-  const fresh = rowsOf((await boardOf($)).board, await getLive($))
+  const live = await getLive($)
+  if (live.error) {
+    $.ui.toast(`Not archived: ${live.error}`)
+    return
+  }
+  const trees = await refreshRepos($).catch(() => [] as Repo[])
+  const fresh = rowsOf((await boardOf($)).board, live)
   const targets = rows.flatMap(row => fresh.filter(one => one.id === row.id))
   const allowed = targets.filter(row => isArchivable(row.board ?? { state: row.state }, row.live))
   const refused = rows.filter(row => !allowed.some(one => one.id === row.id)).map(row => row.name)
@@ -282,7 +294,7 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
     await setConfirming($, `archive:${first.id}`)
     return
   }
-  const clean = all ? allowed.filter(row => !lossesOf(row, trees).length) : allowed
+  const clean = all ? allowed.filter(row => !lossesOf(row, trees).length) : allowed.slice(0, 1)
   const items = itemsOf(fresh, await getAgents($), await getWorkflows($))
   const archived: Row[] = []
   for (const row of clean) {

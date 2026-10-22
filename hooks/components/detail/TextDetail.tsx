@@ -87,7 +87,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
         </Box>
       ) : (
         <Box key={`actions-${row.id}`} flexDirection="row" gap="sm">
-          {now && facts?.needsYou ? <Button key={`chat-${row.id}`} variant="primary" label="Open chat" onPress={() => actions.open(row.id, row.name)} /> : null}
+          {now && row.state === 'needs-you' ? <Button key={`chat-${row.id}`} variant="primary" label="Open chat" onPress={() => actions.open(row.id, row.name)} /> : null}
           <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} />
           {isStoppable ? <Button key={`stop-${row.id}`} label="Stop" onPress={() => actions.stop(row.id, row.name)} /> : null}
           {canArchive ? <Button key={`archive-${row.id}`} label={losses.length ? 'Archive…' : 'Archive'} onPress={() => (losses.length ? actions.confirm(`archive:${row.id}`) : actions.archive([row], undefined, losses))} /> : null}

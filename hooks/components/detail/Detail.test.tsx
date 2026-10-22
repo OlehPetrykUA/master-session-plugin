@@ -397,3 +397,121 @@ test('a repo with no origin/HEAD, no main and no master is unknown: the row says
   expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 1 with work to keep' })).toBeDefined()
   await ui.unmount()
 })
+
+const STATUS = 'status --porcelain=v2 --branch --untracked-files=all --ignore-submodules=none'
+
+const parentOf = (node: unknown, text: string, parent?: unknown): unknown => {
+  if (!node || typeof node !== 'object') return undefined
+  const one = node as { type?: string; children?: unknown[] }
+  if (one.type === 'Text' && (one.children ?? []).join('') === text) return parent
+  for (const child of one.children ?? []) {
+    const found = parentOf(child, text, node)
+    if (found) return found
+  }
+  return undefined
+}
+
+test('git status always lists untracked files and submodules: a repo that hides them by config still asks before removing them', async ($, on) => {
+  const git = { ...CLEAN_GIT(), [`${CLEAN} ${STATUS}`]: '# branch.oid 1111111\n# branch.head feat/clean\n? new.sh\n' }
+  const { calls, gits } = await started($, on, doneOf('local_clean'), { git, sessions: [session('local_clean', 'clean-work', CLEAN)] })
+  expect(gits.some(argv => argv[3] === CLEAN && argv.slice(4).join(' ') === STATUS)).toBe(true)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_clean')
+  await click(ui, 'hit-archive-local_clean')
+  expect(await ui.find({ key: 'confirm-local_clean' })).toBeDefined()
+  expect(await textsOf(ui)).toContain('1 uncommitted file in wt-toolkit-clean')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  await ui.unmount()
+})
+
+test('another repo’s worktree inside a known repo’s folder is read as its own repo, not as that folder’s main checkout', async ($, on) => {
+  const other = `${HOME}/Work/other`
+  const nested = `${TOOLKIT}/.worktrees/other-feat`
+  const git = {
+    ...UNMERGED.git,
+    [`${nested} worktree`]: `worktree ${other}\nHEAD 3333333cccccc\nbranch refs/heads/main\n\nworktree ${nested}\nHEAD 4444444dddddd\nbranch refs/heads/feat/other\n\n`,
+    [`${nested} status`]: '# branch.oid 4444444\n# branch.head feat/other\n',
+    [`${nested} symbolic-ref`]: 'origin/main\n',
+    [`${nested} rev-parse`]: '3333333\n',
+    [`${nested} rev-list`]: '2\n',
+  }
+  const { calls } = await started($, on, doneOf('local_other'), { git, sessions: [session('local_other', 'other-work', nested)] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_other')
+  await click(ui, 'hit-archive-local_other')
+  expect(await ui.find({ key: 'confirm-local_other' })).toBeDefined()
+  expect(await textsOf(ui)).toContain('2 commits on feat/other that are not on main')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  await ui.unmount()
+})
+
+test('a path inside a known repo whose own git fails is its own unknown tree, never the enclosing main checkout', async ($, on) => {
+  const inner = `${TOOLKIT}/.worktrees/broken`
+  const { calls } = await started($, on, doneOf('local_broken'), { ...UNMERGED, sessions: [session('local_broken', 'broken-work', inner)] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_broken')
+  await click(ui, 'hit-archive-local_broken')
+  expect(await ui.find({ key: 'confirm-local_broken' })).toBeDefined()
+  expect(await textsOf(ui)).toContain('git state unknown')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  await ui.unmount()
+})
+
+test('archive reads git again and fails closed when that read finds nothing', async ($, on) => {
+  const git: Record<string, string> = CLEAN_GIT()
+  const { calls } = await started($, on, doneOf('local_clean'), { git, sessions: [session('local_clean', 'clean-work', CLEAN)] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_clean')
+  expect(await ui.find({ type: 'Text', text: 'Archive' })).toBeDefined()
+  git[`${WORKTREE} worktree`] = ''
+  await click(ui, 'hit-archive-local_clean')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  expect(await ui.find({ key: 'confirm-local_clean' })).toBeDefined()
+  expect(await textsOf(ui)).toContain('git state unknown')
+  await ui.unmount()
+})
+
+test('archive stops when the live session list can’t be read, so a session running again is never archived', async ($, on) => {
+  let isFailing = false
+  const { calls, toasts } = await started($, on, doneOf('local_conductor'), { sessions: [CONDUCTOR], listError: () => (isFailing ? 'list_sessions timed out' : undefined) })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_conductor')
+  isFailing = true
+  await click(ui, 'hit-archive-local_conductor')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  expect(toasts).toContain('Not archived: list_sessions timed out')
+  await ui.unmount()
+})
+
+test('a needs-you session without blocker text still offers Open chat in its card', async ($, on) => {
+  await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], needsYou: undefined }, BOARD.sessions[1]] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_env')
+  expect(await ui.find({ type: 'Text', text: 'BLOCKER' })).toBeUndefined()
+  expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-chat-local_env', 'hit-open-local_env']))
+  await ui.unmount()
+})
+
+test('the kind word and its dot never shrink, so an amber loss line can’t wrap "Session"', async ($, on) => {
+  await started($, on, doneOf(), UNMERGED)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const tree = await ui.drawn()
+  for (const text of ['Session', '·']) expect((parentOf(tree, text) as { props?: { flexShrink?: number } } | undefined)?.props?.flexShrink).toBe(0)
+  await ui.unmount()
+})
+
+test('archive decides on the git state it just read, not on the stored repos, which another refresh may have left stale', async ($, on) => {
+  let isStale = false
+  on('state.set', ($$, e, next) => (isStale && e.plugin === 'master-session' && e.key === 'repos' ? { value: { isSet: true as const, version: 1 } } : next(e)))
+  const git: Record<string, string> = CLEAN_GIT()
+  const { calls } = await started($, on, doneOf('local_clean'), { git, sessions: [session('local_clean', 'clean-work', CLEAN)] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_clean')
+  expect(await ui.find({ type: 'Text', text: 'Archive' })).toBeDefined()
+  git[`${CLEAN} status`] = '# branch.oid 1111111\n# branch.head feat/clean\n? new.sh\n'
+  isStale = true
+  await click(ui, 'hit-archive-local_clean')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  expect(await ui.find({ key: 'confirm-local_clean' })).toBeDefined()
+  await ui.unmount()
+})

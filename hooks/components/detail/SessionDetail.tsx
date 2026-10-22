@@ -35,6 +35,17 @@ function ActionRow(ui: Ui, props: ActionRowProps) {
   const canArchive = !!row.live && !isRunning && !isNeeds && !props.isReadOnly
   const archive = () => (losses.length ? actions.confirm(`archive:${id}`) : actions.archive([row], undefined, losses))
   if (props.isAsking && canArchive) return ArchiveBox(ui, { id, name: row.name, losses, width, onCancel: () => actions.confirm(''), onArchive: () => actions.archive([row], undefined, losses) })
+  if (isNeeds && !row.board?.needsYou && row.live)
+    return (
+      <Box key={`actions-${id}`} flexDirection="row" gap={across(8)}>
+        <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
+          {ActionButton(ui, { id: `chat-${id}`, kind: 'primary', icon: 'chat', label: 'Open chat', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.open(id, row.name) })}
+        </Box>
+        <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
+          {ActionButton(ui, { id: `open-${id}`, kind: 'secondary', icon: 'open', label: 'Open', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.open(id, row.name) })}
+        </Box>
+      </Box>
+    )
   const second =
     isRunning && !isNeeds
       ? ActionButton(ui, { id: `stop-${id}`, kind: 'secondary', icon: 'stop', label: 'Stop', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.stop(id, row.name) })

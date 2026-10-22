@@ -45,14 +45,18 @@ export function Row(ui: Ui, props: RowProps) {
         {Icon(ui, { id: `row-kind-${item.id}`, name: KIND_ICON[item.kind], size: 12, tone: 'muted', alt: text.kind })}
       </Box>
       {isNarrow ? null : (
-        <Text size="footnote" weight="bold" color={muted}>
-          {text.kind}
-        </Text>
+        <Box flexShrink={0}>
+          <Text size="footnote" weight="bold" color={muted}>
+            {text.kind}
+          </Text>
+        </Box>
       )}
       {isNarrow ? null : (
-        <Text size="footnote" color={muted}>
-          ·
-        </Text>
+        <Box flexShrink={0}>
+          <Text size="footnote" color={muted}>
+            ·
+          </Text>
+        </Box>
       )}
       <Box flexShrink={1} minWidth={0}>
         <Text size="footnote" weight={text.isAlert || loss ? 'bold' : undefined} color={text.isAlert ? C.red : loss ? C.amber : muted} wrap={isNeeds ? 'wrap' : 'truncate-end'}>
