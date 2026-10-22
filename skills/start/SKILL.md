@@ -38,6 +38,7 @@ Invoked with: `$ARGUMENTS`. Free-form words, in any order. Record the settings i
 - `tick now`: run one tick now. Load `mcp__master-session__reports` (ToolSearch `select:mcp__master-session__reports`); it returns each linked worker's `id`, `at`, `ageMinutes`, `state`, `progress`, `now`, `next`, `needsYou`. SendMessage "call the report tool now" only to rows with `state` working and `ageMinutes` over 5; never ping idle or done workers. Without the tool, use `get_session` `lastActivityAt` as the age. The pane's "Ask for updates" button submits it.
 - `status`: post the board now, then continue. With the mod, `/master-session:start status` and `/master-session:info` open its pane (the mod answers both), and the model opens it with `mcp__master-session__open`. `stop`: stop the loop, post the final board. `archive-done`: archive verified-and-captured workers now.
 - Any other text is the task. Examples: `every 5m away`, `worker setup-ui-redo every 10m`, `new "fix the hooks" quiet`.
+- Three more commands drive a live run, and each makes the session the validator first if this skill hasn't run yet: `/master-session:run <task> [persona]` starts a worker session per section 2; `/master-session:run-sub <persona> <task>` runs a persona as a background subagent for a short check; `/master-session:workflow <task>` writes and runs a workflow of persona agents.
 
 ## 1. Start
 

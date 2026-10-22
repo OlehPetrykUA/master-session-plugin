@@ -7,6 +7,7 @@ A Claude Code plugin that turns one session into a **validator** for a team of w
 | Part | What it does |
 |---|---|
 | Skill `start` | `/master-session:start`, the validator protocol: roles, briefs, the tick loop, verification, permissions, the ledger. Ships `personas.md` (the persona index) and `board.md` (the chat board when the pane isn't available). |
+| Skills `run`, `run-sub`, `workflow` | `/master-session:run`, `/master-session:run-sub` and `/master-session:workflow`: start a worker session, a persona subagent or a workflow of persona agents from the validator. |
 | Skill `worker` | The protocol every worker session follows: its own worktree, the report tool, talking to the validator, the `ready <sha>` gate. |
 | Status mod | `/master-session:info` opens it: a pane beside the chat with one tile per worker (state, progress, git, tests, commits), a band above the prompt, archive and unarchive, and **Ask for updates**. Workers report through the `mcp__master-session__report` tool; the mod also records their commits, test runs, edits and waits by itself. |
 | Personas | Six roles, each a skill plus an agent of the same name: `implementer`, `refactorer`, `reviewer`, `qa-verifier`, `design-checker` and `researcher`. |
@@ -43,12 +44,20 @@ Update later with `claude plugin update master-session@master-session`.
 
 ## Usage
 
-- `/master-session:start` turns the current session into the validator. Add a task in plain words, or settings in any order:
-  - `new "<task>"` starts a fresh worker for that task; `worker <name>` attaches an existing session.
-  - `every 5m` sets the heartbeat (default 2 minutes); `away` finishes everything inside the briefs without waiting; `quiet` or `verbose`.
-  - `tick now`, `status`, `stop`, `archive-done`.
-- `/master-session:info` opens the status pane. `/master-session:info ask` asks every running worker for a fresh report.
-- Workers need nothing installed beyond this plugin: their brief loads the `master-session:worker` skill and their persona's skill, and they report through the status tool.
+| Command | What it does |
+|---|---|
+| `/master-session:start [task] [settings]` | Turns the current session into the validator. |
+| `/master-session:run <task> [persona]` | Starts a worker session, a side chat, for the task (persona `implementer` by default) and watches it in the loop. |
+| `/master-session:run-sub <persona> <task>` | Runs a persona as a background subagent for a short check, then relays its result. |
+| `/master-session:workflow <task>` | Writes and runs a workflow for the task with persona agents, announcing the agent count first. |
+| `/master-session:info [ask]` | Opens the status pane; `ask` asks every running worker for a fresh report. |
+
+`run`, `run-sub` and `workflow` make the session the validator first if `/master-session:start` hasn't run yet. Settings for `/master-session:start`, in any order:
+- `new "<task>"` starts a fresh worker for that task; `worker <name>` attaches an existing session.
+- `every 5m` sets the heartbeat (default 2 minutes); `away` finishes everything inside the briefs without waiting; `quiet` or `verbose`.
+- `tick now`, `status`, `stop`, `archive-done`.
+
+Workers need nothing installed beyond this plugin: their brief loads the `master-session:worker` skill and their persona's skill, and they report through the status tool.
 
 The ledger, one note per run with every worker, its state and open findings, goes in your notes or memory tool, or a plain markdown file if you use none.
 
