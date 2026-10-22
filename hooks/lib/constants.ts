@@ -7,6 +7,7 @@ export const FILE_MS = 3_000
 export const LIVE_MS = 15_000
 export const AIM_MS = 2_000
 export const LANDING_MS = 1_000
+export const AGENT_SHOWN_MS = 120_000
 export const FAULT_RETRY_MS = 5_000
 export const FAULT_RETRY_MAX_MS = 60_000
 export const OPENED = 'Master session pane opened.'

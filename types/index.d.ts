@@ -120,6 +120,31 @@ export type Report = {
   git?: { branch: string; dirty: number; ahead: number; at: number; path?: string }
 }
 
+export type AgentState = 'running' | 'done' | 'failed'
+
+export type AgentRecord = {
+  id: string
+  name?: string
+  type: string
+  description: string
+  model?: string
+  isBackground?: boolean
+  run?: { id: string; index: number }
+  state: AgentState
+  startedAt: number
+  endedAt?: number
+}
+
+export type WorkflowRecord = {
+  id: string
+  toolUseId: string
+  taskId?: string
+  name?: string
+  description?: string
+  phases?: string[]
+  startedAt: number
+}
+
 declare module 'claude-code' {
   interface McpToolInputs {
     'mcp__master-session__scroll': { to: string }
@@ -151,6 +176,8 @@ declare module 'claude-code' {
       isSummaryHidden: boolean
       shared: Shared | null
       reports: Report[]
+      agents: AgentRecord[]
+      workflows: WorkflowRecord[]
     }
   }
 }

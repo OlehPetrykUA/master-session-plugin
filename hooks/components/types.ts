@@ -1,8 +1,9 @@
 import type { BoxProps, ButtonProps, ClientProps, ElementConstructor, SvgProps, TextProps } from 'claude-code'
 
-import type { Board, Filter, Live, LiveSession, Repo } from '../../types'
+import type { AgentRecord, Board, Filter, Live, LiveSession, Repo, WorkflowRecord } from '../../types'
 
 import type { Counts, Row } from '../lib/rows'
+import type { RunSummary } from '../lib/totals'
 
 export type TextUi = {
   Box: ElementConstructor<BoxProps>
@@ -32,6 +33,9 @@ export type PaneData = {
   trees: readonly Repo[]
   rows: readonly Row[]
   archived: readonly LiveSession[]
+  agents: readonly AgentRecord[]
+  workflows: readonly WorkflowRecord[]
+  totals: RunSummary
   counts: Counts
   chosen: Filter
   open: readonly string[]

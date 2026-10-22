@@ -1,6 +1,11 @@
 import { expect, test } from 'claude-code/testing'
 
-import { BAND, HOME, PANE, altsOf, childOf, click, started, textsOf, typed, world } from './testing/world'
+import type { On } from 'claude-code'
+
+import type { AgentRecord, WorkflowRecord } from '../types'
+
+import { subagentsOf, workflowRunsOf } from './lib/agents'
+import { BAND, HOME, PANE, SPAWN, altsOf, childOf, click, started, textsOf, typed, world } from './testing/world'
 
 test('/master-session:start status opens the pane; with a task it also runs the skill', async ($, on) => {
   const { opened, ran, clock } = world(on)
@@ -108,4 +113,42 @@ test('a person scroll passes through the pane hook untouched', async ($, on) => 
   const raise = $.ui as unknown as { scroll: (input: unknown) => Promise<unknown> }
   await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 3, by: 3, bodyRows: 20, contentRows: 80, origin: { kind: 'person' } })
   expect(offsets).toEqual([3])
+})
+
+const STATE_PROBE = {
+  name: 'state-probe',
+  register(on: On) {
+    on('ui.render', { component: 'Pane', requestId: 'state-probe' }, async ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      const agents = await $.state.get({ plugin: 'master-session', key: 'agents' })
+      const workflows = await $.state.get({ plugin: 'master-session', key: 'workflows' })
+      return <Text>{JSON.stringify({ agents: agents.value ?? [], workflows: workflows.value ?? [] })}</Text>
+    })
+  },
+}
+
+test('agent spawns, their ends and a Workflow launch reach the agents and workflows atoms through the hooks', { plugins: [STATE_PROBE] }, async ($, on) => {
+  const launch = { status: 'async_launched' as const, taskId: 'wi5', taskType: 'local_workflow' as const, workflowName: 'probe-run', runId: 'wf_7', summary: 'Probe the spawn event' }
+  on('agent.list', () => ({ value: [] }))
+  on('agent.spawn', (_, e) => ({ model: 'claude-haiku-5-5', agentId: e.workflow ? `w${e.workflow.agentIndex}` : 'a1' }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('tool.call', { tool: 'Workflow' }, () => ({ result: launch, text: 'Workflow launched in background.' }))
+  const { clock } = world(on)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  const answer = await $.tool.call({ tool: 'Workflow', script: "export const meta = { name: 'probe-run', phases: [{ title: 'Scan' }, { title: 'Check' }] }" })
+  expect(answer).toEqual(expect.objectContaining({ result: launch }))
+  await $.agent.spawn({ ...SPAWN, description: 'alpha-scan', subagentType: 'workflow-subagent', model: 'haiku', background: false, workflow: { runId: 'wf_7', agentIndex: 1 } })
+  await $.agent.spawn({ ...SPAWN, name: 'probe-helper', description: 'Say gamma', subagentType: 'general-purpose' })
+  await $.turn.complete({ answer: 'alpha', durationMs: 5, isAborted: false, turnId: 'u1', agentId: 'w1', reason: 'answer' })
+  const ui = await $.ui.mount({ ...PANE, plugin: 'state-probe', requestId: 'state-probe', surface: 'terminal' })
+  const state = JSON.parse(String((await ui.find({ type: 'Text' }))?.text)) as { agents: AgentRecord[]; workflows: WorkflowRecord[] }
+  await ui.unmount()
+  expect(state.agents.map(agent => [agent.id, agent.name, agent.type, agent.description, agent.model, agent.run, agent.state])).toEqual([
+    ['w1', undefined, 'workflow-subagent', 'alpha-scan', 'claude-haiku-5-5', { id: 'wf_7', index: 1 }, 'done'],
+    ['a1', 'probe-helper', 'general-purpose', 'Say gamma', 'claude-haiku-5-5', undefined, 'running'],
+  ])
+  expect(state.workflows).toEqual([expect.objectContaining({ id: 'wf_7', name: 'probe-run', description: 'Probe the spawn event', taskId: 'wi5', phases: ['Scan', 'Check'] })])
+  const runs = workflowRunsOf(state.agents, state.workflows)
+  expect([runs.length, subagentsOf(state.agents).map(agent => agent.id)]).toEqual([1, ['a1']])
 })

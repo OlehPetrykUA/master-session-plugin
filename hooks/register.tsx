@@ -24,6 +24,7 @@ import {
   whoAmI,
 } from './data/sources'
 import { addFault, clearFaults, clearPresses, hasFaults, nextRetryMs, runPress } from './data/presses'
+import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
 import { recordTurnEnd, recorder, startRecorder } from './data/recorder'
 import { bandAction, bandProgress, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
@@ -78,16 +79,30 @@ export const register: Register = on => {
       .then(() => refreshAll($))
       .catch(() => undefined)
     $.clock.every(FILE_MS, () => void refreshFile($).then(() => refreshShared($)).then(() => refreshReports($)).catch(() => undefined))
+    $.clock.every(FILE_MS, () => void refreshAgents($).catch(() => undefined))
     $.clock.every(LIVE_MS, () => void refreshAll($).catch(() => undefined))
     return started
   })
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
+    await recordAgentEnd($, e).catch(() => undefined)
     await recordTurnEnd($, e)
     void refreshBoard($).catch(() => undefined)
     return done
   })
+
+  on('agent.spawn', async ($, e, next) => {
+    const out = await next(e)
+    await recordSpawn($, e, out).catch(() => undefined)
+    return out
+  }).catch(($, e, next) => next(e))
+
+  on('tool.call', { tool: 'Workflow' }, async ($, e, next) => {
+    const out = await next(e)
+    await recordWorkflow($, e, out.result).catch(() => undefined)
+    return out
+  }).catch(($, e, next) => next(e))
 
   on('command.run', { command: INFO }, async ($, e) => {
     if (e.args.trim() === 'ask') return { text: await askAll($) }

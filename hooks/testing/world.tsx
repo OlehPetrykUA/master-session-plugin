@@ -1,6 +1,6 @@
 import type { ElementQuery, Engine, FoundElement, MountPointerEvent } from 'claude-code/testing'
 import { mock } from 'claude-code/testing'
-import type { On } from 'claude-code'
+import type { AgentSpawnInput, On } from 'claude-code'
 
 import type { Live } from '../../types'
 
@@ -69,6 +69,17 @@ export const GIT: Record<string, string> = {
 }
 
 export const AT = '1970-01-01T00:50:00.000Z'
+
+export const SPAWN: AgentSpawnInput = {
+  tool_use_id: 'toolu_1',
+  prompt: 'Read the docs.',
+  description: 'Docs lookup',
+  subagentType: 'master-session:researcher',
+  provider: { plugin: 'master-session', tier: 'user' },
+  parentModel: 'claude-opus-5-5',
+  background: true,
+  fork: false,
+}
 
 export function world(on: On, child: Child = {}) {
   const calls: { tool: string; args: Record<string, unknown> }[] = []

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { Board, Filter, Live, Repo, Report, Shared } from '../../types'
+import type { AgentRecord, Board, Filter, Live, Repo, Report, Shared, WorkflowRecord } from '../../types'
 
 const board = atom({ plugin: 'master-session', key: 'board' } as const, null)
 const live = atom({ plugin: 'master-session', key: 'live' } as const, { self: '', title: '', sessions: [], error: '', at: 0 })
@@ -12,6 +12,8 @@ const filter = atom({ plugin: 'master-session', key: 'filter' } as const, 'all')
 const isSummaryHidden = atom({ plugin: 'master-session', key: 'isSummaryHidden' } as const, false)
 const shared = atom({ plugin: 'master-session', key: 'shared' } as const, null)
 const reports = atom({ plugin: 'master-session', key: 'reports' } as const, [])
+const agents = atom({ plugin: 'master-session', key: 'agents' } as const, [])
+const workflows = atom({ plugin: 'master-session', key: 'workflows' } as const, [])
 
 const isSame = (one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other)
 
@@ -95,4 +97,22 @@ export function getReports($: EngineInterface) {
 export async function saveReports($: EngineInterface, change: (value: Report[]) => Report[]) {
   const before = await read($, reports)
   if (!isSame(change(before), before)) await update($, reports, change)
+}
+
+export function getAgents($: EngineInterface) {
+  return read($, agents)
+}
+
+export async function saveAgents($: EngineInterface, change: (value: AgentRecord[]) => AgentRecord[]) {
+  const before = await read($, agents)
+  if (!isSame(change(before), before)) await update($, agents, change)
+}
+
+export function getWorkflows($: EngineInterface) {
+  return read($, workflows)
+}
+
+export async function saveWorkflows($: EngineInterface, change: (value: WorkflowRecord[]) => WorkflowRecord[]) {
+  const before = await read($, workflows)
+  if (!isSame(change(before), before)) await update($, workflows, change)
 }
