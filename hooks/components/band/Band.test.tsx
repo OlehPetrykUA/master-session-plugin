@@ -729,3 +729,11 @@ test('with the strip hidden, the short pill gets the whole room: it fits whole a
   expect(fitBand({ ...input, room: exact })).toEqual({ pill: short, showCounts: false, isDots: true, strip: 0, isHidden: true })
   expect(fitBand({ ...input, room: exact - 1 }).pill).toMatch(/…$/)
 })
+
+test('lane 7 at 300 px: a session asker hides the strip with an icon-only Open chat; a workflow agent asker has no Open chat, so the dots fit', () => {
+  const columns = Math.round((300 + 16) / COLUMN)
+  const session = viewOf(NEEDS, CREW(), columns).view
+  expect([session.fitted.isHidden, session.action?.isIconOnly, session.actionWidth, session.pillText]).toEqual([true, true, 32, 'env-e2e-test needs you'])
+  const flow = viewOf(WORKING, CREW({ flow: true }), columns).view
+  expect([flow.fitted.isHidden, flow.fitted.isDots, flow.action, flow.pillText]).toEqual([false, true, undefined, 'scan 1 needs you'])
+})
