@@ -91,6 +91,12 @@ claude plugin validate .
 claude plugin test .
 ```
 
+`plugin test` runs the mod's tests only. Check the SessionStart persona hook with:
+
+```bash
+sh hooks/persona.test.sh
+```
+
 Type-check against the engine's generated types: load the plugin once with `claude --plugin-dir .` so the engine writes `.claude-plugin/types/`, then run `tsc -p .`.
 
 ## License
