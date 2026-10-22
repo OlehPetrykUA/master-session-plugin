@@ -69,6 +69,7 @@ export type Live = {
   self: string
   title: string
   sessions: LiveSession[]
+  family?: LiveSession[]
   error: string
   at: number
 }

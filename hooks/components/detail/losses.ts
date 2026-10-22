@@ -1,4 +1,4 @@
-import type { LiveSession, Repo } from '../../../types'
+import type { Live, LiveSession, Repo } from '../../../types'
 
 import { ARCHIVE_LIMIT } from '../../lib/constants'
 import { locate } from '../../lib/git'
@@ -32,28 +32,36 @@ function lineAt(path: string, trees: readonly Repo[]) {
 
 const isWorktree = (path: string, trees: readonly Repo[]) => !locate(path, trees)?.tree.isMain
 
+const treeOf = (path: string, trees: readonly Repo[]) => locate(path, trees)?.tree.path ?? path
+
+export const familyOf = (live: Live) => live.family ?? live.sessions
+
 export function sideOf(row: Row, sessions: readonly LiveSession[], trees: readonly Repo[]) {
   const ids = new Set([row.id])
-  const cwds = new Set(row.live?.cwd && isWorktree(row.live.cwd, trees) ? [row.live.cwd] : [])
+  const cwds = new Set(row.live?.cwd && isWorktree(row.live.cwd, trees) ? [treeOf(row.live.cwd, trees)] : [])
   const found: LiveSession[] = []
   for (let grew = true; grew; ) {
     grew = false
     for (const one of sessions) {
-      if (one.isArchived || ids.has(one.id) || !(ids.has(one.startedBy ?? '') || cwds.has(one.cwd))) continue
+      if (ids.has(one.id) || !(ids.has(one.startedBy ?? '') || (!one.isArchived && cwds.has(treeOf(one.cwd, trees))))) continue
       ids.add(one.id)
-      found.push(one)
-      if (isWorktree(one.cwd, trees)) cwds.add(one.cwd)
       grew = true
+      if (one.isArchived) continue
+      found.push(one)
+      if (isWorktree(one.cwd, trees)) cwds.add(treeOf(one.cwd, trees))
     }
   }
   return found
 }
 
-const othersOf = (row: Row, sessions: readonly LiveSession[], trees: readonly Repo[]) => sideOf(row, sessions, trees).filter(one => !pathsOf(row).includes(one.cwd))
+const othersOf = (row: Row, sessions: readonly LiveSession[], trees: readonly Repo[]) => {
+  const own = pathsOf(row).map(path => treeOf(path, trees))
+  return sideOf(row, sessions, trees).filter(one => !own.includes(treeOf(one.cwd, trees)))
+}
 
 const nameOf = (one: LiveSession) => one.name || one.title || one.id
 
-const isCut = (sessions: readonly LiveSession[]) => sessions.filter(one => !one.isArchived).length >= ARCHIVE_LIMIT
+const isCut = (sessions: readonly LiveSession[]) => sessions.length >= ARCHIVE_LIMIT
 
 export function lossesOf(row: Row, trees: readonly Repo[], sessions: readonly LiveSession[]) {
   if (!row.live?.cwd || isCut(sessions)) return [UNKNOWN]

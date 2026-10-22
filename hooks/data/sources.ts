@@ -133,14 +133,14 @@ export async function askAll($: EngineInterface) {
   return askSummary(sent, idle)
 }
 
-async function listSessions($: EngineInterface, known: readonly LiveSession[], args: { include_archived: boolean; limit: number }) {
+async function listSessions($: EngineInterface, known: readonly LiveSession[], args: { include_archived: boolean; limit: number }, hasFacts = true) {
   const before = new Map(known.map(one => [one.id, one]))
   const list = JSON.parse(await call($, 'ccd_session_mgmt', 'list_sessions', { linked: true, ...args })) as Record<string, unknown>[]
   return Promise.all(
     list.map(async (row): Promise<LiveSession> => {
       const id = String(row.sessionId ?? '')
       const seen = before.get(id)
-      const facts = seen?.createdAt !== undefined && seen.model ? undefined : await sessionOf($, id).catch(() => ({}) as Record<string, unknown>)
+      const facts = !hasFacts || (seen?.createdAt !== undefined && seen.model) ? undefined : await sessionOf($, id).catch(() => ({}) as Record<string, unknown>)
       const createdAt = seen?.createdAt ?? Date.parse(String(facts?.createdAt ?? ''))
       const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
       return {
@@ -291,12 +291,12 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
     $.ui.toast(`Not archived: ${live.error}`)
     return
   }
-  const sessions = await listSessions($, live.sessions, { include_archived: false, limit: ARCHIVE_LIMIT }).catch((error: unknown) => messageOf(error))
+  const sessions = await listSessions($, live.sessions, { include_archived: true, limit: ARCHIVE_LIMIT }, false).catch((error: unknown) => messageOf(error))
   if (typeof sessions === 'string') {
     $.ui.toast(`Not archived: ${sessions}`)
     return
   }
-  await saveLive($, prev => ({ ...prev, sessions: [...sessions, ...prev.sessions.filter(one => one.isArchived)] }))
+  await saveLive($, prev => ({ ...prev, family: sessions }))
   const trees = await refreshRepos($, sessions).catch(() => [] as Repo[])
   const fresh = rowsOf((await boardOf($)).board, live)
   const targets = rows.flatMap(row => fresh.filter(one => one.id === row.id))

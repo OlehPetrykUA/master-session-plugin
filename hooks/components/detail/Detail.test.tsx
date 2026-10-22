@@ -574,19 +574,36 @@ test('wide primary buttons draw the design’s accent face, not the theme accent
 
 const FILLER = (count: number) => Array.from({ length: count }, (_, index) => ({ sessionId: `local_f${index}`, name: `filler-${index}`, title: `Filler ${index}`, cwd: '/elsewhere', isRunning: false, isArchived: false, lastActivityAt: AT }))
 
-test('a dirty side session past the first 50 still asks: archive lists 200 unarchived sessions before it decides', async ($, on) => {
-  const { calls } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { git: UNMERGED.git, sessions: [CONDUCTOR, ...FILLER(55), SIDE()] })
+test('a dirty side session past the first 50 still asks: archive lists 200 family sessions, the box keeps them through the 15 s refresh, and yes archives', async ($, on) => {
+  const { calls, clock } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { git: UNMERGED.git, sessions: [CONDUCTOR, ...FILLER(55), SIDE()] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_conductor')
+  const facts = calls.filter(one => one.tool === 'get_session').length
   await click(ui, 'hit-archive-local_conductor')
-  expect(calls.some(one => one.tool === 'list_sessions' && one.args.limit === 200 && one.args.include_archived === false)).toBe(true)
+  expect(calls.some(one => one.tool === 'list_sessions' && one.args.limit === 200 && one.args.include_archived === true)).toBe(true)
+  expect(calls.filter(one => one.tool === 'get_session').length).toBe(facts)
   expect(await ui.find({ key: 'confirm-local_conductor' })).toBeDefined()
   expect(await textsOf(ui)).toContain('side-work: 2 commits on its branch that are not on main')
+  await clock.advance(15_000)
+  expect(await textsOf(ui)).toContain('side-work: 2 commits on its branch that are not on main')
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  await click(ui, 'hit-archive-yes-local_conductor')
+  expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
   await ui.unmount()
 })
 
-test('200 or more unarchived sessions may hide a side session, so every target is unknown: the box asks and Archive all skips', async ($, on) => {
+test('a running session in a subfolder of the worktree shares it: archive refuses while it works', async ($, on) => {
+  const sub = { sessionId: 'local_sub', name: 'sub-work', title: 'sub-work', cwd: `${CLEAN}/pkg`, isRunning: true, isArchived: false, lastActivityAt: AT, startedBy: 'local_parent' }
+  const { calls, toasts } = await started($, on, doneOf('local_clean'), { git: CLEAN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN), sub] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_clean')
+  await click(ui, 'hit-archive-local_clean')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  expect(toasts).toContain('Not archived: sub-work is still working')
+  await ui.unmount()
+})
+
+test('200 or more family sessions may hide a side session, so every target is unknown: the box asks and Archive all skips', async ($, on) => {
   const { calls } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { sessions: [CONDUCTOR, ...FILLER(200)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_conductor')
@@ -612,6 +629,33 @@ test('a grandchild side session counts: its repo is read and its unmerged commit
     [`${grand} rev-list`]: '2\n',
   }
   const kid = SIDE({ sessionId: 'local_kid', name: 'kid-work', title: 'kid-work', cwd: `${HOME}/dotfiles` })
+  const grandchild = SIDE({ sessionId: 'local_grand', name: 'grand-work', title: 'grand-work', cwd: grand, startedBy: 'local_kid' })
+  const { calls, gits } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { git, sessions: [CONDUCTOR, kid, grandchild] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_conductor')
+  await click(ui, 'hit-archive-local_conductor')
+  expect(gits.some(argv => argv[3] === grand && argv[4] === 'worktree')).toBe(true)
+  expect(await ui.find({ key: 'confirm-local_conductor' })).toBeDefined()
+  expect(await textsOf(ui)).toContain('grand-work: 2 commits on feat/g that are not on main')
+  await click(ui, 'hit-archive-no-local_conductor')
+  await click(ui, 'hit-collapse-local_conductor')
+  await click(ui, 'hit-archive-all')
+  expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  await ui.unmount()
+})
+
+test('a side session started by an archived child still counts: archive follows startedBy through archived sessions', async ($, on) => {
+  const other = `${HOME}/Work/other`
+  const grand = `${HOME}/Work/other-wt`
+  const git = {
+    [`${grand} worktree`]: `worktree ${other}\nHEAD 3333333cccccc\nbranch refs/heads/main\n\nworktree ${grand}\nHEAD 4444444dddddd\nbranch refs/heads/feat/g\n\n`,
+    [`${grand} status`]: '# branch.oid 4444444\n# branch.head feat/g\n',
+    [`${other} status`]: '# branch.oid 3333333\n# branch.head main\n',
+    [`${grand} symbolic-ref`]: 'origin/main\n',
+    [`${grand} rev-parse`]: '3333333\n',
+    [`${grand} rev-list`]: '2\n',
+  }
+  const kid = SIDE({ sessionId: 'local_kid', name: 'kid-work', title: 'kid-work', cwd: `${HOME}/dotfiles`, isArchived: true })
   const grandchild = SIDE({ sessionId: 'local_grand', name: 'grand-work', title: 'grand-work', cwd: grand, startedBy: 'local_kid' })
   const { calls, gits } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { git, sessions: [CONDUCTOR, kid, grandchild] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })

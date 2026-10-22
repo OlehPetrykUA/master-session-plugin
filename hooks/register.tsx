@@ -126,13 +126,18 @@ export const register: Register = on => {
   on('tool.call', { tool: 'mcp__master-session__open' }, async ($, e) => {
     const expand = typeof e.expand === 'string' ? e.expand.trim() : ''
     const isArchived = e.archived === true
-    if (isArchived || expand) await setFilter($, isArchived ? 'archived' : 'all')
-    if (expand) await setExpanded($, () => [expand])
+    const data = await paneData($, columns || 48)
+    const isItem = paneViewOf(data).items.some(item => item.id === expand || (item.kind === 'workflow' && item.run.agents.some(agent => agent.id === expand)))
+    const isOldOne = data.archived.some(one => one.id === expand)
+    const isShown = !!expand && (isItem || (isArchived && isOldOne))
+    if (isArchived || isShown) await setFilter($, isArchived ? 'archived' : 'all')
+    if (isShown) await setExpanded($, () => [expand])
     const isPlaced = await openPane($)
-    const shown = [isArchived ? 'the Archived list' : '', expand ? `${expand} expanded` : ''].filter(Boolean).join(' with ')
+    const shown = [isArchived ? 'the Archived list' : '', isShown ? `${expand} expanded` : ''].filter(Boolean).join(' with ')
+    const missing = expand && !isShown ? ` ${expand} was not found among its items${isOldOne ? '; it is archived, so pass archived: true' : ''}.` : ''
     return {
       result: isPlaced
-        ? `The master session pane is open beside the chat${shown ? `, showing ${shown}` : ''}.`
+        ? `The master session pane is open beside the chat${shown ? `, showing ${shown}` : ''}.${missing}`
         : 'The pane is open, but no attached surface draws it: post the board in chat.',
     }
   }).catch(() => ({ deny: 'The master session pane could not be opened: post the board in chat.' }))

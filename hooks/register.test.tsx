@@ -169,6 +169,10 @@ test('the open tool can expand one card and open the Archived list, so a check c
   expect(await textsOf(list)).toEqual(expect.arrayContaining(['Archived', 'Remove the stale mod']))
   expect(await list.find({ key: 'group-head-waiting' })).toBeUndefined()
   await list.unmount()
+  const missing = (await $.tool.call({ tool: 'mcp__master-session__open', expand: 'nope' })) as { result?: string }
+  expect(missing.result).toBe('The master session pane is open beside the chat. nope was not found among its items.')
+  const hidden = (await $.tool.call({ tool: 'mcp__master-session__open', expand: 'local_old' })) as { result?: string }
+  expect(hidden.result).toBe('The master session pane is open beside the chat. local_old was not found among its items; it is archived, so pass archived: true.')
   const plain = (await $.tool.call({ tool: 'mcp__master-session__open' })) as { result?: string }
   expect(plain.result).toBe('The master session pane is open beside the chat.')
   expect(opened.length).toBeGreaterThanOrEqual(3)
