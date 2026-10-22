@@ -23,9 +23,10 @@ export function runSummaryOf({ rows, counts, archived, agents, workflows, board,
     sessions: { total: rows.length, 'needs-you': counts['needs-you'], waiting: counts.waiting, working: counts.working, done: counts.done, archived },
     needsYou: counts['needs-you'],
     subagents: stateCountsOf(subagentsOf(agents)),
-    workflows: { ...stateCountsOf(runs), agents: runs.reduce((sum, run) => sum + run.agents.length, 0) },
+    workflows: { ...stateCountsOf(runs), agents: runs.reduce((sum, run) => sum + run.agents.length, 0), agentsDone: runs.reduce((sum, run) => sum + run.counts.done, 0) },
     commits: { total: rows.reduce((sum, row) => sum + (row.board?.commits?.length ?? 0), 0), repos: trees.length },
     tests: board?.testsPassed === undefined ? undefined : { passed: board.testsPassed, note: board.testsNote ?? '' },
     duration: { since, ms: at - since },
+    git: { dirty: trees.reduce((sum, repo) => sum + repo.worktrees.reduce((count, tree) => count + tree.dirty, 0), 0) },
   }
 }

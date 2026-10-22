@@ -70,10 +70,11 @@ test('the run summary counts sessions by state, needs you, subagents, workflows,
     sessions: { total: 3, 'needs-you': 1, waiting: 0, working: 1, done: 1, archived: 1 },
     needsYou: 1,
     subagents: { total: 2, running: 1, done: 1, failed: 0 },
-    workflows: { total: 3, running: 2, done: 1, failed: 0, agents: 3 },
+    workflows: { total: 3, running: 2, done: 1, failed: 0, agents: 3, agentsDone: 1 },
     commits: { total: 3, repos: 0 },
     tests: { passed: 526, note: 'smoke 398 · hooks 128' },
     duration: { since: NOW - 3_600_000, ms: 3_600_000 },
+    git: { dirty: 0 },
   })
   const empty = runSummaryOf({ rows: [], counts: countsOf([], []), archived: 0, agents: [], workflows: [], board: null, trees: [], at: NOW })
   expect([empty.tests, empty.duration]).toEqual([undefined, { since: NOW, ms: 0 }])

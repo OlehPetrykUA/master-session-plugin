@@ -79,23 +79,25 @@ test('the scroll tool moves the desktop pane to every drawn section and refuses 
     expect(landed).toEqual([row])
     return row
   }
-  expect(String(((await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'nowhere' })) as { deny?: string }).deny)).toContain('section-tiles')
+  expect(String(((await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'nowhere' })) as { deny?: string }).deny)).toContain('section-list')
   const header = await move('section-header')
+  const summary = await move('section-summary')
   const chips = await move('section-chips')
-  const tiles = await move('section-tiles')
+  const tiles = await move('section-list')
+  const archived = await move('section-archived')
   expect(header).toBe(0)
-  expect(chips).toBe(0)
+  expect(summary).toBe(0)
+  expect(chips).toBeGreaterThan(summary)
   expect(tiles).toBeGreaterThan(chips)
-  for (const key of ['section-expanded', 'section-archived', 'section-summary']) {
-    const answer = (await $.tool.call({ tool: 'mcp__master-session__scroll', to: key })) as { deny?: string }
-    expect(String(answer.deny)).toContain(`${key} is not drawn`)
-  }
-  await click(ui, 'hit-tile-local_env')
+  expect(archived).toBeGreaterThan(tiles)
+  const answer = (await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'section-expanded' })) as { deny?: string }
+  expect(String(answer.deny)).toContain('section-expanded is not drawn')
+  await click(ui, 'hit-row-local_env')
   expect(await move('section-expanded')).toBe(tiles)
   await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 7, by: 7, bodyRows: 20, contentRows: 400, origin: { kind: 'plugin', name: 'master-session' } })
   expect(landed.at(-1)).toBe(7)
-  const asked = await move('section-tiles')
-  await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'section-tiles' })
+  const asked = await move('section-list')
+  await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'section-list' })
   landed.length = 0
   await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 20, contentRows: 22, origin: { kind: 'plugin', name: 'master-session' } })
   expect(landed).toEqual([asked])

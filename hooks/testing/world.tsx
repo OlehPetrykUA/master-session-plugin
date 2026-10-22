@@ -91,6 +91,7 @@ export function world(on: On, child: Child = {}) {
     { sessionId: 'local_setup', name: 'setup-ui-redo', title: 'Redo toolkit setup UI', cwd: WORKTREE, isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: SELF },
     { sessionId: 'local_old', name: 'stale-removal', title: 'Remove the stale mod', cwd: `${HOME}/dotfiles`, isRunning: false, isArchived: true, lastActivityAt: AT, startedBy: SELF },
     { sessionId: 'local_parent', name: 'parent', title: 'Someone else', cwd: '/elsewhere', isRunning: false, isArchived: false, lastActivityAt: AT },
+    ...(child.sessions ?? []),
   ]
   mock.env(on, { HOME })
   const clock = mock.clock(on, { now: 3_600_000 })
@@ -135,6 +136,8 @@ export function world(on: On, child: Child = {}) {
         ? text(child.parent ? { sessionId: 'local_worker', title: 'Worker chat', parentSessionId: child.parent } : { sessionId: SELF, title: 'Orbit Agents Toolkit Validator' })
         : text({ sessionId: e.args.session_id, createdAt: '1970-01-01T00:10:00.000Z', model: 'claude-opus-5-5', effort: 'xhigh', permissionMode: 'auto' })
     }
+    const failure = e.tool === 'list_sessions' ? child.listError?.() : undefined
+    if (failure) return { value: { content: [{ type: 'text' as const, text: failure }], isError: true } }
     if (e.tool === 'list_sessions') return text(sessions)
     if (e.tool === 'archive_session' || e.tool === 'unarchive_session') {
       const isArchived = e.tool === 'archive_session'
@@ -219,7 +222,7 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { parent?: string; files?: Record<string, string> }
+export type Child = { parent?: string; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, masterTitle: MASTER_TITLE, board })

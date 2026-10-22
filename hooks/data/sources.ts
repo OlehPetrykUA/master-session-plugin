@@ -9,7 +9,7 @@ import { messageOf } from '../lib/format'
 import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
-import { getBoard, getLive, getReports, getShared, saveBoard, saveLive, saveReports, saveRepos, saveShared, setConfirming, setExpanded, setSummaryHidden } from '../state/atoms'
+import { getBoard, getLive, getReports, getShared, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, merge } from './contract'
 import { roleOf } from './recorder'
 import { askForUpdates, readBoard, readReports, writeBoard } from './status'
@@ -121,6 +121,8 @@ export async function askAll($: EngineInterface) {
   const targets = askTargets(await getReports($), me, ids)
   const idle = me.sessions.filter(one => ids.includes(one.id) && !one.isRunning && !one.isArchived).length
   const sent = await askForUpdates($, targets, me.self || roleOf().self, at)
+  const reached = sent.filter(one => one.via !== 'failed').length
+  reached && (await setAsked($, { at, count: reached }))
   return askSummary(sent, idle)
 }
 
@@ -209,8 +211,13 @@ export async function isPaneOpen($: EngineInterface) {
 
 export async function refreshAll($: EngineInterface, isForced = false) {
   if (!isForced && !(await boardOf($)).board && !(await isPaneOpen($))) return
-  await refreshLive($, isForced)
-  await refreshRepos($)
+  isForced && (await setRefreshing($, true))
+  try {
+    await refreshLive($, isForced)
+    await refreshRepos($)
+  } finally {
+    isForced && (await setRefreshing($, false))
+  }
 }
 
 export async function openPane($: EngineInterface) {
@@ -228,7 +235,6 @@ export async function openSession($: EngineInterface, id: string, name: string) 
 }
 
 export async function openSummary($: EngineInterface) {
-  await setSummaryHidden($, false)
   await openPane($)
 }
 

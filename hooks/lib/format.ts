@@ -16,7 +16,7 @@ export function compactOf(ms: number) {
 
 export const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
-export const updatedOf = (ms: number) => (ms < 60_000 ? 'updated just now' : `updated ${compactOf(ms)} ago`)
+export const updatedOf = (ms: number) => (ms < 5_000 ? 'updated just now' : ms < 60_000 ? `updated ${Math.floor(ms / 1_000)}s ago` : `updated ${compactOf(ms)} ago`)
 
 export const modelOf = (model: string | undefined, effort: string | undefined) => {
   const family = model?.replace(/^claude-/, '').split('-')[0]

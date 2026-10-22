@@ -1,4 +1,4 @@
-import type { AgentInfo, AgentSpawnInput, AgentSpawnResult, AgentStatus, EngineInterface, TurnCompleteInput } from 'claude-code'
+import type { AgentInfo, AgentSpawnInput, AgentSpawnResult, AgentStatus, EngineInterface, TurnCompleteInput, TurnUsage } from 'claude-code'
 
 import type { AgentRecord, AgentState, WorkflowRecord } from '../../types'
 
@@ -9,6 +9,15 @@ import { getAgents, getWorkflows, saveAgents, saveWorkflows } from '../state/ato
 const ENDED: Partial<Record<AgentStatus, AgentState>> = { completed: 'done', failed: 'failed', killed: 'failed' }
 
 const isOld = (at: number | undefined, now: number) => at !== undefined && now - at >= AGENT_SHOWN_MS
+
+const TEXT_MAX = 2_000
+
+export type AgentOutcome = { result?: string; tokens?: number }
+
+const clipped = (text: string) => (text.length > TEXT_MAX ? `${text.slice(0, TEXT_MAX)}…` : text)
+
+export const tokensOf = (usage: TurnUsage | undefined) =>
+  usage ? usage.input_tokens + usage.output_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens : undefined
 
 const textOf = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
 
@@ -55,28 +64,45 @@ export function spawned(agents: AgentRecord[], e: AgentSpawnInput, out: AgentSpa
     type: e.subagentType,
     description: e.description,
     model: out.model || e.model,
+    requestedModel: e.model,
+    parentModel: e.parentModel,
+    prompt: clipped(e.prompt),
     isBackground: e.background,
+    isFork: e.fork,
+    spawnedBy: known?.spawnedBy,
     run: e.workflow?.runId ? { id: e.workflow.runId, index: e.workflow.agentIndex } : undefined,
     state: 'running',
     startedAt: known?.startedAt ?? now,
+    tokens: known?.tokens,
   }
   return known ? agents.map(one => (one.id === id ? agent : one)) : [...agents, agent]
 }
 
-export const ended = (agents: AgentRecord[], id: string, isAnswered: boolean, now: number) =>
-  agents.map((one): AgentRecord => (one.id === id && one.state === 'running' ? { ...one, state: isAnswered ? 'done' : 'failed', endedAt: now } : one))
+export const ended = (agents: AgentRecord[], id: string, isAnswered: boolean, now: number, outcome: AgentOutcome = {}) =>
+  agents.map((one): AgentRecord =>
+    one.id === id && one.state === 'running'
+      ? {
+          ...one,
+          state: isAnswered ? 'done' : 'failed',
+          endedAt: now,
+          result: outcome.result === undefined ? one.result : clipped(outcome.result),
+          tokens: outcome.tokens === undefined ? one.tokens : (one.tokens ?? 0) + outcome.tokens,
+        }
+      : one,
+  )
 
 export function listed(agents: AgentRecord[], infos: readonly AgentInfo[], now: number) {
   const byId = new Map(infos.filter(info => !info.teammateId).map(info => [info.id, info]))
   const known = agents.map((one): AgentRecord => {
-    if (one.state !== 'running' || one.run) return one
     const info = byId.get(one.id)
+    const named = info?.spawnedBy && info.spawnedBy !== one.spawnedBy ? { ...one, spawnedBy: info.spawnedBy } : one
+    if (one.state !== 'running' || one.run) return named
     const state = info ? ENDED[info.status] : 'done'
-    return state ? { ...one, state, endedAt: now } : one
+    return state ? { ...named, state, endedAt: now } : named
   })
   const found = [...byId.values()]
     .filter(info => !ENDED[info.status] && !agents.some(one => one.id === info.id))
-    .map((info): AgentRecord => ({ id: info.id, name: info.name, type: info.type, description: info.description, state: 'running', startedAt: now }))
+    .map((info): AgentRecord => ({ id: info.id, name: info.name, type: info.type, description: info.description, spawnedBy: info.spawnedBy, state: 'running', startedAt: now }))
   return [...known, ...found]
 }
 
@@ -113,7 +139,7 @@ export async function recordAgentEnd($: EngineInterface, e: TurnCompleteInput) {
   const id = e.agentId
   if (id === undefined) return
   const now = await $.clock.now()
-  await saveAgents($, agents => ended(agents, id, e.reason === 'answer', now))
+  await saveAgents($, agents => ended(agents, id, e.reason === 'answer', now, { result: e.answer, tokens: tokensOf(e.usage) }))
 }
 
 export async function recordWorkflow($: EngineInterface, e: { tool_use_id: string; script?: string }, result: unknown) {

@@ -1,20 +1,35 @@
 import { across, faceWidth, tall } from '../lib/layout'
 import type { IconName } from '../theme/icons'
 import { C, KINDS, LABEL_COLOR, SIZES } from '../theme/tokens'
-import type { Kind, Size } from '../theme/tokens'
+import type { Kind, Size, Tone } from '../theme/tokens'
 import { Hit } from './Hit'
 import { Icon } from './Icon'
 import type { Ui } from './types'
 
-export type ActionButtonProps = { id: string; kind: Kind; icon: IconName; label: string; onPress: () => void; size?: Size; wide?: number }
+export type ActionButtonProps = {
+  id: string
+  kind: Kind
+  icon: IconName
+  label: string
+  onPress: () => void
+  size?: Size
+  wide?: number
+  iconSize?: number
+  isPressed?: boolean
+  isQuiet?: boolean
+  isIconOnly?: boolean
+}
 
 export function ActionButton(ui: Ui, props: ActionButtonProps) {
   const { Box, Text, Button } = ui
   const [height, , , gap] = SIZES[props.size ?? 's']
   const one = KINDS[props.kind]
   const color = LABEL_COLOR[props.kind]
-  const width = props.wide ?? faceWidth(props.label, props.size)
-  const icon = (tone: typeof one.tone, suffix: string) => Icon(ui, { id: `${props.id}-${suffix}`, name: props.icon, size: 15, tone, weight: 1.9 })
+  const iconSize = props.iconSize ?? 15
+  const width = props.isIconOnly ? height : (props.wide ?? faceWidth(props.label, props.size) + iconSize - 15)
+  const rest: Tone = props.isQuiet ? 'faint' : props.isPressed ? 'text' : one.tone
+  const labelColor = props.isQuiet ? C.faint : props.isPressed ? C.text : color.rest
+  const icon = (tone: Tone, suffix: string) => Icon(ui, { id: `${props.id}-${suffix}`, name: props.icon, size: iconSize, tone, weight: 1.9, alt: props.isIconOnly ? props.label : props.icon })
   return (
     <Box
       key={`face-${props.id}`}
@@ -22,33 +37,33 @@ export function ActionButton(ui: Ui, props: ActionButtonProps) {
       alignItems="center"
       justifyContent="center"
       gap={across(gap)}
-      width={props.wide === undefined ? across(width) : '100%'}
-      flexShrink={props.wide === undefined ? 0 : 1}
+      width={props.wide === undefined || props.isIconOnly ? across(width) : '100%'}
+      flexShrink={props.wide === undefined || props.isIconOnly ? 0 : 1}
       minWidth={0}
       height={tall(height)}
       paddingX={0}
       paddingY={0}
       borderStyle="round"
       borderColor={one.border}
-      backgroundColor={one.bg}
-      hover={{ backgroundColor: one.hoverBg, borderColor: one.hoverBorder }}
+      backgroundColor={props.isPressed ? C.pressBg : one.bg}
+      hover={{ backgroundColor: props.isPressed ? C.pressBg : one.hoverBg, borderColor: one.hoverBorder }}
     >
-      {one.isDim ? (
+      {one.isDim && !props.isQuiet && !props.isPressed ? (
         <Box flexDirection="row">
           <Box position="absolute" top={0} left={0} display="none" hover={{ display: 'flex' }}>
             {icon('text', 'icon-hot')}
           </Box>
-          {icon(one.tone, 'icon')}
+          {icon(rest, 'icon')}
         </Box>
       ) : (
-        icon(one.tone, 'icon')
+        icon(rest, 'icon')
       )}
-      {ui.Client ? (
-        <Text weight="semibold" color={color.rest} hover={{ color: color.hover }} wrap="truncate-end">
+      {ui.Client && props.isIconOnly ? null : ui.Client ? (
+        <Text weight="bold" color={labelColor} hover={props.kind === 'link' ? { color: color.hover, underline: true } : { color: props.isQuiet ? C.faint : color.hover }} wrap="truncate-end">
           {props.label}
         </Text>
       ) : (
-        <Button key={props.id} plain dimColor={one.isDim || undefined} label={props.label} onPress={props.onPress} hover={{ backgroundColor: C.clear, color: C.text }} />
+        <Button key={props.id} plain dimColor={one.isDim || props.isQuiet || undefined} label={props.label} onPress={props.onPress} hover={{ backgroundColor: C.clear, color: C.text }} />
       )}
       {Hit(ui, { id: props.id, width, height, onPress: props.onPress })}
     </Box>

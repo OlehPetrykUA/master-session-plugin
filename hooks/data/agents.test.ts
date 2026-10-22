@@ -6,7 +6,7 @@ import type { AgentRecord, WorkflowRecord } from '../../types'
 import { workflowRunsOf } from '../lib/agents'
 import { AGENT_SHOWN_MS } from '../lib/constants'
 import { SPAWN } from '../testing/world'
-import { ended, keptAgents, keptWorkflows, launched, listed, phasesOf, spawned } from './agents'
+import { ended, keptAgents, keptWorkflows, launched, listed, phasesOf, spawned, tokensOf } from './agents'
 
 const NOW = 1_000_000
 
@@ -20,7 +20,7 @@ const info = (id: string, status: AgentInfo['status'], extra: Partial<AgentInfo>
 
 test('a started spawn records its proper names: name, type, task, model and background; a workflow agent links to its run', () => {
   expect(spawned([], { ...SPAWN, name: 'probe-helper' }, { model: 'claude-sonnet-5-5', agentId: 'a7' }, NOW)).toEqual([
-    { id: 'a7', name: 'probe-helper', type: 'master-session:researcher', description: 'Docs lookup', model: 'claude-sonnet-5-5', isBackground: true, run: undefined, state: 'running', startedAt: NOW },
+    { id: 'a7', name: 'probe-helper', type: 'master-session:researcher', description: 'Docs lookup', model: 'claude-sonnet-5-5', requestedModel: undefined, parentModel: 'claude-opus-5-5', prompt: 'Read the docs.', isBackground: true, isFork: false, spawnedBy: undefined, run: undefined, state: 'running', startedAt: NOW, tokens: undefined },
   ])
   const [flow] = spawned([], FLOW, { model: 'claude-haiku-5-5', agentId: 'w2' }, NOW)
   expect([flow?.description, flow?.type, flow?.model, flow?.run]).toEqual(['alpha-scan', 'workflow-subagent', 'claude-haiku-5-5', { id: 'wf_9', index: 2 }])
@@ -132,4 +132,16 @@ test('the live event sequence of one workflow run, as engine 2.1.304 raised it, 
 test('engine limit: a subagent resumed by SendMessage raises no agent.spawn, so it stays done even when the list shows it running again', () => {
   const over: AgentRecord = { ...RUNNING, state: 'done', endedAt: NOW }
   expect(listed([over], [info('a1', 'running')], NOW + 5)).toEqual([over])
+})
+
+test("an agent's end keeps its answer, clipped at 2,000 characters, and adds up its tokens over resumed runs; the list names the plugin that spawned it", () => {
+  const usage = { model: 'claude-haiku-5-5', input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 5, cache_creation_input_tokens: 3 }
+  expect(tokensOf(usage)).toBe(128)
+  expect(tokensOf(undefined)).toBeUndefined()
+  const [first] = ended([RUNNING], 'a1', true, NOW + 5, { result: 'x'.repeat(2_100), tokens: 128 })
+  expect([first?.result?.length, first?.result?.endsWith('…'), first?.tokens]).toEqual([2_001, true, 128])
+  const resumed = spawned([first!], { ...SPAWN, resume: { agentId: 'a1' } }, { model: 'm', agentId: 'a1' }, NOW + 9)
+  expect(ended(resumed, 'a1', true, NOW + 20, { result: 'again', tokens: 72 })[0]).toEqual(expect.objectContaining({ result: 'again', tokens: 200 }))
+  expect(listed([RUNNING], [info('a1', 'running', { spawnedBy: 'master-session' })], NOW)[0]?.spawnedBy).toBe('master-session')
+  expect(listed([], [info('b2', 'running', { spawnedBy: 'lab' })], NOW)[0]?.spawnedBy).toBe('lab')
 })

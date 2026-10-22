@@ -2,7 +2,7 @@ import type { AgentRecord, AgentState, WorkflowRecord } from '../../types'
 
 export type StateCounts = Record<AgentState, number> & { total: number }
 
-export type WorkflowAgent = { id: string; index: number; label: string; type: string; model?: string; state: AgentState; startedAt: number; endedAt?: number }
+export type WorkflowAgent = { id: string; index: number; label: string; type: string; model?: string; state: AgentState; startedAt: number; endedAt?: number; result?: string; tokens?: number }
 
 export type WorkflowRun = {
   id: string
@@ -15,6 +15,7 @@ export type WorkflowRun = {
   endedAt?: number
   agents: WorkflowAgent[]
   counts: StateCounts
+  tokens: number
 }
 
 export const subagentsOf = (agents: readonly AgentRecord[]) => agents.filter(agent => !agent.run)
@@ -50,8 +51,11 @@ export function workflowRunsOf(agents: readonly AgentRecord[], workflows: readon
         state: agent.state,
         startedAt: agent.startedAt,
         endedAt: agent.endedAt,
+        result: agent.result,
+        tokens: agent.tokens,
       })),
       counts,
+      tokens: members.reduce((sum, agent) => sum + (agent.tokens ?? 0), 0),
     }
   })
 }

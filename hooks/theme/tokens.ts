@@ -12,6 +12,8 @@ export const C = {
   border: 'rgba(125,125,124,0.224)',
   borderStrong: 'rgba(131,131,130,0.507)',
   accentRing: 'rgba(217,119,87,0.6)',
+  pressBg: 'rgba(170,159,114,0.26)',
+  amberTint: 'rgba(232,176,75,0.14)',
   redTint: 'rgba(211,119,114,0.139)',
   greenTint: 'rgba(114,158,107,0.164)',
   accent: 'claude',
@@ -37,9 +39,9 @@ export const TERMINAL_COLOR: Record<SessionState, string> = { 'needs-you': 'erro
 
 export const STATE_COLOR: Record<SessionState, string> = { 'needs-you': C.red, waiting: C.amber, working: C.green, done: C.muted }
 
-export type Kind = 'secondary' | 'ghost' | 'soft' | 'tint' | 'primary'
+export type Kind = 'secondary' | 'ghost' | 'soft' | 'tint' | 'primary' | 'link'
 
-export type Size = 's' | 'm' | 'ms' | 'mx' | 'ma' | 'l' | 'xl' | 'band' | 'bandTint' | 'bandStrong'
+export type Size = 's' | 'm' | 'ms' | 'mx' | 'ma' | 'l' | 'xl' | 'band' | 'bandTint' | 'bandStrong' | 'b32' | 'b40'
 
 export const SIZES: Record<Size, readonly [number, number, number, number]> = {
   s: [32, 8, 10, 5],
@@ -52,6 +54,8 @@ export const SIZES: Record<Size, readonly [number, number, number, number]> = {
   band: [36, 6, 8, 6],
   bandTint: [36, 10, 12, 6],
   bandStrong: [36, 12, 14, 6],
+  b32: [32, 8, 12, 4],
+  b40: [40, 12, 16, 8],
 }
 
 export const KINDS: Record<Kind, { bg?: string; border: string; hoverBg: string; hoverBorder: string; tone: Tone; isDim: boolean }> = {
@@ -60,6 +64,7 @@ export const KINDS: Record<Kind, { bg?: string; border: string; hoverBg: string;
   soft: { bg: C.inset, border: C.clear, hoverBg: C.insetHover, hoverBorder: C.clear, tone: 'text', isDim: false },
   tint: { bg: C.accentTint, border: C.clear, hoverBg: C.accentTint2, hoverBorder: C.clear, tone: 'accentText', isDim: false },
   primary: { bg: C.accent, border: C.clear, hoverBg: C.accentHover, hoverBorder: C.clear, tone: 'onAccent', isDim: false },
+  link: { border: C.clear, hoverBg: C.hoverBg, hoverBorder: C.clear, tone: 'accentText', isDim: false },
 }
 
 export const LABEL_COLOR: Record<Kind, { rest: string; hover: string }> = {
@@ -68,4 +73,5 @@ export const LABEL_COLOR: Record<Kind, { rest: string; hover: string }> = {
   soft: { rest: C.text, hover: C.text },
   tint: { rest: C.accent, hover: C.accent },
   primary: { rest: 'inverseText', hover: 'inverseText' },
+  link: { rest: C.accent, hover: C.accent },
 }

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRecord, Board, Filter, Live, Repo, Report, Shared, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, Repo, Report, Shared, WorkflowRecord } from '../../types'
 
 const board = atom({ plugin: 'master-session', key: 'board' } as const, null)
 const live = atom({ plugin: 'master-session', key: 'live' } as const, { self: '', title: '', sessions: [], error: '', at: 0 })
@@ -9,7 +9,9 @@ const repos = atom({ plugin: 'master-session', key: 'repos' } as const, [])
 const expanded = atom({ plugin: 'master-session', key: 'expanded' } as const, [])
 const confirming = atom({ plugin: 'master-session', key: 'confirming' } as const, '')
 const filter = atom({ plugin: 'master-session', key: 'filter' } as const, 'all')
-const isSummaryHidden = atom({ plugin: 'master-session', key: 'isSummaryHidden' } as const, false)
+const archiveView = atom({ plugin: 'master-session', key: 'archiveView' } as const, 'closed')
+const asked = atom({ plugin: 'master-session', key: 'asked' } as const, null)
+const isRefreshing = atom({ plugin: 'master-session', key: 'isRefreshing' } as const, false)
 const shared = atom({ plugin: 'master-session', key: 'shared' } as const, null)
 const reports = atom({ plugin: 'master-session', key: 'reports' } as const, [])
 const agents = atom({ plugin: 'master-session', key: 'agents' } as const, [])
@@ -73,12 +75,28 @@ export function setFilter($: EngineInterface, value: Filter) {
   return update($, filter, () => value)
 }
 
-export function getSummaryHidden($: EngineInterface) {
-  return read($, isSummaryHidden)
+export function getArchiveView($: EngineInterface) {
+  return read($, archiveView)
 }
 
-export function setSummaryHidden($: EngineInterface, value: boolean) {
-  return update($, isSummaryHidden, () => value)
+export function setArchiveView($: EngineInterface, value: ArchiveView) {
+  return update($, archiveView, () => value)
+}
+
+export function getAsked($: EngineInterface) {
+  return read($, asked)
+}
+
+export function setAsked($: EngineInterface, value: Asked | null) {
+  return update($, asked, () => value)
+}
+
+export function getRefreshing($: EngineInterface) {
+  return read($, isRefreshing)
+}
+
+export function setRefreshing($: EngineInterface, value: boolean) {
+  return update($, isRefreshing, () => value)
 }
 
 export function getShared($: EngineInterface) {

@@ -11,7 +11,7 @@ export const AGENT_SHOWN_MS = 120_000
 export const FAULT_RETRY_MS = 5_000
 export const FAULT_RETRY_MAX_MS = 60_000
 export const OPENED = 'Master session pane opened.'
-export const SECTIONS = ['section-header', 'section-chips', 'section-tiles', 'section-expanded', 'section-archived', 'section-summary'] as const
+export const SECTIONS = ['section-header', 'section-summary', 'section-chips', 'section-list', 'section-expanded', 'section-archived'] as const
 
 const LIST = { type: 'array', items: { type: 'string' } }
 

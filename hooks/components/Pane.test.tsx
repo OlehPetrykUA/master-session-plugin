@@ -1,11 +1,11 @@
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-import { LH, across, down, tall } from '../lib/layout'
+import { COLUMN, LH, across, down, tall } from '../lib/layout'
 import { C, KINDS } from '../theme/tokens'
-import { BOARD, HOME, MASTER_TITLE, PANE, SELF, WORKTREE, altsOf, buttonsOf, childOf, click, dump, hitsOf, started, textsOf, world } from '../testing/world'
+import { BOARD, HOME, MASTER_TITLE, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, childOf, click, dump, hitsOf, started, textsOf, world } from '../testing/world'
 
-test('Main: header, repos, chips with counts, 50% tiles; every card, chip and face has one press region', async ($, on) => {
+test('v2 one list: header, repos, summary blocks, chips, groups with Needs you pinned first, kind labels, and one press region per row, chip and button', async ($, on) => {
   const { answer } = await started($, on)
   expect(answer).toEqual({ result: 'Board updated: 2 sessions in the pane and the band. Post only 🔴 needs-you lines in chat.' })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
@@ -13,46 +13,60 @@ test('Main: header, repos, chips with counts, 50% tiles; every card, chip and fa
   expect(await hitsOf(ui)).toEqual([
     'hit-chip-all',
     'hit-chip-needs-you',
-    'hit-chip-waiting',
     'hit-chip-working',
+    'hit-chip-waiting',
     'hit-chip-done',
     'hit-chip-archived',
-    'hit-tile-local_env',
-    'hit-tile-local_setup',
+    'hit-row-local_env',
+    'hit-chat-local_env',
+    'hit-row-local_setup',
+    'hit-archived-show',
     'hit-ask',
     'hit-refresh',
   ])
   expect(await buttonsOf(ui)).toEqual([])
-  const region = await ui.find({ key: 'hit-tile-local_env' })
-  expect(region?.props).toEqual(expect.objectContaining({ module: 'hooks/components/press.tsx', height: 7 }))
-  expect(Number(region?.props.width)).toBeGreaterThan(20)
-  expect((await ui.find({ key: 'hit-chip-needs-you' }))?.props).toEqual(expect.objectContaining({ height: 2 }))
   const texts = await textsOf(ui)
-  for (const word of ['Master session', 'updated just now', 'Needs you', 'Test and validate local agent environment', 'needs you']) expect(texts).toContain(word)
-  expect((await ui.find({ key: 'tile-local_env' }))?.props).toEqual(expect.objectContaining({ width: '50%', borderStyle: 'round' }))
-  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['live', 'clock', 'refresh', 'chat', 'folder', 'all', 'Needs you', 'archive', 'needs you', 'step 4 of 6', 'step 2 of 5', 'house', 'branch']))
-  expect(await ui.find({ type: 'Text', text: /Someone else|parent/ })).toBeUndefined()
+  const order = ['Sessions', 'Needs you', 'Subagents', 'Workflows', 'Commits', 'Tests', 'Duration', 'Git', 'All', 'Needs you', 'Working', 'Waiting', 'Done', 'Archived', 'Master session', 'updated just now', 'Ask for updates', 'Refresh', 'Repos']
+  let from = -1
+  for (const word of order) {
+    const at = texts.indexOf(word, from + 1)
+    expect(at).toBeGreaterThan(from)
+    from = at
+  }
+  for (const word of ['1 blocker', 'none', '—', 'Session', 'Approve the settings.json edit', 'Redo toolkit setup UI', 'mockups', '50m']) expect(texts).toContain(word)
+  expect(texts.some(text => /^since \d\d:\d\d$/.test(text))).toBe(true)
+  expect((await ui.find({ key: 'block-needs-you' }))?.props).toEqual(expect.objectContaining({ backgroundColor: C.redTint, borderColor: C.red, borderStyle: 'round' }))
+  expect((await ui.find({ key: 'row-local_env' }))?.props).toEqual(expect.objectContaining({ borderColor: C.red, minHeight: tall(56), paddingLeft: across(12), paddingRight: across(8), gap: across(12) }))
+  expect((await ui.find({ key: 'row-local_setup' }))?.props).toEqual(expect.objectContaining({ borderColor: C.border, backgroundColor: C.surface, borderStyle: 'round' }))
+  expect((await ui.find({ key: 'face-chat-local_env' }))?.props).toEqual(expect.objectContaining({ backgroundColor: KINDS.primary.bg, height: tall(32) }))
+  expect((await ui.find({ key: 'chip-all' }))?.props).toEqual(expect.objectContaining({ height: tall(32), borderColor: C.accent, backgroundColor: C.accentTint }))
+  const groups = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
+  expect(groups).toEqual(['group-head-needs-you', 'group-head-waiting', 'group-head-archived'])
+  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['live', 'needs you', 'waiting', 'Session', '2 of 5', '1 uncommitted', 'worktree']))
+  expect(await ui.find({ key: 'detail-local_env' })).toBeUndefined()
   await ui.unmount()
   for (const surface of ['terminal', 'vscode', 'mobile'] as const) {
     const other = await $.ui.mount({ ...PANE, surface })
-    expect(await other.find({ key: 'tile-open-local_setup' })).toBeDefined()
+    expect(await other.find({ key: 'row-open-local_setup' })).toBeDefined()
     expect(await hitsOf(other)).toEqual([])
     if (surface === 'terminal') {
       await dump('main-terminal', other)
-      expect(await other.find({ type: 'Text', text: /needs you ●1 50m 4\/6/ })).toBeDefined()
-      expect((await other.find({ key: 'tile-open-local_env' }))?.text).toBe('Test and validate local agent environment')
+      const lines = await textsOf(other)
+      expect(lines).toEqual(expect.arrayContaining(['Needs you 1', 'Waiting 1', 'Archived 1', 'Session · Approve the settings.json edit', 'Session · mockups · 50m · 2/5']))
+      expect(lines.some(line => line.startsWith('Sessions 2 (0 / 1 / 0) · Needs you 1 1 blocker'))).toBe(true)
+      expect((await other.find({ key: 'row-open-local_env' }))?.text).toBe('Test and validate local agent environment')
     }
     await other.unmount()
   }
 })
 
-test('a press anywhere on a card expands it: down then up inside the region; a drag out is no press', async ($, on) => {
+test('a press anywhere on a row expands it: down then up inside the region; a drag out is no press', async ($, on) => {
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await ui.pointer({ type: 'down', x: 3, y: 5, button: 'left', in: 'hit-tile-local_setup' })
-  await ui.pointer({ type: 'up', x: 300, y: 50, button: 'left', in: 'hit-tile-local_setup' })
+  await ui.pointer({ type: 'down', x: 3, y: 5, button: 'left', in: 'hit-row-local_setup' })
+  await ui.pointer({ type: 'up', x: 300, y: 50, button: 'left', in: 'hit-row-local_setup' })
   expect(await ui.find({ key: 'detail-local_setup' })).toBeUndefined()
-  await click(ui, 'hit-tile-local_setup', 20, 6)
+  await click(ui, 'hit-row-local_setup', 20, 2)
   expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
   await ui.unmount()
 })
@@ -60,18 +74,20 @@ test('a press anywhere on a card expands it: down then up inside the region; a d
 test('Expanded: blocker first, sub-tiles in the design order, Open and Archive as equal halves', async ($, on) => {
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-tile-local_env')
+  await click(ui, 'hit-row-local_env')
   await dump('expanded-needs', ui)
   const texts = await textsOf(ui)
-  const at = ['Test and validate local agent environment', 'BLOCKER', 'Now', 'Next', 'Main checkout', 'Git', 'Time', 'Permission', 'Model'].map(word => texts.indexOf(word))
-  expect(at.every(index => index >= 0)).toBe(true)
+  const title = texts.indexOf('Test and validate local agent environment')
+  const at = ['BLOCKER', 'Now', 'Next', 'Main checkout', 'Git', 'Time', 'Permission', 'Model'].map(word => texts.indexOf(word, title))
+  expect(title).toBeGreaterThan(0)
+  expect(at.every(index => index > title)).toBe(true)
   expect([...at].sort((left, right) => left - right)).toEqual(at)
   for (const word of ['Approve the settings.json edit', 'branch master', 'running 50 min', 'active now', 'auto', 'opus · xhigh', 'Open chat', 'Open', 'Collapse']) expect(texts).toContain(word)
   expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-collapse-local_env', 'hit-chat-local_env', 'hit-open-local_env']))
   expect(await hitsOf(ui)).not.toContain('hit-archive-local_env')
   expect((await ui.find({ key: 'face-open-local_env' }))?.props).toEqual(expect.objectContaining({ width: '100%', justifyContent: 'center', height: expect.any(Number) }))
   await click(ui, 'hit-collapse-local_env')
-  await click(ui, 'hit-tile-local_setup')
+  await click(ui, 'hit-row-local_setup')
   await dump('expanded-worktree', ui)
   const other = await textsOf(ui)
   for (const word of ['Worktree', 'wt-toolkit-setup-ui', 'detached ＠0a4621c']) expect(other).toContain(word)
@@ -84,22 +100,146 @@ test('Expanded: blocker first, sub-tiles in the design order, Open and Archive a
   await ui.unmount()
 })
 
-test('Needs-you filter shows only the needs-you tile; other filters filter too', async ($, on) => {
+test('Needs you stays pinned above any other filter with its note; a filter shows only its own group; an empty filter shows the dashed box with Show all', async ($, on) => {
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-chip-needs-you')
+  await click(ui, 'hit-chip-waiting')
   await dump('needs-filter', ui)
-  expect(await ui.find({ key: 'tile-local_env' })).toBeDefined()
-  expect(await ui.find({ key: 'tile-local_setup' })).toBeUndefined()
+  const heads = async () => (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
+  expect(await heads()).toEqual(['group-head-needs-you', 'group-head-waiting'])
+  expect(await textsOf(ui)).toContain('pinned on every filter')
+  await click(ui, 'hit-chip-needs-you')
+  expect(await heads()).toEqual(['group-head-needs-you'])
+  expect(await textsOf(ui)).not.toContain('pinned on every filter')
   await click(ui, 'hit-chip-done')
-  expect(await ui.find({ type: 'Text', text: 'No sessions in this filter.' })).toBeDefined()
+  expect(await heads()).toEqual(['group-head-needs-you'])
+  expect((await ui.find({ key: 'empty-group-done' }))?.props).toEqual(expect.objectContaining({ borderStyle: 'dashed', borderColor: C.borderStrong, alignItems: 'center' }))
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Nothing done yet', 'Show all']))
+  await click(ui, 'hit-show-all-group-done')
+  expect(await heads()).toEqual(['group-head-needs-you', 'group-head-waiting', 'group-head-archived'])
   await ui.unmount()
+})
+
+test('subagents and workflows are rows with their kind and the same groups: running ones under Working, finished ones under Done; workflow agents never get rows', async ($, on) => {
+  on('agent.list', () => ({ value: [] }))
+  on('agent.spawn', (_, e) => ({ model: 'claude-haiku-5-5', agentId: e.workflow ? `w${e.workflow.agentIndex}` : e.description }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('tool.call', { tool: 'Workflow' }, () => ({ result: { status: 'async_launched' as const, taskId: 'wi5', runId: 'wf_7', workflowName: 'review-changes', summary: 'Review the branch' }, text: 'launched' }))
+  await started($, on)
+  await $.tool.call({ tool: 'Workflow', script: "export const meta = { name: 'review-changes', phases: [{ title: 'Review' }, { title: 'Verify' }] }" })
+  await $.agent.spawn({ ...SPAWN, description: 'review:bugs', subagentType: 'workflow-subagent', model: 'haiku', background: false, workflow: { runId: 'wf_7', agentIndex: 1 } })
+  await $.agent.spawn({ ...SPAWN, description: 'verify:band.ts', subagentType: 'workflow-subagent', model: 'haiku', background: false, workflow: { runId: 'wf_7', agentIndex: 2 } })
+  await $.agent.spawn({ ...SPAWN, name: undefined, description: 'Review auth flow', subagentType: 'Explore', model: 'haiku' })
+  await $.agent.spawn({ ...SPAWN, name: 'token-finder', description: 'Find token usages', subagentType: 'master-session:researcher', model: 'sonnet' })
+  await $.turn.complete({ answer: 'ok', durationMs: 5, isAborted: false, turnId: 'u1', agentId: 'w1', reason: 'answer' })
+  await $.turn.complete({ answer: 'found', durationMs: 5, isAborted: false, turnId: 'u2', agentId: 'Find token usages', reason: 'answer' })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await dump('agents-desktop', ui)
+  const texts = await textsOf(ui)
+  for (const word of ['review-changes', 'Workflow', 'verify:band.ts', 'Review auth flow', 'Explore', 'haiku', 'token-finder', 'researcher', 'sonnet']) expect(texts).toContain(word)
+  for (const word of ['review:bugs', 'workflow-subagent', 'master-session:researcher']) expect(texts).not.toContain(word)
+  const keys = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('row-') || box.key?.startsWith('group-head-') ? [box.key] : []))
+  expect(keys).toEqual(['group-head-needs-you', 'row-local_env', 'group-head-working', 'row-wf_7', 'row-Review auth flow', 'group-head-waiting', 'row-local_setup', 'group-head-done', 'row-Find token usages', 'group-head-archived'])
+  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Workflow', 'Explore', '1 of 2']))
+  expect((await ui.find({ key: 'block-subagents' }))?.text).toContain('1 running')
+  expect((await ui.find({ key: 'block-workflows' }))?.text).toContain('1/2 agents')
+  expect((await ui.find({ key: 'chip-all' }))?.text).toContain('5')
+  await ui.unmount()
+  const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await textsOf(terminal)).toEqual(expect.arrayContaining(['Working 2', 'Workflow · verify:band.ts · <1m · 1/2', 'Explore · haiku · <1m', 'Done 1', 'researcher · sonnet · <1m']))
+  await terminal.unmount()
+})
+
+test('Archived is the last group, closed with Show; open it lists two rows, Hide and Show N more; the Archived chip lists them all', async ($, on) => {
+  const sessions = ['a', 'b', 'c', 'd'].map(id => ({ sessionId: `local_${id}`, name: `old-${id}`, title: `Old ${id}`, cwd: '/', isRunning: false, isArchived: true, lastActivityAt: '1970-01-01T00:00:00.000Z', startedBy: SELF }))
+  await started($, on, BOARD, { sessions })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ key: 'archived-local_a' })).toBeUndefined()
+  await click(ui, 'hit-archived-show')
+  await dump('archived', ui)
+  const rows = async () => (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('archived-local_') ? [box.key] : []))
+  expect((await rows()).length).toBe(2)
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Hide', 'Show 3 more', 'archived 1h ago']))
+  expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-archived-hide', 'hit-archived-more', 'hit-unarchive-local_a', 'hit-archived-open-local_a']))
+  await click(ui, 'hit-archived-more')
+  expect((await rows()).length).toBe(5)
+  await click(ui, 'hit-archived-hide')
+  expect((await rows()).length).toBe(0)
+  await click(ui, 'hit-chip-archived')
+  expect((await rows()).length).toBe(5)
+  expect(await hitsOf(ui)).not.toContain('hit-archived-hide')
+  await click(ui, 'hit-unarchive-local_a')
+  expect(await ui.find({ type: 'Text', text: /Unarchive old-a\?/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('all done stays the one list: finished header line, every row under Done with Archive all…, no summary mode', async ($, on) => {
+  const done = { ...BOARD, testsPassed: 526, testsNote: 'smoke 398 · hooks 128', sessions: BOARD.sessions.map(one => ({ ...one, state: 'done', needsYou: undefined, progress: 'step 5 of 5 — shipped', verified: 'tests 526 passed' })) }
+  await started($, on, done)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await dump('summary', ui)
+  const texts = await textsOf(ui)
+  expect(texts).toContain('finished 19:46')
+  expect(texts).not.toContain('Run summary')
+  expect(texts).toEqual(expect.arrayContaining(['passed', 'Done', 'shipped']))
+  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Tests 526', 'Sessions 2', 'Needs you 0']))
+  const heads = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
+  expect(heads).toEqual(['group-head-done', 'group-head-archived'])
+  expect((await ui.find({ key: 'block-needs-you' }))?.props.backgroundColor).toBe(C.surface)
+  await ui.unmount()
+})
+
+test('the header: 56 tall, title and live dot over the status line, Ask and Refresh ghost 32; Ask reads Ask for updates from 460 px; narrow panes move the buttons to a second row', async ($, on) => {
+  await started($, on)
+  for (const [columns, ask, isNarrow] of [
+    [40, 'Ask', true],
+    [48, 'Ask', false],
+    [56, 'Ask for updates', false],
+    [80, 'Ask for updates', false],
+  ] as const) {
+    const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: columns }, surface: 'desktop' })
+    expect(columns * COLUMN >= 460).toBe(ask === 'Ask for updates')
+    const header = await ui.find({ key: 'section-header' })
+    for (const word of ['Master session', 'updated just now', ask, 'Refresh']) expect(header?.text).toContain(word)
+    expect(await ui.find({ key: 'header-buttons' }) !== undefined).toBe(isNarrow)
+    expect(header?.props.height).toBe(isNarrow ? undefined : tall(56))
+    expect((await ui.find({ key: 'face-refresh' }))?.props).toEqual(expect.objectContaining({ height: tall(32), borderColor: KINDS.ghost.border }))
+    expect((await ui.find({ key: 'face-refresh' }))?.props.backgroundColor).toBeUndefined()
+    expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-ask', 'hit-refresh']))
+    expect((await ui.findAll({ type: 'Box' })).filter(box => box.props.position === 'absolute' && box.props.display === 'none' && box.text !== '')).toEqual([])
+    if (isNarrow) {
+      expect(await ui.find({ key: 'row-clock-local_setup' })).toBeUndefined()
+      expect(await textsOf(ui)).toContain('50m')
+      expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).toBe(across(32))
+      expect((await ui.find({ key: 'blocks-0' }))?.children.length).toBe(3)
+    }
+    await ui.unmount()
+  }
+})
+
+test('header states: offline turns the dot and line amber with a notice under the repos; Asked replaces Ask until a worker answers', async ($, on) => {
+  let failure: string | undefined
+  const { clock } = await started($, on, BOARD, { listError: () => failure })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-ask')
+  await dump('header-asked', ui)
+  expect((await ui.find({ key: 'section-header' }))?.text).toContain('Asked')
+  expect(await textsOf(ui)).toContain('asked 1 worker · just now')
+  await ui.unmount()
+  failure = 'board.json not found'
+  await clock.advance(15_000)
+  const offline = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await dump('header-offline', offline)
+  expect(await textsOf(offline)).toEqual(expect.arrayContaining(['live data unavailable', 'Can’t read sessions: board.json not found']))
+  expect((await offline.find({ key: 'notice' }))?.props).toEqual(expect.objectContaining({ backgroundColor: C.amberTint }))
+  expect(await altsOf(offline)).toContain('live data unavailable')
+  await offline.unmount()
 })
 
 test('Archived: rows with Unarchive and Open; unarchive asks first; archive asks first', async ($, on) => {
   const { calls, toasts } = await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], state: 'working' }, { ...BOARD.sessions[1], state: 'done', verified: 'tests 13/13 and a screenshot' }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-tile-local_setup')
+  await click(ui, 'hit-row-local_setup')
   await click(ui, 'hit-archive-local_setup')
   expect(await ui.find({ type: 'Text', text: 'Archive setup-ui-redo?' })).toBeDefined()
   await click(ui, 'hit-archive-no-local_setup')
@@ -119,60 +259,6 @@ test('Archived: rows with Unarchive and Open; unarchive asks first; archive asks
   await ui.unmount()
 })
 
-test('archive and unarchive confirms are cards like the tiles, with design faces, 10 apart from the card above and the tiles below', async ($, on) => {
-  await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], state: 'working' }, { ...BOARD.sessions[1], state: 'done', verified: 'tests 13/13 and a screenshot' }] })
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  const card = { flexDirection: 'column', gap: down(8), paddingX: across(12), paddingY: down(12), borderStyle: 'round', borderColor: C.border, backgroundColor: C.surface }
-  await click(ui, 'hit-tile-local_setup')
-  await click(ui, 'hit-archive-local_setup')
-  expect((await ui.find({ key: 'confirm-local_setup' }))?.props).toEqual(expect.objectContaining(card))
-  expect((await ui.find({ key: 'detail-local_setup' }))?.props.gap).toBe(down(10))
-  expect((await ui.find({ key: 'section-expanded' }))?.props.gap).toBe(down(10))
-  expect((await ui.find({ key: 'section-tiles' }))?.props.gap).toBe(down(10))
-  expect((await ui.find({ key: 'face-archive-yes-local_setup' }))?.props).toEqual(expect.objectContaining({ backgroundColor: KINDS.primary.bg, height: tall(36) }))
-  expect((await ui.find({ key: 'face-archive-no-local_setup' }))?.props).toEqual(expect.objectContaining({ backgroundColor: KINDS.secondary.bg, borderColor: KINDS.secondary.border }))
-  expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-archive-yes-local_setup', 'hit-archive-no-local_setup']))
-  expect(await buttonsOf(ui)).toEqual([])
-  await click(ui, 'hit-archive-no-local_setup')
-  await click(ui, 'hit-chip-archived')
-  await click(ui, 'hit-unarchive-local_old')
-  expect((await ui.find({ key: 'unarchive-ask-local_old' }))?.props).toEqual(expect.objectContaining(card))
-  expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-unarchive-yes-local_old', 'hit-unarchive-no-local_old']))
-  expect(await buttonsOf(ui)).toEqual([])
-  await ui.unmount()
-})
-
-test('Run summary: totals, needs-you list, finished list, switch to the board', async ($, on) => {
-  const done = {
-    ...BOARD,
-    testsPassed: 526,
-    testsNote: 'smoke 398 · hooks 128',
-    sessions: [
-      { ...BOARD.sessions[0], state: 'needs-you' },
-      { ...BOARD.sessions[1], state: 'done', progress: 'step 5 of 5 — shipped', commits: ['db8ea4d setup screen', '9f95022 token wizard'], verified: 'tests 526 passed' },
-    ],
-  }
-  await started($, on, done)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await dump('summary', ui)
-  const texts = await textsOf(ui)
-  expect(texts).toContain('Run summary')
-  expect(texts).not.toContain('Master session')
-  expect(texts).toContain('finished 19:46')
-  const at = ['Sessions', 'Commits', 'Tests passed', 'Duration', 'Needs you', 'Finished'].map(word => texts.indexOf(word))
-  expect(at.every(index => index >= 0)).toBe(true)
-  expect([...at].sort((left, right) => left - right)).toEqual(at)
-  for (const word of ['526', '2', 'smoke 398 · hooks 128', 'Test and validate local agent environment', 'Redo toolkit setup UI']) expect(texts).toContain(word)
-  expect(await hitsOf(ui)).toEqual(['hit-summary-chat-local_env', 'hit-archive-local_setup', 'hit-view-toggle', 'hit-refresh'])
-  await click(ui, 'hit-archive-local_setup')
-  expect(await ui.find({ type: 'Text', text: 'Archive setup-ui-redo?' })).toBeDefined()
-  await click(ui, 'hit-archive-no-local_setup')
-  expect(await ui.find({ key: 'chip-all' })).toBeUndefined()
-  await click(ui, 'hit-view-toggle')
-  expect(await ui.find({ key: 'chip-all' })).toBeDefined()
-  await ui.unmount()
-})
-
 test('a worker chat shows its master board read-only, from the master’s board file', async ($, on) => {
   const run = world(on, childOf(3_000_000))
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
@@ -181,7 +267,7 @@ test('a worker chat shows its master board read-only, from the master’s board 
   await dump('shared', ui)
   expect(await textsOf(ui)).toContain(`from ${MASTER_TITLE}`)
   expect(await hitsOf(ui)).not.toContain('hit-ask')
-  await click(ui, 'hit-tile-local_setup')
+  await click(ui, 'hit-row-local_setup')
   expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
   expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-collapse-local_setup', 'hit-open-local_setup']))
   expect(await hitsOf(ui)).not.toContain('hit-archive-local_setup')
@@ -200,17 +286,8 @@ test('polls that find nothing new write no state, so a press is never cut by a r
   writes.length = 0
   await clock.advance(60_000)
   expect(writes).toEqual([])
-  await click(ui, 'hit-tile-local_env')
+  await click(ui, 'hit-row-local_env')
   expect(writes).toEqual(['expanded'])
-  await ui.unmount()
-})
-
-test('expanding keeps the other tile rows keyed by their first tile, not by position', async ($, on) => {
-  await started($, on)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect(await ui.find({ key: 'row-local_env' })).toBeDefined()
-  await click(ui, 'hit-tile-local_env')
-  expect(await ui.find({ key: 'row-local_setup' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -239,7 +316,7 @@ test('Ask for updates sends one envelope to each running worker and says how man
   await ui.unmount()
 })
 
-test('a working tile whose session is idle says so on its line instead of the step', async ($, on) => {
+test('a working row whose session is idle says so on its line instead of the step', async ($, on) => {
   await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], state: 'working' }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await textsOf(ui)).toContain('idle')
@@ -249,15 +326,15 @@ test('a working tile whose session is idle says so on its line instead of the st
 test('one card is expanded at a time: opening a second closes the first, collapsing the open one closes it', async ($, on) => {
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-tile-local_env')
+  await click(ui, 'hit-row-local_env')
   expect(await ui.find({ key: 'detail-local_env' })).toBeDefined()
-  await click(ui, 'hit-tile-local_setup')
+  await click(ui, 'hit-row-local_setup')
   expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
   expect(await ui.find({ key: 'detail-local_env' })).toBeUndefined()
   await click(ui, 'hit-chip-waiting')
   expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
   await click(ui, 'hit-chip-all')
-  await click(ui, 'hit-tile-local_env')
+  await click(ui, 'hit-row-local_env')
   expect(await ui.find({ key: 'detail-local_env' })).toBeDefined()
   expect(await ui.find({ key: 'detail-local_setup' })).toBeUndefined()
   await click(ui, 'hit-collapse-local_env')
@@ -271,7 +348,7 @@ test('the expanded card shows long values in full: wrapped, never cut', async ($
   const needsYou = `Approve the settings.json edit ${'so the worker can carry on with the next step '.repeat(6)}`.trim()
   await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], now, needsYou }, BOARD.sessions[1]] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-tile-local_env')
+  await click(ui, 'hit-row-local_env')
   expect(now.length).toBeGreaterThanOrEqual(300)
   expect(needsYou.length).toBeGreaterThanOrEqual(300)
   for (const value of [now, needsYou]) {
@@ -283,59 +360,12 @@ test('the expanded card shows long values in full: wrapped, never cut', async ($
   await ui.unmount()
 })
 
-test('the header shows every button with its label at 48, 57 and 80 columns, the update time sits in the repos row, and no button draws a tooltip', async ($, on) => {
-  await started($, on)
-  for (const [columns, ask] of [
-    [48, 'Ask'],
-    [57, 'Ask for updates'],
-    [80, 'Ask for updates'],
-  ] as const) {
-    const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: columns }, surface: 'desktop' })
-    const header = await ui.find({ key: 'section-header' })
-    const repos = await ui.find({ key: 'section-repos' })
-    const labels = (await ui.findAll({ type: 'Text' })).map(one => one.text)
-    for (const word of ['Master session', ask, 'Refresh']) expect(labels).toContain(word)
-    expect(header?.text).toContain('Master session')
-    expect(header?.text).toContain(ask)
-    expect(header?.text).toContain('Refresh')
-    expect(header?.text).not.toContain('updated')
-    expect(repos?.text).toContain('updated just now')
-    expect(await ui.find({ key: 'header-buttons' })).toBeUndefined()
-    expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-ask', 'hit-refresh']))
-    const pin = await ui.find({ key: 'header-pin' })
-    expect(JSON.stringify(pin?.children)).not.toMatch(/Ask every running worker|Re-read sessions|Show the run summary|Show every session/)
-    expect((await ui.findAll({ type: 'Box' })).filter(box => box.props.position === 'absolute' && box.props.display === 'none' && box.text !== '')).toEqual([])
-    await ui.unmount()
-  }
-})
-
-test('an all-done board too narrow for one row stacks its labelled buttons under the title, and shortens Ask before it stacks', async ($, on) => {
-  const done = { ...BOARD, sessions: BOARD.sessions.map(one => ({ ...one, state: 'done', progress: 'step 5 of 5 — shipped' })) }
-  await started($, on, done)
-  const top = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: 57 }, surface: 'desktop' })
-  await click(top, 'hit-view-toggle')
-  await top.unmount()
-  for (const [columns, isStacked, ask] of [
-    [48, true, 'Ask for updates'],
-    [57, false, 'Ask'],
-    [80, false, 'Ask for updates'],
-  ] as const) {
-    const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: columns }, surface: 'desktop' })
-    const row = await ui.find({ key: 'header-buttons' })
-    expect(row !== undefined).toBe(isStacked)
-    const labels = (await ui.findAll({ type: 'Text' })).map(one => one.text)
-    for (const word of ['Master session', 'Summary', ask, 'Refresh']) expect(labels).toContain(word)
-    expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-view-toggle', 'hit-ask', 'hit-refresh']))
-    await ui.unmount()
-  }
-})
-
 test('a worker that works in a worktree shows that worktree in its place and Git cells, from its report', async ($, on) => {
   const report = { v: 1, kind: 'status', session: 'local_env', engineId: 'engine-env', parent: SELF, seq: 2, at: 3_590_000, run: { isRunning: true }, modelAt: 3_590_000, state: 'working', activity: [], commits: [], tests: [], files: [], git: { branch: '', dirty: 1, ahead: 0, at: 3_590_000, path: WORKTREE } }
   const { clock } = await started($, on, BOARD, { files: { [`${HOME}/.claude/state/master-session/sessions/local_env.json`]: JSON.stringify(report) } })
   await clock.advance(3_000)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-tile-local_env')
+  await click(ui, 'hit-row-local_env')
   const texts = await textsOf(ui)
   for (const word of ['Worktree', 'wt-toolkit-setup-ui', 'detached ＠0a4621c', '1 uncommitted']) expect(texts).toContain(word)
   expect(texts).not.toContain('Main checkout')
@@ -347,7 +377,7 @@ test('the expanded card shows the mod-band row in full at 57 columns: title, sub
   const next = 'segments fill width, animations, Board hidden when pane open'
   await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], state: 'working', needsYou: undefined, progress: 'step 3 of 5 — implement band plan', now, next }, BOARD.sessions[1]] })
   const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: 57 }, surface: 'desktop' })
-  await click(ui, 'hit-tile-local_env')
+  await click(ui, 'hit-row-local_env')
   expect(await ui.find({ key: 'detail-local_env' })).toBeDefined()
   for (const value of [now, next, 'Test and validate local agent environment', /implement band plan/]) {
     expect((await ui.findAll({ type: 'Text', text: value })).some(one => one.props.wrap === 'wrap')).toBe(true)
@@ -392,7 +422,7 @@ test('a saved list from multi-expand loads as one card: only the last id stays o
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
   expect(await ui.find({ key: 'detail-local_env' })).toBeUndefined()
-  await click(ui, 'hit-tile-local_env')
+  await click(ui, 'hit-row-local_env')
   expect(written.at(-1)).toEqual(['local_env'])
   await ui.unmount()
 })
@@ -401,7 +431,7 @@ test('a legacy single-id expanded value gives way when another card is pressed',
   const written = legacyExpanded(on)
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-tile-local_setup')
+  await click(ui, 'hit-row-local_setup')
   expect(written.at(-1)).toEqual(['local_setup'])
   expect(await ui.find({ key: 'detail-local_env' })).toBeUndefined()
   expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
@@ -420,10 +450,10 @@ test('the header block stays pinned at the scroll offset over the content, with 
   const inside = JSON.stringify(pin?.children)
   for (const key of ['section-header', 'hit-refresh', 'hit-ask', 'header-rule']) expect(inside).toContain(`"${key}"`)
   expect(inside).not.toContain('hit-chip-all')
-  expect(inside).not.toContain('hit-tile-local_env')
+  expect(inside).not.toContain('hit-row-local_env')
   expect((await down.find({ key: 'header-space' }))?.props.height).toBe(space)
   await click(down, 'hit-refresh')
-  await click(down, 'hit-tile-local_setup')
+  await click(down, 'hit-row-local_setup')
   expect(await down.find({ key: 'detail-local_setup' })).toBeDefined()
   await down.unmount()
   const terminal = await $.ui.mount({ ...PANE, surface: 'terminal', props: { ...PANE.props, scroll: { offset: 9, bodyRows: 60 } } })
@@ -460,9 +490,9 @@ test('the pinned header lands on the same pixel row at start, at an aimed row in
   aimed(on)
   await started($, on)
   const start = await $.ui.mount(scrolled(0))
-  await click(start, 'hit-tile-local_env')
+  await click(start, 'hit-row-local_env')
   expect(await liftOn(start)).toBe(0)
-  const row = await aimAt($, 'section-tiles')
+  const row = await aimAt($, 'section-list')
   expect(row).toBeGreaterThan(0)
   await start.unmount()
   const mid = await $.ui.mount(scrolled(row))
@@ -484,7 +514,7 @@ test('a hand-scrolled offset never pushes the header down: the pin sits on or ab
   for (const isExpanded of [false, true]) {
     if (isExpanded) {
       const top = await $.ui.mount(scrolled(0))
-      await click(top, 'hit-tile-local_env')
+      await click(top, 'hit-row-local_env')
       await top.unmount()
     }
     for (const offset of [1, 9, ...(isExpanded ? [30] : [])]) {
@@ -502,7 +532,7 @@ test('the live end repro: offset 85, bodyRows 50, contentRows 135 with a card op
   aimed(on)
   await started($, on)
   const top = await $.ui.mount(scrolled(0))
-  await click(top, 'hit-tile-local_env')
+  await click(top, 'hit-row-local_env')
   await top.unmount()
   await ($.ui as unknown as Raise).scroll({ component: 'Pane', requestId: 'master-session', offset: 85, by: 85, bodyRows: 50, contentRows: 135, origin: { kind: 'plugin', name: 'master-session' } })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, scroll: { offset: 85, bodyRows: 50 } } })
@@ -516,13 +546,13 @@ test('collapsing a card at a large offset clamps the pin to the new end and move
   const landed = aimed(on)
   await started($, on)
   const top = await $.ui.mount(scrolled(0))
-  await click(top, 'hit-tile-local_env')
+  await click(top, 'hit-row-local_env')
   await top.unmount()
-  const ui = await $.ui.mount(scrolled(30))
-  expect(Math.abs((await liftOn(ui)) - 29.5 * LH)).toBeLessThan(0.1)
+  const ui = await $.ui.mount(scrolled(40))
+  expect(Math.abs((await liftOn(ui)) - 39.5 * LH)).toBeLessThan(0.1)
   await click(ui, 'hit-collapse-local_env')
   const end = await liftOn(ui)
-  expect(end).toBeLessThan(29.5 * LH)
+  expect(end).toBeLessThan(39.5 * LH)
   await pluginScroll($)
   expect(landed).toContain(Math.round(end / LH))
   await ui.unmount()
@@ -532,13 +562,13 @@ test('a filter change while scrolled clamps the pin to the new end and moves the
   const landed = aimed(on)
   await started($, on)
   const top = await $.ui.mount(scrolled(0))
-  await click(top, 'hit-tile-local_setup')
+  await click(top, 'hit-row-local_setup')
   await top.unmount()
-  const ui = await $.ui.mount(scrolled(30))
-  expect(Math.abs((await liftOn(ui)) - 29.5 * LH)).toBeLessThan(0.1)
+  const ui = await $.ui.mount(scrolled(40))
+  expect(Math.abs((await liftOn(ui)) - 39.5 * LH)).toBeLessThan(0.1)
   await click(ui, 'hit-chip-needs-you')
   const end = await liftOn(ui)
-  expect(end).toBeLessThan(29.5 * LH)
+  expect(end).toBeLessThan(39.5 * LH)
   await pluginScroll($)
   expect(landed).toContain(Math.round(end / LH))
   await ui.unmount()

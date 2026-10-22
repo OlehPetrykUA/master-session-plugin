@@ -2,6 +2,10 @@ export type SessionState = 'needs-you' | 'waiting' | 'working' | 'done'
 
 export type Filter = 'all' | SessionState | 'archived'
 
+export type ArchiveView = 'closed' | 'open' | 'all'
+
+export type Asked = { at: number; count: number }
+
 export type BoardSession = {
   id: string
   name: string
@@ -128,11 +132,18 @@ export type AgentRecord = {
   type: string
   description: string
   model?: string
+  requestedModel?: string
+  parentModel?: string
+  prompt?: string
   isBackground?: boolean
+  isFork?: boolean
+  spawnedBy?: string
   run?: { id: string; index: number }
   state: AgentState
   startedAt: number
   endedAt?: number
+  result?: string
+  tokens?: number
 }
 
 export type WorkflowRecord = {
@@ -173,7 +184,9 @@ declare module 'claude-code' {
       expanded: string[]
       confirming: string
       filter: Filter
-      isSummaryHidden: boolean
+      archiveView: ArchiveView
+      asked: Asked | null
+      isRefreshing: boolean
       shared: Shared | null
       reports: Report[]
       agents: AgentRecord[]

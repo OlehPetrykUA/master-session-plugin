@@ -1,6 +1,6 @@
 import type { BoxProps, ButtonProps, ClientProps, ElementConstructor, SvgProps, TextProps } from 'claude-code'
 
-import type { AgentRecord, Board, Filter, Live, LiveSession, Repo, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Repo, WorkflowRecord } from '../../types'
 
 import type { Counts, Row } from '../lib/rows'
 import type { RunSummary } from '../lib/totals'
@@ -15,7 +15,7 @@ export type Ui = TextUi & { Svg: ElementConstructor<SvgProps>; Client?: ElementC
 
 export type Actions = {
   refresh: () => void
-  showBoard: (isBoard: boolean) => void
+  archiveView: (value: ArchiveView) => void
   filter: (id: Filter) => void
   toggle: (id: string) => void
   collapse: (id: string) => void
@@ -40,7 +40,9 @@ export type PaneData = {
   chosen: Filter
   open: readonly string[]
   asking: string
-  isBoardForced: boolean
+  archiveView: ArchiveView
+  asked: Asked | null
+  isRefreshing: boolean
   at: number
   home: string
   columns: number

@@ -1,45 +1,49 @@
-import { ASK, across, down, headerLabelsOf, tall } from '../lib/layout'
+import { across, down, tall } from '../lib/layout'
 import { liveDot } from '../theme/icons'
 import type { IconName } from '../theme/icons'
+import type { Tone } from '../theme/tokens'
 import { ActionButton } from './ActionButton'
+import { Icon } from './Icon'
 import type { Ui } from './types'
 
-export type HeaderProps = {
-  title: string
-  isLive: boolean
-  toggle?: { label: string; icon: IconName; onPress: () => void }
-  onRefresh: () => void
-  onAsk?: () => void
-  columns: number
-}
+export type HeaderButton = { id: string; icon: IconName; label: string; onPress: () => void; isPressed?: boolean; isQuiet?: boolean }
+
+export type HeaderProps = { title: string; isLive: boolean; status: { text: string; icon: IconName; tone: Tone }; buttons: readonly HeaderButton[]; isNarrow: boolean }
 
 export function Header(ui: Ui, props: HeaderProps) {
   const { Box, Text, Svg } = ui
-  const wanted = [props.toggle?.label ?? '', props.onAsk ? ASK : '', 'Refresh'].filter(Boolean)
-  const { labels, isStacked } = headerLabelsOf(props.columns, props.title, wanted)
-  const faces = [
-    props.toggle ? { id: 'view-toggle', icon: props.toggle.icon, label: props.toggle.label, onPress: props.toggle.onPress } : undefined,
-    props.onAsk ? { id: 'ask', icon: 'chat' as const, label: labels[wanted.indexOf(ASK)] ?? ASK, onPress: props.onAsk } : undefined,
-    { id: 'refresh', icon: 'refresh' as const, label: 'Refresh', onPress: props.onRefresh },
-  ].filter(face => face !== undefined)
-  const buttons = faces.map(face => ActionButton(ui, { id: face.id, kind: 'ghost', icon: face.icon, label: face.label, onPress: face.onPress }))
-  return (
-    <Box key="section-header" flexDirection="column">
-      <Box flexDirection="row" alignItems="center" gap={across(8)} height={tall(52)} paddingLeft={across(16)} paddingRight={across(8)}>
-        <Box flexShrink={0}>
-          <Text weight="semibold" size="heading">
-            {props.title}
-          </Text>
-        </Box>
+  const color = props.status.tone === 'amber' ? 'warning' : 'inactive'
+  const title = (
+    <Box key="header-title" flexDirection="column" gap={down(2)} minWidth={0} flexShrink={1}>
+      <Box flexDirection="row" alignItems="center" gap={across(8)}>
+        <Text weight="bold" size="heading" wrap="truncate-end">
+          {props.title}
+        </Text>
         <Svg key="live" source={liveDot(props.isLive ? 'green' : 'amber')} alt={props.isLive ? 'live' : 'live data unavailable'} width={14} height={14} />
-        <Box flexGrow={1} />
-        {isStacked ? null : buttons}
       </Box>
-      {isStacked ? (
-        <Box key="header-buttons" flexDirection="row" justifyContent="flex-end" gap={across(8)} height={tall(40)} paddingLeft={across(16)} paddingRight={across(8)} paddingBottom={down(8)}>
+      <Box flexDirection="row" alignItems="center" gap={across(4)}>
+        {Icon(ui, { id: 'header-status-icon', name: props.status.icon, size: 12, tone: props.status.tone })}
+        <Text size="footnote" color={color} wrap="truncate-end">
+          {props.status.text}
+        </Text>
+      </Box>
+    </Box>
+  )
+  const buttons = props.buttons.map(button => ActionButton(ui, { ...button, kind: 'ghost', size: 'b32', iconSize: 16 }))
+  if (props.isNarrow)
+    return (
+      <Box key="section-header" flexDirection="column" flexShrink={0} gap={down(8)} paddingTop={down(12)} paddingBottom={down(8)} paddingLeft={across(16)} paddingRight={across(8)}>
+        {title}
+        <Box key="header-buttons" flexDirection="row" justifyContent="flex-end" gap={across(4)}>
           {buttons}
         </Box>
-      ) : null}
+      </Box>
+    )
+  return (
+    <Box key="section-header" flexDirection="row" alignItems="center" flexShrink={0} gap={across(8)} height={tall(56)} paddingLeft={across(16)} paddingRight={across(8)}>
+      {title}
+      <Box flexGrow={1} />
+      {buttons}
     </Box>
   )
 }

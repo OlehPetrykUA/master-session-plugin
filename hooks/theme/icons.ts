@@ -1,6 +1,6 @@
 import type { SessionState } from '../../types'
 
-import { escape } from '../lib/layout'
+import { escape, textWidth } from '../lib/layout'
 import type { Tone } from './tokens'
 
 const LIGHT =
@@ -41,6 +41,11 @@ export const I = {
   permission: 'M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6Z',
   model: 'M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5Z',
   pulse: 'M3 12h4l3-7 4 14 3-7h4',
+  session: 'M3 5h18v14H3Z M7 10l3 2-3 2 M12 14h5',
+  agent: 'M6 8h12v11H6Z M12 4v4 M9.5 12.5v1 M14.5 12.5v1 M9.5 16h5',
+  flow: 'M4 4h6v6H4Z M14 14h6v6h-6Z M7 10v4a3 3 0 0 0 3 3h4',
+  expand: 'M6 9l6 6 6-6',
+  close: 'M6 6l12 12 M18 6L6 18',
 } as const
 
 export type IconName = keyof typeof I
@@ -92,11 +97,16 @@ export const dot = (tone: Tone, size = 7) => svg(size, size, `<circle cx="${size
 export const liveDot = (tone: Tone) =>
   svg(14, 14, `<circle cx="7" cy="7" r="7" style="fill:var(--${tone === 'green' ? 'greenTint' : 'amberTint'})"/><circle cx="7" cy="7" r="4" style="fill:var(--${tone})"/>`)
 
-export function gitBadge(count: number) {
+export function gitPill(count: number) {
   const label = String(count)
   const width = Math.ceil(6 + 6 + 4 + label.length * 6.6 + 6)
   return {
-    source: svg(width, 20, `<rect width="${width}" height="20" rx="10" style="fill:var(--surface2)"/><circle cx="9" cy="10" r="3" style="fill:var(--text)"/><text x="16" y="14" style="fill:var(--text);font-size:11px;font-weight:600">${escape(label)}</text>`),
+    source: svg(width, 16, `<rect width="${width}" height="16" rx="8" style="fill:var(--surface2)"/><circle cx="9" cy="8" r="3" style="fill:var(--text)"/><text x="16" y="12" style="fill:var(--text);font-size:11px;font-weight:600">${escape(label)}</text>`),
     width,
   }
+}
+
+export function numeral(value: string, tone: Tone) {
+  const width = Math.ceil(textWidth(value, 18) * 1.25) + 4
+  return { source: svg(width, 24, `<text x="0" y="18" style="fill:var(--${tone});font-size:18px;font-weight:600">${escape(value)}</text>`), width }
 }

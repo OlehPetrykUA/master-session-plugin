@@ -48,12 +48,6 @@ export function countsOf(rows: readonly Row[], repos: readonly Repo[]): Counts {
 
 export const archivedOf = (live: Live) => live.sessions.filter(one => one.isArchived)
 
-export const lineOf = (row: Row) => {
-  if (row.state === 'needs-you') return 'needs you'
-  if (row.state === 'done') return 'done'
-  return stepOf(row.board?.progress)?.label || row.board?.now || (row.live?.isRunning ? 'running' : 'idle')
-}
-
 export const activityOf = (row: Row) =>
   (row.board?.activity ?? []).slice(0, 3).map(line => {
     const cut = line.lastIndexOf(' · ')

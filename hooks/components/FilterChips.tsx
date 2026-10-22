@@ -14,13 +14,15 @@ export type Chip = { id: Filter; label: string; count: number; tone?: Tone; icon
 
 export type FilterChipsProps = { chips: readonly Chip[]; chosen: Filter; onFilter: (id: Filter) => void }
 
+export const markWidthOf = (chip: Chip) => (chip.tone ? 8 : chip.icon ? 14 : 0)
+
 export function FilterChips(ui: Ui, props: FilterChipsProps) {
   const { Box, Text, Button, Svg } = ui
   return (
-    <Box key="section-chips" flexDirection="row" flexWrap="wrap" columnGap={across(6)} rowGap={down(6)} paddingLeft={across(16)} paddingRight={across(16)} paddingTop={down(12)} paddingBottom={down(4)}>
+    <Box key="section-chips" flexDirection="row" flexWrap="wrap" columnGap={across(8)} rowGap={down(8)} paddingLeft={across(16)} paddingRight={across(16)} paddingTop={down(12)}>
       {props.chips.map(chip => {
         const isOn = props.chosen === chip.id
-        const markWidth = chip.tone ? 7 : chip.icon ? 14 : 0
+        const markWidth = markWidthOf(chip)
         const width = chipWidthOf({ label: chip.label, count: chip.count, hasMark: !!markWidth, markWidth })
         const press = () => props.onFilter(chip.id)
         return (
@@ -29,10 +31,10 @@ export function FilterChips(ui: Ui, props: FilterChipsProps) {
             flexDirection="row"
             alignItems="center"
             justifyContent="center"
-            gap={across(6)}
+            gap={across(8)}
             width={across(width)}
             flexShrink={0}
-            height={tall(36)}
+            height={tall(32)}
             paddingX={0}
             paddingY={0}
             borderStyle="round"
@@ -41,21 +43,21 @@ export function FilterChips(ui: Ui, props: FilterChipsProps) {
             hover={{ backgroundColor: isOn ? C.accentTint2 : C.hoverBg, borderColor: isOn ? C.accent : C.borderStrong }}
           >
             {chip.tone ? (
-              <Svg key={`chip-dot-${chip.id}`} source={dot(chip.tone)} alt={chip.label} width={7} height={7} />
+              <Svg key={`chip-dot-${chip.id}`} source={dot(chip.tone, 8)} alt={chip.label} width={8} height={8} />
             ) : chip.icon ? (
               Icon(ui, { id: `chip-icon-${chip.id}`, name: chip.icon, size: 14, tone: isOn ? 'accentText' : 'text' })
             ) : null}
             {ui.Client || isOn ? (
-              <Text weight={isOn ? 'semibold' : 'medium'} color={isOn ? C.accent : C.text}>
+              <Text weight={isOn ? 'bold' : 'medium'} color={isOn ? C.accent : C.text}>
                 {chip.label}
               </Text>
             ) : (
               <Button key={`filter-${chip.id}`} plain label={chip.label} onPress={press} hover={{ backgroundColor: C.clear }} />
             )}
-            <Text weight={isOn ? 'semibold' : undefined} color={isOn ? C.accent : C.muted} tabular>
+            <Text weight={isOn ? 'bold' : undefined} color={isOn ? C.accent : C.muted} tabular>
               {String(chip.count)}
             </Text>
-            {Hit(ui, { id: `chip-${chip.id}`, width, height: 36, onPress: press })}
+            {Hit(ui, { id: `chip-${chip.id}`, width, height: 32, onPress: press })}
           </Box>
         )
       })}

@@ -7,7 +7,6 @@ export const LH = 19
 export const liftOf = (offset: number) => offset * LH
 export const COLUMN = 8.3
 export const PAD = 4
-export const TILE_HEIGHT = 118
 
 const THIN = 13 / 5
 
@@ -48,24 +47,7 @@ export const fill = (text: string, px: number) => {
 
 export const bodyWidthOf = (columns: number) => columns * COLUMN - 32
 
-export const ASK = 'Ask for updates'
-export const ASK_SHORT = 'Ask'
-
 export function faceWidth(label: string, size: Size = 's') {
   const [, left, right, gap] = SIZES[size]
   return 2 + left + 15 + gap + widthOf(label) * 1.08 + right
-}
-
-export const statusWidthOf = (status: string) => 13 + 4 + Math.max(textWidth(status, 12), textWidth('updated 00h 00m ago', 12)) * 1.08
-
-const titleRowOf = (title: string, labels: readonly string[]) => 16 + textWidth(title, 16) * 1.08 + 8 + 14 + 8 + labels.reduce((sum, label) => sum + 8 + faceWidth(label), 0) + 8
-
-const buttonRowOf = (labels: readonly string[]) => 16 + labels.reduce((sum, label) => sum + faceWidth(label) + 8, 0)
-
-export function headerLabelsOf(columns: number, title: string, labels: readonly string[]) {
-  const room = columns * COLUMN
-  const short = labels.map(label => (label === ASK ? ASK_SHORT : label))
-  if (titleRowOf(title, labels) <= room) return { labels, isStacked: false }
-  if (titleRowOf(title, short) <= room) return { labels: short, isStacked: false }
-  return { labels: buttonRowOf(labels) <= room ? labels : short, isStacked: true }
 }
