@@ -24,7 +24,7 @@ Your brief holds your whole run: no go, rebase or merged message will come.
 - **Pause:** on `PAUSE`, commit work in progress, stop every Monitor and background job, and end the turn. On `RESUME`, re-arm your watches and continue from the step it names.
 
 ## Live status: the report tool
-- Call `mcp__master-session__report` (load it with ToolSearch `select:mcp__master-session__report`) at every step boundary, on a blocker, and when done, with `{ state?: "working"|"waiting"|"needs-you"|"done", progress?: "step N of M — label", now?, next?, needsYou?, risk?, activity?: [], commits?: [], tests?: [], files?: [] }`. Never paste status into chat.
+- Call `mcp__master-session__report` (load it with ToolSearch `select:mcp__master-session__report`) at every step boundary, on a blocker, and when done, with `{ state?: "working"|"waiting"|"needs-you"|"done", persona?: "<your brief's persona, e.g. Implementer>", progress?: "step N of M — label", now?, next?, needsYou?, risk?, activity?: [], commits?: [], tests?: [], files?: [] }`. Never paste status into chat.
 - The mod records commits, test runs, edits and waits by itself, and an idle session sends nothing. No timed loops, heartbeats or ScheduleWakeup for status. Watch a long job with Monitor or a background Bash `until` loop on its own log.
 - Without the tool, send no step updates: the parent reads your session's events.
 
