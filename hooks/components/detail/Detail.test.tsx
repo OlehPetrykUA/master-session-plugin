@@ -670,3 +670,39 @@ test('a side session started by an archived child still counts: archive follows 
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
   await ui.unmount()
 })
+
+test('the open tool expands a workflow agent’s run, since the agent has no card of its own', async ($, on) => {
+  await agentsStarted($, on)
+  const answer = (await $.tool.call({ tool: 'mcp__master-session__open', expand: 'w1' })) as { result?: string }
+  expect(answer.result).toBe('The master session pane is open beside the chat, showing wf_7 expanded (w1 is one of its agents).')
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ key: 'detail-wf_7' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the 15 s refresh keeps reading a side session past the first 50 from the family list, so the box keeps its commits and yes archives', async ($, on) => {
+  const other = `${HOME}/Work/other`
+  const far = `${HOME}/Work/other-wt`
+  const git = {
+    ...UNMERGED.git,
+    [`${far} worktree`]: `worktree ${other}\nHEAD 3333333cccccc\nbranch refs/heads/main\n\nworktree ${far}\nHEAD 4444444dddddd\nbranch refs/heads/feat/far\n\n`,
+    [`${far} status`]: '# branch.oid 4444444\n# branch.head feat/far\n',
+    [`${other} status`]: '# branch.oid 3333333\n# branch.head main\n',
+    [`${far} symbolic-ref`]: 'origin/main\n',
+    [`${far} rev-parse`]: '3333333\n',
+    [`${far} rev-list`]: '2\n',
+  }
+  const farSide = SIDE({ sessionId: 'local_far', name: 'far-work', title: 'far-work', cwd: far })
+  const { calls, clock } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { git, sessions: [CONDUCTOR, ...FILLER(55), farSide] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_conductor')
+  await click(ui, 'hit-archive-local_conductor')
+  expect(await textsOf(ui)).toContain('far-work: 2 commits on feat/far that are not on main')
+  await clock.advance(15_000)
+  const texts = await textsOf(ui)
+  expect(texts).toContain('far-work: 2 commits on feat/far that are not on main')
+  expect(texts).not.toContain('far-work: git state unknown')
+  await click(ui, 'hit-archive-yes-local_conductor')
+  expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
+  await ui.unmount()
+})

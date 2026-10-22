@@ -127,13 +127,14 @@ export const register: Register = on => {
     const expand = typeof e.expand === 'string' ? e.expand.trim() : ''
     const isArchived = e.archived === true
     const data = await paneData($, columns || 48)
-    const isItem = paneViewOf(data).items.some(item => item.id === expand || (item.kind === 'workflow' && item.run.agents.some(agent => agent.id === expand)))
+    const item = paneViewOf(data).items.find(one => one.id === expand || (one.kind === 'workflow' && one.run.agents.some(agent => agent.id === expand)))
     const isOldOne = data.archived.some(one => one.id === expand)
-    const isShown = !!expand && (isItem || (isArchived && isOldOne))
+    const card = isArchived ? (isOldOne ? expand : '') : (item?.id ?? '')
+    const isShown = !!expand && !!card
     if (isArchived || isShown) await setFilter($, isArchived ? 'archived' : 'all')
-    if (isShown) await setExpanded($, () => [expand])
+    if (isShown) await setExpanded($, () => [card])
     const isPlaced = await openPane($)
-    const shown = [isArchived ? 'the Archived list' : '', isShown ? `${expand} expanded` : ''].filter(Boolean).join(' with ')
+    const shown = [isArchived ? 'the Archived list' : '', isShown ? `${card} expanded${card === expand ? '' : ` (${expand} is one of its agents)`}` : ''].filter(Boolean).join(' with ')
     const missing = expand && !isShown ? ` ${expand} was not found among its items${isOldOne ? '; it is archived, so pass archived: true' : ''}.` : ''
     return {
       result: isPlaced

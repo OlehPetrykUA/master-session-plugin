@@ -2,7 +2,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { Board, LiveSession, Repo, SessionState, Worktree } from '../../types'
 
-import { lossesOf, sideOf } from '../components/detail/losses'
+import { familyOf, lossesOf, sideOf } from '../components/detail/losses'
 import { withReported } from '../lib/agents'
 import { bandProgress } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
@@ -215,7 +215,7 @@ async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[
   const rows = rowsOf(current, live)
   const paths = [
     ...rows.flatMap(row => [row.board?.cwd ?? '', row.live?.cwd ?? ''].filter(Boolean)),
-    ...rows.flatMap(row => sideOf(row, sessions ?? live.sessions, [])).map(one => one.cwd),
+    ...rows.flatMap(row => sideOf(row, sessions ?? familyOf(live), [])).map(one => one.cwd),
     ...(current?.repos ?? []).map(path => expandHome(path, home)),
     ...(current?.sessions ?? []).flatMap(one => (one.worktrees ?? []).map(path => expandHome(path, home))),
   ].filter(path => path.startsWith('/'))

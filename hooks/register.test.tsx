@@ -173,6 +173,8 @@ test('the open tool can expand one card and open the Archived list, so a check c
   expect(missing.result).toBe('The master session pane is open beside the chat. nope was not found among its items.')
   const hidden = (await $.tool.call({ tool: 'mcp__master-session__open', expand: 'local_old' })) as { result?: string }
   expect(hidden.result).toBe('The master session pane is open beside the chat. local_old was not found among its items; it is archived, so pass archived: true.')
+  const live = (await $.tool.call({ tool: 'mcp__master-session__open', archived: true, expand: 'local_setup' })) as { result?: string }
+  expect(live.result).toBe('The master session pane is open beside the chat, showing the Archived list. local_setup was not found among its items.')
   const plain = (await $.tool.call({ tool: 'mcp__master-session__open' })) as { result?: string }
   expect(plain.result).toBe('The master session pane is open beside the chat.')
   expect(opened.length).toBeGreaterThanOrEqual(3)
