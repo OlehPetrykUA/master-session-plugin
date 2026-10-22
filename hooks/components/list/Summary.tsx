@@ -1,8 +1,8 @@
 import type { Block } from '../../lib/list'
 import { across, down } from '../../lib/layout'
 import { dot, numeral } from '../../theme/icons'
-import { Icon } from '../Icon'
 import { C } from '../../theme/tokens'
+import { Icon } from '../Icon'
 import type { Ui } from '../types'
 
 export type SummaryProps = { blocks: readonly Block[]; perRow: number }

@@ -721,11 +721,13 @@ test('the 15 s refresh keeps reading a side session past the first 50 from the f
   await ui.unmount()
 })
 
-test('a done session with a reported sha reads ready for verify in Waiting, and archiving it puts the Undo bar in Waiting, not Done', async ($, on) => {
-  const { calls } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], state: 'done', sha: '0a4621c' }] }, UNMERGED)
+test('a done session with a reported sha reads ready for verify in Waiting, and archiving it puts the Undo bar in Waiting at its own index, not Done', async ($, on) => {
+  const waiting = { id: 'local_conductor', name: 'conductor-redo', state: 'waiting', now: 'waiting for the go' }
+  const { calls } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], state: 'done', sha: '0a4621c' }, waiting] }, UNMERGED)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const before = await keysOf(ui)
-  expect(before.indexOf('group-head-waiting')).toBeLessThan(before.indexOf('row-local_setup'))
+  expect(before.indexOf('group-head-waiting')).toBeLessThan(before.indexOf('row-local_conductor'))
+  expect(before.indexOf('row-local_conductor')).toBeLessThan(before.indexOf('row-local_setup'))
   expect(before).not.toContain('group-head-done')
   await click(ui, 'hit-row-local_setup')
   await click(ui, 'hit-archive-local_setup')
@@ -734,6 +736,20 @@ test('a done session with a reported sha reads ready for verify in Waiting, and 
   const after = await keysOf(ui)
   expect(after).toContain('undo-bar-waiting')
   expect(after).not.toContain('undo-bar-done')
-  expect(after.indexOf('group-head-waiting')).toBeLessThan(after.indexOf('undo-bar-waiting'))
+  expect(after.indexOf('row-local_conductor')).toBeLessThan(after.indexOf('undo-bar-waiting'))
+  await ui.unmount()
+})
+
+test('a merged worktree with a reported sha reads merged in Done only with its git state, and archiving it puts the Undo bar in Done, not Waiting', async ($, on) => {
+  const { calls } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...finished('local_clean'), sha: '1111111' }] }, { git: CLEAN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN)] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const before = await keysOf(ui)
+  expect(before.indexOf('group-head-done')).toBeLessThan(before.indexOf('row-local_clean'))
+  await click(ui, 'hit-row-local_clean')
+  await click(ui, 'hit-archive-local_clean')
+  expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_clean'])
+  const after = await keysOf(ui)
+  expect(after).toContain('undo-bar-done')
+  expect(after).not.toContain('undo-bar-waiting')
   await ui.unmount()
 })

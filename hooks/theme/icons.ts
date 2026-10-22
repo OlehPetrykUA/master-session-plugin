@@ -1,4 +1,3 @@
-
 import { escape, textWidth } from '../lib/layout'
 import { C } from './tokens'
 import type { Tone } from './tokens'
