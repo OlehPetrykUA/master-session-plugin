@@ -13,7 +13,7 @@ import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, dump, started, text } from 
 import { PERCENT } from '../../theme/band'
 import { I } from '../../theme/icons'
 import { dotsWidth, strip } from '../../theme/strip'
-import type { Segment } from '../../theme/strip'
+import type { StripItem, StripTone } from '../../theme/strip'
 import { guardSvg } from '../guard'
 import { Band } from './Band'
 import { TextBand } from './TextBand'
@@ -67,7 +67,15 @@ async function band($: Engine, on: On, sessions: BoardSession[], isPaneOpen = fa
 
 const mount = ($: Engine, bodyColumns = 100) => $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns } })
 
-const IDLE = { subagents: 0, workflows: 0 }
+const IDLE = { agents: [], workflows: [] }
+
+const S = (tone: StripTone, fill: number, isWorking = false): StripItem => ({ kind: 'session', tone, fill, isWorking })
+
+const A = (tone: StripTone): StripItem => ({ kind: 'subagent', tone, fill: 1, isChild: true })
+
+const W = (tone: StripTone, fill: number, pieces: number): StripItem => ({ kind: 'workflow', tone, fill, pieces })
+
+const sessionsOf = (count: number) => Array.from({ length: count }, () => S('green', 0))
 
 function crewOf($: Engine, on: On) {
   let running: string[] = []
@@ -102,7 +110,7 @@ const countsOf = async ($: Engine, bodyColumns = 100) => {
   const strip = await stripOf(ui)
   const found = {
     texts: texts.map(one => one.text.replace(/[  ]/g, '').trim()),
-    extras: texts.filter(one => one.props.weight === 'semibold' && one.props.color === 'text').map(one => one.text),
+    extras: texts.filter(one => one.props.weight === 'semibold' && one.props.color === 'text' && !one.text.includes(' needs you')).map(one => one.text),
     alt: strip?.props.alt,
     segments: pills(pathOf(String(strip?.props.source), 'track')),
   }
@@ -130,64 +138,54 @@ const pathOf = (source: string, tone: string) => source.match(new RegExp(`<path(
 
 const pills = (path: string) => path.split('M').filter(Boolean).length
 
-function design(width: number, segments: { tone: string; share: number }[]) {
-  const pill = (start: number, size: number) => {
-    const length = Math.max(size, 8)
-    return 'M' + (start + 4).toFixed(1) + ',1h' + (length - 8).toFixed(1) + 'a4,4 0 0 1 0,8h' + (8 - length).toFixed(1) + 'a4,4 0 0 1 0,-8Z'
-  }
-  const slot = (width - 4 * (segments.length - 1)) / segments.length
-  const paths: Record<string, string> = { track: '', grey: '', amber: '', green: '', red: '' }
-  segments.forEach((segment, index) => {
-    const start = index * (slot + 4)
-    paths.track += pill(start, slot)
-    paths[segment.tone] += pill(start, slot * segment.share)
-  })
-  return paths
-}
+const BARS = [A('green'), A('failed'), S('green', 0.6), A('green'), A('grey'), S('amber', 0.8), S('red', 16.3 / 32.5), W('green', 1.505 / 3, 3)]
 
-test('the strip draws the design geometry: one rounded track and one solid fill per worker, dots when narrow', () => {
-  const working: Segment[] = [
-    { state: 'waiting', fill: 0.8 },
-    { state: 'working', fill: 0.6 },
-    { state: 'working', fill: 0.8 },
-    { state: 'done', fill: 1 },
-  ]
-  const tones = { waiting: 'amber', working: 'green', done: 'grey', 'needs-you': 'red' } as const
-  const needs: Segment[] = [{ state: 'needs-you', fill: 0.5 }, ...working]
-  for (const [width, segments] of [
-    [340, working],
-    [210, working],
-    [280, needs],
-    [56, needs],
-  ] as const) {
-    const want = design(width, segments.map(one => ({ tone: tones[one.state], share: one.fill })))
-    const source = strip(width, segments)
-    for (const tone of ['track', 'grey', 'amber', 'green', 'red']) expect(pathOf(source, tone)).toBe(want[tone])
-    expect(pills(pathOf(source, 'track'))).toBe(segments.length)
-  }
-  expect(dotsWidth(5)).toBe(56)
-  expect(strip(56, needs)).toContain('M4.0,1h0.0a4,4 0 0 1 0,8h0.0a4,4 0 0 1 0,-8Z')
-  const finished: Segment[] = working.map(one => ({ state: 'done', fill: 1 }))
-  expect(pathOf(strip(340, finished, 'done'), 'green')).toBe(design(340, finished.map(() => ({ tone: 'green', share: 1 }))).green)
-  expect(pathOf(strip(340, finished, 'done'), 'grey')).toBe('')
-  expect(pills(pathOf(strip(400, Array.from({ length: 7 }, () => ({ state: 'waiting' as const, fill: 0 }))), 'track'))).toBe(7)
+const DOTS = [A('green'), A('red'), S('green', 0.4), A('green'), A('grey'), S('amber', 0.5), S('red', 0.5), W('green', 0.5, 2), S('green', 0.4), A('green'), S('grey', 1), S('green', 0.4), A('green'), A('green'), W('green', 0.5, 1), S('amber', 0.5)]
+
+test('the strip draws lane 7 at 200 px: sessions 10 high, subagents 6×12 after their parent, workflow pieces with 2 px corners, gaps 4 and 2', () => {
+  const source = strip(200, BARS)
+  const session = (x: number, length: number) => `M${x.toFixed(1)},0h${length.toFixed(1)}a5,5 0 0 1 0,10h-${length.toFixed(1)}a5,5 0 0 1 0,-10Z`
+  const sub = (x: number) => `M${x.toFixed(1)},2h6.0a3,3 0 0 1 0,6h-6.0a3,3 0 0 1 0,-6Z`
+  const piece = (x: number, length: number) => `M${x.toFixed(1)},0h${length.toFixed(1)}a2,2 0 0 1 2,2v6a2,2 0 0 1 -2,2h-${length.toFixed(1)}a2,2 0 0 1 -2,-2v-6a2,2 0 0 1 2,-2Z`
+  expect(pathOf(source, 'track')).toBe(session(35, 22.5) + session(99.5, 22.5) + session(136, 22.5) + piece(169.5, 5.5) + piece(181, 5.5) + piece(192.5, 5.5))
+  expect(pathOf(source, 'grey')).toBe(sub(81.5) + piece(169.5, 5.5))
+  expect(pathOf(source, 'amber')).toBe(session(99.5, 16))
+  expect(pathOf(source, 'green')).toBe(sub(3) + session(35, 9.5) + sub(67.5) + piece(181, 0.8))
+  expect(source).toContain(`<path d="${sub(17)}" style="fill:var(--red)"/>`)
+  expect(source).toContain(`<path class="s" d="${session(136, 6.3)}" style="fill:var(--red)"/>`)
+  const finished = [S('grey', 1), A('grey'), W('grey', 1, 2)]
+  expect(pathOf(strip(200, finished, 'done'), 'grey')).toBe('')
+  expect(pills(pathOf(strip(200, finished, 'done'), 'green'))).toBe(4)
 })
 
-test('the strip animates only a sweep inside working fills and a red pulse, and stops under reduced motion', () => {
-  const calm = strip(340, [{ state: 'waiting', fill: 0.5 }, { state: 'done', fill: 1 }])
+test('the strip draws lane 7 dots at 162 px: circle 8 for a session, dot 6 for a subagent, square 8 for a workflow run', () => {
+  expect(dotsWidth(DOTS)).toBe(162)
+  const source = strip(162, DOTS, 'live', true)
+  const dot = (x: number, radius: number) => `M${x.toFixed(1)},5m-${radius},0a${radius},${radius} 0 1 0 ${2 * radius},0a${radius},${radius} 0 1 0 -${2 * radius},0Z`
+  const square = (x: number) => `M${x.toFixed(1)},1h4a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-4a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2Z`
+  expect(pathOf(source, 'track')).toBe('')
+  expect(pathOf(source, 'grey')).toBe(dot(39, 3) + dot(106, 4))
+  expect(pathOf(source, 'amber')).toBe(dot(50, 4) + dot(158, 4))
+  expect(pathOf(source, 'green')).toBe(dot(3, 3) + dot(22, 4) + dot(31, 3) + square(72) + dot(86, 4) + dot(95, 3) + dot(118, 4) + dot(127, 3) + dot(135, 3) + square(144))
+  expect(pathOf(source, 'red')).toBe(dot(11, 3) + dot(62, 4))
+  expect(dotsWidth(sessionsOf(5))).toBe(56)
+})
+
+test('the strip animates only a sweep inside working session fills and a red pulse for needs you, never for a failed one, and stops under reduced motion', () => {
+  const calm = strip(340, [S('amber', 0.5), S('grey', 1), A('failed'), W('failed', 1, 2)])
   expect(calm).not.toContain('<animate')
-  const busy = strip(340, [{ state: 'working', fill: 0.6 }, { state: 'working', fill: 0.8 }, { state: 'waiting', fill: 0.8 }])
+  const busy = strip(340, [S('green', 0.6, true), S('green', 0.8, true), S('amber', 0.8), A('green')])
   expect(busy.match(/<animateTransform attributeName="transform" type="translate"/g)).toHaveLength(2)
   expect(busy.match(/dur="2.4s"/g)).toHaveLength(2)
-  expect(busy).toContain('clip-path="url(#f0)"')
+  expect(busy).toContain('clip-path="url(#s0)"')
   expect(busy).not.toContain('<animate ')
   expect(busy).not.toContain('<rect')
   expect(busy).toContain('@media (prefers-reduced-motion: reduce){.m{display:none}.s{display:inline}}')
-  const asking = strip(280, [{ state: 'needs-you', fill: 0.5 }, { state: 'working', fill: 0.6 }], 'dim')
+  const asking = strip(280, [S('red', 0.5), S('green', 0.6, true), A('red')], 'dim')
   expect(asking).toContain('<g opacity=".35">')
   expect(asking).toContain('<animate attributeName="opacity" values="1;.4;1" dur="2.4s"')
   expect(asking).not.toContain('animateTransform')
-  expect(strip(2000, Array.from({ length: 40 }, () => ({ state: 'working' as const, fill: 0.7 }))).length).toBeLessThan(131_072)
+  expect(strip(2000, Array.from({ length: 40 }, () => S('green', 0.7, true))).length).toBeLessThan(131_072)
 })
 
 test('no band with no board and no worker of mine, with an empty board and no workers, or with every worker archived; archived ones drop out', () => {
@@ -261,7 +259,7 @@ test('the strip stretches by flex: bars fill the box that takes the leftover wid
   const many: BoardSession[] = [...Array(10).keys()].map(index => ({ id: `local_${index}`, name: `w${index}`, state: 'working', progress: 'step 1 of 2 — x' }))
   await $.tool.call({ tool: BOARD_TOOL, ...publish(many) })
   const dots = await mount($)
-  expect((await stripOf(dots))?.props.width).toBe(dotsWidth(10))
+  expect((await stripOf(dots))?.props.width).toBe(dotsWidth(sessionsOf(10)))
   const growing = (await dots.findAll({ type: 'Box' })).filter(box => box.props.flexGrow === 1 && box.props.width === undefined)
   expect(growing.map(box => box.props.flexShrink)).toEqual([0])
   expect(JSON.stringify(growing[0]?.children)).toContain('10 working')
@@ -410,8 +408,8 @@ for (const point of BREAKPOINTS) {
     expect(needs.texts[0]).toMatch(point.pill)
     expect(needs.texts[1]).toBe('Open chat')
     expect(needs.icons).toEqual(['needs', 'chat'])
-    expect(needs.width === dotsWidth(5)).toBe(point.needsDots)
-    expect(needs.width).toBeGreaterThanOrEqual(point.needsDots ? dotsWidth(5) : 5 * 24 + 4 * 4)
+    expect(needs.width === dotsWidth(sessionsOf(5))).toBe(point.needsDots)
+    expect(needs.width).toBeGreaterThanOrEqual(point.needsDots ? dotsWidth(sessionsOf(5)) : 5 * 24 + 4 * 4)
     const done = await parts(DONE, 'all-done')
     expect(done.texts).toEqual([...point.done])
     expect(done.icons).toEqual(point.done.length === 2 ? ['check', 'done', 'panel'] : ['check', 'panel'])
@@ -424,11 +422,11 @@ test('more than 8 workers: dots at any width, and the counts still show when the
   await band($, on, many)
   const ui = await mount($)
   await dump('band-dots', ui)
-  expect(await widthOfStrip(ui)).toBe(dotsWidth(10))
+  expect(await widthOfStrip(ui)).toBe(dotsWidth(sessionsOf(10)))
   expect(await textsOf(ui)).toEqual(['50%', '5 working · 5 waiting', 'Open board'])
   await ui.unmount()
-  expect(fitBand({ room: 70, gap: 12, count: 3, counts: 150 })).toEqual({ pill: '', showCounts: false, isDots: true, strip: dotsWidth(3) })
-  expect(fitBand({ room: 400, gap: 12, count: 3, counts: 150 })).toEqual({ pill: '', showCounts: true, isDots: false, strip: 238 })
+  expect(fitBand({ room: 70, gap: 12, items: sessionsOf(3), counts: 150 })).toEqual({ pill: '', showCounts: false, isDots: true, strip: dotsWidth(sessionsOf(3)) })
+  expect(fitBand({ room: 400, gap: 12, items: sessionsOf(3), counts: 150 })).toEqual({ pill: '', showCounts: true, isDots: false, strip: 238 })
 })
 
 test('terminal: text segments, one per worker, and the same pressable action', async ($, on) => {
@@ -468,7 +466,7 @@ test('without a Client: one native Button per face, each press runs its action',
   await ui.unmount()
 })
 
-test('working counts add running subagents and workflows in text semibold; each part hides at 0; workflow agents add no segment', async ($, on) => {
+test('working counts add running subagents and workflows in text semibold; each part hides at 0; a run adds one piece per phase, its agents none', async ($, on) => {
   const crew = crewOf($, on)
   await band($, on, WORKING)
   const none = await countsOf($)
@@ -483,7 +481,7 @@ test('working counts add running subagents and workflows in text semibold; each 
   const both = await countsOf($)
   expect(both.extras).toEqual(['2 subagents · 1 workflow'])
   expect(both.alt).toBe('Master session: 80 percent, 2 working, 1 waiting, 2 subagents, 1 workflow')
-  expect(both.segments).toBe(4)
+  expect(both.segments).toBe(5)
   await crew.finish('docs')
   await crew.finish('review')
   expect((await countsOf($)).extras).toEqual(['1 workflow'])
@@ -522,12 +520,11 @@ test('narrowing drops the subagent and workflow part first, then the counts, nev
   expect(seen).toEqual(['all', 'counts', 'none'])
 })
 
-test('agentCountsOf counts running subagents and running workflow runs; extrasOf names each with its plural and drops zeros', () => {
-  const agent = (id: string, state: 'running' | 'done' | 'failed', run?: string) => ({ id, type: 'general-purpose', description: id, state, startedAt: 0, run: run ? { id: run, index: 0 } : undefined })
-  const workflow = (id: string) => ({ id, toolUseId: id, startedAt: 0 })
+test('extrasOf names each part with its plural and drops zeros; agentCountsOf hands the agents and workflows to the band as they are', () => {
+  const agent = { id: 'a', type: 'general-purpose', description: 'a', state: 'running' as const, startedAt: 0 }
   expect(agentCountsOf([], [])).toEqual(IDLE)
-  expect(agentCountsOf([agent('a', 'running'), agent('b', 'done'), agent('c', 'failed'), agent('w', 'running', 'wf_1'), agent('x', 'done', 'wf_2')], [workflow('wf_1'), workflow('wf_2'), workflow('wf_3')])).toEqual({ subagents: 1, workflows: 2 })
-  expect(extrasOf(IDLE)).toEqual([])
+  expect(agentCountsOf([agent], [])).toEqual({ agents: [agent], workflows: [] })
+  expect(extrasOf({ subagents: 0, workflows: 0 })).toEqual([])
   expect(extrasOf({ subagents: 1, workflows: 0 })).toEqual(['1 subagent'])
   expect(extrasOf({ subagents: 0, workflows: 1 })).toEqual(['1 workflow'])
   expect(extrasOf({ subagents: 3, workflows: 2 })).toEqual(['3 subagents', '2 workflows'])
@@ -571,5 +568,75 @@ test('terminal: the subagent and workflow part follows the counts in semibold', 
   expect(texts.map(one => one.text).slice(-2)).toEqual(['2 working · 1 waiting', '· 1 subagent · 1 workflow'])
   expect(texts.at(-1)?.props.weight).toBe('semibold')
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
+  await ui.unmount()
+})
+
+const CREW = (asking: { own?: boolean; remote?: boolean; flow?: boolean } = {}) => {
+  const ask = { text: 'Allow Bash: rm -rf dist', since: 1 }
+  return {
+    agents: [
+      { id: 'o1', name: 'QA verifier', type: 'master-session:qa-verifier', description: 'Verify the sha', state: 'running' as const, startedAt: 1 },
+      { id: 'o2', name: 'Reviewer', type: 'master-session:reviewer', description: 'Review the diff', state: 'running' as const, startedAt: 2, parentAgentId: 'o1', ...(asking.own ? { asking: ask } : {}) },
+      { id: 'r1', name: 'QA verifier', type: 'master-session:qa-verifier', description: 'Verify', state: 'running' as const, startedAt: 3, parentSessionId: 'local_b' },
+      { id: 'r2', name: 'Reviewer', type: 'master-session:reviewer', description: 'Review', state: 'running' as const, startedAt: 4, parentSessionId: 'local_b', parentAgentId: 'r1', ...(asking.remote ? { asking: ask } : {}) },
+      { id: 'x0', type: 'workflow-subagent', description: 'remote scan', state: 'running' as const, startedAt: 5, parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } },
+      { id: 'w0', type: 'workflow-subagent', description: 'scan 0', state: 'done' as const, startedAt: 6, endedAt: 7, run: { id: 'wf_1', index: 0 } },
+      { id: 'w1', type: 'workflow-subagent', description: 'scan 1', state: 'running' as const, startedAt: 8, run: { id: 'wf_1', index: 1 }, ...(asking.flow ? { asking: { ...ask, text: 'Allow Edit: a.ts' } } : {}) },
+    ],
+    workflows: [{ id: 'wf_1', toolUseId: 't1', name: 'review-changes', phases: ['Scan', 'Check'], startedAt: 6 }],
+  }
+}
+
+const viewOf = (sessions: BoardSession[], crew: ReturnType<typeof CREW>, columns = 100) => {
+  const current = boardOf(sessions)
+  const progress = bandProgress(current, liveOf([], sessions))
+  if (!progress) throw new Error('no band')
+  const chats: string[] = []
+  const view = bandViewOf(columns, current, progress, '', false, crew, { board: () => chats.push('board'), chat: (id, name) => chats.push(`${id} ${name}`) })
+  return { view, chats }
+}
+
+test('lane 7 order: this chat’s own subagents first, then each session followed by its own subagents nested under their parent and its runs, then this chat’s runs', () => {
+  const { view } = viewOf(WORKING, CREW(), 160)
+  expect(view.items.map(one => [one.id, one.kind, !!one.isChild])).toEqual([
+    ['o1', 'subagent', true],
+    ['o2', 'subagent', true],
+    ['local_a', 'session', false],
+    ['local_b', 'session', false],
+    ['r1', 'subagent', true],
+    ['r2', 'subagent', true],
+    ['local_c', 'session', false],
+    ['wf_9', 'workflow', false],
+    ['local_d', 'session', false],
+    ['wf_1', 'workflow', false],
+  ])
+  expect(view.items.find(one => one.id === 'wf_1')).toEqual(expect.objectContaining({ pieces: 2, fill: 0.5, tone: 'green' }))
+  expect(view.extras).toBe('4 subagents · 2 workflows')
+})
+
+test('the needs-you pill names any kind: a session, a worker’s subagent with its parent and Open chat to that worker, this chat’s subagent or workflow agent with no Open chat', () => {
+  const remote = viewOf(WORKING.map(one => (one.id === 'local_b' ? { ...one, state: 'needs-you' as const, needsYou: 'Allow Bash: rm -rf dist' } : one)), CREW({ remote: true }))
+  expect([remote.view.pillText, remote.view.alt]).toEqual(['Reviewer, in QA verifier, needs you · Allow Bash: rm -rf dist', 'Master session: Reviewer, in QA verifier, needs you, Allow Bash: rm -rf dist'])
+  expect(remote.view.action?.label).toBe('Open chat')
+  remote.view.action?.press()
+  expect(remote.chats).toEqual(['local_b mod-ui'])
+  expect(viewOf(WORKING.map(one => (one.id === 'local_b' ? { ...one, state: 'needs-you' as const, needsYou: 'Allow Bash: rm -rf dist' } : one)), CREW({ remote: true }), 66).view.pillText).toBe('Reviewer needs you')
+  const own = viewOf(WORKING, CREW({ own: true }))
+  expect([own.view.pillText, own.view.action]).toEqual(['Reviewer, in QA verifier, needs you · Allow Bash: rm -rf dist', undefined])
+  const flow = viewOf(WORKING, CREW({ flow: true }))
+  expect([flow.view.pillText, flow.view.action]).toEqual(['scan 1, in review-changes, needs you · Allow Edit: a.ts', undefined])
+  expect(flow.view.items.find(one => one.id === 'wf_1')?.tone).toBe('red')
+  const session = viewOf(NEEDS, CREW())
+  expect([session.view.pillText, session.view.action?.label]).toEqual(['env-e2e-test needs you · commit blocked', 'Open chat'])
+})
+
+test('the needs-you pill: C.text words on the red tint, red border and glyph', async ($, on) => {
+  await band($, on, NEEDS)
+  const ui = await mount($)
+  const pill = (await ui.findAll({ type: 'Box' }))[1]
+  expect(pill?.props).toEqual(expect.objectContaining({ borderColor: 'error', backgroundColor: 'rgba(211,119,114,0.139)' }))
+  const words = (await ui.findAll({ type: 'Text' })).find(one => one.text.includes('needs you'))
+  expect(words?.props.color).toBe('text')
+  expect(String((await ui.findAll({ type: 'Svg' }))[0]?.props.source)).toContain('var(--red)')
   await ui.unmount()
 })

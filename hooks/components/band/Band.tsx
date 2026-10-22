@@ -15,15 +15,15 @@ export type BandProps = { view: BandView; progress: Progress }
 export function Band(ui: Ui, props: BandProps) {
   const { Box, Text, Svg } = ui
   const { view, progress } = props
-  const { segments, asking, isAllDone, counts, extras, alt, action, fitted, showCounts, pillText } = view
+  const { items, asker, isAllDone, counts, extras, alt, action, fitted, showCounts, pillText } = view
   const icon = (name: IconName, size: number, tone: Tone, weight = 1.9) => <Svg source={glyph(name, size, tone, weight)} alt={name} width={size} height={size} />
-  const kind = asking ? 'primary' : 'tint'
+  const kind = asker ? 'primary' : 'tint'
   const stripWidth = fitted.strip
-  const look = asking ? 'dim' : isAllDone ? 'done' : 'live'
-  const lead = asking ? (
-    <Box flexDirection="row" alignItems="center" flexShrink={1} minWidth={0} gap={across(PILL.gap)} height={tall(PILL.height)} paddingLeft={across(PILL.left)} paddingRight={across(PILL.right)} paddingY={0} borderStyle="round" borderColor="error" backgroundColor={C.redTint}>
+  const look = asker ? 'dim' : isAllDone ? 'done' : 'live'
+  const lead = asker ? (
+    <Box flexDirection="row" alignItems="center" flexShrink={1} minWidth={0} gap={across(PILL.gap)} height={tall(PILL.height)} paddingLeft={across(PILL.left)} paddingRight={across(PILL.right)} paddingY={0} borderStyle="round" borderColor={C.red} backgroundColor={C.redTint}>
       {icon('needs', PILL.icon, 'red', 2)}
-      <Text weight="semibold" color="error" wrap="truncate-end">
+      <Text weight="semibold" color={C.text} wrap="truncate-end">
         {pillText}
       </Text>
     </Box>
@@ -55,12 +55,12 @@ export function Band(ui: Ui, props: BandProps) {
       {lead}
       {fitted.isDots ? (
         <Box flexDirection="row" alignItems="center" gap={across(view.gap)} flexGrow={1} flexShrink={0}>
-          <Svg source={strip(stripWidth, segments, look)} alt={alt} width={stripWidth} height={10} isInteractive />
+          <Svg source={strip(stripWidth, items, look, true)} alt={alt} width={stripWidth} height={10} isInteractive />
           {counter}
         </Box>
       ) : (
         <Box flexDirection="column" alignItems="stretch" flexGrow={1} flexShrink={1} width={0} minWidth={0}>
-          <Svg source={strip(stripWidth, segments, look)} alt={alt} height={10} isInteractive />
+          <Svg source={strip(stripWidth, items, look)} alt={alt} height={10} isInteractive />
         </Box>
       )}
       {fitted.isDots ? null : counter}

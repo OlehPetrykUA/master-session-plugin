@@ -1,27 +1,38 @@
 import type { BandView } from '../../lib/band'
 import type { Progress } from '../../lib/board'
-import { TERMINAL_COLOR } from '../../theme/tokens'
+import type { StripTone } from '../../theme/strip'
 import type { TextUi } from '../types'
 
 export type TextBandProps = { view: BandView; progress: Progress; columns: number }
 
+const TERMINAL: Record<StripTone, string> = { red: 'error', failed: 'error', amber: 'warning', green: 'success', grey: 'subtle' }
+
 export function TextBand(ui: TextUi, props: TextBandProps) {
   const { Box, Text, Button } = ui
   const { view, progress, columns } = props
-  const { segments, asking, isAllDone, counts, extras, action, showCounts, pillText } = view
-  const lead = asking ? `● ${pillText}` : isAllDone ? '✓' : `${progress.percent}%`.padStart(4)
+  const { items, asker, isAllDone, counts, extras, action, showCounts, pillText } = view
+  const lead = asker ? `● ${pillText}` : isAllDone ? '✓' : `${progress.percent}%`.padStart(4)
   const more = showCounts && extras ? `· ${extras}` : ''
-  const fixed = lead.length + (showCounts ? counts.length : 0) + (more ? more.length + 1 : 0) + (action?.label.length ?? 0) + 12
-  const cells = Math.max(1, Math.min(8, Math.floor((columns - fixed) / segments.length) - 1))
+  const marks = items.reduce((sum, one) => sum + (one.kind === 'subagent' ? 2 : one.kind === 'workflow' ? (one.pieces ?? 1) + 1 : 0), 0)
+  const sessions = Math.max(1, items.filter(one => one.kind === 'session').length)
+  const fixed = lead.length + (showCounts ? counts.length : 0) + (more ? more.length + 1 : 0) + (action?.label.length ?? 0) + marks + 12
+  const cells = Math.max(1, Math.min(8, Math.floor((columns - fixed) / sessions) - 1))
+  const toneOf = (tone: StripTone) => (isAllDone ? 'success' : TERMINAL[tone])
   return (
     <Box flexDirection="row" gap={1}>
-      <Text color={asking ? 'error' : isAllDone ? 'success' : undefined} weight="semibold">
+      <Text color={asker ? 'error' : isAllDone ? 'success' : undefined} weight="semibold">
         {lead}
       </Text>
-      {segments.map(one => {
+      {items.map(one => {
+        if (one.kind === 'subagent') return <Text color={toneOf(one.tone)} dimColor={!!asker || undefined}>•</Text>
+        if (one.kind === 'workflow') {
+          const pieces = one.pieces ?? 1
+          const filled = Math.round(pieces * Math.min(1, one.fill))
+          return <Text color={toneOf(one.tone)} dimColor={!!asker || undefined}>{'■'.repeat(filled) + '□'.repeat(pieces - filled)}</Text>
+        }
         const filled = Math.max(1, Math.round(cells * Math.min(1, one.fill)))
         return (
-          <Text color={TERMINAL_COLOR[one.state]} dimColor={!!asking || undefined}>
+          <Text color={toneOf(one.tone)} dimColor={!!asker || undefined}>
             {'█'.repeat(filled) + '░'.repeat(cells - filled)}
           </Text>
         )
