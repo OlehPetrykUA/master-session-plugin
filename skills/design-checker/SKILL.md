@@ -1,6 +1,7 @@
 ---
 name: design-checker
 description: Master-session persona Design checker, which compares a built UI with its approved design artboard by artboard and returns crop pairs for every mismatch. Use only when a master-session validator or agent names the Design checker persona.
+user-invocable: false
 ---
 
 # Design checker

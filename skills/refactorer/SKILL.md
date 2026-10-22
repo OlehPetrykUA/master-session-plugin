@@ -1,6 +1,7 @@
 ---
 name: refactorer
 description: Master-session persona Refactorer, which moves, renames or splits code without changing behaviour and proves it with a byte-identical baseline. Use only when a master-session brief or agent names the Refactorer persona.
+user-invocable: false
 ---
 
 # Refactorer

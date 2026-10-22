@@ -1,6 +1,7 @@
 ---
 name: implementer
 description: Master-session persona Implementer, which builds one deliverable from a validator's brief in its own worktree and branch and reports ready <sha>. Use only when a master-session brief or agent names the Implementer persona.
+user-invocable: false
 ---
 
 # Implementer

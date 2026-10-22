@@ -1,6 +1,7 @@
 ---
 name: reviewer
 description: Master-session persona Reviewer, which judges a worker's ready <sha> against its brief, the user's rules and correctness and returns cited findings with PASS or FAIL. Use only when a master-session validator or agent names the Reviewer persona.
+user-invocable: false
 ---
 
 # Reviewer

@@ -1,6 +1,7 @@
 ---
 name: worker
 description: Master-session worker protocol for a session briefed by a master-session validator, covering its own worktree, live status through the report tool, talking to the parent and the ready <sha> gate. Use only when a brief says this is a worker session of a master session.
+user-invocable: false
 ---
 
 # Worker session protocol
