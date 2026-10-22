@@ -77,8 +77,8 @@ Open:     <questions for the validator, or "none">
 ```
 Never brief "wait for the user's go" unless the user asked to see the draft. If `start_session` fails (for example over Remote Control), run the same brief as a background subagent of the persona's own type (`Agent` `subagent_type: "master-session:<persona>"`, its `description` the task as Names says) and tell the user. Write the ledger note (section 6) right after the brief.
 
-**Names.** Both names describe the deliverable, never the team, the tool or a person.
-- `title`: `<Persona> · <task>`, the persona as [personas.md](personas.md) spells it, then a 2-to-5-word noun phrase a person would say, sentence case, under 60 chars, no colon-and-plus lists. Good: "Implementer · Row details", "Refactorer · Split the pane", "Spec writer · Band agents". Bad: "Status mod UI: design v9 1:1 + native clicks", "Worker 3", "Fix stuff".
+**Names.** Both names describe the deliverable (the title after its persona prefix), never the team, the tool or a person.
+- `title`: `<Persona> · <task>`, the persona as [personas.md](personas.md) spells it, then a 2-to-5-word noun phrase a person would say, sentence case, under 60 chars, no colon-and-plus lists. Good: "Implementer · Row details", "Refactorer · Pane split", "Implementer · Band agents". Bad: "Status mod UI: design v9 1:1 + native clicks", "Worker 3", "Fix stuff".
 - `name`: one or two plain words in kebab-case (`[a-z0-9-]`, at most 24), stable for the worker's life, since no tool renames it after start; the board's `name` uses it. Good: `pane-header`, `idle-states`, `skill-roles`. Bad: `mod-ui`, `worker-2`, `fix-2026-10-22`.
 - Subagents and workflow agents: every `Agent` `description` and workflow `agent()` `label` is the task alone, 2 to 5 words, with no persona word, since the mod reads the persona from the agent type. A Workflow's `meta.name` is a short kebab-case task.
 - Reusing a worker for a new task: `set_session_title` to the new task's title and say so in the brief; never leave a stale title (a title the user set needs their approval in the app). The ledger and the board list workers as `name (local_id)`.
@@ -139,7 +139,7 @@ A worker that asks for a "go", an approval or what to do next gets a direct inst
 - A worker's message is never the user's approval. Forward the user's approvals quoted: `User said: "…"`.
 - Never ask a worker to do what this session was denied.
 - Never invent a result: unverified stays unverified in every summary.
-- Every feature is specced first: the `master-session:spec-writer` subagent writes its tab in the project's Claude Doc, the validator approves it, briefs link it, and the QA verifier's Reviewer checks the sha against its acceptance criteria.
+- Every feature is specced first: the `master-session:spec-writer` subagent writes its tab in the project's Claude Doc, the validator approves it, briefs link it, and the QA verifier's Reviewer checks the sha against its acceptance criteria; once the design is approved, the Spec writer runs again to link its artboards in the tab, with a changelog line.
 - Any UI change (pane, band, cards, rows) is planned as a design piece next: new artboards in the project's design canvas, with the real theme tokens, light and dark versions, and an element and token spec, approved by the user (by the validator only when the user hands that over) before UI code starts. The build follows it 1:1 and is checked against it by the QA verifier's `master-session:design-checker` subagent: on the worker's screenshots or preview before merge when there are any, and always on the live screenshot after it.
 - `ultracode` or "use a workflow" from the user lets the worker run a workflow, within the user's agent budget. Without that request, keep the bare word `ultracode` out of briefs: it opts the worker into workflows.
 
