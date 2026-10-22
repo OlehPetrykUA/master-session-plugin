@@ -25,7 +25,7 @@ import {
 import { addFault, clearFaults, clearPresses, hasFaults, nextRetryMs, runPress } from './data/presses'
 import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
 import { recordTurnEnd, recorder, startRecorder } from './data/recorder'
-import { agentCountsOf, bandAction, bandProgress, bandViewOf } from './lib/band'
+import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
 import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
 import { messageOf } from './lib/format'
@@ -223,7 +223,8 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, event, next) => {
     const { board: current, from } = await boardOf($)
-    const progress = bandProgress(current, await getLive($))
+    const agents = agentCountsOf(await getAgents($), await getWorkflows($))
+    const progress = bandProgressWith(current, await getLive($), agents)
     if (event.props.hasSurvey || !progress) return next(event)
     const table = $.ui.resolve(event)
     const bandColumns = event.props.bodyColumns || 100
@@ -231,7 +232,6 @@ export const register: Register = on => {
     const { Box, Button, Text } = table
     const Svg = event.surface !== 'terminal' && 'Svg' in table ? guardSvg(table.Svg, Text) : undefined
     const Client = event.surface === 'desktop' && 'Client' in table && !hasFaults() ? table.Client : undefined
-    const agents = agentCountsOf(await getAgents($), await getWorkflows($))
     const view = bandViewOf(bandColumns, current, progress, from, isOpen, agents, {
       board: () => void openPane($),
       chat: (id, name) => void openSession($, id, name),

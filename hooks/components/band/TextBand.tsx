@@ -9,10 +9,10 @@ const TERMINAL: Record<StripTone, string> = { red: 'error', failed: 'error', amb
 
 export function TextBand(ui: TextUi, props: TextBandProps) {
   const { Box, Text, Button } = ui
-  const { view, progress, columns } = props
-  const { items, asker, isAllDone, counts, extras, action, showCounts, pillText } = view
-  const lead = asker ? `● ${pillText}` : isAllDone ? '✓' : `${progress.percent}%`.padStart(4)
-  const more = showCounts && extras ? `· ${extras}` : ''
+  const { view, columns } = props
+  const { items, asker, isAllDone, percent, counts, extras, action, showCounts, pillText } = view
+  const lead = asker ? `● ${pillText}` : isAllDone ? '✓' : `${percent}%`.padStart(4)
+  const more = showCounts && extras ? (counts ? `· ${extras}` : extras) : ''
   const marks = items.reduce((sum, one) => sum + (one.kind === 'subagent' ? 2 : one.kind === 'workflow' ? (one.pieces ?? 1) + 1 : 0), 0)
   const sessions = Math.max(1, items.filter(one => one.kind === 'session').length)
   const fixed = lead.length + (showCounts ? counts.length : 0) + (more ? more.length + 1 : 0) + (action?.label.length ?? 0) + marks + 12
@@ -37,7 +37,7 @@ export function TextBand(ui: TextUi, props: TextBandProps) {
           </Text>
         )
       })}
-      {showCounts ? <Text dimColor>{counts}</Text> : null}
+      {showCounts && counts ? <Text dimColor>{counts}</Text> : null}
       {more ? <Text weight="semibold">{more}</Text> : null}
       {action ? <Button key={`band-${action.name}`} variant="primary" label={action.label} onPress={action.press} /> : null}
     </Box>

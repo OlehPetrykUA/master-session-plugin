@@ -13,7 +13,7 @@ import { itemsOf } from '../lib/list'
 import { rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
 import { getAgents, getBoard, getLive, getReports, getShared, getUndone, getWorkflows, saveAgents, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
-import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, merge } from './contract'
+import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
 import { keptAgents } from './agents'
 import { roleOf } from './recorder'
 import { askForUpdates, readBoard, readReports, writeBoard } from './status'
@@ -107,7 +107,7 @@ export async function refreshReports($: EngineInterface) {
   const { self } = roleOf()
   if (!self) return
   const onBoard = new Set((await getBoard($))?.sessions.map(one => one.id))
-  const mine = (await readReports($, home)).filter(one => one.parent === self || onBoard.has(one.session))
+  const mine = liveReportsOf((await readReports($, home)).filter(one => one.parent === self || onBoard.has(one.session)), await getLive($))
   await saveReports($, () => mine)
   const now = await $.clock.now()
   const workflows = await getWorkflows($)

@@ -2,7 +2,7 @@ import type { EngineInterface, On, ToolCallInput, TurnCompleteInput } from 'clau
 
 import { asked, reportAgentsOf } from '../lib/agents'
 import { expandHome, parseStatus } from '../lib/git'
-import { getAgents, saveAgents } from '../state/atoms'
+import { getAgents, getLive, saveAgents } from '../state/atoms'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
 import type { ReportAgent, SessionState } from '../../types'
@@ -368,8 +368,8 @@ async function listed($: EngineInterface) {
   await detected($)
   const now = await $.clock.now()
   const shared = role.self ? await readBoard($, home, role.self, now) : undefined
-  const live = { self: role.self, title: '', sessions: [], error: '', at: now }
-  return { result: JSON.stringify(reportsView(shared?.board ?? null, await readReports($, home), live, now)) }
+  const live = await getLive($)
+  return { result: JSON.stringify(reportsView(shared?.board ?? null, await readReports($, home), { ...live, self: live.self || role.self }, now)) }
 }
 
 export async function startRecorder($: EngineInterface) {

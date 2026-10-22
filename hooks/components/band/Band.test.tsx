@@ -4,7 +4,7 @@ import type { On } from 'claude-code'
 
 import type { Board, BoardSession, Live } from '../../../types'
 
-import { agentCountsOf, bandAction, bandProgress, bandViewOf, extrasOf, fitBand, slotWidth } from '../../lib/band'
+import { agentCountsOf, bandAction, bandProgress, bandProgressWith, bandViewOf, extrasOf, fitBand, slotWidth } from '../../lib/band'
 import { CH, COLUMN, across, tall } from '../../lib/layout'
 import { freshReport, merge } from '../../data/contract'
 import { progressOf } from '../../lib/board'
@@ -334,7 +334,7 @@ test('no jumping: tabular percent and counts in fixed slots keep the segments th
   const width = await widthOfStrip(before)
   expect((await before.findAll({ type: 'Text' })).filter(one => one.props.tabular).map(one => one.text)).toEqual(['80%', '2 working · 1 waiting'])
   const percent = (await before.findAll({ type: 'Text' })).find(one => one.text === '80%')
-  expect(percent?.props).toEqual(expect.objectContaining({ weight: 'bold', size: 'heading', tabular: true }))
+  expect(percent?.props).toEqual(expect.objectContaining({ weight: 'semibold', size: 'heading', tabular: true }))
   expect((await before.findAll({ type: 'Box' })).some(box => box.props.width === across(PERCENT) && JSON.stringify(box.children).includes('80%'))).toBe(true)
   await before.unmount()
   await $.tool.call({ tool: BOARD_TOOL, ...publish([{ ...WORKING[0]!, progress: 'step 0 of 5 — x' }, { ...WORKING[1]!, state: 'waiting', progress: 'step 0 of 5 — x' }, WORKING[2]!, WORKING[3]!]) })
@@ -638,5 +638,24 @@ test('the needs-you pill: C.text words on the red tint, red border and glyph', a
   const words = (await ui.findAll({ type: 'Text' })).find(one => one.text.includes('needs you'))
   expect(words?.props.color).toBe('text')
   expect(String((await ui.findAll({ type: 'Svg' }))[0]?.props.source)).toContain('var(--red)')
+  await ui.unmount()
+})
+
+test('with no worker sessions, running subagents still show the band: their segments, the subagent count alone, and Open board', async ($, on) => {
+  const crew = crewOf($, on)
+  await band($, on, [], false, [])
+  const agent = { id: 'a', type: 'general-purpose', description: 'a', startedAt: 0 }
+  expect(bandProgressWith(boardOf([]), liveOf([], []), IDLE)).toBeUndefined()
+  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [{ ...agent, state: 'done' }], workflows: [] })).toBeUndefined()
+  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [{ ...agent, state: 'running' }], workflows: [] })?.total).toBe(0)
+  expect(bandProgressWith(boardOf(WORKING), liveOf([], WORKING), IDLE)?.total).toBe(4)
+  await crew.subagent('docs')
+  await crew.subagent('review')
+  const ui = await mount($)
+  const source = String((await stripOf(ui))?.props.source)
+  expect(pathOf(source, 'green').split('M').filter(one => one.includes(',2h')).length).toBe(2)
+  expect(pathOf(source, 'track')).toBe('')
+  expect(await textsOf(ui)).toEqual(['0%', '2 subagents', 'Open board'])
+  expect((await stripOf(ui))?.props.alt).toBe('Master session: 0 percent, 2 subagents')
   await ui.unmount()
 })

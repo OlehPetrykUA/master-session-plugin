@@ -133,3 +133,38 @@ test('a needs-you report reaches the master: within one FILE_MS refresh its row 
 test('a validator started from another session and moved to top level still reads its workers’ needs-you reports', ($, on) => reachesMaster($, on, { origin: 'local_origin' }))
 
 test('a validator that is itself a child of another session reads its own workers’ needs-you reports too', ($, on) => reachesMaster($, on, { origin: 'local_origin', isDetached: false }))
+
+test("an archived or vanished session's needs-you report stays on disk but reaches neither the band, the list nor the reports tool", async ($, on) => {
+  const stale = (session: string): Report => ({
+    v: 1,
+    kind: 'status',
+    session,
+    engineId: `engine-${session}`,
+    parent: 'local_validator',
+    seq: 9,
+    at: 3_000_000,
+    run: { isRunning: false },
+    modelAt: 3_000_000,
+    state: 'needs-you',
+    needsYou: 'Approve the old thing',
+    activity: [],
+    commits: [],
+    tests: [],
+    files: [],
+  })
+  const files: Record<string, string> = { [reportPath(HOME, 'local_old')]: JSON.stringify(stale('local_old')), [reportPath(HOME, 'local_gone')]: JSON.stringify(stale('local_gone')) }
+  const board = { ...BOARD, sessions: [{ ...BOARD.sessions[0], state: 'working', needsYou: undefined }, BOARD.sessions[1]] }
+  const run = await started($, on, board, { files })
+  await run.clock.advance(15_000)
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect((await altsOf(band)).some(alt => String(alt).includes('needs you'))).toBe(false)
+  await band.unmount()
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const keys = (await pane.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('row-') ? [box.key] : []))
+  expect(keys.some(key => key.includes('local_old') || key.includes('local_gone'))).toBe(false)
+  expect(await textsOf(pane)).not.toContain('Approve the old thing')
+  await pane.unmount()
+  const listed = await $.tool.call({ tool: 'mcp__master-session__reports' })
+  expect(String((listed as { result?: unknown }).result)).not.toMatch(/local_old|local_gone/)
+  expect(files[reportPath(HOME, 'local_old')]).toBeDefined()
+})

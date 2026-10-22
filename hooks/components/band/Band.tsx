@@ -14,7 +14,7 @@ export type BandProps = { view: BandView; progress: Progress }
 
 export function Band(ui: Ui, props: BandProps) {
   const { Box, Text, Svg } = ui
-  const { view, progress } = props
+  const { view } = props
   const { items, asker, isAllDone, counts, extras, alt, action, fitted, showCounts, pillText } = view
   const icon = (name: IconName, size: number, tone: Tone, weight = 1.9) => <Svg source={glyph(name, size, tone, weight)} alt={name} width={size} height={size} />
   const kind = asker ? 'primary' : 'tint'
@@ -31,23 +31,29 @@ export function Band(ui: Ui, props: BandProps) {
     icon('check', CHECK, 'green', 2.4)
   ) : (
     <Box flexDirection="row" flexShrink={0} width={across(PERCENT)}>
-      <Text weight="bold" size="heading" tabular>
-        {`${progress.percent}%`}
+      <Text weight="semibold" size="heading" tabular>
+        {`${view.percent}%`}
       </Text>
     </Box>
   )
   const counter = showCounts ? (
     <Box flexDirection="row" alignItems="center" flexShrink={0} gap={across(COUNTS.gap)} paddingLeft={across(COUNTS.left)} paddingRight={across(COUNTS.right)}>
       {icon(isAllDone ? 'done' : 'pulse', COUNTS.icon, 'muted')}
-      <Text color={C.muted} tabular>
-        {counts}
-        {extras ? ' · ' : null}
-        {extras ? (
-          <Text color={C.text} weight="semibold">
-            {extras}
-          </Text>
-        ) : null}
-      </Text>
+      {counts ? (
+        <Text color={C.muted} tabular>
+          {counts}
+          {extras ? ' · ' : null}
+          {extras ? (
+            <Text color={C.text} weight="semibold">
+              {extras}
+            </Text>
+          ) : null}
+        </Text>
+      ) : (
+        <Text color={C.text} weight="semibold" tabular>
+          {extras}
+        </Text>
+      )}
     </Box>
   ) : null
   return (

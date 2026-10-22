@@ -289,9 +289,15 @@ export function merge(board: Published | null, reports: readonly Report[], live:
   return { ...(board ?? { needsYou: [], repos: [], source: 'file' as const }), sessions }
 }
 
+export function liveReportsOf(reports: readonly Report[], live: Live) {
+  if (!live.at || live.error) return [...reports]
+  const known = new Map(live.sessions.map(one => [one.id, one]))
+  return reports.filter(report => known.has(report.session) && !known.get(report.session)?.isArchived)
+}
+
 export function reportsView(board: Board | null, reports: readonly Report[], live: Live, now: number) {
   const rows = new Map(board?.sessions.map(one => [one.id, one]))
-  const sessions = [...latestOf(reports).values()]
+  const sessions = [...latestOf(liveReportsOf(reports, live)).values()]
     .filter(report => rows.has(report.session) || (live.self && report.parent === live.self))
     .map(report => ({
       id: report.session,

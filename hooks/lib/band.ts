@@ -168,16 +168,26 @@ export function bandProgress(current: Board | null, live: Live) {
   return progress.total ? progress : undefined
 }
 
+const IDLE_PROGRESS: Progress = { segments: [], percent: 0, done: 0, total: 0 }
+
+export function bandProgressWith(current: Board | null, live: Live, { agents, workflows }: AgentCounts) {
+  const progress = bandProgress(current, live)
+  if (progress) return progress
+  const isBusy = agents.some(one => one.state === 'running') || workflowRunsOf(agents, workflows).some(run => run.state === 'running')
+  return isBusy ? IDLE_PROGRESS : undefined
+}
+
 export function bandViewOf(columns: number, current: Board | null, progress: Progress, from: string, isPaneOpen: boolean, agents: AgentCounts, act: BandActions) {
   const width = columns * COLUMN - 16
   const isNarrow = width < 600
   const items = bandItemsOf(progress.segments, current, agents)
   const count = (state: SessionState) => progress.segments.filter(one => one.state === state).length
   const asker = items.find(one => one.asker)?.asker
-  const isAllDone = !asker && progress.done === progress.total
+  const isAllDone = !asker && progress.total > 0 && progress.done === progress.total
+  const percent = progress.total ? progress.percent : Math.round((100 * items.filter(one => !one.isRunning).length) / Math.max(1, items.length))
   const digits = String(progress.total).length
   const number = (value: number) => String(value).padStart(digits, ' ')
-  const counts = isAllDone ? `${number(progress.total)} done · ${number(0)} open` : `${number(count('working'))} working · ${number(count('waiting'))} waiting`
+  const counts = isAllDone ? `${number(progress.total)} done · ${number(0)} open` : progress.total ? `${number(count('working'))} working · ${number(count('waiting'))} waiting` : ''
   const running = (kind: StripItem['kind']) => items.filter(one => one.kind === kind && one.isRunning).length
   const parts = isAllDone || asker ? [] : extrasOf({ subagents: running('subagent'), workflows: running('workflow') })
   const via = from ? `, from ${from}` : ''
@@ -186,7 +196,7 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
     ? `Master session: ${headOf(asker)}${asker.reason ? `, ${asker.reason}` : ''}${via}`
     : isAllDone
       ? `Master session: all ${progress.total} done${via}`
-      : `Master session: ${[`${progress.percent} percent`, `${count('working')} working`, `${count('waiting')} waiting`, ...parts].join(', ')}${via}`
+      : `Master session: ${[`${percent} percent`, ...(progress.total ? [`${count('working')} working`, `${count('waiting')} waiting`] : []), ...parts].join(', ')}${via}`
   const chat = asker?.chat
   const action = asker
     ? chat
@@ -203,11 +213,11 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
   const room = width - padLeft - padRight - 2 - leadWidth - gap - (action ? actionWidth + gap : 0)
   const fitOf = (text: string) => fitBand({ room, gap, items, counts: countsWidthOf(text), full, short: asker ? `${asker.short}${NEEDS}` : undefined })
   const extras = parts.join(' · ')
-  const wide = fitOf(extras ? `${counts} · ${extras}` : counts)
-  const fitted = wide.showCounts || !extras ? wide : fitOf(counts)
+  const wide = fitOf([counts, extras].filter(Boolean).join(' · '))
+  const fitted = wide.showCounts || !extras || !counts ? wide : fitOf(counts)
   const { showCounts } = fitted
   const pillText = fitted.pill
-  return { items, asker, isAllDone, counts, extras: fitted === wide ? extras : '', alt, action, actionWidth, padLeft, padRight, gap, fitted, showCounts, pillText }
+  return { items, asker, isAllDone, percent, counts, extras: fitted === wide ? extras : '', alt, action, actionWidth, padLeft, padRight, gap, fitted, showCounts, pillText }
 }
 
 export type BandView = ReturnType<typeof bandViewOf>
