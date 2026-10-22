@@ -15,7 +15,7 @@ A Claude Code plugin that turns one session into a **validator** for a team of w
 At the prompt of a Claude Code terminal session:
 
 ```
-/plugin install master-session --marketplace <owner>/master-session-plugin
+/plugin install master-session --marketplace OlehPetrykUA/master-session-plugin
 ```
 
 Answer `y` to add the marketplace, then pick a scope (user scope is the first choice).
@@ -23,20 +23,20 @@ Answer `y` to add the marketplace, then pick a scope (user scope is the first ch
 From a shell:
 
 ```bash
-claude plugin install master-session --marketplace <owner>/master-session-plugin
+claude plugin install master-session --marketplace OlehPetrykUA/master-session-plugin
 ```
 
 Or in two steps, adding the marketplace once:
 
 ```bash
-claude plugin marketplace add <owner>/master-session-plugin
+claude plugin marketplace add OlehPetrykUA/master-session-plugin
 ```
 
 ```bash
 claude plugin install master-session@master-session
 ```
 
-In the Claude desktop app, where `/plugin` does not run: click **+** next to the prompt box, then **Plugins**, **Add marketplace** with `<owner>/master-session-plugin`, then **Add plugin**. A plugin installed at user scope from a terminal also loads in the desktop app's local sessions.
+In the Claude desktop app, where `/plugin` does not run: click **+** next to the prompt box, then **Plugins**, **Add marketplace** with `OlehPetrykUA/master-session-plugin`, then **Add plugin**. A plugin installed at user scope from a terminal also loads in the desktop app's local sessions.
 
 Update later with `claude plugin update master-session@master-session`.
 
