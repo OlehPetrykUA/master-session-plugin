@@ -6,7 +6,7 @@ import type { Board, BoardSession, Live, WorkflowRecord } from '../../../types'
 
 import { agentCountsOf, bandAction, bandProgress, bandProgressWith, bandViewOf, extrasOf, fitBand, slotWidth } from '../../lib/band'
 import type { AgentCounts } from '../../lib/band'
-import { CH, COLUMN, across, tall } from '../../lib/layout'
+import { CH, COLUMN, across, tall, widthOf } from '../../lib/layout'
 import { freshReport, merge } from '../../data/contract'
 import { progressOf } from '../../lib/board'
 import { rowsOf } from '../../lib/rows'
@@ -110,7 +110,7 @@ const countsOf = async ($: Engine, bodyColumns = 100) => {
   const texts = await ui.findAll({ type: 'Text' })
   const strip = await stripOf(ui)
   const found = {
-    texts: texts.map(one => one.text.replace(/[  ]/g, '').trim()),
+    texts: await textsOf(ui),
     extras: texts.filter(one => one.props.weight === 'semibold' && one.props.color === 'text' && !one.text.includes(' needs you')).map(one => one.text),
     alt: strip?.props.alt,
     segments: pills(pathOf(String(strip?.props.source), 'track')),
@@ -121,7 +121,11 @@ const countsOf = async ($: Engine, bodyColumns = 100) => {
 
 type Found = { findAll: (query: { type?: string }) => Promise<FoundElement[]>; find: (query: { key?: string }) => Promise<FoundElement | undefined> }
 
-const textsOf = async (ui: Found) => (await ui.findAll({ type: 'Text' })).map(one => one.text.replace(/[\u2007\u2009]/g, '').trim())
+const isFace = (one: FoundElement) => one.type === 'Svg' && String(one.props.source).includes('<rect x="0.5"')
+
+const isHot = (one: FoundElement) => /fill:var\(--(?:accentBtnHover|accentTint2)\)/.test(String(one.props.source))
+
+const textsOf = async (ui: Found) => (await ui.findAll({})).flatMap(one => (one.type === 'Text' ? [one.text.replace(/[\u2007\u2009]/g, '').trim()] : isFace(one) && !isHot(one) ? [String(one.props.alt)] : []))
 
 const buttonsOf = async (ui: Found) => (await ui.findAll({ type: 'Button' })).map(one => [one.key, String(one.props.label)])
 
@@ -131,7 +135,7 @@ const stripOf = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).find(on
 
 const widthOfStrip = async (ui: Found) => Number(String((await stripOf(ui))?.props.source).match(/viewBox="0 0 ([\d.]+) 10"/)?.[1])
 
-const iconsOf = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true).map(one => ICON[String(one.props.source).match(/<path d="([^"]+)"/)?.[1] ?? ''] ?? '?')
+const iconsOf = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true && !isHot(one)).map(one => ICON[String(one.props.source).match(/<path d="([^"]+)"/)?.[1] ?? ''] ?? '?')
 
 const scopesOf = async (ui: Found) => (await ui.findAll({ type: 'Box' })).flatMap(one => (one.key ? [one.key] : []))
 
@@ -270,13 +274,14 @@ test('the strip stretches by flex: bars fill the box that takes the leftover wid
 test('every icon is drawn with its name as alt, the counts icon included', async ($, on) => {
   await band($, on, WORKING)
   const work = await mount($)
-  const icons = (await work.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true)
-  expect(icons.map(one => one.props.alt)).toEqual(['pulse', 'panel'])
+  const icons = (await work.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true && !isFace(one))
+  expect(icons.map(one => one.props.alt)).toEqual(['pulse'])
+  expect((await work.findAll({ type: 'Svg' })).filter(one => isFace(one) && !isHot(one)).map(one => one.props.alt)).toEqual(['Open board'])
   expect(await iconsOf(work)).toEqual(['pulse', 'panel'])
   await work.unmount()
   await $.tool.call({ tool: BOARD_TOOL, ...publish(DONE) })
   const done = await mount($)
-  expect((await done.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true).map(one => one.props.alt)).toEqual(['check', 'done', 'panel'])
+  expect((await done.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true && !isFace(one)).map(one => one.props.alt)).toEqual(['check', 'done'])
   await done.unmount()
 })
 
@@ -396,7 +401,7 @@ for (const point of BREAKPOINTS) {
       await $.tool.call({ tool: BOARD_TOOL, ...publish(sessions) })
       const ui = await mount($, columns)
       await dump(`band-narrow-${point.px}-${name}`, ui)
-      const found = { texts: await textsOf(ui), icons: await iconsOf(ui), width: await widthOfStrip(ui) }
+      const found = { texts: await textsOf(ui), icons: await iconsOf(ui), width: await widthOfStrip(ui), spacers: (await ui.findAll({ type: 'Box' })).filter(box => box.props.flexGrow === 1 && !box.children?.length).length }
       await ui.unmount()
       return found
     }
@@ -406,11 +411,12 @@ for (const point of BREAKPOINTS) {
     expect(working.width).toBeGreaterThanOrEqual(4 * 24 + 3 * 4)
     const needs = await parts(NEEDS, 'needs-you')
     expect(needs.texts[0]).toMatch(point.pill)
-    expect(needs.texts.slice(1)).toEqual(point.px < 600 ? [] : ['Open chat'])
+    expect(needs.texts.slice(1)).toEqual(['Open chat'])
     expect(needs.icons).toEqual(['needs', 'chat'])
     const strip = Number.isNaN(needs.width) ? 'none' : needs.width === dotsWidth(sessionsOf(5)) ? 'dots' : 'bars'
     expect([point.px, strip]).toEqual([point.px, point.needsStrip])
     strip === 'bars' && expect(needs.width).toBeGreaterThanOrEqual(5 * 24 + 4 * 4)
+    expect(needs.spacers).toBe(strip === 'none' ? 1 : 0)
     const done = await parts(DONE, 'all-done')
     expect(done.texts).toEqual([...point.done])
     expect(done.icons).toEqual(point.done.length === 2 ? ['check', 'done', 'panel'] : ['check', 'panel'])
@@ -534,15 +540,21 @@ test('extrasOf names each part with its plural and drops zeros; agentCountsOf ha
 test('v2-11 geometry: bar 56 with gap 12, percent 34, pill 34 with 0 12 0 8, button 32 with 0 12 0 8 and gap 4, icons 15, 16 and 18', async ($, on) => {
   await band($, on, NEEDS)
   const boxes = async (ui: Found) => (await ui.findAll({ type: 'Box' })).map(one => one.props)
-  const sizes = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true).map(one => [one.props.alt, one.props.width])
+  const sizes = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true && !isFace(one)).map(one => [one.props.alt, one.props.width])
+  const faceOf = async (ui: Found, _name: string) => String((await ui.findAll({ type: 'Svg' })).find(one => isFace(one) && !isHot(one))?.props.source)
   for (const [px, padLeft, padRight] of [[760, 8, 8], [390, 8, 6]] as const) {
     const ui = await mount($, Math.round((px + 16) / COLUMN))
     const [bar, pill] = await boxes(ui)
     expect(bar).toEqual(expect.objectContaining({ height: tall(56), gap: across(12), paddingLeft: across(padLeft), paddingRight: across(padRight), borderStyle: 'round' }))
     expect(pill).toEqual(expect.objectContaining({ height: tall(34), gap: across(6), paddingLeft: across(8), paddingRight: across(12), borderStyle: 'round', borderColor: 'error' }))
-    expect((await ui.find({ key: 'face-band-chat' }))?.props).toEqual(expect.objectContaining({ height: tall(32), gap: across(4), borderStyle: 'round' }))
+    expect((await ui.find({ key: 'face-band-chat' }))?.props).toEqual(expect.objectContaining({ height: tall(32) }))
     px < 600 && expect((await ui.find({ key: 'face-band-chat' }))?.props.width).toBe(across(32))
-    expect(await sizes(ui)).toEqual([['needs', 15], ['chat', 16]])
+    expect(await sizes(ui)).toEqual([['needs', 15]])
+    const chat = await faceOf(ui, 'chat')
+    expect(chat).toMatch(/--accentBtn:#B85335.*--onAccent:#FFFFFF.*prefers-color-scheme: dark.*fill:var\(--accentBtn\)/)
+    expect(chat).toContain('stroke:var(--onAccent)')
+    expect(chat).toContain(`scale(${16 / 24})`)
+    expect(chat.includes('Open chat')).toBe(px >= 600)
     await ui.unmount()
   }
   for (const [sessions, padLeft, padRight, px] of [[WORKING, 16, 8, 760], [WORKING, 12, 6, 390], [DONE, 16, 8, 760], [DONE, 12, 6, 390]] as const) {
@@ -550,9 +562,11 @@ test('v2-11 geometry: bar 56 with gap 12, percent 34, pill 34 with 0 12 0 8, but
     const ui = await mount($, Math.round((px + 16) / COLUMN))
     const [bar] = await boxes(ui)
     expect(bar).toEqual(expect.objectContaining({ height: tall(56), gap: across(12), paddingLeft: across(padLeft), paddingRight: across(padRight) }))
-    expect((await ui.find({ key: 'face-band-board' }))?.props).toEqual(expect.objectContaining({ height: tall(32), gap: across(4) }))
+    expect((await ui.find({ key: 'face-band-board' }))?.props).toEqual(expect.objectContaining({ height: tall(32) }))
+    const board = await faceOf(ui, 'board')
+    expect(board).toMatch(/fill:var\(--accentTint\).*stroke:var\(--accentText\).*fill:var\(--accentText\)/)
+    expect(board).toContain(`scale(${16 / 24})`)
     const icons = Object.fromEntries(await sizes(ui))
-    expect(icons.panel).toBe(16)
     sessions === DONE && expect(icons.check).toBe(18)
     px === 760 && expect(icons[sessions === DONE ? 'done' : 'pulse']).toBe(15)
     await ui.unmount()
@@ -661,6 +675,12 @@ test('with no worker sessions, running subagents still show the band: their segm
   expect(await textsOf(ui)).toEqual(['2 subagents', 'Open board'])
   expect((await stripOf(ui))?.props.alt).toBe('Master session: 2 subagents')
   await ui.unmount()
+  const terminal = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  const lines = (await terminal.findAll({ type: 'Text' })).map(one => one.text)
+  expect(lines.some(one => /%/.test(one))).toBe(false)
+  expect(lines[0]).toBe('•')
+  expect(lines).toContain('2 subagents')
+  await terminal.unmount()
 })
 
 test("a worker's run keeps its phases from the worker's report: one piece per phase, drawn before its first agent", () => {
@@ -676,7 +696,7 @@ test('a run with many phases never gets a piece under 4 px: it takes its own lea
   const items = [S('green', 0.5), W('green', 0.5, 13), S('amber', 0.5)]
   expect(barsWidth(items)).toBe(24 + (13 * 4 + 2 * 12) + 24 + 2 * 4)
   const source = strip(barsWidth(items), items)
-  const widths = [...source.matchAll(/M[\d.]+,0h(-?[\d.]+)a2,2/g)].map(match => Number(match[1]) + 4)
+  const widths = [...pathOf(source, 'track').matchAll(/M[\d.]+,0h(-?[\d.]+)a([\d.]+),/g)].map(match => Number(match[1]) + 2 * Number(match[2]))
   expect(widths.length).toBeGreaterThanOrEqual(13)
   expect(Math.min(...widths)).toBeGreaterThanOrEqual(4)
 })
@@ -700,4 +720,12 @@ test('a plain session that runs a subagent, with no board of its own and no work
   const ui = await mount($)
   expect(await textsOf(ui)).toEqual(['no band'])
   await ui.unmount()
+})
+
+test('with the strip hidden, the short pill gets the whole room: it fits whole at room = pill chrome + text and truncates only below', () => {
+  const short = 'env-e2e-test needs you'
+  const exact = 2 + 8 + 15 + 6 + 12 + widthOf(short)
+  const input = { gap: 12, items: sessionsOf(5), counts: 0, full: `${short} · commit blocked`, short }
+  expect(fitBand({ ...input, room: exact })).toEqual({ pill: short, showCounts: false, isDots: true, strip: 0, isHidden: true })
+  expect(fitBand({ ...input, room: exact - 1 }).pill).toMatch(/…$/)
 })

@@ -22,7 +22,7 @@ export type ActionButtonProps = {
   isIconOnly?: boolean
 }
 
-const PRIMARY: { rest: FaceLook; hover: FaceLook } = { rest: { fill: 'accentBtn', ink: 'onAccent' }, hover: { fill: 'accentBtnHover', ink: 'onAccent' } }
+export const PRIMARY: { rest: FaceLook; hover: FaceLook } = { rest: { fill: 'accentBtn', ink: 'onAccent' }, hover: { fill: 'accentBtnHover', ink: 'onAccent' } }
 
 const LINK: { rest: FaceLook; hover: FaceLook } = { rest: { ink: 'accentText' }, hover: { fill: 'hoverBg', ink: 'accentText', isUnderlined: true } }
 

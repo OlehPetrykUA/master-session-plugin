@@ -11,7 +11,7 @@ export function TextBand(ui: TextUi, props: TextBandProps) {
   const { Box, Text, Button } = ui
   const { view, columns } = props
   const { items, asker, isAllDone, percent, counts, extras, action, showCounts, pillText } = view
-  const lead = asker ? `● ${pillText}` : isAllDone ? '✓' : `${percent}%`.padStart(4)
+  const lead = asker ? `● ${pillText}` : isAllDone ? '✓' : view.hasLead ? `${percent}%`.padStart(4) : ''
   const more = showCounts && extras ? (counts ? `· ${extras}` : extras) : ''
   const marks = items.reduce((sum, one) => sum + (one.kind === 'subagent' ? 2 : one.kind === 'workflow' ? (one.pieces ?? 1) + 1 : 0), 0)
   const sessions = Math.max(1, items.filter(one => one.kind === 'session').length)
@@ -20,9 +20,11 @@ export function TextBand(ui: TextUi, props: TextBandProps) {
   const toneOf = (tone: StripTone) => (isAllDone ? 'success' : TERMINAL[tone])
   return (
     <Box flexDirection="row" gap={1}>
-      <Text color={asker ? 'error' : isAllDone ? 'success' : undefined} weight="semibold">
-        {lead}
-      </Text>
+      {lead ? (
+        <Text color={asker ? 'error' : isAllDone ? 'success' : undefined} weight="semibold">
+          {lead}
+        </Text>
+      ) : null}
       {items.map(one => {
         if (one.kind === 'subagent') return <Text color={toneOf(one.tone)} dimColor={!!asker || undefined}>•</Text>
         if (one.kind === 'workflow') {

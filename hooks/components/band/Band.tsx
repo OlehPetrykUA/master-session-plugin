@@ -59,7 +59,9 @@ export function Band(ui: Ui, props: BandProps) {
   return (
     <Box flexDirection="row" alignItems="center" gap={across(view.gap)} height={tall(BAR.height)} paddingLeft={across(view.padLeft)} paddingRight={across(view.padRight)} paddingY={0} borderStyle="round" borderColor={C.border} backgroundColor={C.surface}>
       {lead}
-      {fitted.isHidden ? null : fitted.isDots ? (
+      {fitted.isHidden ? (
+        <Box flexGrow={1} />
+      ) : fitted.isDots ? (
         <Box flexDirection="row" alignItems="center" gap={across(view.gap)} flexGrow={1} flexShrink={0}>
           <Svg source={strip(stripWidth, items, look, true)} alt={alt} width={stripWidth} height={10} isInteractive />
           {counter}
@@ -70,7 +72,7 @@ export function Band(ui: Ui, props: BandProps) {
         </Box>
       )}
       {fitted.isDots ? null : counter}
-      {action ? BandButton(ui, { name: action.name, label: action.label, art: icon(action.icon, BUTTON.icon, KINDS[kind].tone), onPress: action.press, kind, width: view.actionWidth, isIconOnly: action.isIconOnly }) : null}
+      {action ? BandButton(ui, { name: action.name, label: action.label, icon: action.icon, art: icon(action.icon, BUTTON.icon, KINDS[kind].tone), onPress: action.press, kind, width: view.actionWidth, isIconOnly: action.isIconOnly }) : null}
     </Box>
   )
 }

@@ -157,8 +157,8 @@ export function fitBand({ room, gap, items, counts, full, short }: FitInput) {
     const left = room - PILL_WIDTH - widthOf(text)
     if (left >= (isDots ? dots : bars)) return { pill: text, showCounts: false, isDots, strip: Math.round(isDots ? dots : left), isHidden: false }
   }
-  if (room - gap - PILL_WIDTH - widthOf(brief) >= 0) return { pill: brief, showCounts: false, isDots: true, strip: 0, isHidden: true }
-  return { pill: fit(brief, room - gap - PILL_WIDTH), showCounts: false, isDots: true, strip: 0, isHidden: true }
+  if (room - PILL_WIDTH - widthOf(brief) >= 0) return { pill: brief, showCounts: false, isDots: true, strip: 0, isHidden: true }
+  return { pill: fit(brief, room - PILL_WIDTH), showCounts: false, isDots: true, strip: 0, isHidden: true }
 }
 
 export function bandProgress(current: Board | null, live: Live) {
