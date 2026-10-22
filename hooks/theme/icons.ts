@@ -57,6 +57,14 @@ export const I = {
   haiku: 'M5 7h9 M5 12h14 M5 17h9',
   fable: 'M3 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0Z M12 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0Z',
   modelChip: 'M7 7h10v10H7Z M10 3v4 M14 3v4 M10 17v4 M14 17v4 M3 10h4 M3 14h4 M17 10h4 M17 14h4',
+  implementer: 'M14.5 4.5a4.5 4.5 0 0 0-4.2 6.1L4 16.9V20h3.1l6.3-6.3a4.5 4.5 0 0 0 6.1-4.2l-2.8 2.8-2.6-.5-.5-2.6Z',
+  refactorer: 'M4 8h13 M14 5l3 3-3 3 M20 16H7 M10 13l-3 3 3 3',
+  reviewer: 'M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Z M20 20l-4.8-4.8 M7.8 10.6l1.9 1.9 3.6-3.6',
+  verifier: 'M9 3h6v4H9Z M9 5H6v16h12V5h-3 M9 13.5l2 2 4-4',
+  designChecker: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z M12 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6Z',
+  researcher: 'M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5Z M5 19.5A1.5 1.5 0 0 0 6.5 21H19 M9 7h6',
+  designer: 'M15 4l5 5L9 20H4v-5Z M13 6l5 5',
+  validator: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5Z',
   session: 'M3 5h18v14H3Z M7 10l3 2-3 2 M12 14h5',
   agent: 'M6 8h12v11H6Z M12 4v4 M9.5 12.5v1 M14.5 12.5v1 M9.5 16h5',
   flow: 'M4 4h6v6H4Z M14 14h6v6h-6Z M7 10v4a3 3 0 0 0 3 3h4',
@@ -65,6 +73,17 @@ export const I = {
 } as const
 
 export type IconName = keyof typeof I
+
+export const PERSONA_GLYPH: Record<string, IconName> = {
+  Implementer: 'implementer',
+  Refactorer: 'refactorer',
+  Reviewer: 'reviewer',
+  'QA verifier': 'verifier',
+  'Design checker': 'designChecker',
+  Researcher: 'researcher',
+  Designer: 'designer',
+  Validator: 'validator',
+}
 
 const svg = (width: number, height: number, body: string, box = `0 0 ${width} ${height}`) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${box}"><style>svg{${LIGHT}}@media (prefers-color-scheme: dark){svg{${DARK}}}text{font-family:${FONT};font-variant-numeric:tabular-nums}${MOTION}</style>${body}</svg>`

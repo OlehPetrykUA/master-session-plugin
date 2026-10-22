@@ -92,6 +92,8 @@ export function displayNameOf(item: RowItem | { kind: 'master' }): Name {
   return { persona: personaOfType(item.agent.type), task: item.agent.description }
 }
 
+export const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
+
 export const nameText = (name: Name) => (name.task ? `${name.persona} · ${name.task}` : name.persona)
 
 export function sessionStatusOf(row: Row, trees: readonly Repo[] = [], sessions: readonly LiveSession[] = []): Status {

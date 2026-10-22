@@ -1,6 +1,6 @@
 import { compactOf, modelOf } from '../../lib/format'
 import { across, tall } from '../../lib/layout'
-import { clockOf, shortNameOf } from '../../lib/list'
+import { clockOf, oneLine, shortNameOf } from '../../lib/list'
 import type { Context, ListItem } from '../../lib/list'
 import { activityOf, headOf, othersOf, syncOf, whereOf } from '../../lib/rows'
 import type { Row } from '../../lib/rows'
@@ -136,7 +136,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
             label: 'Files owned',
             children: [
               Strong(ui, { text: `${files.length} file${files.length === 1 ? '' : 's'}`, isFull: true }),
-              ...files.slice(0, 3).map(path => Quiet(ui, { text: path, isMono: true, isFull: true })),
+              ...files.slice(0, 3).map(path => Quiet(ui, { text: oneLine(path), isMono: true })),
               files.length > 3 ? Quiet(ui, { text: `+${files.length - 3} more`, isFull: true }) : null,
             ],
           })

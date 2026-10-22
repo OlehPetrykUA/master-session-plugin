@@ -1,6 +1,6 @@
 import { dirtyOf } from '../../lib/git'
 import { across, down, tall } from '../../lib/layout'
-import { displayNameOf, elapsedOfItem, lineOf, stepsOfItem } from '../../lib/list'
+import { displayNameOf, elapsedOfItem, lineOf, oneLine, stepsOfItem } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { whereOf } from '../../lib/rows'
 import { STATUS, gitPill, statusBadge, toneRing } from '../../theme/icons'
@@ -51,7 +51,7 @@ export function Row(ui: Ui, props: RowProps) {
       {glyph(`${id}-ask-icon`, 'needs', 'red')}
       <Box flexShrink={1} minWidth={0}>
         <Text size="footnote" weight="semibold" color={C.red} wrap="wrap">
-          {line.text}
+          {oneLine(line.text)}
         </Text>
       </Box>
     </Box>
@@ -75,7 +75,7 @@ export function Row(ui: Ui, props: RowProps) {
       {!isNeeds && line.text ? (
         <Box key={`${id}-text`} flexShrink={1} minWidth={0}>
           <Text size="footnote" color={C.muted} wrap="truncate-end">
-            {line.text}
+            {oneLine(line.text)}
           </Text>
         </Box>
       ) : null}
@@ -146,7 +146,7 @@ export function Row(ui: Ui, props: RowProps) {
           {name.task ? (
             <Box flexShrink={1} minWidth={0}>
               <Text size="heading" color={C.muted} wrap="truncate-end">
-                {name.task}
+                {oneLine(name.task)}
               </Text>
             </Box>
           ) : null}

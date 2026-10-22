@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord } from '../../../types'
 
-import { across } from '../../lib/layout'
+import { across, tall } from '../../lib/layout'
 import { phaseStrip } from '../../theme/detail'
 import { C } from '../../theme/tokens'
 import { BOARD, PANE, altsOf, click, hitsOf, started, textsOf } from '../../testing/world'
@@ -149,5 +149,27 @@ test('an open archived card or workflow agent card counts as expanded, so the pa
   await click(ui, 'hit-row-local_old')
   expect(await ui.find({ key: 'detail-local_old' })).toBeDefined()
   expect(await drawn()).not.toContain('is not drawn')
+  await ui.unmount()
+})
+
+test('long multi-line tests and activity draw as one truncated line each: the last 5 tests with +N more, nothing spills into the next item', async ($, on) => {
+  const script = 'cd "$HOME/.claude/worktrees/wt-x"\nL=$(mktemp)\ntsc -p . --noEmit > "$L" 2>&1\necho "tsc exit $?"\ncat "$L"\nrm "$L"'
+  const tests = ['one', 'two', 'three', 'four', 'five', 'six', script]
+  const activity = [`Bash ${script} · 2m`, 'Read hooks/lib/band.ts · 1m']
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], tests, activity }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_setup')
+  const flat = script.replace(/\s+/g, ' ')
+  const keys = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('test-local_setup-') ? [box.key] : []))
+  expect(keys).toEqual(['test-local_setup-0', 'test-local_setup-1', 'test-local_setup-2', 'test-local_setup-3', 'test-local_setup-4'])
+  const texts = await textsOf(ui)
+  expect(texts).toEqual(expect.arrayContaining(['three', 'six', '+2 more']))
+  for (const gone of ['one', 'two']) expect(texts).not.toContain(gone)
+  expect(texts.some(text => text.includes('\n'))).toBe(false)
+  const lines = (await ui.findAll({ type: 'Text' })).filter(one => String(one.text ?? '').includes('mktemp') && one.props.wrap !== undefined)
+  expect(lines.length).toBe(2)
+  expect(lines.every(one => one.props.wrap === 'truncate-end')).toBe(true)
+  expect(lines.map(one => String(one.text))).toEqual(expect.arrayContaining([flat, expect.stringContaining(flat.slice(3))]))
+  expect((await ui.find({ key: 'test-local_setup-0' }))?.props).toEqual(expect.objectContaining({ height: tall(24), minWidth: 0, flexShrink: 1 }))
   await ui.unmount()
 })
