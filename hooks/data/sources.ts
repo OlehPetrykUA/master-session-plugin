@@ -102,8 +102,8 @@ export async function refreshShared($: EngineInterface) {
 }
 
 export async function refreshReports($: EngineInterface) {
-  const { role, self } = roleOf()
-  if (role !== 'master') return
+  const { self } = roleOf()
+  if (!self) return
   const onBoard = new Set((await getBoard($))?.sessions.map(one => one.id))
   const mine = (await readReports($, home)).filter(one => one.parent === self || onBoard.has(one.session))
   await saveReports($, () => mine)

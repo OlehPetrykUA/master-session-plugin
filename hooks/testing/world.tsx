@@ -135,7 +135,11 @@ export function world(on: On, child: Child = {}) {
     calls.push({ tool: e.tool, args: e.args })
     if (e.tool === 'get_session') {
       return e.args.session_id === 'self'
-        ? text(child.parent ? { sessionId: 'local_worker', title: 'Worker chat', parentSessionId: child.parent } : { sessionId: SELF, title: 'Orbit Agents Toolkit Validator' })
+        ? text(
+            child.parent
+              ? { sessionId: 'local_worker', title: 'Worker chat', parentSessionId: child.parent }
+              : { sessionId: SELF, title: 'Orbit Agents Toolkit Validator', ...(child.origin ? { parentSessionId: child.origin, detached: child.isDetached ?? true } : {}) },
+          )
         : text({ sessionId: e.args.session_id, createdAt: '1970-01-01T00:10:00.000Z', model: 'claude-opus-5-5', effort: 'xhigh', permissionMode: 'auto' })
     }
     const failure = e.tool === 'list_sessions' ? child.listError?.() : undefined
@@ -226,7 +230,7 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { parent?: string; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string> }
+export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string> }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, masterTitle: MASTER_TITLE, board })

@@ -82,7 +82,8 @@ async function detect($: EngineInterface) {
   const me = await callJson($, 'ccd_session_mgmt', 'get_session', { session_id: 'self' }).catch(() => ({}) as Record<string, unknown>)
   const self = typeof me.sessionId === 'string' ? me.sessionId : ''
   if (!self) return
-  const parent = typeof me.parentSessionId === 'string' && me.parentSessionId ? me.parentSessionId : await parentFromBoards($, home, self)
+  const isChild = typeof me.parentSessionId === 'string' && !!me.parentSessionId && me.detached !== true
+  const parent = isChild ? String(me.parentSessionId) : await parentFromBoards($, home, self)
   const engineId = await $.session.id()
   role = { role: parent ? 'worker' : 'master', self, parent, engineId }
   if (!parent) {

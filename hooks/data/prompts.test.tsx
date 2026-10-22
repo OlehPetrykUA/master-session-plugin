@@ -3,6 +3,7 @@ import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { BAND, BOARD, HOME, MASTER, PANE, altsOf, hitsOf, started, textsOf, world } from '../testing/world'
+import type { Child } from '../testing/world'
 import type { Report } from './contract'
 import { promptTextOf } from './recorder'
 import { reportPath } from './status'
@@ -87,7 +88,7 @@ test("a waiting prompt's notification marks needs-you when nothing else did, its
   expect([run.last()?.state, run.last()?.needsYou]).toEqual(['needs-you', 'Pick the design'])
 })
 
-test('a needs-you report reaches the master: within one FILE_MS refresh its row is pinned red with Open chat and the band names it', async ($, on) => {
+async function reachesMaster($: Engine, on: On, child: Child) {
   const board = { ...BOARD, sessions: [{ ...BOARD.sessions[0], state: 'working', needsYou: undefined }, BOARD.sessions[1]] }
   const report: Report = {
     v: 1,
@@ -106,7 +107,7 @@ test('a needs-you report reaches the master: within one FILE_MS refresh its row 
     files: [],
   }
   const files: Record<string, string> = { [reportPath(HOME, 'local_setup')]: JSON.stringify(report) }
-  const run = await started($, on, board, { files })
+  const run = await started($, on, board, { ...child, files })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const heads = async () => (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
   expect(await heads()).toEqual(['group-head-working', 'group-head-waiting', 'group-head-archived'])
@@ -125,4 +126,10 @@ test('a needs-you report reaches the master: within one FILE_MS refresh its row 
   const after = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await hitsOf(after)).not.toContain('hit-chat-local_setup')
   await after.unmount()
-})
+}
+
+test('a needs-you report reaches the master: within one FILE_MS refresh its row is pinned red with Open chat and the band names it', ($, on) => reachesMaster($, on, {}))
+
+test('a validator started from another session and moved to top level still reads its workers’ needs-you reports', ($, on) => reachesMaster($, on, { origin: 'local_origin' }))
+
+test('a validator that is itself a child of another session reads its own workers’ needs-you reports too', ($, on) => reachesMaster($, on, { origin: 'local_origin', isDetached: false }))
