@@ -144,7 +144,7 @@ export function world(on: On, child: Child = {}) {
     }
     const failure = e.tool === 'list_sessions' ? child.listError?.() : undefined
     if (failure) return { value: { content: [{ type: 'text' as const, text: failure }], isError: true } }
-    if (e.tool === 'list_sessions') return text(sessions)
+    if (e.tool === 'list_sessions') return text(sessions.filter(one => e.args.include_archived === true || !one.isArchived).slice(0, Number(e.args.limit ?? 20)))
     if (e.tool === 'archive_session' || e.tool === 'unarchive_session') {
       const isArchived = e.tool === 'archive_session'
       sessions = sessions.map(one => (one.sessionId === e.args.session_id ? { ...one, isArchived } : one))

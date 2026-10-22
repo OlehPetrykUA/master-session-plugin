@@ -27,11 +27,11 @@ import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './da
 import { recordTurnEnd, recorder, startRecorder } from './data/recorder'
 import { agentCountsOf, bandAction, bandProgress, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
-import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
+import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
 import { messageOf } from './lib/format'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
-import { getAgents, getLive, getWorkflows, saveBoard } from './state/atoms'
+import { getAgents, getLive, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
 
 let columns = 0
 let pending: { row: number; at: number } | undefined
@@ -57,8 +57,8 @@ export const register: Register = on => {
     await startRecorder($)
     await $.tool.register({
       name: 'open',
-      description: 'Opens the master session pane beside the chat. Use it when the user asks to see the sessions board or the status pane.',
-      inputSchema: { type: 'object', properties: {} },
+      description: 'Opens the master session pane beside the chat. Use it when the user asks to see the sessions board or the status pane. expand opens one item’s card; archived: true opens the Archived list.',
+      inputSchema: OPEN_SCHEMA,
     })
     await $.tool.register({
       name: 'board',
@@ -123,11 +123,16 @@ export const register: Register = on => {
     return next({ ...e, text: e.text + note })
   }).catch(($, e, next) => next(e))
 
-  on('tool.call', { tool: 'mcp__master-session__open' }, async $ => {
+  on('tool.call', { tool: 'mcp__master-session__open' }, async ($, e) => {
+    const expand = typeof e.expand === 'string' ? e.expand.trim() : ''
+    const isArchived = e.archived === true
+    if (isArchived || expand) await setFilter($, isArchived ? 'archived' : 'all')
+    if (expand) await setExpanded($, () => [expand])
     const isPlaced = await openPane($)
+    const shown = [isArchived ? 'the Archived list' : '', expand ? `${expand} expanded` : ''].filter(Boolean).join(' with ')
     return {
       result: isPlaced
-        ? 'The master session pane is open beside the chat.'
+        ? `The master session pane is open beside the chat${shown ? `, showing ${shown}` : ''}.`
         : 'The pane is open, but no attached surface draws it: post the board in chat.',
     }
   }).catch(() => ({ deny: 'The master session pane could not be opened: post the board in chat.' }))

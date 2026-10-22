@@ -154,3 +154,22 @@ test('agent spawns, their ends and a Workflow launch reach the agents and workfl
   const runs = workflowRunsOf(state.agents, state.workflows)
   expect([runs.length, subagentsOf(state.agents).map(agent => agent.id)]).toEqual([1, ['a1']])
 })
+
+test('the open tool can expand one card and open the Archived list, so a check can see every card without clicks', async ($, on) => {
+  const { opened } = await started($, on)
+  const expanded = (await $.tool.call({ tool: 'mcp__master-session__open', expand: 'local_setup' })) as { result?: string }
+  expect(expanded.result).toBe('The master session pane is open beside the chat, showing local_setup expanded.')
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
+  await ui.unmount()
+  const archived = (await $.tool.call({ tool: 'mcp__master-session__open', archived: true, expand: 'local_old' })) as { result?: string }
+  expect(archived.result).toBe('The master session pane is open beside the chat, showing the Archived list with local_old expanded.')
+  const list = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await list.find({ key: 'detail-local_setup' })).toBeUndefined()
+  expect(await textsOf(list)).toEqual(expect.arrayContaining(['Archived', 'Remove the stale mod']))
+  expect(await list.find({ key: 'group-head-waiting' })).toBeUndefined()
+  await list.unmount()
+  const plain = (await $.tool.call({ tool: 'mcp__master-session__open' })) as { result?: string }
+  expect(plain.result).toBe('The master session pane is open beside the chat.')
+  expect(opened.length).toBeGreaterThanOrEqual(3)
+})

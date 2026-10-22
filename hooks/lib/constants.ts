@@ -5,6 +5,8 @@ export const INFO = 'master-session:info'
 export const BOARD_TOOL = 'mcp__master-session__board'
 export const FILE_MS = 3_000
 export const LIVE_MS = 15_000
+export const LIVE_LIMIT = 50
+export const ARCHIVE_LIMIT = 200
 export const AIM_MS = 2_000
 export const LANDING_MS = 1_000
 export const AGENT_SHOWN_MS = 120_000
@@ -56,6 +58,14 @@ export const BOARD_SCHEMA = {
     testsNote: { type: 'string', description: 'e.g. "smoke 398 · hooks 128"' },
   },
   required: ['sessions'],
+}
+
+export const OPEN_SCHEMA = {
+  type: 'object',
+  properties: {
+    expand: { type: 'string', description: 'An item id (session, subagent, workflow run or workflow agent, archived session) whose card opens expanded' },
+    archived: { type: 'boolean', description: 'true opens the Archived list' },
+  },
 }
 
 export const SCROLL_SCHEMA = {

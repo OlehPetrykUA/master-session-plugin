@@ -6,7 +6,7 @@ import { lossesOf, sideOf } from '../components/detail/losses'
 import { withReported } from '../lib/agents'
 import { bandProgress } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
-import { BOARD_TOOL, PANE, TITLE, UNDO_MS } from '../lib/constants'
+import { ARCHIVE_LIMIT, BOARD_TOOL, LIVE_LIMIT, PANE, TITLE, UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
 import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
@@ -133,37 +133,39 @@ export async function askAll($: EngineInterface) {
   return askSummary(sent, idle)
 }
 
+async function listSessions($: EngineInterface, known: readonly LiveSession[], args: { include_archived: boolean; limit: number }) {
+  const before = new Map(known.map(one => [one.id, one]))
+  const list = JSON.parse(await call($, 'ccd_session_mgmt', 'list_sessions', { linked: true, ...args })) as Record<string, unknown>[]
+  return Promise.all(
+    list.map(async (row): Promise<LiveSession> => {
+      const id = String(row.sessionId ?? '')
+      const seen = before.get(id)
+      const facts = seen?.createdAt !== undefined && seen.model ? undefined : await sessionOf($, id).catch(() => ({}) as Record<string, unknown>)
+      const createdAt = seen?.createdAt ?? Date.parse(String(facts?.createdAt ?? ''))
+      const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
+      return {
+        id,
+        name: String(row.name ?? ''),
+        title: String(row.title ?? ''),
+        cwd: String(row.cwd ?? ''),
+        isRunning: row.isRunning === true,
+        isArchived: row.isArchived === true,
+        lastActivityAt: row.isRunning === true ? 0 : Math.floor((Date.parse(String(row.lastActivityAt ?? '')) || 0) / 60_000) * 60_000,
+        startedBy: text(row.startedBy),
+        createdAt: Number.isNaN(createdAt) ? undefined : createdAt,
+        model: text(facts?.model) ?? seen?.model,
+        effort: text(facts?.effort) ?? seen?.effort,
+        permissionMode: text(row.permissionMode) ?? seen?.permissionMode ?? text(facts?.permissionMode),
+      }
+    }),
+  )
+}
+
 async function refreshLive($: EngineInterface, isForced = false) {
   const at = await $.clock.now()
   try {
     const me = await whoAmI($)
-    const known = new Map(me.sessions.map(one => [one.id, one]))
-    const list = JSON.parse(
-      await call($, 'ccd_session_mgmt', 'list_sessions', { linked: true, include_archived: true, limit: 50 }),
-    ) as Record<string, unknown>[]
-    const sessions = await Promise.all(
-      list.map(async (row): Promise<LiveSession> => {
-        const id = String(row.sessionId ?? '')
-        const before = known.get(id)
-        const facts = before?.createdAt !== undefined && before.model ? undefined : await sessionOf($, id).catch(() => ({}) as Record<string, unknown>)
-        const createdAt = before?.createdAt ?? Date.parse(String(facts?.createdAt ?? ''))
-        const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
-        return {
-          id,
-          name: String(row.name ?? ''),
-          title: String(row.title ?? ''),
-          cwd: String(row.cwd ?? ''),
-          isRunning: row.isRunning === true,
-          isArchived: row.isArchived === true,
-          lastActivityAt: row.isRunning === true ? 0 : Math.floor((Date.parse(String(row.lastActivityAt ?? '')) || 0) / 60_000) * 60_000,
-          startedBy: text(row.startedBy),
-          createdAt: Number.isNaN(createdAt) ? undefined : createdAt,
-          model: text(facts?.model) ?? before?.model,
-          effort: text(facts?.effort) ?? before?.effort,
-          permissionMode: text(row.permissionMode) ?? before?.permissionMode ?? text(facts?.permissionMode),
-        }
-      }),
-    )
+    const sessions = await listSessions($, me.sessions, { include_archived: true, limit: LIVE_LIMIT })
     await saveLive($, prev => (!isForced && !prev.error && JSON.stringify(prev.sessions) === JSON.stringify(sessions) ? prev : { ...prev, sessions, error: '', at }))
   } catch (error) {
     await saveLive($, prev => (prev.error === messageOf(error) ? prev : { ...prev, error: messageOf(error), at }))
@@ -207,13 +209,13 @@ export async function repoOf($: EngineInterface, path: string): Promise<Repo | u
   }
 }
 
-async function refreshRepos($: EngineInterface) {
+async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[]) {
   const { board: current } = await boardOf($)
-  const rows = rowsOf(current, await getLive($))
-  const ids = new Set(rows.map(row => row.id))
+  const live = await getLive($)
+  const rows = rowsOf(current, live)
   const paths = [
     ...rows.flatMap(row => [row.board?.cwd ?? '', row.live?.cwd ?? ''].filter(Boolean)),
-    ...(await getLive($)).sessions.filter(one => !one.isArchived && ids.has(one.startedBy ?? '')).map(one => one.cwd),
+    ...rows.flatMap(row => sideOf(row, sessions ?? live.sessions, [])).map(one => one.cwd),
     ...(current?.repos ?? []).map(path => expandHome(path, home)),
     ...(current?.sessions ?? []).flatMap(one => (one.worktrees ?? []).map(path => expandHome(path, home))),
   ].filter(path => path.startsWith('/'))
@@ -289,23 +291,29 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
     $.ui.toast(`Not archived: ${live.error}`)
     return
   }
-  const trees = await refreshRepos($).catch(() => [] as Repo[])
+  const sessions = await listSessions($, live.sessions, { include_archived: false, limit: ARCHIVE_LIMIT }).catch((error: unknown) => messageOf(error))
+  if (typeof sessions === 'string') {
+    $.ui.toast(`Not archived: ${sessions}`)
+    return
+  }
+  await saveLive($, prev => ({ ...prev, sessions: [...sessions, ...prev.sessions.filter(one => one.isArchived)] }))
+  const trees = await refreshRepos($, sessions).catch(() => [] as Repo[])
   const fresh = rowsOf((await boardOf($)).board, live)
   const targets = rows.flatMap(row => fresh.filter(one => one.id === row.id))
-  const busyOf = (row: Row) => sideOf(row, live.sessions, trees).find(one => one.isRunning || fresh.some(each => each.id === one.id && each.state === 'needs-you'))
+  const busyOf = (row: Row) => sideOf(row, sessions, trees).find(one => one.isRunning || fresh.some(each => each.id === one.id && each.state === 'needs-you'))
   const able = targets.filter(row => isArchivable(row.board ?? { state: row.state }, row.live))
   const allowed = able.filter(row => !busyOf(row))
   const refused = rows.filter(row => !able.some(one => one.id === row.id)).map(row => row.name)
   if (refused.length) $.ui.toast(`Not archived: ${refused.join(', ')} ${refused.length === 1 ? 'is' : 'are'} still working or waiting for your answer.`)
   for (const busy of able.flatMap(row => busyOf(row) ?? [])) $.ui.toast(`Not archived: ${busy.name || busy.title} is still working`)
   const first = allowed[0]
-  const losses = first ? lossesOf(first, trees, live.sessions) : []
+  const losses = first ? lossesOf(first, trees, sessions) : []
   if (!all && first && losses.length && JSON.stringify(losses) !== JSON.stringify(confirmed)) {
     await setExpanded($, () => [first.id])
     await setConfirming($, `archive:${first.id}`)
     return
   }
-  const clean = all ? allowed.filter(row => !lossesOf(row, trees, live.sessions).length) : allowed.slice(0, 1)
+  const clean = all ? allowed.filter(row => !lossesOf(row, trees, sessions).length) : allowed.slice(0, 1)
   const items = itemsOf(fresh, await getAgents($), await getWorkflows($))
   const archived: Row[] = []
   for (const row of clean) {
