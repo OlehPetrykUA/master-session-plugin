@@ -102,7 +102,7 @@ On every wake (note, idle notice, worker message, branch move, heartbeat), do on
 ## 4. Answering the worker
 
 A worker that asks for a "go", an approval or what to do next gets a direct instruction from you, quoting the user's relevant words. Never bounce it to the user. Review drafts against the brief and the user's words, then reply "go" or a precise list of changes.
-- **Approve yourself, at once:** drafts, mockups, plans and design choices that fit the brief and the user's words; edits, tests and one-line commits inside the worker's owned files; worktrees and scratch under the rules; reruns, retries and fixes; moving to the next step; `--ff-only` merges of verified work; archiving workers verified and captured in the ledger; anything reversible inside the brief.
+- **Approve yourself, at once:** drafts, mockups, plans and design choices that fit the brief and the user's words, except UI designs, which the user approves (Rules); edits, tests and one-line commits inside the worker's owned files; worktrees and scratch under the rules; reruns, retries and fixes; moving to the next step; `--ff-only` merges of verified work; archiving workers verified and captured in the ledger; anything reversible inside the brief.
 - **Only the user:** deletes outside git; pushes, PRs and anything external or irreversible; unsettled preferences; raising a permission mode. A tool call that stays denied: section 5.
 - Unsure: decide the reversible way and tell the user in one line.
 

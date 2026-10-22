@@ -10,7 +10,7 @@ A Claude Code plugin that turns one session into a **validator** for a team of w
 | Skills `subchat`, `subagent`, `workflow` | `/master-session:subchat`, `/master-session:subagent` and `/master-session:workflow`: start a worker session, a persona subagent or a workflow of persona agents from the validator. |
 | Skill `worker` | The protocol every worker session follows: its own worktree, the report tool, talking to the validator, the `ready <sha>` gate. |
 | Status mod | `/master-session:info` opens it: a pane beside the chat with one tile per worker (state, progress, git, tests, commits), a band above the prompt, archive and unarchive, and **Ask for updates**. Workers report through the `mcp__master-session__report` tool; the mod also records their commits, test runs, edits and waits by itself. |
-| Personas | Six roles, each a skill plus an agent of the same name: `implementer`, `refactorer`, `reviewer`, `qa-verifier`, `design-checker` and `researcher`. |
+| Personas | Seven roles, each a skill plus an agent of the same name: `implementer`, `refactorer`, `reviewer`, `qa-verifier`, `design-checker`, `researcher` and `designer`. |
 
 ## Install
 
@@ -73,6 +73,7 @@ Each persona is a skill, `master-session:<persona>`, and an agent of the same na
 | `qa-verifier` | Re-runs the gate at an exact sha in a clean worktree, ending in PASS or FAIL. |
 | `design-checker` | Compares the built UI with the approved design. |
 | `researcher` | Answers one question from published docs, citing each claim. |
+| `designer` | Draws the UI design as new artboards in the project's design canvas, in light and dark, for the user to approve before any UI code. |
 
 Start a session as a persona. Claude Code's default system prompt is kept, and the plugin's SessionStart hook loads the persona's skill, plus the worker skill for the implementer and refactorer:
 

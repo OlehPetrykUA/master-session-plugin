@@ -10,9 +10,10 @@ A persona is a fixed role the validator hands out. Each one has its own skill, `
 | QA verifier | subagent | `claude --agent master-session:qa-verifier` | `master-session:qa-verifier` | sonnet / medium |
 | Design checker | subagent | `claude --agent master-session:design-checker` | `master-session:design-checker` | sonnet / medium |
 | Researcher | subagent | `claude --agent master-session:researcher` | `master-session:researcher` | sonnet / medium; haiku / low for one fact |
+| Designer | subagent | `claude --agent master-session:designer` | `master-session:designer` | opus / high |
 | Integrator | the validator itself | | | the session's own |
 
-The read-only personas' agents deny Edit, Write and NotebookEdit. A `start_session` worker can't pick an agent, so its brief loads the skills instead.
+The read-only personas' agents deny Edit, Write and NotebookEdit. A `start_session` worker can't pick an agent, so its brief loads the skills instead. UI work: Designer first, then Implementer.
 
 - Implementer: [skill `master-session:implementer`](../implementer/SKILL.md), with [`master-session:worker`](../worker/SKILL.md).
 - Refactorer: [skill `master-session:refactorer`](../refactorer/SKILL.md), with [`master-session:worker`](../worker/SKILL.md).
@@ -20,6 +21,7 @@ The read-only personas' agents deny Edit, Write and NotebookEdit. A `start_sessi
 - QA verifier: [skill `master-session:qa-verifier`](../qa-verifier/SKILL.md).
 - Design checker: [skill `master-session:design-checker`](../design-checker/SKILL.md).
 - Researcher: [skill `master-session:researcher`](../researcher/SKILL.md).
+- Designer: [skill `master-session:designer`](../designer/SKILL.md).
 - Integrator: below; the validator's own role, with no skill or agent.
 
 ## Integrator

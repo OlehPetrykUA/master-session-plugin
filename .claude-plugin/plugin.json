@@ -2,7 +2,7 @@
   "name": "master-session",
   "displayName": "Master session",
   "version": "1.0.0",
-  "description": "A validator session (/master-session:start) that briefs worker sessions (/master-session:subchat), persona subagents (/master-session:subagent) and workflows (/master-session:workflow), verifies what they deliver and merges it, with a live status pane (/master-session:info), a band above the prompt and six personas (implementer, refactorer, reviewer, QA verifier, design checker, researcher), each a skill and an agent.",
+  "description": "A validator session (/master-session:start) that briefs worker sessions (/master-session:subchat), persona subagents (/master-session:subagent) and workflows (/master-session:workflow), verifies what they deliver and merges it, with a live status pane (/master-session:info), a band above the prompt and seven personas (implementer, refactorer, reviewer, QA verifier, design checker, researcher, designer), each a skill and an agent.",
   "author": {
     "name": "Oleh Petryk"
   },

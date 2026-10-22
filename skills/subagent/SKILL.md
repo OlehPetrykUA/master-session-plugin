@@ -7,7 +7,7 @@ argument-hint: '<persona> <task>'
 
 # Run a persona subagent
 
-Invoked with: `$ARGUMENTS`. The first word is the persona, one of the six in [personas.md](../start/personas.md); the rest is the task. With no known persona, list the six and stop.
+Invoked with: `$ARGUMENTS`. The first word is the persona, one of the seven in [personas.md](../start/personas.md); the rest is the task. With no known persona, list the seven and stop.
 
 This runs inside a validator session. If `/master-session:start` hasn't run in this session yet, become the validator first: read `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` and do its section 1 with no settings, then continue here.
 
