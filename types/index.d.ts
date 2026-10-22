@@ -12,6 +12,7 @@ export type BoardSession = {
   id: string
   name: string
   title?: string
+  persona?: string
   state: SessionState
   now?: string
   next?: string
@@ -115,6 +116,7 @@ export type Report = {
   run: { isRunning: boolean; since?: number; lastEnd?: { at: number; reason: EndReason } }
   modelAt: number
   state: SessionState
+  persona?: string
   progress?: Step
   now?: string
   next?: string
@@ -126,9 +128,12 @@ export type Report = {
   files: string[]
   waits?: { since: number; on: string }
   git?: { branch: string; dirty: number; ahead: number; at: number; path?: string }
+  agents?: ReportAgent[]
 }
 
 export type AgentState = 'running' | 'done' | 'failed'
+
+export type AgentAsk = { text: string; since: number }
 
 export type AgentRecord = {
   id: string
@@ -148,7 +153,12 @@ export type AgentRecord = {
   endedAt?: number
   result?: string
   tokens?: number
+  asking?: AgentAsk
+  parentAgentId?: string
+  parentSessionId?: string
 }
+
+export type ReportAgent = Pick<AgentRecord, 'id' | 'type' | 'description' | 'state' | 'startedAt' | 'name' | 'endedAt' | 'asking' | 'parentAgentId'> & { runId?: string; runIndex?: number }
 
 export type WorkflowRecord = {
   id: string

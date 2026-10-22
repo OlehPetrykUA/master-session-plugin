@@ -3,6 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import type { Board, LiveSession, Repo, SessionState, Worktree } from '../../types'
 
 import { lossesOf, sideOf } from '../components/detail/losses'
+import { withReported } from '../lib/agents'
 import { bandProgress } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
 import { BOARD_TOOL, PANE, TITLE, UNDO_MS } from '../lib/constants'
@@ -11,8 +12,9 @@ import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
 import { rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
-import { getAgents, getBoard, getLive, getReports, getShared, getUndone, getWorkflows, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
+import { getAgents, getBoard, getLive, getReports, getShared, getUndone, getWorkflows, saveAgents, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, merge } from './contract'
+import { keptAgents } from './agents'
 import { roleOf } from './recorder'
 import { askForUpdates, readBoard, readReports, writeBoard } from './status'
 
@@ -107,6 +109,9 @@ export async function refreshReports($: EngineInterface) {
   const onBoard = new Set((await getBoard($))?.sessions.map(one => one.id))
   const mine = (await readReports($, home)).filter(one => one.parent === self || onBoard.has(one.session))
   await saveReports($, () => mine)
+  const now = await $.clock.now()
+  const workflows = await getWorkflows($)
+  await saveAgents($, agents => keptAgents(withReported(agents, mine), workflows, now))
 }
 
 export async function publishBoard($: EngineInterface, board: Board, at: number) {

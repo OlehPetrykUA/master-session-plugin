@@ -106,7 +106,7 @@ test('summary blocks read the run totals as the design words them, zeros and das
     ['Git', '0', 'clean', false],
   ])
   expect(blocksOf(totals, true, '20:04')[6]?.sub).toMatch(/^\d\d:\d\d – 20:04$/)
-  expect(blocksOf({ ...totals, subagents: { total: 2, running: 0, done: 2, failed: 0 } }, true)[2]?.sub).toBe('all finished')
+  expect(blocksOf({ ...totals, subagents: { total: 2, running: 0, done: 2, failed: 0, asking: 0 } }, true)[2]?.sub).toBe('all finished')
   expect(blocks[0]?.dots).toEqual([
     { tone: 'green', count: 1 },
     { tone: 'amber', count: 1 },

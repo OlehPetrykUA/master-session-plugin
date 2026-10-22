@@ -24,7 +24,7 @@ const RUNS: WorkflowRecord[] = [
 
 test('subagents are the Agent tool agents only: workflow agents never count as subagents', () => {
   expect(subagentsOf(AGENTS).map(one => one.id)).toEqual(['a1', 'a2'])
-  expect(stateCountsOf(subagentsOf(AGENTS))).toEqual({ total: 2, running: 1, done: 1, failed: 0 })
+  expect(stateCountsOf(subagentsOf(AGENTS))).toEqual({ total: 2, running: 1, done: 1, failed: 0, asking: 0 })
 })
 
 test('workflow runs gather their agents by index under the launch name, with state, span and counts', () => {
@@ -69,8 +69,8 @@ test('the run summary counts sessions by state, needs you, subagents, workflows,
   expect(runSummaryOf({ rows, counts: countsOf(rows, []), archived: 1, agents: AGENTS, workflows: RUNS, board, trees: [], at: NOW })).toEqual({
     sessions: { total: 3, 'needs-you': 1, waiting: 0, working: 1, done: 1, archived: 1 },
     needsYou: 1,
-    subagents: { total: 2, running: 1, done: 1, failed: 0 },
-    workflows: { total: 3, running: 2, done: 1, failed: 0, agents: 3, agentsDone: 1 },
+    subagents: { total: 2, running: 1, done: 1, failed: 0, asking: 0 },
+    workflows: { total: 3, running: 2, done: 1, failed: 0, asking: 0, agents: 3, agentsDone: 1 },
     commits: { total: 3, repos: 0 },
     tests: { passed: 526, note: 'smoke 398 · hooks 128' },
     duration: { since: NOW - 3_600_000, ms: 3_600_000 },

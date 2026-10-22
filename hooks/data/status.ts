@@ -19,13 +19,13 @@ const widthOf = (point: number) => (point < 0x80 ? 1 : point < 0x800 ? 2 : point
 
 export const bytesOf = (text: string) => [...text].reduce((sum, char) => sum + widthOf(char.codePointAt(0) ?? 0), 0)
 
-const isEmpty = (report: Report) => !report.activity.length && !report.commits.length && !report.tests.length && !report.files.length
+const isEmpty = (report: Report) => !report.activity.length && !report.commits.length && !report.tests.length && !report.files.length && !report.agents?.length
 
 export function reportJson(report: Report) {
   let next = capped(report)
   let text = JSON.stringify(next)
   while (bytesOf(text) > REPORT_CAP && !isEmpty(next)) {
-    next = { ...next, activity: next.activity.slice(1), commits: next.commits.slice(1), tests: next.tests.slice(1), files: next.files.slice(1) }
+    next = { ...next, activity: next.activity.slice(1), commits: next.commits.slice(1), tests: next.tests.slice(1), files: next.files.slice(1), agents: next.agents?.slice(1) }
     text = JSON.stringify(next)
   }
   return text

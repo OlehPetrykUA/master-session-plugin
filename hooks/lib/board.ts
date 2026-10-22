@@ -4,7 +4,7 @@ export const ORDER: readonly SessionState[] = ['needs-you', 'waiting', 'working'
 
 const BY_ICON: Record<string, SessionState> = { '🔴': 'needs-you', '🟡': 'waiting', '🟢': 'working', '✅': 'done' }
 
-const FIELDS = ['title', 'now', 'next', 'progress', 'time', 'done', 'verified', 'git', 'location', 'risk', 'needsYou', 'sha'] as const
+const FIELDS = ['title', 'persona', 'now', 'next', 'progress', 'time', 'done', 'verified', 'git', 'location', 'risk', 'needsYou', 'sha'] as const
 
 type Field = (typeof FIELDS)[number]
 

@@ -1,10 +1,16 @@
 import type { EngineInterface, On, ToolCallInput, TurnCompleteInput } from 'claude-code'
 
+import { asked, reportAgentsOf } from '../lib/agents'
 import { expandHome, parseStatus } from '../lib/git'
+import { getAgents, saveAgents } from '../state/atoms'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
 import type { SessionState } from '../../types'
 import { parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
+
+type Held = { text: string; tool: string; state: SessionState; needsYou?: string }
+
+const MAIN = ''
 
 export type Role = { role: 'worker' | 'master' | ''; self: string; parent: string; engineId: string }
 
@@ -26,7 +32,7 @@ let role = NO_ROLE
 let current: Report | undefined
 let detecting: Promise<void> | undefined
 let gitCwd = ''
-let held: { text: string; tool: string; state: SessionState; needsYou?: string } | undefined
+let held = new Map<string, Held>()
 
 export const roleOf = () => role
 
@@ -74,8 +80,28 @@ async function callJson($: EngineInterface, server: string, tool: string, args: 
 }
 
 async function save($: EngineInterface, next: Report, now: number) {
-  current = stamped(next, now)
+  current = stamped({ ...next, agents: reportAgentsOf(await getAgents($)) }, now)
   await writeReport($, home, current)
+}
+
+export async function syncAgents($: EngineInterface) {
+  if (!current) return
+  const agents = reportAgentsOf(await getAgents($))
+  if (JSON.stringify(agents) === JSON.stringify(current.agents ?? [])) return
+  await save($, current, await $.clock.now())
+}
+
+async function agentAsked($: EngineInterface, id: string, text: string, tool: string) {
+  const now = await $.clock.now()
+  held.set(id, { text, tool, state: 'working' })
+  await saveAgents($, agents => asked(agents, id, { text, since: now }))
+  await syncAgents($)
+}
+
+async function agentCleared($: EngineInterface, id: string) {
+  held.delete(id)
+  await saveAgents($, agents => asked(agents, id, undefined))
+  await syncAgents($)
 }
 
 async function detect($: EngineInterface) {
@@ -144,26 +170,30 @@ async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?:
   )
 }
 
-async function promptOpened($: EngineInterface, text: string, tool: string) {
+async function promptOpened($: EngineInterface, text: string, tool: string, agentId?: string) {
   await detected($)
+  if (agentId !== undefined) return agentAsked($, agentId, text, tool)
   if (!current) return
   const now = await $.clock.now()
-  held = { text, tool, state: held?.state ?? current.state, needsYou: held ? held.needsYou : current.needsYou }
+  const main = held.get(MAIN)
+  held.set(MAIN, { text, tool, state: main?.state ?? current.state, needsYou: main ? main.needsYou : current.needsYou })
   if (current.state === 'needs-you' && current.needsYou === text) return
   await save($, { ...current, state: 'needs-you', needsYou: text, modelAt: now, waits: { since: now, on: 'you' } }, now)
 }
 
-async function promptClosed($: EngineInterface, tool?: string) {
-  if (!current || !held || (tool !== undefined && held.tool && held.tool !== tool)) return
-  const before = held
-  held = undefined
+async function promptClosed($: EngineInterface, tool?: string, agentId?: string) {
+  const before = held.get(agentId ?? MAIN)
+  if (!before || (tool !== undefined && before.tool && before.tool !== tool)) return
+  if (agentId !== undefined) return agentCleared($, agentId)
+  if (!current) return
+  held.delete(MAIN)
   if (current.state !== 'needs-you' || current.needsYou !== before.text) return
   const now = await $.clock.now()
   await save($, { ...current, state: before.state, needsYou: before.needsYou, modelAt: now, waits: undefined }, now)
 }
 
 async function turnStarted($: EngineInterface) {
-  held = undefined
+  held.delete(MAIN)
   if (!current) return
   const now = await $.clock.now()
   const wasAsking = current.state === 'needs-you'
@@ -230,12 +260,12 @@ export async function startRecorder($: EngineInterface) {
   current = undefined
   detecting = undefined
   gitCwd = ''
-  held = undefined
+  held = new Map()
   void detected($)
 }
 
 export async function recordTurnEnd($: EngineInterface, e: TurnCompleteInput) {
-  if (e.agentId !== undefined) return
+  if (e.agentId !== undefined) return agentCleared($, e.agentId).catch(() => undefined)
   await promptClosed($).catch(() => undefined)
   await turnEnded($, e).catch(() => undefined)
 }
@@ -244,9 +274,9 @@ export function recorder(on: On) {
   on('tool.call', async ($, e, next) => {
     if (String(e.tool) === REPORT_TOOL) return reported($, e)
     if (String(e.tool) === REPORTS_TOOL) return listed($)
-    if (String(e.tool) === QUESTION_TOOL) await promptOpened($, promptTextOf(QUESTION_TOOL, e), QUESTION_TOOL).catch(() => undefined)
+    if (String(e.tool) === QUESTION_TOOL) await promptOpened($, promptTextOf(QUESTION_TOOL, e), QUESTION_TOOL, e.agentId).catch(() => undefined)
     const out = await next(e)
-    await promptClosed($, String(e.tool)).catch(() => undefined)
+    await promptClosed($, String(e.tool), e.agentId).catch(() => undefined)
     if (current && out.deny === undefined) await recordTool($, e, out).catch(() => undefined)
     return out
   }).catch(($, e, next) => {
@@ -255,19 +285,20 @@ export function recorder(on: On) {
   })
 
   on('classic.PermissionRequest', async ($, e, next) => {
-    await promptOpened($, promptTextOf(e.tool_name, e.tool_input), e.tool_name).catch(() => undefined)
+    await promptOpened($, promptTextOf(e.tool_name, e.tool_input), e.tool_name, e.agent_id).catch(() => undefined)
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('classic.Notification', async ($, e, next) => {
-    if (ASKING.has(e.notification_type) && !held) await promptOpened($, e.message || e.title || 'Claude needs your input', '').catch(() => undefined)
-    if (ANSWERED.has(e.notification_type)) await promptClosed($).catch(() => undefined)
+    if (ASKING.has(e.notification_type) && !held.has(e.agent_id ?? MAIN)) await promptOpened($, e.message || e.title || 'Claude needs your input', '', e.agent_id).catch(() => undefined)
+    if (ANSWERED.has(e.notification_type)) await promptClosed($, undefined, e.agent_id).catch(() => undefined)
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('turn.start', async ($, e, next) => {
     const started = await next(e)
     if (e.agentId === undefined) await detected($).then(() => turnStarted($)).catch(() => undefined)
+    else await agentCleared($, e.agentId).catch(() => undefined)
     return started
   })
 

@@ -1,6 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { BoardSession, Live, LiveSession } from '../../types'
+
+import { boardFromJson } from '../lib/board'
 import {
   accept,
   answerOf,
@@ -208,4 +210,15 @@ test('the Ask toast names what it did: running workers asked, idle ones skipped'
   expect(askSummary([{ via: 'mod' }, { via: 'failed' }], 1)).toBe('Asked 1 running worker · 1 not reached · 1 idle skipped')
   expect(askSummary([], 3)).toBe('No running workers to ask · 3 idle, their last state is shown')
   expect(askSummary([], 0)).toBe('No running workers to ask')
+})
+
+test('persona: the report tool takes it, a report file keeps it with its agents, the board JSON keeps it, and merge fills it from either side', () => {
+  const intent = parseIntent({ persona: 'Implementer' })
+  expect(intent.intent?.persona).toBe('Implementer')
+  const agents = [{ id: 'a1', type: 'Explore', description: 'Find callers', state: 'running', startedAt: 1, asking: { text: 'Allow Bash: ls', since: 2 } }, { id: 'bad', state: 'running' }]
+  expect(parseReport({ ...report({ persona: 'Refactorer' }), agents })).toEqual(expect.objectContaining({ persona: 'Refactorer', agents: [agents[0]] }))
+  expect(boardFromJson({ sessions: [{ id: 'local_a', state: 'working', persona: 'Designer' }] })?.sessions[0]?.persona).toBe('Designer')
+  const live = liveOf(liveOne('local_a', true))
+  expect(merge(boardOf(80 * MIN, row()), [report({ persona: 'Implementer' })], live, NOW).sessions[0]?.persona).toBe('Implementer')
+  expect(merge(boardOf(95 * MIN, row({ persona: 'Reviewer' })), [report()], live, NOW).sessions[0]?.persona).toBe('Reviewer')
 })

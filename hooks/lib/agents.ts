@@ -1,8 +1,10 @@
-import type { AgentRecord, AgentState, WorkflowRecord } from '../../types'
+import type { AgentAsk, AgentRecord, AgentState, Report, ReportAgent, WorkflowRecord } from '../../types'
 
-export type StateCounts = Record<AgentState, number> & { total: number }
+const REPORTED_MAX = 20
 
-export type WorkflowAgent = { id: string; index: number; label: string; type: string; model?: string; state: AgentState; startedAt: number; endedAt?: number; result?: string; tokens?: number }
+export type StateCounts = Record<AgentState, number> & { total: number; asking: number }
+
+export type WorkflowAgent = { id: string; index: number; label: string; type: string; model?: string; state: AgentState; startedAt: number; endedAt?: number; result?: string; tokens?: number; asking?: AgentAsk }
 
 export type WorkflowRun = {
   id: string
@@ -20,9 +22,10 @@ export type WorkflowRun = {
 
 export const subagentsOf = (agents: readonly AgentRecord[]) => agents.filter(agent => !agent.run)
 
-export function stateCountsOf(agents: readonly { state: AgentState }[]): StateCounts {
+export function stateCountsOf(agents: readonly { state: AgentState; asking?: AgentAsk }[]): StateCounts {
   const count = (state: AgentState) => agents.filter(agent => agent.state === state).length
-  return { total: agents.length, running: count('running'), done: count('done'), failed: count('failed') }
+  const asking = agents.filter(agent => agent.state === 'running' && agent.asking).length
+  return { total: agents.length, running: count('running'), done: count('done'), failed: count('failed'), asking }
 }
 
 export function workflowRunsOf(agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]): WorkflowRun[] {
@@ -53,9 +56,38 @@ export function workflowRunsOf(agents: readonly AgentRecord[], workflows: readon
         endedAt: agent.endedAt,
         result: agent.result,
         tokens: agent.tokens,
+        asking: agent.asking,
       })),
       counts,
       tokens: members.reduce((sum, agent) => sum + (agent.tokens ?? 0), 0),
     }
   })
 }
+
+export const asked = (agents: AgentRecord[], id: string, asking: AgentAsk | undefined) =>
+  agents.map((one): AgentRecord => (one.id === id && !one.parentSessionId && (asking ? one.state === 'running' : !!one.asking) ? { ...one, asking } : one))
+
+export const reportAgentsOf = (agents: readonly AgentRecord[]): ReportAgent[] =>
+  agents
+    .filter(one => !one.parentSessionId)
+    .slice(-REPORTED_MAX)
+    .map(one => ({
+      id: one.id,
+      type: one.type,
+      description: one.description,
+      name: one.name,
+      state: one.state,
+      startedAt: one.startedAt,
+      endedAt: one.endedAt,
+      asking: one.asking,
+      parentAgentId: one.parentAgentId,
+      runId: one.run?.id,
+      runIndex: one.run?.index,
+    }))
+
+export const withReported = (agents: AgentRecord[], reports: readonly Report[]): AgentRecord[] => [
+  ...agents.filter(one => !one.parentSessionId),
+  ...reports.flatMap(report =>
+    (report.agents ?? []).map(({ runId, runIndex, ...one }): AgentRecord => ({ ...one, parentSessionId: report.session, run: runId ? { id: runId, index: runIndex ?? 0 } : undefined })),
+  ),
+]

@@ -28,6 +28,7 @@ export const BOARD_SCHEMA = {
           id: { type: 'string', description: 'local_… session id' },
           name: { type: 'string' },
           title: { type: 'string' },
+          persona: { type: 'string', description: 'the persona the worker runs as, e.g. Implementer' },
           state: { type: 'string', enum: ['needs-you', 'waiting', 'working', 'done'] },
           progress: { type: 'string', description: 'step N of M — step name' },
           now: { type: 'string' },

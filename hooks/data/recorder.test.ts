@@ -44,6 +44,7 @@ const settle = async () => {
 function world(parent = MASTER, files: Record<string, string> = {}) {
   const registered: { name: string; isDeferred?: unknown }[] = []
   const ran: string[][] = []
+  const atoms: Record<string, { value: unknown; version: number }> = {}
   const $ = {
     env: { get: async (name: string) => (name === 'HOME' ? HOME : undefined) },
     session: { id: async () => ENGINE, cwd: async () => HOME },
@@ -83,6 +84,15 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
         const text = files[path]
         if (text === undefined) throw new Error(`ENOENT ${path}`)
         return { kind: 'file', size: text.length, mtimeMs: 1, isLink: false }
+      },
+    },
+    state: {
+      get: async (ref: { key: string }) => atoms[ref.key] ?? { value: undefined, version: 0 },
+      set: async (ref: { key: string }, value: unknown, options: { ifVersion?: number } = {}) => {
+        const version = atoms[ref.key]?.version ?? 0
+        if (options.ifVersion !== undefined && options.ifVersion !== version) return { isSet: false, version }
+        atoms[ref.key] = { value, version: version + 1 }
+        return { isSet: true, version: version + 1 }
       },
     },
   }

@@ -1,4 +1,4 @@
-import type { Board, BoardSession, EndReason, Live, LiveSession, Report, SessionState, Step } from '../../types'
+import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, SessionState, Step } from '../../types'
 
 import { ORDER, stateOf } from '../lib/board'
 import { compactOf } from '../lib/format'
@@ -21,7 +21,7 @@ const FILES_CAP = 50
 
 export type { EndReason, Report, Step }
 
-export type Intent = Partial<Pick<Report, 'state' | 'progress' | 'now' | 'next' | 'needsYou' | 'risk'>> & { activity: string[]; files: string[] }
+export type Intent = Partial<Pick<Report, 'state' | 'persona' | 'progress' | 'now' | 'next' | 'needsYou' | 'risk'>> & { activity: string[]; files: string[] }
 
 export type Merged = BoardSession & { reportAt?: number; ageMinutes?: number; isVerified: boolean; isQuiet: boolean; note?: string }
 
@@ -35,6 +35,7 @@ const REPORT_SCHEMA = {
   type: 'object',
   properties: {
     state: { type: 'string', enum: ['working', 'waiting', 'needs-you', 'done'] },
+    persona: { type: 'string', description: 'the persona your brief names, e.g. Implementer' },
     progress: { type: 'string', description: 'step N of M — label' },
     now: { type: 'string' },
     next: { type: 'string' },
@@ -78,6 +79,11 @@ export function parseStep(text: string): Step | undefined {
   return of > 0 && step <= of ? { step, of, label: (match[3] ?? '').trim() } : undefined
 }
 
+const AGENT_STATES = new Set(['running', 'done', 'failed'])
+
+const isReportAgent = (item: Record<string, unknown>) =>
+  typeof item.id === 'string' && typeof item.type === 'string' && typeof item.description === 'string' && AGENT_STATES.has(String(item.state)) && Number.isFinite(item.startedAt)
+
 const isStep = (value: unknown): value is Step => {
   const step = value as Partial<Step> | undefined
   return !!step && Number.isInteger(step.step) && Number.isInteger(step.of) && (step.of ?? 0) > 0 && (step.step ?? 0) >= 0 && (step.step ?? 0) <= (step.of ?? 0)
@@ -95,6 +101,7 @@ export function parseIntent(raw: unknown): { intent: Intent; error?: undefined }
   return {
     intent: {
       state,
+      persona: textOf(data.persona),
       progress,
       now: textOf(data.now),
       next: textOf(data.next),
@@ -140,6 +147,7 @@ export function applyIntent(report: Report, intent: Intent, now: number): Report
     ...report,
     modelAt: now,
     state,
+    persona: intent.persona ?? report.persona,
     progress: intent.progress ?? report.progress,
     now: intent.now ?? report.now,
     next: intent.next ?? report.next,
@@ -171,6 +179,7 @@ export function parseReport(raw: unknown): Report | undefined {
     run: { ...run, isRunning: run.isRunning === true },
     modelAt: Number(data.modelAt) || 0,
     state,
+    persona: textOf(data.persona),
     progress: isStep(data.progress) ? data.progress : undefined,
     now: textOf(data.now),
     next: textOf(data.next),
@@ -182,6 +191,7 @@ export function parseReport(raw: unknown): Report | undefined {
     files: textsOf(data.files),
     waits: listOf<NonNullable<Report['waits']>>([data.waits], item => Number.isFinite(item.since))[0],
     git: listOf<NonNullable<Report['git']>>([data.git], item => typeof item.branch === 'string' && Number.isFinite(item.dirty))[0],
+    agents: listOf<ReportAgent>(data.agents, isReportAgent),
   }
 }
 
@@ -236,6 +246,7 @@ function mergeOne(id: string, row: BoardSession | undefined, boardAt: number, re
     id,
     name: row?.name ?? (live?.name || id),
     title: row?.title ?? live?.title,
+    persona: pick(report?.persona, row?.persona),
     state,
     progress: pick(report?.progress && progressText(report.progress), row?.progress),
     now: isIdle ? `idle · waiting for ${report?.waits?.on || 'the next message'}` : pick(report?.now, row?.now),

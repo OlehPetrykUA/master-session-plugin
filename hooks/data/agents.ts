@@ -5,6 +5,7 @@ import type { AgentRecord, AgentState, WorkflowRecord } from '../../types'
 import { workflowRunsOf } from '../lib/agents'
 import { AGENT_SHOWN_MS } from '../lib/constants'
 import { getAgents, getWorkflows, saveAgents, saveWorkflows } from '../state/atoms'
+import { syncAgents } from './recorder'
 
 const ENDED: Partial<Record<AgentStatus, AgentState>> = { completed: 'done', failed: 'failed', killed: 'failed' }
 
@@ -71,6 +72,7 @@ export function spawned(agents: AgentRecord[], e: AgentSpawnInput, out: AgentSpa
     isFork: e.fork,
     spawnedBy: known?.spawnedBy,
     run: e.workflow?.runId ? { id: e.workflow.runId, index: e.workflow.agentIndex } : undefined,
+    parentAgentId: e.parentAgentId,
     state: 'running',
     startedAt: known?.startedAt ?? now,
     tokens: known?.tokens,
@@ -85,6 +87,7 @@ export const ended = (agents: AgentRecord[], id: string, isAnswered: boolean, no
           ...one,
           state: isAnswered ? 'done' : 'failed',
           endedAt: now,
+          asking: undefined,
           result: outcome.result === undefined ? one.result : clipped(outcome.result),
           tokens: outcome.tokens === undefined ? one.tokens : (one.tokens ?? 0) + outcome.tokens,
         }
@@ -94,15 +97,17 @@ export const ended = (agents: AgentRecord[], id: string, isAnswered: boolean, no
 export function listed(agents: AgentRecord[], infos: readonly AgentInfo[], now: number) {
   const byId = new Map(infos.filter(info => !info.teammateId).map(info => [info.id, info]))
   const known = agents.map((one): AgentRecord => {
+    if (one.parentSessionId) return one
     const info = byId.get(one.id)
     const named = info?.spawnedBy && info.spawnedBy !== one.spawnedBy ? { ...one, spawnedBy: info.spawnedBy } : one
-    if (one.state !== 'running' || one.run) return named
+    const parented = info?.parentId && !named.parentAgentId ? { ...named, parentAgentId: info.parentId } : named
+    if (one.state !== 'running' || one.run) return parented
     const state = info ? ENDED[info.status] : 'done'
-    return state ? { ...named, state, endedAt: now } : named
+    return state ? { ...parented, state, endedAt: now, asking: undefined } : parented
   })
   const found = [...byId.values()]
     .filter(info => !ENDED[info.status] && !agents.some(one => one.id === info.id))
-    .map((info): AgentRecord => ({ id: info.id, name: info.name, type: info.type, description: info.description, spawnedBy: info.spawnedBy, state: 'running', startedAt: now }))
+    .map((info): AgentRecord => ({ id: info.id, name: info.name, type: info.type, description: info.description, spawnedBy: info.spawnedBy, parentAgentId: info.parentId, state: 'running', startedAt: now }))
   return [...known, ...found]
 }
 
@@ -133,6 +138,7 @@ export function keptWorkflows(workflows: WorkflowRecord[], agents: AgentRecord[]
 export async function recordSpawn($: EngineInterface, e: AgentSpawnInput, out: AgentSpawnResult) {
   const now = await $.clock.now()
   await saveAgents($, agents => spawned(agents, e, out, now))
+  await syncAgents($)
 }
 
 export async function recordAgentEnd($: EngineInterface, e: TurnCompleteInput) {
@@ -140,6 +146,7 @@ export async function recordAgentEnd($: EngineInterface, e: TurnCompleteInput) {
   if (id === undefined) return
   const now = await $.clock.now()
   await saveAgents($, agents => ended(agents, id, e.reason === 'answer', now, { result: e.answer, tokens: tokensOf(e.usage) }))
+  await syncAgents($)
 }
 
 export async function recordWorkflow($: EngineInterface, e: { tool_use_id: string; script?: string }, result: unknown) {
@@ -157,4 +164,5 @@ export async function refreshAgents($: EngineInterface) {
   await saveAgents($, agents => keptAgents(listed(agents, infos, now), workflows, now))
   const agents = await getAgents($)
   await saveWorkflows($, current => keptWorkflows(current, agents, now))
+  await syncAgents($)
 }
