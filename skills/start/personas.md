@@ -1,6 +1,6 @@
 # Personas
 
-A persona is a fixed role the validator hands out. Each one has its own skill, `master-session:<persona>` (mission, inputs, output, gate, must-not), and its own agent of the same name, which preloads that skill when it runs as a subagent. Long work with commits runs as a `start_session` worker: the brief's first line loads the `master-session:worker` and `master-session:<persona>` skills. Short read-only checks run as the persona's subagent, named by `Agent` `subagent_type` or Workflow `agent(…, {agentType})`. Pick models by alias only, the cheaper tier when torn. A `start_session` worker can't go above the validator's own model.
+A persona is a fixed role the validator hands out. Each one has its own skill, `master-session:<persona>` (mission, inputs, output, gate, must-not), and its own agent of the same name, which preloads that skill as a subagent; a session started with `claude --agent master-session:<persona>` gets it from the plugin's SessionStart hook. Long work with commits runs as a `start_session` worker: the brief's first line loads the `master-session:worker` and `master-session:<persona>` skills. Short read-only checks run as the persona's subagent, named by `Agent` `subagent_type` or Workflow `agent(…, {agentType})`. Pick models by alias only, the cheaper tier when torn. A `start_session` worker can't go above the validator's own model.
 
 | Persona | Runs as | Session agent | Subagent | Model / effort |
 |---|---|---|---|---|

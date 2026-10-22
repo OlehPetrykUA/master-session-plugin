@@ -27,7 +27,7 @@ import { addFault, clearFaults, clearPresses, hasFaults, nextRetryMs, runPress }
 import { recordTurnEnd, recorder, startRecorder } from './data/recorder'
 import { bandAction, bandProgress, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
-import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, LIVE_MS, OPENED, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
+import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
 import { messageOf } from './lib/format'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
@@ -55,10 +55,6 @@ export const register: Register = on => {
     const started = await next(e)
     startSources(String((await $.env.get('HOME')) ?? ''))
     await startRecorder($)
-    await $.command.register({
-      name: 'master-session-status',
-      description: 'Open the master session pane: worker sessions, their state, location and git',
-    })
     await $.tool.register({
       name: 'open',
       description: 'Opens the master session pane beside the chat. Use it when the user asks to see the sessions board or the status pane.',
@@ -93,7 +89,7 @@ export const register: Register = on => {
     return done
   })
 
-  on('command.run', { command: 'master-session-status' }, async ($, e) => {
+  on('command.run', { command: INFO }, async ($, e) => {
     if (e.args.trim() === 'ask') return { text: await askAll($) }
     await openPane($)
     return { text: OPENED }

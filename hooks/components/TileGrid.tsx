@@ -42,7 +42,7 @@ export function TileGrid(ui: Ui, props: TileGridProps) {
       ))}
       {props.shown.length ? null : (
         <Text key="empty" size="footnote" color={C.muted}>
-          {props.isEmpty ? 'No worker sessions yet. Start one with /master-session and a task.' : 'No sessions in this filter.'}
+          {props.isEmpty ? 'No worker sessions yet. Start one with /master-session:start and a task.' : 'No sessions in this filter.'}
         </Text>
       )}
     </Box>

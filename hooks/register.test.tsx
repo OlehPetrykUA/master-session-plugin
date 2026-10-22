@@ -2,17 +2,27 @@ import { expect, test } from 'claude-code/testing'
 
 import { BAND, HOME, PANE, altsOf, childOf, click, started, textsOf, typed, world } from './testing/world'
 
-test('/master-session status opens the pane; with a task it also runs the skill', async ($, on) => {
+test('/master-session:start status opens the pane; with a task it also runs the skill', async ($, on) => {
   const { opened, ran, clock } = world(on)
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
   await clock.settle()
-  expect((await $.command.run(typed('master-session', 'status'))).text).toBe('Master session pane opened.')
+  expect((await $.command.run(typed('master-session:start', 'status'))).text).toBe('Master session pane opened.')
   expect(ran).toEqual([])
-  expect((await $.command.run(typed('master-session', 'fix the hooks'))).text).toBe('skill ran')
-  expect(ran).toEqual(['master-session fix the hooks'])
-  expect((await $.command.run(typed('master-session:master-session', 'status'))).text).toBe('Master session pane opened.')
-  expect(ran).toEqual(['master-session fix the hooks'])
-  expect(opened).toEqual(['master-session', 'master-session', 'master-session'])
+  expect((await $.command.run(typed('master-session:start', 'fix the hooks'))).text).toBe('skill ran')
+  expect(ran).toEqual(['master-session:start fix the hooks'])
+  expect((await $.command.run(typed('start', 'status'))).text).toBe('skill ran')
+  expect(opened).toEqual(['master-session', 'master-session'])
+})
+
+test('/master-session:info opens the pane without running its skill, and ask asks the workers', async ($, on) => {
+  const { opened, ran, clock } = world(on)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  expect((await $.command.run(typed('master-session:info', ''))).text).toBe('Master session pane opened.')
+  expect(opened).toEqual(['master-session'])
+  expect((await $.command.run(typed('master-session:info', 'ask'))).text).toMatch(/^No running workers to ask|^Asked \d+ running worker/)
+  expect(opened).toEqual(['master-session'])
+  expect(ran).toEqual([])
 })
 
 test('the skill prompt says the pane is on and points at the board tool', async ($, on) => {
@@ -20,10 +30,10 @@ test('the skill prompt says the pane is on and points at the board tool', async 
   on('skill.prompt', (_, e) => ({ text: e.text }))
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
   await clock.settle()
-  const prompt = await $.skill.prompt({ skill: 'master-session', text: 'Validator mode.', frontmatter: {}, source: 'userSettings' })
-  expect(prompt.text).toContain('Status pane: on. Publish every board with the mcp__master-session__board tool')
-  const plugin = await $.skill.prompt({ skill: 'master-session:master-session', text: 'Validator mode.', frontmatter: {}, source: 'plugin' })
-  expect(plugin.text).toContain('Status pane: on.')
+  const plugin = await $.skill.prompt({ skill: 'master-session:start', text: 'Validator mode.', frontmatter: {}, source: 'plugin' })
+  expect(plugin.text).toContain('Status pane: on. Publish every board with the mcp__master-session__board tool')
+  const bare = await $.skill.prompt({ skill: 'start', text: 'Start.', frontmatter: {}, source: 'userSettings' })
+  expect(bare.text).toBe('Start.')
   const other = await $.skill.prompt({ skill: 'commit', text: 'Commit.', frontmatter: {}, source: 'userSettings' })
   expect(other.text).toBe('Commit.')
 })

@@ -134,7 +134,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
               {two.map(tile)}
             </Box>
           ))}
-          {view.shown.length ? null : <Text dimColor>{data.rows.length ? 'No sessions in this filter.' : 'No worker sessions yet. Start one with /master-session and a task.'}</Text>}
+          {view.shown.length ? null : <Text dimColor>{data.rows.length ? 'No sessions in this filter.' : 'No worker sessions yet. Start one with /master-session:start and a task.'}</Text>}
         </Box>
       )}
     </Box>

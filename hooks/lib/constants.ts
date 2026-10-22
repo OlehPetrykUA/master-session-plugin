@@ -1,6 +1,7 @@
 export const PANE = 'master-session'
 export const TITLE = 'Master session'
-export const SKILL = /^(master-session:)?master-session$/
+export const SKILL = 'master-session:start'
+export const INFO = 'master-session:info'
 export const BOARD_TOOL = 'mcp__master-session__board'
 export const FILE_MS = 3_000
 export const LIVE_MS = 15_000
