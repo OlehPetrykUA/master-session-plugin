@@ -62,13 +62,13 @@ export function FilterChips(ui: Ui, props: FilterChipsProps) {
               Icon(ui, { id: `chip-icon-${chip.id}`, name: chip.icon, size: 14, tone: isOn ? 'accentText' : 'text' })
             ) : null}
             {ui.Client || isOn ? (
-              <Text weight={isOn ? 'bold' : 'medium'} color={isOn ? C.accent : C.text}>
+              <Text weight={isOn ? 'semibold' : 'medium'} color={isOn ? C.accent : C.text}>
                 {chip.label}
               </Text>
             ) : (
               <Button key={`filter-${chip.id}`} plain label={chip.label} onPress={press} hover={{ backgroundColor: C.clear }} />
             )}
-            <Text weight={isOn ? 'bold' : undefined} color={isOn ? C.accent : C.muted} tabular>
+            <Text weight={isOn ? 'semibold' : undefined} color={isOn ? C.accent : C.muted} tabular>
               {String(chip.count)}
             </Text>
             {Hit(ui, { id: `chip-${chip.id}`, width, height: 32, onPress: press })}

@@ -84,5 +84,7 @@ export function lossLineOf(row: Row, trees: readonly Repo[], sessions: readonly 
 
 export function mergedLineOf(row: Row, trees: readonly Repo[]) {
   const found = row.live?.cwd ? locate(row.live.cwd, trees) : undefined
-  return found && !found.tree.isMain && found.tree.unmerged === 0 && !found.tree.dirty ? `merged to ${found.repo.base}` : ''
+  if (!found || found.tree.dirty || !found.repo.base) return ''
+  const isOnBase = found.tree.isMain ? !!row.board?.sha && found.tree.branch === found.repo.base : found.tree.unmerged === 0
+  return isOnBase ? `merged to ${found.repo.base}` : ''
 }

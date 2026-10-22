@@ -28,7 +28,7 @@ export function WorkflowDetail(ui: Ui, props: WorkflowDetailProps) {
   const at = context.at
   const end = run.endedAt ?? at
   const failed = run.agents.filter(agent => agent.state === 'failed')
-  const strip = phaseStrip(props.innerWidth, [{ done: counts.done, running: counts.running, failed: counts.failed, total: counts.total, isFinished: run.state !== 'running' }])
+  const strip = phaseStrip(props.innerWidth, [{ done: counts.done, running: counts.running, failed: counts.failed, asking: counts.asking, total: counts.total, isFinished: run.state !== 'running' }])
   const look = STATUS[item.status]
   const half = (key: string, icon: Parameters<typeof Block>[1]['icon'], label: string, children: Parameters<typeof Block>[1]['children']) => Block(ui, { id: `${key}-${id}`, icon, label, isHalf: true, children })
   return Card(ui, {

@@ -56,9 +56,10 @@ export function Row(ui: Ui, props: RowProps) {
       </Box>
     </Box>
   )
-  const tail = isNarrow && elapsed && !(isNeeds && props.chat) ? ` · ${elapsed}` : ''
+  const chevron = props.isInCard ? 'collapse' : 'expand'
+  const narrowElapsed = isNarrow && elapsed && !(isNeeds && props.chat)
   const second = (
-    <Box key={`${id}-line`} flexDirection="row" alignItems={isNeeds ? 'flex-start' : 'center'} gap={across(4)} minWidth={0}>
+    <Box key={`${id}-line`} flexDirection="row" alignItems={isNeeds ? 'flex-start' : 'center'} gap={across(4)} minWidth={0} overflow="hidden">
       {glyph(`${id}-kind`, KIND_ICON[item.kind], 'muted', KIND_WORD[item.kind])}
       {line.chain ? muted(line.chain, `${id}-chain`) : null}
       {isNeeds && !line.chain ? question : null}
@@ -71,10 +72,18 @@ export function Row(ui: Ui, props: RowProps) {
         </Box>
       ) : null}
       {line.word && line.text ? muted('·', `${id}-dot`) : null}
-      {!isNeeds && (line.text || tail) ? (
+      {!isNeeds && line.text ? (
         <Box key={`${id}-text`} flexShrink={1} minWidth={0}>
           <Text size="footnote" color={C.muted} wrap="truncate-end">
-            {`${line.text}${tail}`}
+            {line.text}
+          </Text>
+        </Box>
+      ) : null}
+      {narrowElapsed && !isNeeds && (line.text || line.word) ? muted('·', `${id}-elapsed-dot`) : null}
+      {narrowElapsed && !isNeeds ? (
+        <Box key={`${id}-elapsed-narrow`} flexShrink={0}>
+          <Text size="footnote" color={C.muted} tabular>
+            {elapsed}
           </Text>
         </Box>
       ) : null}
@@ -115,7 +124,7 @@ export function Row(ui: Ui, props: RowProps) {
       backgroundColor={props.isInCard ? undefined : C.surface}
       hover={props.isInCard ? undefined : { backgroundColor: C.tileHover, borderColor: isNeeds ? C.red : C.accentRing }}
     >
-      <Svg key={`${id}-badge`} source={statusBadge(item.status, 28)} alt={status.word} width={28} height={28} />
+      <Svg key={`${id}-badge`} source={statusBadge(item.status, 28)} alt={line.word?.text ?? status.word} width={28} height={28} />
       <Box flexDirection="column" gap={down(2)} flexGrow={1} flexShrink={1} minWidth={0}>
         <Box flexDirection="row" alignItems="center" gap={across(4)} minWidth={0}>
           <Box flexShrink={0}>
@@ -146,9 +155,12 @@ export function Row(ui: Ui, props: RowProps) {
         {isNeeds && line.chain ? question : null}
       </Box>
       {meta}
-      {steps && !(isNeeds && props.chat) && !isNarrow ? <Svg key={`${id}-ring`} source={toneRing(steps.done, steps.total, status.tone)} alt={`${steps.done} of ${steps.total}`} width={34} height={34} /> : null}
+      {steps && !(isNeeds && props.chat) ? <Svg key={`${id}-ring`} source={toneRing(steps.done, steps.total, status.tone)} alt={`${steps.done} of ${steps.total}`} width={34} height={34} /> : null}
       {ui.Client ? Hit(ui, { id, width: props.width, height: ROW_HEIGHT, onPress: props.onOpen }) : null}
       {isNeeds && props.chat ? ActionButton(ui, { id: `chat-${item.id}`, kind: 'primary', icon: 'chat', label: props.chat.label, onPress: props.chat.onPress, size: 'b32', iconSize: 16, isIconOnly: isNarrow }) : null}
+      <Box key={`${id}-chevron`} flexDirection="row" alignItems="center" justifyContent="center" width={across(14)} flexShrink={0}>
+        {Icon(ui, { id: `${id}-chevron-icon`, name: chevron, size: 14, tone: 'muted', weight: 2, alt: chevron })}
+      </Box>
     </Box>
   )
 }

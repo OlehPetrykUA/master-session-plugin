@@ -4,7 +4,6 @@ import { compactOf, modelOf } from '../../lib/format'
 import { clockOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, modelFamilyOf, nameText, parentsOf, plural, runAgentsOf, shortNameOf } from '../../lib/list'
 import type { Context, ListItem, RowItem } from '../../lib/list'
 import { headOf, syncOf, whereOf } from '../../lib/rows'
-import { STATUS } from '../../theme/icons'
 import { CARD_BORDER, TERMINAL_COLOR } from '../../theme/tokens'
 import type { Actions, TextUi } from '../types'
 import { LOST } from './ArchiveBox'
@@ -85,7 +84,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
         </Box>
       ) : (
         <Box key={`actions-${row.id}`} flexDirection="row" gap="sm">
-                    <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} />
+          <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} />
           {isStoppable ? <Button key={`stop-${row.id}`} label="Stop" onPress={() => actions.stop(row.id, row.name)} /> : null}
           {canArchive ? <Button key={`archive-${row.id}`} label={losses.length ? 'Archive…' : 'Archive'} onPress={() => (losses.length ? actions.confirm(`archive:${row.id}`) : actions.archive([row], undefined, losses))} /> : null}
         </Box>

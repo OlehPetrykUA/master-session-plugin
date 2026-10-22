@@ -1,4 +1,3 @@
-import type { SessionState } from '../../types'
 
 import { escape, textWidth } from '../lib/layout'
 import { C } from './tokens'
@@ -50,7 +49,6 @@ export const I = {
   unmerged: 'M6 4a2 2 0 1 0 0 4a2 2 0 0 0 0-4Z M6 8v12 M18 16a2 2 0 1 0 0 4a2 2 0 0 0 0-4Z M18 16V9a3 3 0 0 0-3-3h-4 M13 4l-2 2 2 2',
   elapsed: 'M12 8a7 7 0 1 0 0 14a7 7 0 0 0 0-14Z M12 11.5V15 M10 2h4 M12 2v3 M18.5 6.5l1.5-1.5',
   usage: 'M5 20v-8 M10 20V6 M15 20v-9 M20 20v-4',
-  offline: 'M3 3l18 18 M8.6 8.6A8 8 0 0 0 5 11 M12.5 5a12 12 0 0 1 7.5 3 M8.5 14.5a5 5 0 0 1 6.2-.5 M12 18.5h.01',
   info: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M12 11v5 M12 7.6v.1',
   stop: 'M7 7h10v10H7Z',
   undo: 'M9 14L4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-3',
@@ -59,14 +57,6 @@ export const I = {
   haiku: 'M5 7h9 M5 12h14 M5 17h9',
   fable: 'M3 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0Z M12 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0Z',
   modelChip: 'M7 7h10v10H7Z M10 3v4 M14 3v4 M10 17v4 M14 17v4 M3 10h4 M3 14h4 M17 10h4 M17 14h4',
-  implementer: 'M14.5 4.5a4.5 4.5 0 0 0-4.2 6.1L4 16.9V20h3.1l6.3-6.3a4.5 4.5 0 0 0 6.1-4.2l-2.8 2.8-2.6-.5-.5-2.6Z',
-  refactorer: 'M4 8h13 M14 5l3 3-3 3 M20 16H7 M10 13l-3 3 3 3',
-  reviewer: 'M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Z M20 20l-4.8-4.8 M7.8 10.6l1.9 1.9 3.6-3.6',
-  verifier: 'M9 3h6v4H9Z M9 5H6v16h12V5h-3 M9 13.5l2 2 4-4',
-  designChecker: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z M12 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6Z',
-  researcher: 'M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5Z M5 19.5A1.5 1.5 0 0 0 6.5 21H19 M9 7h6',
-  designer: 'M15 4l5 5L9 20H4v-5Z M13 6l5 5',
-  validator: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5Z',
   session: 'M3 5h18v14H3Z M7 10l3 2-3 2 M12 14h5',
   agent: 'M6 8h12v11H6Z M12 4v4 M9.5 12.5v1 M14.5 12.5v1 M9.5 16h5',
   flow: 'M4 4h6v6H4Z M14 14h6v6h-6Z M7 10v4a3 3 0 0 0 3 3h4',
@@ -84,13 +74,6 @@ const stroke = (path: string, tone: Tone, weight: number) =>
 
 export const glyph = (name: IconName, size: number, tone: Tone, weight = 1.75) => svg(size, size, stroke(I[name], tone, weight), '0 0 24 24')
 
-export const STATE: Record<SessionState, { icon: IconName; tone: Tone; tint: string; word: string }> = {
-  'needs-you': { icon: 'needs', tone: 'red', tint: 'redTint', word: 'needs you' },
-  waiting: { icon: 'clock', tone: 'amber', tint: 'amberTint', word: 'waiting' },
-  working: { icon: 'working', tone: 'green', tint: 'greenTint', word: 'working' },
-  done: { icon: 'done', tone: 'grey', tint: 'greyTint', word: 'done' },
-}
-
 export type Status = 'needs' | 'working' | 'waiting' | 'idle' | 'ready' | 'verified' | 'merged' | 'done' | 'failed' | 'archived' | 'queued' | 'unmerged'
 
 export const STATUS: Record<Status, { icon: IconName; tone: Tone; tint: string; color: string; box: string; word: string }> = {
@@ -100,7 +83,7 @@ export const STATUS: Record<Status, { icon: IconName; tone: Tone; tint: string; 
   idle: { icon: 'idle', tone: 'grey', tint: 'greyTint', color: C.grey, box: C.greyTint, word: 'idle' },
   ready: { icon: 'ready', tone: 'amber', tint: 'amberTint', color: C.amber, box: C.amberTint, word: 'ready for verify' },
   verified: { icon: 'verified', tone: 'green', tint: 'greenTint', color: C.green, box: C.greenTint, word: 'verified' },
-  merged: { icon: 'merged', tone: 'green', tint: 'greenTint', color: C.green, box: C.greenTint, word: 'merged to main' },
+  merged: { icon: 'merged', tone: 'green', tint: 'greenTint', color: C.green, box: C.greenTint, word: 'merged' },
   done: { icon: 'done', tone: 'grey', tint: 'greyTint', color: C.grey, box: C.greyTint, word: 'done' },
   failed: { icon: 'failed', tone: 'red', tint: 'redTint', color: C.red, box: C.redTint, word: 'failed' },
   archived: { icon: 'archive', tone: 'grey', tint: 'greyTint', color: C.grey, box: C.greyTint, word: 'archived' },
@@ -110,24 +93,12 @@ export const STATUS: Record<Status, { icon: IconName; tone: Tone; tint: string; 
 
 export const statusBadge = (status: Status, size: 28 | 32) => square(STATUS[status].icon, STATUS[status].tone, STATUS[status].tint, size, size === 28 ? 8 : 10, size === 28 ? 16 : 18, 1.75)
 
-export function badge(state: SessionState, size = 32, radius = 10, iconSize = 18) {
-  const one = STATE[state]
-  const at = (size - iconSize) / 2
-  return svg(
-    size,
-    size,
-    `<rect width="${size}" height="${size}" rx="${radius}" style="fill:var(--${one.tint})"/><g${state === 'needs-you' ? ' class="p"' : ''} transform="translate(${at} ${at}) scale(${iconSize / 24})">${stroke(I[one.icon], one.tone, 1.75)}</g>`,
-  )
-}
-
 export function square(name: IconName, tone: Tone, tint: string, size: number, radius: number, iconSize: number, weight = 2.2) {
   const at = (size - iconSize) / 2
   return svg(size, size, `<rect width="${size}" height="${size}" rx="${radius}" style="fill:var(--${tint})"/><g transform="translate(${at} ${at}) scale(${iconSize / 24})">${stroke(I[name], tone, weight)}</g>`)
 }
 
 const RING = 2 * Math.PI * 14
-
-export const ring = (done: number, total: number, state: SessionState) => toneRing(done, total, STATE[state].tone)
 
 export function toneRing(done: number, total: number, tone: Tone) {
   const share = total ? Math.min(done / total, 1) : 0

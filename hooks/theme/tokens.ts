@@ -35,11 +35,7 @@ export type Tone = 'text' | 'muted' | 'faint' | 'red' | 'amber' | 'green' | 'gre
 
 export const CARD_BORDER = '#8080803d'
 
-export const LABEL: Record<SessionState, string> = { 'needs-you': 'needs you', waiting: 'waiting', working: 'working', done: 'done' }
-
 export const TERMINAL_COLOR: Record<SessionState, string> = { 'needs-you': 'error', waiting: 'warning', working: 'success', done: 'subtle' }
-
-export const STATE_COLOR: Record<SessionState, string> = { 'needs-you': C.red, waiting: C.amber, working: C.green, done: C.muted }
 
 export type Kind = 'secondary' | 'ghost' | 'soft' | 'tint' | 'primary' | 'link'
 

@@ -3,6 +3,7 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord } from '../../../types'
 
+import { across } from '../../lib/layout'
 import { phaseStrip } from '../../theme/detail'
 import { C } from '../../theme/tokens'
 import { BOARD, PANE, altsOf, click, hitsOf, started, textsOf } from '../../testing/world'
@@ -89,7 +90,7 @@ test('an archived card shows Last, Time, Worktree, Git and Model, then Open and 
   expect(texts).not.toContain('removed at archive; made again on its next turn')
   expect(texts.some(text => /^archived \d\d:\d\d$/.test(text))).toBe(true)
   expect(texts.some(text => /^last turn /.test(text))).toBe(true)
-  expect(await altsOf(ui)).toContain('archived')
+  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['archived 10m ago', 'collapse']))
   await click(ui, 'hit-unarchive-local_old')
   expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Unarchive Remove the stale mod?', 'It comes back in its group with its chat. Its worktree is made again on its next turn.', 'Cancel']))
   expect(await hitsOf(ui)).not.toContain('hit-unarchive-local_old')
@@ -98,10 +99,55 @@ test('an archived card shows Last, Time, Worktree, Git and Model, then Open and 
   await ui.unmount()
 })
 
-test('a finished run’s strip greys its done share and keeps failures red; a running run fills green', () => {
-  const finished = phaseStrip(300, [{ done: 5, running: 0, failed: 1, total: 6, isFinished: true }])
+test('a finished run’s strip greys its done share and keeps failures red; a run waiting on an answer greys done and reds the asking share; a running run fills green', () => {
+  const finished = phaseStrip(300, [{ done: 5, running: 0, failed: 1, asking: 0, total: 6, isFinished: true }])
   expect(finished).toContain('fill:var(--grey)')
   expect(finished).toContain('fill:var(--red)')
   expect(finished).not.toContain('fill:var(--green)')
-  expect(phaseStrip(300, [{ done: 1, running: 1, failed: 0, total: 3, isFinished: false }])).toContain('fill:var(--green)')
+  expect(phaseStrip(300, [{ done: 1, running: 1, failed: 0, asking: 0, total: 3, isFinished: false }])).toContain('fill:var(--green)')
+  const asking = phaseStrip(300, [{ done: 1, running: 2, failed: 0, asking: 1, total: 3, isFinished: false }])
+  expect(asking).toContain('fill:var(--grey)')
+  expect(asking).toContain('fill:var(--red)')
+  expect(asking).not.toContain('fill:var(--green)')
+})
+
+test('every row ends in a chevron: expand while closed, collapse on the card top; the summary needs block reds only its border, tint and glyph; the active chip is semibold', async ($, on) => {
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const inside = async (key: string) => JSON.stringify((await ui.find({ key }))?.children ?? null)
+  expect((await ui.find({ key: 'row-local_setup-chevron' }))?.props).toEqual(expect.objectContaining({ width: across(14), flexShrink: 0 }))
+  expect(await inside('row-local_setup-chevron')).toContain('"alt":"expand"')
+  expect(await inside('row-local_setup-chevron')).toContain('M6 9l6 6 6-6')
+  expect(await inside('row-local_env-chevron')).toContain('"alt":"expand"')
+  const needs = await ui.find({ key: 'block-needs-you' })
+  expect(needs?.props).toEqual(expect.objectContaining({ borderColor: C.red, backgroundColor: C.redTint }))
+  expect(await inside('block-needs-you')).toContain('"alt":"needs"')
+  for (const text of ['Needs you', '1 blocker']) expect((await ui.findAll({ type: 'Text', text })).every(one => one.props.color !== C.red)).toBe(true)
+  expect(String((await ui.findAll({ type: 'Svg' })).find(one => one.props.alt === 'Needs you 1')?.props.source)).not.toContain('var(--red)')
+  await click(ui, 'hit-row-local_setup')
+  expect(await inside('top-local_setup-chevron')).toContain('"alt":"collapse"')
+  expect(await inside('top-local_setup-chevron')).toContain('M6 15l6-6 6 6')
+  await ui.unmount()
+  const plain = await $.ui.mount({ ...PANE, surface: 'vscode' })
+  const all = await plain.findAll({ type: 'Text', text: 'All' })
+  expect(all.length).toBeGreaterThan(0)
+  expect(all.every(one => one.props.weight === 'semibold')).toBe(true)
+  await plain.unmount()
+})
+
+test('an open archived card or workflow agent card counts as expanded, so the pane can scroll to its end', async ($, on) => {
+  seeded(on, [{ id: 'w1', type: 'workflow-subagent', description: 'review:bugs', state: 'running', startedAt: NOW - 30_000, run: { id: 'wf_1', index: 1 } }])
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const drawn = async () => String(((await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'section-expanded' })) as { deny?: string }).deny ?? '')
+  expect(await drawn()).toContain('section-expanded is not drawn')
+  await click(ui, 'hit-row-wf_1')
+  await click(ui, 'hit-row-w1')
+  expect(await ui.find({ key: 'detail-w1' })).toBeDefined()
+  expect(await drawn()).not.toContain('is not drawn')
+  await click(ui, 'hit-chip-archived')
+  await click(ui, 'hit-row-local_old')
+  expect(await ui.find({ key: 'detail-local_old' })).toBeDefined()
+  expect(await drawn()).not.toContain('is not drawn')
+  await ui.unmount()
 })

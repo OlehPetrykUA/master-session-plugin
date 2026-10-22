@@ -1,6 +1,7 @@
 import type { Block } from '../../lib/list'
 import { across, down } from '../../lib/layout'
 import { dot, numeral } from '../../theme/icons'
+import { Icon } from '../Icon'
 import { C } from '../../theme/tokens'
 import type { Ui } from '../types'
 
@@ -9,8 +10,7 @@ export type SummaryProps = { blocks: readonly Block[]; perRow: number }
 export function Summary(ui: Ui, props: SummaryProps) {
   const { Box, Text, Svg } = ui
   const block = (one: Block) => {
-    const muted = one.isAlert ? C.red : C.muted
-    const value = numeral(one.value, one.isAlert ? 'red' : 'text')
+    const value = numeral(one.value, 'text')
     return (
       <Box
         key={`block-${one.key}`}
@@ -25,23 +25,28 @@ export function Summary(ui: Ui, props: SummaryProps) {
         borderColor={one.isAlert ? C.red : C.border}
         backgroundColor={one.isAlert ? C.redTint : C.surface}
       >
-        <Text size="caption" weight="semibold" color={muted} wrap="truncate-end">
-          {one.label}
-        </Text>
+        <Box flexDirection="row" alignItems="center" gap={across(4)} minWidth={0}>
+          {one.isAlert ? Icon(ui, { id: `block-icon-${one.key}`, name: 'needs', size: 12, tone: 'red', weight: 2.2 }) : null}
+          <Box flexShrink={1} minWidth={0}>
+            <Text size="caption" weight="semibold" color={C.muted} wrap="truncate-end">
+              {one.label}
+            </Text>
+          </Box>
+        </Box>
         <Svg key={`block-value-${one.key}`} source={value.source} alt={`${one.label} ${one.value}`} width={value.width} height={24} />
         {one.dots ? (
           <Box flexDirection="row" alignItems="center" gap={across(4)}>
             {one.dots.map(mark => (
               <Box key={`block-${one.key}-${mark.tone}`} flexDirection="row" alignItems="center" gap={across(2)}>
                 <Svg key={`block-dot-${one.key}-${mark.tone}`} source={dot(mark.tone, 6)} alt={mark.tone} width={6} height={6} />
-                <Text size="caption" weight="semibold" color={muted} tabular>
+                <Text size="caption" weight="semibold" color={C.muted} tabular>
                   {String(mark.count)}
                 </Text>
               </Box>
             ))}
           </Box>
         ) : (
-          <Text size="caption" color={muted} wrap="truncate-end">
+          <Text size="caption" color={C.muted} wrap="truncate-end">
             {one.sub}
           </Text>
         )}

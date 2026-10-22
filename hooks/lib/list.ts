@@ -2,7 +2,7 @@ import type { AgentRecord, ArchiveView, Board, BoardSession, Filter, LiveSession
 
 import { lossLineOf, mergedLineOf } from '../components/detail/losses'
 import { STATUS } from '../theme/icons'
-import type { IconName, Status } from '../theme/icons'
+import type { Status } from '../theme/icons'
 import { workflowRunsOf } from './agents'
 import type { WorkflowAgent, WorkflowRun } from './agents'
 import { stepOf } from './board'
@@ -65,24 +65,13 @@ const PERSONA: Record<string, string> = {
   validator: 'Validator',
 }
 
-export const PERSONA_GLYPH: Record<string, IconName> = {
-  Implementer: 'implementer',
-  Refactorer: 'refactorer',
-  Reviewer: 'reviewer',
-  'QA verifier': 'verifier',
-  'Design checker': 'designChecker',
-  Researcher: 'researcher',
-  Designer: 'designer',
-  Validator: 'validator',
-}
+export const MASTER = 'Validator'
 
 const GENERIC = ['general-purpose', 'workflow-subagent']
 
-export const MASTER = 'Validator'
-
 export const kindOfType = (type: string) => type.split(':').at(-1) ?? type
 
-export const personaOfType = (type: string) => PERSONA[kindOfType(type)] ?? (kindOfType(type) || 'Subagent')
+export const personaOfType = (type: string) => (GENERIC.includes(kindOfType(type)) ? 'Agent' : (PERSONA[kindOfType(type)] ?? (kindOfType(type) || 'Subagent')))
 
 export const modelFamilyOf = (model: string | undefined) => (model ? (model.replace(/^claude-/, '').split('-')[0] ?? model) : '')
 
@@ -99,7 +88,7 @@ export function displayNameOf(item: RowItem | { kind: 'master' }): Name {
   if (item.kind === 'session') return sessionNameOf(titleOf(item.row), item.row.board?.persona)
   if (item.kind === 'archived') return sessionNameOf(item.board?.title || item.one.title || item.one.name, item.board?.persona)
   if (item.kind === 'workflow') return { persona: 'Workflow', task: item.run.name }
-  if (item.kind === 'agent') return { persona: GENERIC.includes(item.agent.type) ? 'Agent' : personaOfType(item.agent.type), task: item.agent.label }
+  if (item.kind === 'agent') return { persona: personaOfType(item.agent.type), task: item.agent.label }
   return { persona: personaOfType(item.agent.type), task: item.agent.description }
 }
 

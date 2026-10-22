@@ -7,7 +7,7 @@ const SWEEP = '2.4s'
 const frame = (width: number, height: number, body: string, box = `0 0 ${width} ${height}`) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${box}" preserveAspectRatio="none"><style>svg{${LIGHT}}@media (prefers-color-scheme: dark){svg{${DARK}}}.s{display:none}@media (prefers-reduced-motion: reduce){.m{display:none}.s{display:inline}}</style>${body}</svg>`
 
-export type PhaseShare = { done: number; running: number; failed: number; total: number; isFinished: boolean }
+export type PhaseShare = { done: number; running: number; failed: number; asking: number; total: number; isFinished: boolean }
 
 const pill = (start: number, width: number) => {
   const length = Math.max(width, 8)
@@ -29,12 +29,13 @@ export function phaseStrip(width: number, phases: readonly PhaseShare[]) {
       return
     }
     const share = (count: number) => (phase.total ? (slot * count) / phase.total : 0)
-    const good = share(phase.done + phase.running / 2)
-    const bad = share(phase.failed)
-    if (good >= 1 && phase.isFinished) grey += pill(start, good)
+    const isHeld = phase.isFinished || phase.asking > 0
+    const good = share(phase.done + (phase.asking ? 0 : phase.running / 2))
+    const bad = share(phase.failed + phase.asking)
+    if (good >= 1 && isHeld) grey += pill(start, good)
     else if (good >= 1) green += pill(start, good)
     if (bad >= 1) red += pill(start + good + (good >= 1 ? 2 : 0), bad - (good >= 1 ? 2 : 0))
-    if (!phase.running || good < 8) return
+    if (!phase.running || isHeld || good < 8) return
     const glow = Math.max(8, good * 0.3)
     shine +=
       `<clipPath id="w${index}"><path d="${pill(start, good)}"/></clipPath><g clip-path="url(#w${index})" style="fill:#FFFFFF;opacity:.45">` +

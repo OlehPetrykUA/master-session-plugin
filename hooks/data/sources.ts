@@ -315,7 +315,7 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
     return
   }
   const clean = all ? allowed.filter(row => !lossesOf(row, trees, sessions).length) : allowed.slice(0, 1)
-  const items = itemsOf(fresh, await getAgents($), await getWorkflows($))
+  const items = itemsOf(fresh, await getAgents($), await getWorkflows($), { trees, sessions })
   const archived: Row[] = []
   for (const row of clean) {
     try {
@@ -327,7 +327,7 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
     }
   }
   await setExpanded($, open => open.filter(id => !archived.some(row => row.id === id)))
-  const group = all?.group ?? archived[0]?.state
+  const group = all?.group ?? items.find(item => item.id === archived[0]?.id)?.group
   const skipped = all ? all.skipped + allowed.length - clean.length : 0
   if (!group || (!archived.length && !skipped)) return
   const at = await $.clock.now()

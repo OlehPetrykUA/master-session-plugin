@@ -79,7 +79,14 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
       .map(group => ({ rows: group.id === 'archived' ? (group.isOpen ? (data.chosen === 'archived' || data.archiveView === 'all' ? group.archived.length : Math.min(ARCHIVED_PEEK, group.archived.length)) : 0) : group.items.length, isArchived: group.id === 'archived' })),
     hasMore: view.hasMore,
     isEmpty: view.isEmpty,
-    hasExpanded: view.groups.some(group => group.items.some(item => data.open.includes(item.id))) || !!data.asking || !!data.undone,
+    hasExpanded:
+      view.groups.some(
+        group =>
+          group.items.some(item => data.open.includes(item.id) || (item.kind === 'workflow' && item.run.agents.some(agent => data.open.includes(agent.id)))) ||
+          group.archived.some(one => data.open.includes(one.id)),
+      ) ||
+      !!data.asking ||
+      !!data.undone,
   }
 }
 

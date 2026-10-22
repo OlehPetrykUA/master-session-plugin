@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-import { COLUMN, LH, across, down, tall } from '../lib/layout'
+import { COLUMN, LH, across, tall } from '../lib/layout'
 import { C, KINDS } from '../theme/tokens'
 import { BOARD, HOME, MASTER_TITLE, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, childOf, click, dump, hitsOf, started, textsOf, world } from '../testing/world'
 
@@ -141,7 +141,7 @@ test('Archived is the last group, closed with Show; open it lists two rows, Hide
   const rows = async () => (await ui.findAll({ type: 'Box' })).flatMap(box => (/^(row|detail)-local_(old|[abcd])$/.test(box.key ?? '') ? [box.key] : []))
   expect((await rows()).length).toBe(2)
   expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Hide', 'archived 1h ago', 'worktree removed', 'Session', 'Old a']))
-  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Show 3 more', 'archived']))
+  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Show 3 more', 'archived 1h ago', 'expand']))
   expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-archived-hide', 'hit-archived-more', 'hit-row-local_old', 'hit-row-local_a']))
   await click(ui, 'hit-archived-more')
   expect((await rows()).length).toBe(5)
@@ -193,7 +193,9 @@ test('the header: 56 tall, title and live dot over the status line, Ask and Refr
     expect((await ui.findAll({ type: 'Box' })).filter(box => box.props.position === 'absolute' && box.props.display === 'none' && box.text !== '')).toEqual([])
     if (isNarrow) {
       expect(await ui.find({ key: 'row-local_setup-meta' })).toBeUndefined()
-      expect(await textsOf(ui)).toContain('waiting for the go · 50m')
+      expect(await textsOf(ui)).toEqual(expect.arrayContaining(['waiting for the go', '50m']))
+      expect((await ui.find({ key: 'row-local_setup-elapsed-narrow' }))?.props.flexShrink).toBe(0)
+      expect(await altsOf(ui)).toContain('2 of 5')
       expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).toBe(across(32))
       expect((await ui.find({ key: 'blocks-0' }))?.children.length).toBe(3)
     }

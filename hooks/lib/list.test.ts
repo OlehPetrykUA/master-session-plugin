@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import type { AgentRecord, Board, LiveSession, Repo, WorkflowRecord } from '../../types'
 
 import { liveOf } from '../testing/world'
-import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, countsOfItems, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, lineOf, lineTextOf, modelFamilyOf, nameText, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived } from './list'
+import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, countsOfItems, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, lineOf, lineTextOf, modelFamilyOf, nameText, personaOfType, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived } from './list'
 import type { Context, RowItem } from './list'
 import type { Row } from './rows'
 import { countsOf, rowsOf } from './rows'
@@ -104,6 +104,7 @@ test('every kind names itself persona · task and says its state word and curren
   const done = itemsOf([], agents.map(agent => ({ ...agent, state: 'done' as const, endedAt: agent.endedAt ?? NOW })), workflows).find(item => item.kind === 'workflow')
   expect(said(done!)).toEqual(['done', 'Workflow · review-changes', 'done · 3 of 3 agents'])
   expect([kindOfType('a:b:c'), kindOfType('Explore'), modelFamilyOf('claude-opus-5-5'), modelFamilyOf('haiku'), modelFamilyOf(undefined)]).toEqual(['c', 'Explore', 'opus', 'haiku', ''])
+  expect([personaOfType('general-purpose'), personaOfType('workflow-subagent'), personaOfType('master-session:qa-verifier'), personaOfType('Explore'), personaOfType('')]).toEqual(['Agent', 'Agent', 'QA verifier', 'Explore', 'Subagent'])
 })
 
 test('a session reads idle, ready, verified or merged from its live state, board and worktree; a persona on the board or the title names it', () => {
@@ -121,6 +122,13 @@ test('a session reads idle, ready, verified or merged from its live state, board
     sessionStatusOf(row('done', { sha: 'abc' }), tree(0, 1)),
     sessionStatusOf(row('done')),
   ]).toEqual(['idle', 'idle', 'waiting', 'ready', 'verified', 'merged', 'ready', 'ready', 'done'])
+  const main = (branch: string, dirty = 0): Repo[] => [{ path: '/r/wt', name: 'r', localOnly: 0, base: 'main', worktrees: [{ path: '/r/wt', branch, sha: 'abc', isMain: true, dirty, paths: [], upstream: '', ahead: 0, behind: 0, unmerged: 0 }] }]
+  expect([
+    sessionStatusOf(row('done', { sha: 'abc' }), main('main')),
+    sessionStatusOf(row('done'), main('main')),
+    sessionStatusOf(row('done', { sha: 'abc' }), main('feature')),
+    sessionStatusOf(row('done', { sha: 'abc' }), main('main', 1)),
+  ]).toEqual(['merged', 'done', 'ready', 'ready'])
   const item = (one: Row, trees: Repo[] = []): RowItem => ({ kind: 'session', id: 's', group: one.state, status: sessionStatusOf(one, trees), row: one })
   expect(said(item(row('done', { sha: 'abc' }), tree(0)), { ...context, trees: tree(0) })).toEqual(['merged', 'Implementer · Savvy removal', 'merged to main · abc'])
   expect(displayNameOf(item({ ...row('working', { persona: 'Designer' } as object), live: { ...live, title: 'canvas v3' } }))).toEqual({ persona: 'Designer', task: 'canvas v3' })
