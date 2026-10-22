@@ -93,7 +93,7 @@ export const register: Register = on => {
     if (e.args.trim() === 'ask') return { text: await askAll($) }
     await openPane($)
     return { text: OPENED }
-  })
+  }).catch(($, e, next) => next(e))
 
   on('command.run', { command: SKILL }, async ($, e, next) => {
     if (e.args.trim() === 'status') {
