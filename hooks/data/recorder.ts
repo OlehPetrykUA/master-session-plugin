@@ -115,6 +115,8 @@ async function keyOf($: EngineInterface, agentId: string | undefined) {
 
 async function agentCleared($: EngineInterface, id: string) {
   held.delete(id)
+  const main = held.get(MAIN)
+  if (main?.by === id) await mainClosed($, main)
   await saveAgents($, agents => asked(agents, id, undefined))
   await syncAgents($)
 }
@@ -198,12 +200,16 @@ async function promptOpened($: EngineInterface, text: string, tool: string, agen
   await save($, { ...current, state: 'needs-you', needsYou: text, modelAt: now, waits: { since: now, on: 'you' } }, now)
 }
 
-async function promptClosed($: EngineInterface, tool?: string, agentId?: string) {
+async function promptClosed($: EngineInterface, tool?: string, agentId?: string, isScoped = true) {
   const key = agentId !== undefined && held.has(agentId) ? agentId : await keyOf($, agentId)
   const before = held.get(key)
   if (!before || (tool !== undefined && before.tool && before.tool !== tool)) return
   if (key !== MAIN) return agentCleared($, key)
-  if ((tool !== undefined || agentId !== undefined) && before.by !== agentId) return
+  if (isScoped && before.by !== agentId) return
+  await mainClosed($, before)
+}
+
+async function mainClosed($: EngineInterface, before: Held) {
   if (!current) return
   held.delete(MAIN)
   if (current.state !== 'needs-you' || current.needsYou !== before.text) return
@@ -287,7 +293,7 @@ export async function startRecorder($: EngineInterface) {
 
 export async function recordTurnEnd($: EngineInterface, e: TurnCompleteInput) {
   if (e.agentId !== undefined) return agentCleared($, e.agentId).catch(() => undefined)
-  await promptClosed($).catch(() => undefined)
+  await promptClosed($, undefined, undefined, false).catch(() => undefined)
   await turnEnded($, e).catch(() => undefined)
 }
 

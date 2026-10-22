@@ -219,3 +219,34 @@ test("a session prompt stays open through an untracked agent's same-named tool, 
   await $.tool.call({ tool: 'Bash', command: 'rm -rf build', agentId: 'tm1' })
   expect(last()).toEqual(['working', undefined])
 })
+
+test("an untracked agent's prompt clears when that agent's turn starts, ends or is aborted, and a main-thread answer never clears it", async ($, on) => {
+  const written: Report[] = []
+  on('fs.write', (_, e) => {
+    if (e.path === reportPath(HOME, 'local_worker')) written.push(JSON.parse(e.text) as Report)
+    return { value: undefined }
+  })
+  loops(on, [])
+  const { clock } = world(on, { parent: MASTER })
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  await $.tool.call({ tool: 'mcp__master-session__report', state: 'working', progress: 'step 2 of 4 — build' })
+  const last = () => [written.at(-1)?.state, written.at(-1)?.needsYou]
+  const ask = () => $.classic.Notification({ message: 'Claude needs your permission', notification_type: 'permission_prompt', agent_id: 'tm1' } as never)
+  const asking = ['needs-you', 'Claude needs your permission']
+  await ask()
+  expect(last()).toEqual(asking)
+  await $.turn.start({ text: 'go on', turnId: 'm1', agentId: 'tm1' } as never)
+  expect(last()).toEqual(['working', undefined])
+  await ask()
+  await $.turn.complete({ answer: 'done', durationMs: 5, isAborted: false, turnId: 'm2', agentId: 'tm1', reason: 'answer' })
+  expect(last()).toEqual(['working', undefined])
+  await ask()
+  await $.turn.complete({ answer: '', durationMs: 5, isAborted: true, turnId: 'm3', agentId: 'tm1', reason: 'aborted' } as never)
+  expect(last()).toEqual(['working', undefined])
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'git push' }, agent_id: 'tm1' } as never)
+  await $.classic.Notification({ message: 'done', notification_type: 'elicitation_response' })
+  expect(last()).toEqual(['needs-you', 'Allow Bash: git push'])
+  await $.tool.call({ tool: 'Bash', command: 'git push', agentId: 'tm1' })
+  expect(last()).toEqual(['working', undefined])
+})
