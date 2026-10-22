@@ -30,7 +30,7 @@ The validator never implements, fixes, rebases or writes skills itself. Its only
 
 ## Arguments
 
-Invoked with: `$ARGUMENTS`. Free-form words, in any order. Record the settings in the ledger and in the loop args: a tick reads this file by path and gets no arguments. Running `/master-session:master-session <words>` again changes a live run.
+Invoked with: `$ARGUMENTS`. Free-form words, in any order. Record the settings in the ledger and in the loop args: a tick reads this file by path and gets no arguments. Running `/master-session:start <words>` again changes a live run.
 - `every <N>m`: heartbeat in minutes. Default 2m, minimum 1m, maximum 60m (`ScheduleWakeup` clamps to 60–3600 s).
 - `away`: the user is away. Finish everything inside the briefs without waiting, archive verified-and-captured workers, `PushNotification` on every 🔴 and at the end. Implies `quiet`.
 - `quiet` | `verbose`: `quiet` posts only 🔴 lines and the final board; `verbose` (default) posts the full board on every tick with news.
