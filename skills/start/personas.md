@@ -1,6 +1,6 @@
 # Personas
 
-A persona is a fixed role the validator hands out. Each one has its own skill, `master-session:<persona>` (mission, inputs, output, gate, must-not), and its own agent of the same name, which preloads that skill as a subagent; a session started with `claude --agent master-session:<persona>` gets it from the plugin's SessionStart hook. Long work with commits runs as a `start_session` worker: the brief's first line loads the `master-session:worker` and `master-session:<persona>` skills. Short read-only checks run as the persona's subagent, named by `Agent` `subagent_type` or Workflow `agent(…, {agentType})`. On every `ready <sha>`, the QA verifier, the Reviewer and, for UI, the Design checker run in parallel ([SKILL.md](SKILL.md#3-the-loop) section 3, step 2). Pick models by alias only, the cheaper tier when torn. A `start_session` worker can't go above the validator's own model.
+A persona is a fixed role the validator hands out. Each one has its own skill, `master-session:<persona>` (mission, inputs, output, gate, must-not), and its own agent of the same name, which preloads that skill as a subagent; a session started with `claude --agent master-session:<persona>` gets it from the plugin's SessionStart hook. Long work with commits runs as a `start_session` worker: the brief's first line loads the `master-session:worker` and `master-session:<persona>` skills. Short read-only checks run as the persona's subagent, named by `Agent` `subagent_type` or Workflow `agent(…, {agentType})`. On every `ready <sha>` the validator makes one call, to the QA verifier, which runs the Reviewer and, for UI, the Design checker as its own subagents ([SKILL.md](SKILL.md#3-the-loop) section 3, step 2). Pick models by alias only, the cheaper tier when torn. A `start_session` worker can't go above the validator's own model.
 
 | Persona | Runs as | Session agent | Subagent | Model / effort |
 |---|---|---|---|---|
@@ -26,7 +26,7 @@ The read-only personas' agents deny Edit, Write and NotebookEdit. A `start_sessi
 
 ## Integrator
 - **Mission:** turn verified `ready <sha>` reports into master.
-- **Inputs:** worker reports, the QA verifier, Reviewer and Design checker verdicts, the ledger.
+- **Inputs:** worker reports, the QA verifier's verdict, the ledger.
 - **Output:** a `--ff-only` merge, the board and a ledger line.
-- **Gate:** QA verifier and Reviewer `PASS`, plus Design checker `PASS` for UI, on that exact sha (the validator's own check only where section 3, step 2 allows it), and a fast-forward is possible.
+- **Gate:** the QA verifier's `PASS` on that exact sha (the validator's own check only where section 3, step 2 allows it), and a fast-forward is possible.
 - **Must not:** implement, fix, rebase or write skills; merge anything that isn't a fast-forward. Send it back to its worker.
