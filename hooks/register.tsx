@@ -129,12 +129,12 @@ export const register: Register = on => {
     const data = await paneData($, columns || 48)
     const item = paneViewOf(data).items.find(one => one.id === expand || (one.kind === 'workflow' && one.run.agents.some(agent => agent.id === expand)))
     const isOldOne = data.archived.some(one => one.id === expand)
-    const card = isArchived ? (isOldOne ? expand : '') : (item?.id ?? '')
+    const card = isArchived ? (isOldOne ? expand : '') : item ? expand : ''
     const isShown = !!expand && !!card
     if (isArchived || isShown) await setFilter($, isArchived ? 'archived' : 'all')
     if (isShown) await setExpanded($, () => [card])
     const isPlaced = await openPane($)
-    const shown = [isArchived ? 'the Archived list' : '', isShown ? `${card} expanded${card === expand ? '' : ` (${expand} is one of its agents)`}` : ''].filter(Boolean).join(' with ')
+    const shown = [isArchived ? 'the Archived list' : '', isShown ? `${card} expanded${item && item.id !== card ? ` in ${item.id}` : ''}` : ''].filter(Boolean).join(' with ')
     const missing = expand && !isShown ? ` ${expand} was not found among its items${isOldOne ? '; it is archived, so pass archived: true' : ''}.` : ''
     return {
       result: isPlaced

@@ -625,7 +625,7 @@ test('200 or more family sessions may hide a side session, so every target is un
   expect(await ui.find({ key: 'confirm-local_conductor' })).toBeDefined()
   expect(await textsOf(ui)).toContain('git state unknown')
   await click(ui, 'hit-archive-no-local_conductor')
-  await click(ui, 'hit-collapse-local_conductor')
+  await click(ui, 'hit-top-local_conductor')
   await click(ui, 'hit-archive-all')
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
   await ui.unmount()
@@ -652,7 +652,7 @@ test('a grandchild side session counts: its repo is read and its unmerged commit
   expect(await ui.find({ key: 'confirm-local_conductor' })).toBeDefined()
   expect(await textsOf(ui)).toContain('grand-work: 2 commits on feat/g that are not on main')
   await click(ui, 'hit-archive-no-local_conductor')
-  await click(ui, 'hit-collapse-local_conductor')
+  await click(ui, 'hit-top-local_conductor')
   await click(ui, 'hit-archive-all')
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
   await ui.unmount()
@@ -679,18 +679,19 @@ test('a side session started by an archived child still counts: archive follows 
   expect(await ui.find({ key: 'confirm-local_conductor' })).toBeDefined()
   expect(await textsOf(ui)).toContain('grand-work: 2 commits on feat/g that are not on main')
   await click(ui, 'hit-archive-no-local_conductor')
-  await click(ui, 'hit-collapse-local_conductor')
+  await click(ui, 'hit-top-local_conductor')
   await click(ui, 'hit-archive-all')
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
   await ui.unmount()
 })
 
-test('the open tool expands a workflow agent’s run, since the agent has no card of its own', async ($, on) => {
+test('the open tool expands a workflow agent’s own card inside its open run', async ($, on) => {
   await agentsStarted($, on)
   const answer = (await $.tool.call({ tool: 'mcp__master-session__open', expand: 'w1' })) as { result?: string }
-  expect(answer.result).toBe('The master session pane is open beside the chat, showing wf_7 expanded (w1 is one of its agents).')
+  expect(answer.result).toBe('The master session pane is open beside the chat, showing w1 expanded in wf_7.')
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ key: 'detail-wf_7' })).toBeDefined()
+  expect(await ui.find({ key: 'detail-w1' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -740,7 +741,7 @@ test('a done session with a reported sha reads ready for verify in Waiting, and 
   await ui.unmount()
 })
 
-test('a merged worktree with a reported sha reads merged in Done only with its git state, and archiving it puts the Undo bar in Done, not Waiting', async ($, on) => {
+test('a merged worktree with a reported sha sits in Done, which needs its git state, and archiving it puts the Undo bar in Done, not Waiting', async ($, on) => {
   const { calls } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...finished('local_clean'), sha: '1111111' }] }, { git: CLEAN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const before = await keysOf(ui)

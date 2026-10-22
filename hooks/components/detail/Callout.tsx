@@ -7,7 +7,7 @@ import { Quiet } from '../Quiet'
 import { Strong } from '../Strong'
 import type { Ui } from '../types'
 
-export type CalloutProps = { id: string; status: Status; icon?: IconName; label: string; lines: readonly { text: string; isStrong: boolean }[] }
+export type CalloutProps = { id: string; status: Status; icon?: IconName; label: string; lines: readonly { text: string; isStrong: boolean; isOneLine?: boolean }[] }
 
 export function Callout(ui: Ui, props: CalloutProps) {
   const { Box, Text } = ui
@@ -19,7 +19,7 @@ export function Callout(ui: Ui, props: CalloutProps) {
         <Text size="caption" weight="semibold" color={C.text}>
           {props.label.toUpperCase()}
         </Text>
-        {props.lines.map(line => (line.isStrong ? Strong(ui, { text: line.text, isFull: true }) : Quiet(ui, { text: line.text, isFull: true })))}
+        {props.lines.map(line => (line.isStrong ? Strong(ui, { text: line.text, isFull: !line.isOneLine }) : Quiet(ui, { text: line.text, isFull: !line.isOneLine })))}
       </Box>
     </Box>
   )

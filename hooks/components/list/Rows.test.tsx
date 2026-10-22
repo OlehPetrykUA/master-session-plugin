@@ -4,6 +4,7 @@ import type { On } from 'claude-code'
 import type { AgentRecord } from '../../../types'
 
 import { across, tall } from '../../lib/layout'
+import { oneLine } from '../../lib/list'
 import { phaseStrip } from '../../theme/detail'
 import { C } from '../../theme/tokens'
 import { BOARD, PANE, altsOf, click, hitsOf, started, textsOf } from '../../testing/world'
@@ -159,7 +160,8 @@ test('long multi-line tests and activity draw as one truncated line each: the la
   const script = 'cd "$HOME/.claude/worktrees/wt-x"\nL=$(mktemp)\ntsc -p . --noEmit > "$L" 2>&1\necho "tsc exit $?"\ncat "$L"\nrm "$L"'
   const tests = ['one', 'two', 'three', 'four', 'five', 'six', script]
   const activity = [`Bash ${script} · 2m`, 'Read hooks/lib/band.ts · 1m']
-  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], tests, activity }] })
+  const path = 'hooks/lib/\nband.ts'
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], tests, activity, commits: [`abc1234 ${script}`], files: [path] }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_setup')
   const flat = script.replace(/\s+/g, ' ')
@@ -170,9 +172,33 @@ test('long multi-line tests and activity draw as one truncated line each: the la
   for (const gone of ['one', 'two']) expect(texts).not.toContain(gone)
   expect(texts.some(text => text.includes('\n'))).toBe(false)
   const lines = (await ui.findAll({ type: 'Text' })).filter(one => String(one.text ?? '').includes('mktemp') && one.props.wrap !== undefined)
-  expect(lines.length).toBe(2)
+  expect(lines.length).toBe(3)
   expect(lines.every(one => one.props.wrap === 'truncate-end')).toBe(true)
+  expect((await ui.find({ key: 'commit-local_setup-0' }))?.props.minWidth).toBe(0)
+  const file = (await ui.findAll({ type: 'Text' })).find(one => one.text === oneLine(path))
+  expect(file?.props.wrap).toBe('truncate-end')
   expect(lines.map(one => String(one.text))).toEqual(expect.arrayContaining([flat, expect.stringContaining(flat.slice(3))]))
   expect((await ui.find({ key: 'test-local_setup-0' }))?.props).toEqual(expect.objectContaining({ height: tall(24), minWidth: 0, flexShrink: 1 }))
+  await ui.unmount()
+})
+
+test('a task, a needs question and a status line with newlines each draw on one line', async ($, on) => {
+  seeded(on, [agent('a9', { description: 'band\ndiff', asking: { text: 'Allow\nBash: rm -rf dist?', since: NOW - 10_000 } })])
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], now: 'waiting\nfor the go' }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const texts = await textsOf(ui)
+  expect(texts).toEqual(expect.arrayContaining(['band diff', 'Allow Bash: rm -rf dist?', 'waiting for the go']))
+  expect(texts.some(text => text.includes('\n'))).toBe(false)
+  await ui.unmount()
+})
+
+test('the Ready callout draws its gate line as one truncated line, whatever the tests hold', async ($, on) => {
+  const script = 'cd "$HOME/x"\nL=$(mktemp)\ntsc -p .'
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], state: 'done', sha: '4e431f7', tests: [script, 'plugin test'] }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_setup')
+  const gate = (await ui.findAll({ type: 'Text' })).find(one => String(one.text ?? '').startsWith('gate: '))
+  expect(gate?.text).toBe(`gate: ${oneLine(script)}, plugin test`)
+  expect(gate?.props.wrap).toBe('truncate-end')
   await ui.unmount()
 })

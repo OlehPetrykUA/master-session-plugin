@@ -74,7 +74,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
   const base = found?.repo.base ?? 'main'
   const callout =
     item.status === 'ready'
-      ? Callout(ui, { id: row.id, status: 'ready', label: 'Ready for verify', lines: [{ text: [`ready ${facts?.sha ?? ''}`.trim(), where?.branch ? `on ${where.branch}` : ''].filter(Boolean).join(' '), isStrong: true }, ...(facts?.tests?.length ? [{ text: `gate: ${facts.tests.join(', ')}`, isStrong: false }] : [])] })
+      ? Callout(ui, { id: row.id, status: 'ready', label: 'Ready for verify', lines: [{ text: [`ready ${facts?.sha ?? ''}`.trim(), where?.branch ? `on ${where.branch}` : ''].filter(Boolean).join(' '), isStrong: true }, ...(facts?.tests?.length ? [{ text: oneLine(`gate: ${facts.tests.join(', ')}`), isStrong: false, isOneLine: true }] : [])] })
       : item.status === 'verified'
         ? Callout(ui, { id: row.id, status: 'verified', label: 'Verified', lines: [{ text: facts?.verified ?? '', isStrong: true }, { text: `merge to ${base} pending`, isStrong: false }] })
         : null
