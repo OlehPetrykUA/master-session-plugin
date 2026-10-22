@@ -199,7 +199,7 @@ async function promptOpened($: EngineInterface, text: string, tool: string, agen
 }
 
 async function promptClosed($: EngineInterface, tool?: string, agentId?: string) {
-  const key = agentId !== undefined && held.has(agentId) ? agentId : MAIN
+  const key = agentId !== undefined && held.has(agentId) ? agentId : await keyOf($, agentId)
   const before = held.get(key)
   if (!before || (tool !== undefined && before.tool && before.tool !== tool)) return
   if (key !== MAIN) return agentCleared($, key)
