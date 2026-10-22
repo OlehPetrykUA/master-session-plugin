@@ -311,10 +311,12 @@ const GATE = [
   '"$E" plugin validate --strict . > "$L" 2>&1; echo "validate exit $?"; grep -E "✔|✘" "$L"',
   '"$E" plugin test . > "$L" 2>&1; echo "plugin test exit $?"; tail -4 "$L"',
   'tsc -p . --noEmit > "$L" 2>&1; echo "tsc exit $?"',
-  "sh hooks/persona.test.sh > \"$L\"; python3 - \"$L\" <<'EOF'\nimport sys\nprint(open(sys.argv[1]).read().count('ok'))\nEOF",
+  "sh hooks/persona.test.sh > \"$L\"; echo \"persona exit $?\"; python3 - \"$L\" <<'EOF'\nimport sys\nprint(open(sys.argv[1]).read().count('ok'))\nEOF",
 ].join('\n')
 
-const GATE_OUT = 'validate exit 0\n✔ Validation passed\nplugin test exit 0\n\n 186 pass\n 0 fail\nRan 186 tests across 16 files. [12.02s]\ntsc exit 0\n12'
+const GATE_OUT = 'validate exit 0\n✔ Validation passed\nplugin test exit 0\n\n 186 pass\n 0 fail\nRan 186 tests across 16 files. [12.02s]\ntsc exit 0\npersona exit 0\n12'
+
+OUTPUT[GATE] = GATE_OUT
 
 test('a multi-line gate script records one short "<tool> · <result>" label per check it runs, in order, never the raw script', () => {
   const tests = testsOf(GATE, GATE_OUT, false)
@@ -336,10 +338,39 @@ test('a gate script run through Bash stores the labels; a non-test call with "te
   const run = world()
   await run.start()
   await run.fire('tool.call', { tool: 'Bash', tool_use_id: 'gate', command: GATE })
-  expect(run.reportNow()?.tests.map(one => one.cmd)).toEqual(['validate · exit 0', 'plugin test · exit 0', 'tsc · exit 0', 'persona.test · exit 0'])
+  expect(run.reportNow()?.tests.map(one => one.cmd)).toEqual(['validate · passed', 'plugin test · 186 pass', 'tsc · exit 0', 'persona.test · exit 0'])
   const seq = run.reportNow()?.seq
   await run.bash('cat hooks/data/agent-prompts.test.tsx')
   await run.bash('sed -n 1,20p hooks/persona.test.sh')
   expect(run.reportNow()?.seq).toBe(seq)
   expect(run.reportNow()?.tests).toHaveLength(4)
+})
+
+const labels = (command: string, output: string, isError: boolean) => testsOf(command, output, isError).map(one => [one.cmd, one.ok])
+
+test('a check gets the whole call’s exit code only when it runs last; otherwise its own "<name> exit N" line, or no entry; two checks never share one parsed result', () => {
+  expect(labels('tsc -p . --noEmit > "$L" 2>&1; echo "tsc exit $?"; git status', 'tsc exit 2\n', false)).toEqual([['tsc · exit 2', false]])
+  expect(labels('tsc -p . && npm test', 'Exit code 1\nnpm ERR! test failed', true)).toEqual([['npm test · exit 1', false]])
+  expect(labels('npm test; pytest', '3 passed', false)).toEqual([['pytest · exit 0', true]])
+  expect(labels('"$E" plugin test . | tail -4', ' 186 pass\n 0 fail', false)).toEqual([['plugin test · 186 pass', true]])
+})
+
+test('a parsed pass count still fails when the check’s exit status is not 0', () => {
+  expect(labels('pytest -q', '5 passed, 2 errors in 0.3s', true)).toEqual([['pytest · 5 passed · exit 1', false]])
+  expect(labels('pytest -q', '5 passed in 0.3s', false)).toEqual([['pytest · 5 passed', true]])
+})
+
+test('reading, copying, diffing or staging a test file is no run; neither is a test word after echo, grep or ls', () => {
+  for (const command of ['sed -n 1,5p ./hooks/persona.test.sh', 'git diff hooks/persona.test.sh', 'cp tests/test_x.sh /tmp/', 'chmod +x ./test_x.sh', 'cat ./test_x.sh', 'git add tests/test_hooks.py', 'echo npm test', 'grep plugin test x', 'ls go test.txt'])
+    expect([command, isTestCommand(command)]).toEqual([command, false])
+  for (const command of ['"$E" plugin test .', '~/bin/claude plugin validate --strict .', 'sh hooks/persona.test.sh', './hooks/persona.test.sh', 'bash scripts/test_hooks.sh', 'go test ./...'])
+    expect([command, isTestCommand(command)]).toEqual([command, true])
+})
+
+test('launchers and env prefixes still count; tsc version and help flags do not; a heredoc keeps the rest of its opening line; bun test parses pass and fail', () => {
+  for (const command of ['bunx tsc', 'pnpm exec tsc', 'FOO=1 tsc', 'uv run pytest', 'poetry run pytest -q', 'npx --yes tsc -p .', 'time pytest', 'bun x vitest run', 'python3 -m pytest'])
+    expect([command, isTestCommand(command)]).toEqual([command, true])
+  for (const command of ['tsc --version', 'tsc -v', 'tsc -h', 'tsc --help']) expect([command, isTestCommand(command)]).toEqual([command, false])
+  expect(isTestCommand('cat <<EOF > x && pytest\nbody\nEOF')).toBe(true)
+  expect(labels('bun test', ' 12 pass\n 1 fail', true)).toEqual([['bun test · 12 pass · 1 fail', false]])
 })

@@ -236,3 +236,13 @@ test("an asking agent in a working report makes the row and the reports tool nee
   expect([view?.state, view?.needsYou]).toEqual(['needs-you', 'Allow Bash: rm -rf build'])
   expect(merge(boardOf(80 * MIN, row()), [stale], live, NOW).sessions[0]?.state).toBe('working')
 })
+
+test('a merged row shows a new label as stored and an old raw entry with its passed or failed word', () => {
+  const live = liveOf(liveOne('local_a', true))
+  const tests = [
+    { cmd: 'npm test', ok: false, summary: '', at: 1 },
+    { cmd: 'pytest -q', ok: true, summary: '3 passed', at: 2 },
+    { cmd: 'tsc · exit 0', ok: true, summary: '', at: 3 },
+  ]
+  expect(merge(boardOf(80 * MIN, row()), [report({ tests })], live, NOW).sessions[0]?.tests).toEqual(['npm test · failed', 'pytest -q · passed · 3 passed', 'tsc · exit 0'])
+})

@@ -42,76 +42,100 @@ export const commitOf = (command: string, output: string) => {
   return match ? { sha: match[1] ?? '', subject: (match[2] ?? '').trim() } : undefined
 }
 
-type Result = { text: string; ok: boolean }
+type Parsed = { text: string; bad: number }
 
-type Check = { tool: (match: RegExpMatchArray) => string; pattern: RegExp; result?: (output: string) => Result | undefined }
+type Family = 'pass' | 'passed' | 'validate' | 'tsc' | 'persona'
+
+type Check = { pattern: RegExp; tool: (match: RegExpMatchArray) => string; exit: (match: RegExpMatchArray) => string; family?: Family }
 
 const LABEL_CAP = 60
 
 const lastNumber = (output: string, pattern: RegExp) => [...output.matchAll(pattern)].map(match => Number(match[1])).at(-1)
 
-const tally = (output: string, passed: RegExp, failed: RegExp, word: [string, string]): Result | undefined => {
+const tally = (output: string, passed: RegExp, failed: RegExp, word: [string, string]): Parsed | undefined => {
   const good = lastNumber(output, passed)
   const bad = lastNumber(output, failed) ?? 0
   if (good === undefined && !bad) return undefined
-  return { text: [`${good ?? 0} ${word[0]}`, bad ? `${bad} ${word[1]}` : ''].filter(Boolean).join(' · '), ok: !bad }
+  return { text: [`${good ?? 0} ${word[0]}`, bad ? `${bad} ${word[1]}` : ''].filter(Boolean).join(' · '), bad }
 }
 
-const counts = (output: string) => tally(output, /\b(\d+) passed\b/g, /\b(\d+) failed\b/g, ['passed', 'failed'])
+const PARSE: Record<Family, (output: string) => Parsed | undefined> = {
+  pass: output => tally(output, /^\s*(\d+) pass\s*$/gm, /^\s*(\d+) fail\s*$/gm, ['pass', 'fail']),
+  passed: output => tally(output, /\b(\d+) passed\b/g, /\b(\d+) failed\b/g, ['passed', 'failed']),
+  validate: output => (/Validation passed/.test(output) ? { text: 'passed', bad: 0 } : /Validation failed|✘/.test(output) ? { text: 'failed', bad: 1 } : undefined),
+  tsc: output => {
+    const errors = output.match(/\berror TS\d+/g)?.length ?? 0
+    return errors ? { text: `${errors} error${errors === 1 ? '' : 's'}`, bad: errors } : undefined
+  },
+  persona: output => {
+    const good = output.match(/^ok\s/gm)?.length ?? 0
+    const bad = output.match(/^FAIL\s/gm)?.length ?? 0
+    return good || bad ? { text: [`${good} ok`, bad ? `${bad} fail` : ''].filter(Boolean).join(' · '), bad } : undefined
+  },
+}
 
-const RUN = String.raw`(?:^|[;&|(\n])\s*(?:npx\s+|python3?\s+-m\s+)?(?:\S*/)?`
+const CLAUDE = String.raw`(?:""\s+|\S*claude\s+)?`
 
 const CHECKS: Check[] = [
-  { tool: () => 'plugin test', pattern: /\bplugin\s+test\b/, result: output => tally(output, /^\s*(\d+) pass\s*$/gm, /^\s*(\d+) fail\s*$/gm, ['pass', 'fail']) },
-  {
-    tool: () => 'validate',
-    pattern: /\bplugin\s+validate\b/,
-    result: output => (/Validation passed/.test(output) ? { text: 'passed', ok: true } : /Validation failed|✘/.test(output) ? { text: 'failed', ok: false } : undefined),
-  },
-  {
-    tool: () => 'tsc',
-    pattern: new RegExp(`${RUN}tsc(?=\\s|$)`),
-    result: output => {
-      const errors = output.match(/\berror TS\d+/g)?.length ?? 0
-      return errors ? { text: `${errors} error${errors === 1 ? '' : 's'}`, ok: false } : undefined
-    },
-  },
-  {
-    tool: () => 'persona.test',
-    pattern: /(?:\b(?:sh|bash)\s+\S*|\.\/\S*)persona\.test\.sh\b/,
-    result: output => {
-      const good = output.match(/^ok\s/gm)?.length ?? 0
-      const bad = output.match(/^FAIL\s/gm)?.length ?? 0
-      return good || bad ? { text: [`${good} ok`, bad ? `${bad} fail` : ''].filter(Boolean).join(' · '), ok: !bad } : undefined
-    },
-  },
-  { tool: match => `${match[1]} test`, pattern: /\b(npm|pnpm|yarn|bun)(?:\s+run)?\s+test\b/, result: counts },
-  { tool: match => match[1] ?? '', pattern: new RegExp(`${RUN}(pytest|vitest|jest|mocha|bats)\\b`), result: counts },
-  { tool: match => `${match[1]} test`, pattern: /\b(go|cargo)\s+test\b/ },
-  { tool: match => match[1] ?? '', pattern: /(?:\bpython3?\s+|\b(?:sh|bash)\s+|\.\/)\S*?\b(test_\w+\.(?:py|sh))\b/, result: counts },
+  { pattern: new RegExp(`^${CLAUDE}plugin\\s+test\\b`), tool: () => 'plugin test', exit: () => 'plugin test', family: 'pass' },
+  { pattern: new RegExp(`^${CLAUDE}plugin\\s+validate\\b`), tool: () => 'validate', exit: () => '(?:plugin )?validate', family: 'validate' },
+  { pattern: /^(?:\S*\/)?tsc(?=\s|$)(?!\s+(?:-v|--version|-h|--help)\b)/, tool: () => 'tsc', exit: () => 'tsc', family: 'tsc' },
+  { pattern: /^(?:(?:sh|bash)\s+|\.\/|\/)\S*persona\.test\.sh\b/, tool: () => 'persona.test', exit: () => 'persona(?:\\.test)?', family: 'persona' },
+  { pattern: /^bun(?:\s+run)?\s+test\b/, tool: () => 'bun test', exit: () => 'bun test', family: 'pass' },
+  { pattern: /^(npm|pnpm|yarn)(?:\s+run)?\s+test\b/, tool: match => `${match[1]} test`, exit: match => `${match[1]} test`, family: 'passed' },
+  { pattern: /^(?:\S*\/)?(pytest|vitest|jest|mocha|bats)\b/, tool: match => match[1] ?? '', exit: match => match[1] ?? '', family: 'passed' },
+  { pattern: /^(go|cargo)\s+test\b/, tool: match => `${match[1]} test`, exit: match => `${match[1]} test` },
+  { pattern: /^(?:(?:python3?|sh|bash)\s+|\.\/|\/)\S*?\b(test_\w+\.(?:py|sh))\b/, tool: match => match[1] ?? '', exit: match => (match[1] ?? '').replace('.', '\\.'), family: 'passed' },
 ]
 
-const runnable = (command: string) =>
-  command
-    .replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\b/g, '')
-    .replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, '""')
+const LAUNCHER = /^(?:\w+=\S*\s+|time\s+|npx(?:\s+-\S+)*\s+|bunx\s+|bun\s+x\s+|pnpm\s+(?:exec|dlx)\s+|(?:uv|poetry)\s+run\s+|python3?\s+-m\s+)/
 
-const exitOf = (output: string, isError: boolean): Result => (isError ? { text: `exit ${output.match(/^Exit code (\d+)/m)?.[1] ?? 1}`, ok: false } : { text: 'exit 0', ok: true })
-
-export function testsOf(command: string, output: string, isError: boolean) {
-  const code = runnable(command)
-  const found = CHECKS.flatMap(check => {
-    const match = code.match(check.pattern)
-    return match && match.index !== undefined ? [{ at: match.index, tool: check.tool(match), result: check.result?.(output) ?? exitOf(output, isError) }] : []
-  })
-  const seen = new Set<string>()
-  return found
-    .sort((left, right) => left.at - right.at)
-    .filter(one => !seen.has(one.tool) && !!seen.add(one.tool))
-    .map(one => ({ cmd: `${one.tool} · ${one.result.text}`.slice(0, LABEL_CAP), ok: one.result.ok, summary: '' }))
+const unlaunched = (segment: string): string => {
+  const next = segment.replace(LAUNCHER, '')
+  return next === segment ? segment : unlaunched(next)
 }
 
-export const isTestCommand = (command: string) => testsOf(command, '', false).length > 0
+const segmentsOf = (command: string) =>
+  command
+    .replace(/(<<-?\s*['"]?(\w+)['"]?[^\n]*)\n[\s\S]*?\n\s*\2\b/g, '$1')
+    .replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, '""')
+    .split(/&&|\|\||[;|\n()`]|\$\(/)
+    .map(one => unlaunched(one.trim()))
+    .filter(Boolean)
+
+const checksOf = (command: string) => {
+  const segments = segmentsOf(command)
+  const seen = new Set<string>()
+  return segments.flatMap((segment, index) => {
+    for (const check of CHECKS) {
+      const match = segment.match(check.pattern)
+      if (!match) continue
+      const tool = check.tool(match)
+      if (seen.has(tool)) return []
+      seen.add(tool)
+      return [{ check, match, tool, isLast: index === segments.length - 1 }]
+    }
+    return []
+  })
+}
+
+const overallOf = (output: string, isError: boolean) => (isError ? Number(output.match(/^Exit code (\d+)/m)?.[1] ?? 1) : 0)
+
+export function testsOf(command: string, output: string, isError: boolean) {
+  const found = checksOf(command)
+  const shared = (family: Family | undefined) => found.filter(one => one.check.family === family).length > 1
+  return found.flatMap(({ check, match, tool, isLast }) => {
+    const line = lastNumber(output, new RegExp(`\\b${check.exit(match)} exit (\\d+)`, 'g'))
+    const status = line ?? (isLast ? overallOf(output, isError) : undefined)
+    const parsed = check.family && !shared(check.family) ? PARSE[check.family](output) : undefined
+    if (!parsed && status === undefined) return []
+    const ok = parsed ? !parsed.bad && (status === undefined || status === 0) : status === 0
+    const text = parsed ? (!ok && !parsed.bad && status ? `${parsed.text} · exit ${status}` : parsed.text) : `exit ${status}`
+    return [{ cmd: `${tool} · ${text}`.slice(0, LABEL_CAP), ok, summary: '' }]
+  })
+}
+
+export const isTestCommand = (command: string) => checksOf(command).length > 0
 
 const fieldOf = (input: unknown, key: string) => {
   const value = typeof input === 'object' && input ? (input as Record<string, unknown>)[key] : undefined
