@@ -4,12 +4,12 @@ import type { Board, LiveSession, Repo, Worktree } from '../../types'
 
 import { bandProgress } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
-import { BOARD_TOOL, PANE, TITLE } from '../lib/constants'
+import { BOARD_TOOL, PANE, TITLE, UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
 import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
-import { getBoard, getLive, getReports, getShared, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing } from '../state/atoms'
+import { getBoard, getLive, getReports, getShared, getUndone, saveBoard, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, merge } from './contract'
 import { roleOf } from './recorder'
 import { askForUpdates, readBoard, readReports, writeBoard } from './status'
@@ -169,16 +169,17 @@ export async function git($: EngineInterface, cwd: string, args: readonly string
   return ran.stdout
 }
 
-async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number]): Promise<Worktree[]> {
+async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string): Promise<Worktree[]> {
   const status = await git($, tree.path, ['status', '--porcelain=v2', '--branch']).catch(() => undefined)
-  return status ? [{ path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...parseStatus(status) }] : []
+  const ahead = tree.isMain || !base ? '' : await git($, tree.path, ['rev-list', '--count', `${base}..HEAD`]).catch(() => '')
+  return status ? [{ path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...parseStatus(status), unmerged: Number(ahead.trim()) || 0 }] : []
 }
 
 export async function repoOf($: EngineInterface, path: string): Promise<Repo | undefined> {
   const trees = parseWorktrees(await git($, path, ['worktree', 'list', '--porcelain']))
   const main = trees.find(tree => tree.isMain) ?? trees[0]
   if (!main) return undefined
-  const worktrees = (await Promise.all(trees.map(tree => treeOf($, tree)))).flat()
+  const worktrees = (await Promise.all(trees.map(tree => treeOf($, tree, main.branch)))).flat()
   const refs = await git($, path, ['for-each-ref', 'refs/heads', '--format=x%(upstream:short)']).catch(() => '')
   return {
     path: main.path,
@@ -252,24 +253,47 @@ async function archiveOne($: EngineInterface, id: string, name: string) {
   if (after && !after.isArchived) throw new Error(`${name} is still active. The app may be waiting for your approval.`)
 }
 
-export async function archive($: EngineInterface, rows: readonly Row[]) {
+export async function archive($: EngineInterface, rows: readonly Row[], skipped?: number) {
   await setConfirming($, '')
   const allowed = rows.filter(row => isArchivable(row.board ?? { state: row.state }, row.live))
   const refused = rows.filter(row => !allowed.includes(row)).map(row => row.name)
-  if (refused.length) $.ui.toast(`Not archived: ${refused.join(', ')} ${refused.length === 1 ? 'is' : 'are'} not verified done and idle yet.`)
-  if (!allowed.length) return
-  const archived: string[] = []
+  if (refused.length) $.ui.toast(`Not archived: ${refused.join(', ')} ${refused.length === 1 ? 'is' : 'are'} still working or waiting for your answer.`)
+  const archived: Row[] = []
   for (const row of allowed) {
     try {
       await archiveOne($, row.id, row.name)
-      archived.push(row.name)
+      archived.push(row)
     } catch (error) {
       $.ui.toast(`Not archived: ${messageOf(error)}`)
-      return
+      break
     }
   }
-  await setExpanded($, open => open.filter(id => !allowed.some(row => row.id === id)))
-  $.ui.toast(archived.length === 1 ? `Archived ${archived[0]}.` : `Archived ${archived.length} sessions.`)
+  await setExpanded($, open => open.filter(id => !archived.some(row => row.id === id)))
+  const group = archived[0]?.state ?? rows[0]?.state
+  if (!group || (!archived.length && !skipped)) return
+  const at = await $.clock.now()
+  await setUndone($, () => ({ ids: archived.map(row => row.id), name: skipped === undefined && archived[0] ? archived[0].name : '', skipped: skipped ?? 0, group, at }))
+  $.clock.after(UNDO_MS, () => void setUndone($, value => (value?.at === at ? null : value)))
+}
+
+export async function undoArchive($: EngineInterface) {
+  const undone = await getUndone($)
+  await setUndone($, () => null)
+  try {
+    for (const id of undone?.ids ?? []) await call($, 'ccd_session_mgmt', 'unarchive_session', { session_id: id })
+  } catch (error) {
+    $.ui.toast(`Not unarchived: ${messageOf(error)}`)
+  }
+  await refreshLive($).catch(() => undefined)
+}
+
+export async function stopSession($: EngineInterface, id: string, name: string) {
+  try {
+    await call($, 'ccd_session_mgmt', 'stop_session', { session_id: id })
+  } catch (error) {
+    $.ui.toast(`Couldn't stop ${name}: ${messageOf(error)}`)
+  }
+  await refreshLive($).catch(() => undefined)
 }
 
 export async function unarchive($: EngineInterface, one: LiveSession) {

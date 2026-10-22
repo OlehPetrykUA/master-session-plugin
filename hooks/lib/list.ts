@@ -25,7 +25,7 @@ export const ARCHIVED_PEEK = 2
 
 const KIND_ORDER = { session: 0, workflow: 1, subagent: 2 }
 
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
+export const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 
 const agentGroup = (state: AgentRecord['state']): SessionState => (state === 'running' ? 'working' : 'done')
 

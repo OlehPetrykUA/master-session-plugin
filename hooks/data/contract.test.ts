@@ -167,16 +167,14 @@ test('ask: only running, unarchived workers are targets; the envelope round-trip
   expect(answerOf(NOW, undefined, NOW + 2 * MIN)).toBe('no answer')
 })
 
-test('archive: only verified, done, idle rows; the Svg guard stays under 131072', () => {
-  const verified = merge(boardOf(95 * MIN, row({ state: 'done', verified: 'yes' })), [], liveOf(liveOne('local_a', false)), NOW).sessions[0]
-  const unverified = merge(boardOf(95 * MIN, row({ state: 'done' })), [], liveOf(liveOne('local_a', false)), NOW).sessions[0]
-  if (!verified || !unverified) throw new Error('rows missing')
-  expect(isArchivable(verified, liveOne('local_a', false))).toBe(true)
-  expect(isArchivable(verified, liveOne('local_a', true))).toBe(false)
-  expect(isArchivable(verified, liveOne('local_a', false, { isArchived: true }))).toBe(false)
-  expect(isArchivable(verified, undefined)).toBe(false)
-  expect(isArchivable(unverified, liveOne('local_a', false))).toBe(false)
-  expect(isArchivable({ state: 'working', verified: 'yes' }, liveOne('local_a', false))).toBe(false)
+test('archive: done or idle rows that are not running, archived or waiting for an answer; the Svg guard stays under 131072', () => {
+  expect(isArchivable({ state: 'done' }, liveOne('local_a', false))).toBe(true)
+  expect(isArchivable({ state: 'waiting' }, liveOne('local_a', false))).toBe(true)
+  expect(isArchivable({ state: 'working' }, liveOne('local_a', false))).toBe(true)
+  expect(isArchivable({ state: 'done' }, liveOne('local_a', true))).toBe(false)
+  expect(isArchivable({ state: 'done' }, liveOne('local_a', false, { isArchived: true }))).toBe(false)
+  expect(isArchivable({ state: 'done' }, undefined)).toBe(false)
+  expect(isArchivable({ state: 'needs-you' }, liveOne('local_a', false))).toBe(false)
   expect(fitsSvg('x'.repeat(131_071))).toBe(true)
   expect(fitsSvg('x'.repeat(131_072))).toBe(false)
 })

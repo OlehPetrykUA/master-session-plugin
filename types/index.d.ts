@@ -6,6 +6,8 @@ export type ArchiveView = 'closed' | 'open' | 'all'
 
 export type Asked = { at: number; count: number }
 
+export type Undone = { ids: string[]; name: string; skipped: number; group: SessionState; at: number }
+
 export type BoardSession = {
   id: string
   name: string
@@ -87,6 +89,7 @@ export type Worktree = {
   upstream: string
   ahead: number
   behind: number
+  unmerged: number
 }
 
 export type Repo = {
@@ -186,6 +189,7 @@ declare module 'claude-code' {
       filter: Filter
       archiveView: ArchiveView
       asked: Asked | null
+      undone: Undone | null
       isRefreshing: boolean
       shared: Shared | null
       reports: Report[]

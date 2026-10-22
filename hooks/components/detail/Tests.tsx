@@ -14,9 +14,9 @@ export function Tests(ui: Ui, props: TestsProps) {
     icon: 'tests',
     label: 'Tests',
     children: (
-      <Box key={`tests-pills-${id}`} flexDirection="row" flexWrap="wrap" columnGap={across(6)} rowGap={down(6)}>
+      <Box key={`tests-pills-${id}`} flexDirection="row" flexWrap="wrap" columnGap={across(4)} rowGap={down(4)}>
         {props.tests.map((test, index) => (
-          <Box key={`test-${id}-${index}`} flexDirection="row" alignItems="center" gap={across(5)} minHeight={tall(26)} paddingLeft={across(7)} paddingRight={across(9)} paddingY={0} borderStyle="round" borderColor={C.clear} backgroundColor={C.greenTint}>
+          <Box key={`test-${id}-${index}`} flexDirection="row" alignItems="center" gap={across(4)} height={tall(24)} paddingLeft={across(5)} paddingRight={across(7)} paddingY={0} borderStyle="round" borderColor={C.clear} backgroundColor={C.greenTint}>
             {Icon(ui, { id: `test-icon-${id}-${index}`, name: 'check', size: 12, tone: 'green', weight: 2.6 })}
             <Text size="footnote" weight="semibold" color={C.green}>
               {test}

@@ -329,7 +329,6 @@ export function answerOf(askedAt: number, report: Report | undefined, now: numbe
   return now - askedAt >= ANSWER_MS ? 'no answer' : 'asking'
 }
 
-export const isArchivable = (row: Pick<BoardSession, 'state' | 'verified'>, live: LiveSession | undefined) =>
-  row.state === 'done' && !!row.verified && !!live && !live.isRunning && !live.isArchived
+export const isArchivable = (row: Pick<BoardSession, 'state'>, live: LiveSession | undefined) => row.state !== 'needs-you' && !!live && !live.isRunning && !live.isArchived
 
 export const fitsSvg = (source: string) => source.length < SVG_CAP

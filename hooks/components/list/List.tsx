@@ -1,13 +1,16 @@
 import { isArchivable } from '../../data/contract'
 import { bodyWidthOf, across, down } from '../../lib/layout'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, shownArchived } from '../../lib/list'
-import type { ListGroup } from '../../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, plural, shownArchived } from '../../lib/list'
+import type { ListGroup, ListItem } from '../../lib/list'
 import type { Row as SessionRow } from '../../lib/rows'
 import type { PaneView } from '../../lib/view'
 import type { Tone } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
-import { ArchiveConfirm } from '../ArchiveConfirm'
-import { ExpandedTile } from '../ExpandedTile'
+import { lossesOf } from '../detail/losses'
+import { SessionDetail } from '../detail/SessionDetail'
+import { SubagentDetail } from '../detail/SubagentDetail'
+import { UndoBar } from '../detail/UndoBar'
+import { WorkflowDetail } from '../detail/WorkflowDetail'
 import type { PaneData, Ui } from '../types'
 import { ArchivedRow } from './ArchivedRow'
 import { EmptyBox } from './EmptyBox'
@@ -33,15 +36,35 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       onShowAll: isAll ? undefined : () => actions.filter('all'),
     })
   }
+  const innerWidth = width - 2 - 24
+  const collapse = (id: string) => () => actions.collapse(id)
+  const detailOf = (item: ListItem) => {
+    if (item.kind === 'workflow') return WorkflowDetail(ui, { run: item.run, at: data.at, innerWidth, onCollapse: collapse(item.id) })
+    if (item.kind === 'subagent') return SubagentDetail(ui, { agent: item.agent, at: data.at, onCollapse: collapse(item.id) })
+    return SessionDetail(ui, { row: item.row, trees: data.trees, home: data.home, at: data.at, asking: data.asking, isReadOnly, innerWidth, actions })
+  }
   const items = (group: ListGroup) =>
     group.items.map(item => {
-      if (item.kind === 'session' && data.open.includes(item.id))
-        return ExpandedTile(ui, { row: item.row, trees: data.trees, home: data.home, at: data.at, asking: data.asking, isReadOnly, innerWidth: width - 2 - 24, actions })
+      if (data.open.includes(item.id)) return detailOf(item)
       const name = item.kind === 'session' ? item.row.name : item.id
       return Row(ui, { item, trees: data.trees, home: data.home, at: data.at, isNarrow: view.isNarrow, width, onOpen: () => actions.toggle(item.id), onChat: () => actions.open(item.id, name) })
     })
-  const doneSessions = (group: ListGroup) =>
+  const idleSessions = (group: ListGroup) =>
     group.items.flatMap((item): SessionRow[] => (item.kind === 'session' && isArchivable(item.row.board ?? { state: item.row.state }, item.row.live) ? [item.row] : []))
+  const undone = data.undone
+  const undoBar = () =>
+    undone
+      ? UndoBar(ui, {
+          id: undone.group,
+          name: undone.name || undefined,
+          text: undone.name ? 'archived, worktree removed' : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with unmerged work` : ''}`,
+          onUndo: undone.ids.length ? actions.undo : undefined,
+        })
+      : null
+  const archiveAll = (rows: readonly SessionRow[]) => {
+    const clean = rows.filter(row => !lossesOf(row, data.trees).length)
+    actions.archive(clean, rows.length - clean.length)
+  }
   const groupOf = (group: ListGroup) => {
     if (group.id === 'archived') {
       if (data.chosen === 'archived' && !group.archived.length) return empty('archived')
@@ -62,16 +85,15 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       })
     }
     if (!group.items.length) return empty(`group-${group.id}`)
-    const idle = group.id === 'done' ? doneSessions(group) : []
-    const isAsking = data.asking === 'archive:all'
+    const idle = group.id === 'done' ? idleSessions(group) : []
     return Group(ui, {
       id: group.id,
       label: GROUP_LABEL[group.id],
       count: group.items.length,
       tone: TONE[group.id],
       isPinned: group.isPinned,
-      action: idle.length > 1 && !isAsking && !isReadOnly ? { id: 'archive-all', icon: 'archive', label: 'Archive all…', onPress: () => actions.confirm('archive:all') } : undefined,
-      children: [...(group.id === 'done' && isAsking ? [ArchiveConfirm(ui, { id: 'all', title: `Archive all ${idle.length} finished sessions?`, targets: idle, actions })] : []), ...items(group)],
+      action: idle.length && !isReadOnly ? { id: 'archive-all', icon: 'archive', label: 'Archive all', onPress: () => archiveAll(idle) } : undefined,
+      children: [...(undone?.group === group.id ? [undoBar()] : []), ...items(group)],
     })
   }
   const archived = view.groups.find(group => group.id === 'archived')
@@ -79,6 +101,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
   return (
     <Box key="section-list" flexDirection="column" gap={down(16)} paddingLeft={across(16)} paddingRight={across(16)} paddingTop={down(16)} paddingBottom={down(16)}>
       {data.chosen === 'all' && !view.items.length ? empty('all') : null}
+      {undone && !view.groups.some(group => group.id === undone.group) ? undoBar() : null}
       {view.groups.map(groupOf)}
       {view.hasMore ? (
         <Box key="archived-more" flexDirection="row" justifyContent="center">

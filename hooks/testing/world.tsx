@@ -149,7 +149,7 @@ export function world(on: On, child: Child = {}) {
   })
   on('process.run', (_, e) => {
     const [, , , cwd, verb] = e.argv
-    const stdout = verb === 'for-each-ref' ? 'x\nxorigin/main\n' : (GIT[`${cwd} ${verb}`] ?? '')
+    const stdout = verb === 'for-each-ref' ? 'x\nxorigin/main\n' : (child.git?.[`${cwd} ${verb}`] ?? GIT[`${cwd} ${verb}`] ?? '')
     return { value: { exitCode: stdout ? 0 : 128, stdout, stderr: stdout ? '' : 'not a git repository', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   return { calls, opened, toasts, ran, clock }
@@ -224,7 +224,7 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { parent?: string; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined }
+export type Child = { parent?: string; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string> }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, masterTitle: MASTER_TITLE, board })

@@ -1,17 +1,16 @@
 import type { LiveSession } from '../../types'
 
 import { isArchivable } from '../data/contract'
-import { stepOf } from '../lib/board'
 import { TITLE } from '../lib/constants'
 import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, ageOf, rowTextOf, shownArchived } from '../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, ageOf, plural, rowTextOf, shownArchived } from '../lib/list'
 import type { ListGroup, ListItem } from '../lib/list'
-import { elapsedOf, headOf, syncOf, titleOf, whereOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
-import { CARD_BORDER, LABEL, TERMINAL_COLOR } from '../theme/tokens'
-import { ArchiveConfirm } from './ArchiveConfirm'
+import { TERMINAL_COLOR } from '../theme/tokens'
+import { lossesOf } from './detail/losses'
+import { TextSessionDetail, TextSubagentDetail, TextWorkflowDetail } from './detail/TextDetail'
 import { badgeStateOf } from './list/Row'
 import type { PaneData, TextUi } from './types'
 import { UnarchiveConfirm } from './UnarchiveConfirm'
@@ -21,57 +20,36 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
   const isReadOnly = !!data.from
   const { actions, asking, at, trees } = data
 
-  const detail = (row: Row) => {
-    const facts = row.board
-    const now = row.live
-    const step = stepOf(facts?.progress)
-    const where = whereOf(row, trees)?.tree
-    const isIdle = !!now && !now.isRunning
-    const lines = [
-      `${LABEL[row.state]}${step ? ` · step ${step.done} of ${step.total}${step.label ? `: ${step.label}` : ''}` : ''} · ${elapsedOf(row, at)}`,
-      facts?.needsYou ? `Blocker: ${facts.needsYou}` : '',
-      facts?.now ? `Now: ${facts.now}` : '',
-      facts?.next ? `Next: ${facts.next}` : '',
-      where ? `${where.isMain ? 'Main checkout' : 'Worktree'}: ${where.path} · ${headOf(where)}` : facts?.location ? `Location: ${facts.location}` : '',
-      where ? `Git: ${where.dirty ? `${where.dirty} uncommitted` : 'clean'} · ${syncOf(where)} · last ${where.sha}` : facts?.git ? `Git: ${facts.git}` : '',
-      ...(facts?.commits ?? []).slice(0, 3).map(line => `Commit ${line}`),
-      facts?.tests?.length ? `Tests: ${facts.tests.join(' · ')}` : '',
-      facts?.risk ? `Risk: ${facts.risk}` : '',
-    ].filter(Boolean)
-    return (
-      <Box key={`detail-${row.id}`} flexDirection="column" padding="sm" borderStyle="round" borderColor={row.state === 'needs-you' ? 'error' : CARD_BORDER}>
-        <Box flexDirection="row" gap="sm">
-          <Text weight="semibold">{titleOf(row)}</Text>
-          <Box flexGrow={1} />
-          <Button key={`collapse-${row.id}`} plain label="Collapse" onPress={() => actions.collapse(row.id)} />
-        </Box>
-        {lines.map(line => (
-          <Text dimColor wrap="truncate-end">
-            {line}
-          </Text>
-        ))}
-        {asking === `archive:${row.id}` ? (
-          ArchiveConfirm(ui, { id: row.id, title: `Archive ${row.name}?`, targets: [row], actions })
-        ) : (
-          <Box key={`actions-${row.id}`} flexDirection="row" gap="sm">
-            {now && facts?.needsYou ? <Button key={`chat-${row.id}`} variant="primary" label="Open chat" onPress={() => actions.open(row.id, row.name)} /> : null}
-            {now ? <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} /> : null}
-            {isIdle && !isReadOnly ? <Button key={`archive-${row.id}`} label="Archive…" onPress={() => actions.confirm(`archive:${row.id}`)} /> : null}
-          </Box>
-        )}
+  const detail = (item: ListItem) => {
+    const collapse = () => actions.collapse(item.id)
+    if (item.kind === 'workflow') return TextWorkflowDetail(ui, { run: item.run, at, onCollapse: collapse })
+    if (item.kind === 'subagent') return TextSubagentDetail(ui, { agent: item.agent, at, onCollapse: collapse })
+    return TextSessionDetail(ui, { row: item.row, trees, at, asking, isReadOnly, actions })
+  }
+
+  const undone = data.undone
+  const undoLine = () =>
+    undone ? (
+      <Box key="undo" flexDirection="row" gap="sm">
+        <Text dimColor>{undone.name ? `${undone.name} archived, worktree removed` : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with unmerged work` : ''}`}</Text>
+        {undone.ids.length ? <Button key="undo-archive" plain label="Undo" onPress={actions.undo} /> : null}
       </Box>
-    )
+    ) : null
+
+  const archiveAll = (rows: readonly Row[]) => {
+    const clean = rows.filter(one => !lossesOf(one, trees).length)
+    actions.archive(clean, rows.length - clean.length)
   }
 
   const row = (item: ListItem) => {
-    if (item.kind === 'session' && data.open.includes(item.id)) return detail(item.row)
+    if (data.open.includes(item.id)) return detail(item)
     const text = rowTextOf(item, at)
     const isNeeds = item.group === 'needs-you'
     const tail = [text.kind, text.line, isNeeds ? '' : text.elapsed, text.step && !isNeeds ? `${text.step.done}/${text.step.total}` : ''].filter(Boolean).join(' · ')
     return (
       <Box key={`row-${item.id}`} flexDirection="row" gap="sm">
         <Text color={TERMINAL_COLOR[badgeStateOf(item)]}>●</Text>
-        {item.kind === 'session' ? <Button key={`row-open-${item.id}`} plain label={text.title} onPress={() => actions.toggle(item.id)} /> : <Text weight="semibold">{text.title}</Text>}
+        <Button key={`row-open-${item.id}`} plain label={text.title} onPress={() => actions.toggle(item.id)} />
         <Text color={text.isAlert ? 'error' : undefined} dimColor={!text.isAlert || undefined} wrap="truncate-end">
           {tail}
         </Text>
@@ -120,16 +98,16 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
       )
     }
     if (!one.items.length) return empty(`group-${one.id}`)
-    const idle = one.items.flatMap((item): Row[] => (item.kind === 'session' && isArchivable(item.row.board ?? { state: item.row.state }, item.row.live) ? [item.row] : []))
+    const idle = one.id === 'done' ? one.items.flatMap((item): Row[] => (item.kind === 'session' && isArchivable(item.row.board ?? { state: item.row.state }, item.row.live) ? [item.row] : [])) : []
     return (
       <Box key={`group-${one.id}`} flexDirection="column">
         <Box flexDirection="row" gap="sm">
           <Text weight="semibold" color={TERMINAL_COLOR[one.id]}>{`${GROUP_LABEL[one.id]} ${one.items.length}`}</Text>
           {one.isPinned ? <Text dimColor>pinned on every filter</Text> : null}
           <Box flexGrow={1} />
-          {one.id === 'done' && idle.length > 1 && asking !== 'archive:all' && !isReadOnly ? <Button key="archive-all" plain label="Archive all…" onPress={() => actions.confirm('archive:all')} /> : null}
+          {one.id === 'done' && idle.length && !isReadOnly ? <Button key="archive-all" plain label="Archive all" onPress={() => archiveAll(idle)} /> : null}
         </Box>
-        {one.id === 'done' && asking === 'archive:all' ? ArchiveConfirm(ui, { id: 'all', title: `Archive all ${idle.length} finished sessions?`, targets: idle, actions }) : null}
+        {undone?.group === one.id ? undoLine() : null}
         {one.items.map(row)}
       </Box>
     )
@@ -170,6 +148,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
       </Box>
       <Box key="section-list" flexDirection="column" gap="sm">
         {data.chosen === 'all' && !view.items.length ? empty('all') : null}
+        {undone && !view.groups.some(one => one.id === undone.group) ? undoLine() : null}
         {view.groups.map(group)}
       </Box>
     </Box>

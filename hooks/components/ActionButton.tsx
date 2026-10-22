@@ -1,16 +1,17 @@
 import { across, faceWidth, tall } from '../lib/layout'
 import { buttonFace } from '../theme/icons'
-import type { FaceLook, IconName } from '../theme/icons'
+import type { FaceLook } from '../theme/icons'
 import { C, KINDS, LABEL_COLOR, SIZES } from '../theme/tokens'
 import type { Kind, Size, Tone } from '../theme/tokens'
 import { Hit } from './Hit'
-import { Icon } from './Icon'
+import { Icon, isIcon } from './Icon'
+import type { Glyph } from './Icon'
 import type { Ui } from './types'
 
 export type ActionButtonProps = {
   id: string
   kind: Kind
-  icon: IconName
+  icon: Glyph
   label: string
   onPress: () => void
   size?: Size
@@ -35,7 +36,7 @@ export function ActionButton(ui: Ui, props: ActionButtonProps) {
   const rest: Tone = props.isQuiet ? 'faint' : props.isPressed ? 'text' : one.tone
   const labelColor = props.isQuiet ? C.faint : props.isPressed ? C.text : color.rest
   const look = props.kind === 'primary' ? PRIMARY : props.kind === 'link' ? LINK : undefined
-  if (look && ui.Client && props.wide === undefined) {
+  if (look && ui.Client && props.wide === undefined && isIcon(props.icon)) {
     const [, left] = SIZES[props.size ?? 's']
     const text = props.isIconOnly ? '' : props.label
     return (

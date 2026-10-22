@@ -9,6 +9,7 @@ import { badge, gitPill, ring } from '../../theme/icons'
 import type { IconName } from '../../theme/icons'
 import { C, LABEL } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
+import { lossLineOf } from '../detail/losses'
 import { Hit } from '../Hit'
 import { Icon } from '../Icon'
 import type { Ui } from '../types'
@@ -35,7 +36,7 @@ export function Row(ui: Ui, props: RowProps) {
   const dirty = item.kind === 'session' && where ? dirtyOf(where, item.row.board?.files ?? [], props.home) : 0
   const git = dirty ? gitPill(dirty) : undefined
   const hasRing = !isNeeds && item.kind !== 'subagent'
-  const isOpenable = item.kind === 'session'
+  const loss = item.kind === 'session' && item.group === 'done' ? lossLineOf(item.row, props.trees) : ''
   const muted = C.muted
   const line = (
     <Box flexDirection="row" alignItems={isNeeds ? 'flex-start' : 'center'} gap={across(4)} minWidth={0}>
@@ -53,8 +54,8 @@ export function Row(ui: Ui, props: RowProps) {
         </Text>
       )}
       <Box flexShrink={1} minWidth={0}>
-        <Text size="footnote" weight={text.isAlert ? 'bold' : undefined} color={text.isAlert ? C.red : muted} wrap={isNeeds ? 'wrap' : 'truncate-end'}>
-          {text.line}
+        <Text size="footnote" weight={text.isAlert || loss ? 'bold' : undefined} color={text.isAlert ? C.red : loss ? C.amber : muted} wrap={isNeeds ? 'wrap' : 'truncate-end'}>
+          {loss || text.line}
         </Text>
       </Box>
       {isNarrow && !isNeeds ? (
@@ -85,11 +86,11 @@ export function Row(ui: Ui, props: RowProps) {
       borderStyle="round"
       borderColor={isNeeds ? C.red : C.border}
       backgroundColor={C.surface}
-      hover={isOpenable ? { backgroundColor: C.tileHover, borderColor: isNeeds ? C.red : C.accentRing } : undefined}
+      hover={{ backgroundColor: C.tileHover, borderColor: isNeeds ? C.red : C.accentRing }}
     >
       <Svg key={`row-badge-${item.id}`} source={badge(state, 28, 8, 16)} alt={LABEL[state]} width={28} height={28} />
       <Box flexDirection="column" gap={down(2)} flexGrow={1} flexShrink={1} minWidth={0}>
-        {ui.Client || !isOpenable ? (
+        {ui.Client ? (
           <Text weight="bold" size="heading" wrap="truncate-end">
             {text.title}
           </Text>
@@ -115,7 +116,7 @@ export function Row(ui: Ui, props: RowProps) {
         </Box>
       )}
       {hasRing ? <Svg key={`row-ring-${item.id}`} source={ring(text.step?.done ?? 0, text.step?.total ?? 0, state)} alt={text.step ? `${text.step.done} of ${text.step.total}` : 'no steps yet'} width={34} height={34} /> : null}
-      {isOpenable && ui.Client ? Hit(ui, { id: `row-${item.id}`, width: props.width, height: ROW_HEIGHT, onPress: props.onOpen }) : null}
+      {ui.Client ? Hit(ui, { id: `row-${item.id}`, width: props.width, height: ROW_HEIGHT, onPress: props.onOpen }) : null}
       {isNeeds ? ActionButton(ui, { id: `chat-${item.id}`, kind: 'primary', icon: 'chat', label: 'Open chat', onPress: props.onChat, size: 'b32', iconSize: 16, isIconOnly: isNarrow }) : null}
     </Box>
   )

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, Repo, Report, Shared, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, Repo, Report, Shared, Undone, WorkflowRecord } from '../../types'
 
 const board = atom({ plugin: 'master-session', key: 'board' } as const, null)
 const live = atom({ plugin: 'master-session', key: 'live' } as const, { self: '', title: '', sessions: [], error: '', at: 0 })
@@ -11,6 +11,7 @@ const confirming = atom({ plugin: 'master-session', key: 'confirming' } as const
 const filter = atom({ plugin: 'master-session', key: 'filter' } as const, 'all')
 const archiveView = atom({ plugin: 'master-session', key: 'archiveView' } as const, 'closed')
 const asked = atom({ plugin: 'master-session', key: 'asked' } as const, null)
+const undone = atom({ plugin: 'master-session', key: 'undone' } as const, null)
 const isRefreshing = atom({ plugin: 'master-session', key: 'isRefreshing' } as const, false)
 const shared = atom({ plugin: 'master-session', key: 'shared' } as const, null)
 const reports = atom({ plugin: 'master-session', key: 'reports' } as const, [])
@@ -89,6 +90,14 @@ export function getAsked($: EngineInterface) {
 
 export function setAsked($: EngineInterface, value: Asked | null) {
   return update($, asked, () => value)
+}
+
+export function getUndone($: EngineInterface) {
+  return read($, undone)
+}
+
+export function setUndone($: EngineInterface, change: (value: Undone | null) => Undone | null) {
+  return update($, undone, change)
 }
 
 export function getRefreshing($: EngineInterface) {

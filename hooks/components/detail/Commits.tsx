@@ -14,14 +14,15 @@ export function Commits(ui: Ui, props: CommitsProps) {
     label: 'Commits',
     children: props.commits.slice(0, 3).map((line, index) => (
       <Box key={`commit-${id}-${index}`} flexDirection="row" alignItems="flex-start" gap={across(8)}>
-        <Text size="footnote" mono color={C.muted}>
-          {line.split(' ')[0] ?? ''}
-        </Text>
+        <Box flexShrink={0}>
+          <Text size="footnote" mono color={C.muted}>
+            {line.split(' ')[0] ?? ''}
+          </Text>
+        </Box>
         <Box flexGrow={1} flexShrink={1} minWidth={0}>
           <Text wrap="wrap">{line.split(' ').slice(1).join(' ')}</Text>
         </Box>
       </Box>
     )),
-    gap: 6,
   })
 }
