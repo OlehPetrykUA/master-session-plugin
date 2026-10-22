@@ -700,6 +700,8 @@ test('the open tool expands a workflow agent’s own card inside its open run', 
   await $.tool.call({ tool: 'mcp__master-session__open', expand: 'w1' })
   const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await terminal.find({ key: 'detail-wf_7' })).toBeDefined()
+  await terminal.press({ key: 'collapse-wf_7' })
+  expect(await terminal.find({ key: 'detail-wf_7' })).toBeUndefined()
   await terminal.unmount()
 })
 

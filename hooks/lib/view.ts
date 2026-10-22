@@ -7,7 +7,7 @@ import type { Tone } from '../theme/tokens'
 import { shortOf, updatedOf } from './format'
 import { COLUMN, LH, liftOf } from './layout'
 import { familyOf } from './rows'
-import { ARCHIVED_PEEK, ageOf, blocksOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf } from './list'
+import { ARCHIVED_PEEK, ageOf, blocksOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf } from './list'
 import { NARROW_PX, contentHeightOf, headerRowsOf, sectionTopsOf } from './sections'
 import type { SectionInput } from './sections'
 
@@ -82,7 +82,7 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
     hasExpanded:
       view.groups.some(
         group =>
-          group.items.some(item => data.open.includes(item.id) || (item.kind === 'workflow' && item.run.agents.some(agent => data.open.includes(agent.id)))) ||
+          group.items.some(item => openIdOf(item, data.open) !== undefined) ||
           group.archived.some(one => data.open.includes(one.id)),
       ) ||
       !!data.asking ||

@@ -2,7 +2,7 @@ import type { RenderChildren } from 'claude-code'
 
 import { isArchivable } from '../../data/contract'
 import { bodyWidthOf, across, down } from '../../lib/layout'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, plural, sessionOfAgent, shownArchived } from '../../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, openIdOf, plural, sessionOfAgent, shownArchived } from '../../lib/list'
 import type { Context, ListGroup, RowItem } from '../../lib/list'
 import { familyOf } from '../../lib/rows'
 import type { Row as SessionRow } from '../../lib/rows'
@@ -50,15 +50,13 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
     const parent = sessionOfAgent(item.agent, data)
     return parent ? { label: 'Open chat', onPress: () => actions.open(parent.id, parent.name) } : undefined
   }
-  const isOpen = (item: RowItem) => data.open.includes(item.id) || (item.kind === 'workflow' && item.run.agents.some(agent => data.open.includes(agent.id)))
   const itemOf = (item: RowItem, room: number): RenderChildren => {
     const onOpen = () => {
       if (item.kind === 'agent' && data.open.includes(item.id)) return actions.toggle(item.run.id)
-      const agent = item.kind === 'workflow' ? item.run.agents.find(one => data.open.includes(one.id)) : undefined
-      return actions.toggle(agent?.id ?? item.id)
+      return actions.toggle(openIdOf(item, data.open) ?? item.id)
     }
     const rowProps = { item, context, home: data.home, width: room, isNarrow: view.isNarrow, onOpen, chat: chatOf(item) }
-    if (!isOpen(item)) return Row(ui, rowProps)
+    if (!openIdOf(item, data.open)) return Row(ui, rowProps)
     const innerWidth = room - CARD_INSET
     if (item.kind === 'workflow') return WorkflowDetail(ui, { item, context, rowProps, innerWidth, agentOf: agent => itemOf(agent, innerWidth - 24) })
     if (item.kind === 'subagent' || item.kind === 'agent') return SubagentDetail(ui, { item, context, rowProps, innerWidth, actions })

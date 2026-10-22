@@ -259,6 +259,9 @@ export function lineOf(item: RowItem, context: Context): Line {
   return agentLineOf(item.agent, item.status, chainOf(item, context), context)
 }
 
+export const openIdOf = (item: RowItem, open: readonly string[]) =>
+  open.includes(item.id) ? item.id : item.kind === 'workflow' ? item.run.agents.find(agent => open.includes(agent.id))?.id : undefined
+
 export const lineTextOf = (line: Line) => oneLine(`${line.chain ? `${line.chain} ` : ''}${[line.word?.text, line.text].filter(Boolean).join(' · ')}`)
 
 export const shortNameOf = (item: RowItem) => {

@@ -2,7 +2,7 @@ import { isArchivable } from '../data/contract'
 import { TITLE } from '../lib/constants'
 import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, displayNameOf, sessionOfAgent, elapsedOfItem, lineOf, lineTextOf, nameText, plural, shownArchived, stepsOfItem } from '../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, openIdOf, plural, sessionOfAgent, shownArchived, stepsOfItem } from '../lib/list'
 import type { Context, ListGroup, ListItem, RowItem } from '../lib/list'
 import { familyOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
@@ -20,7 +20,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
   const context: Context = { at, trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows }
 
   const detail = (item: ListItem) => {
-    const collapse = () => actions.collapse(item.id)
+    const collapse = () => actions.collapse(openIdOf(item, data.open) ?? item.id)
     if (item.kind === 'workflow') return TextWorkflowDetail(ui, { item, context, onCollapse: collapse })
     if (item.kind === 'subagent') return TextSubagentDetail(ui, { item, context, onCollapse: collapse })
     return TextSessionDetail(ui, { item, context, asking, isReadOnly, actions })
@@ -64,9 +64,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
     )
   }
 
-  const isOpen = (item: ListItem) => data.open.includes(item.id) || (item.kind === 'workflow' && item.run.agents.some(agent => data.open.includes(agent.id)))
-
-  const row = (item: ListItem) => (isOpen(item) ? detail(item) : line(item))
+  const row = (item: ListItem) => (openIdOf(item, data.open) ? detail(item) : line(item))
 
   const archivedRow = (item: Extract<RowItem, { kind: 'archived' }>) => {
     const { one } = item

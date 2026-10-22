@@ -61,13 +61,13 @@ export function Row(ui: Ui, props: RowProps) {
   const second = (
     <Box key={`${id}-line`} flexDirection="row" alignItems={isNeeds ? 'flex-start' : 'center'} gap={across(4)} minWidth={0} overflow="hidden">
       {glyph(`${id}-kind`, KIND_ICON[item.kind], 'muted', KIND_WORD[item.kind])}
-      {line.chain ? muted(line.chain, `${id}-chain`) : null}
+      {line.chain ? muted(oneLine(line.chain), `${id}-chain`) : null}
       {isNeeds && !line.chain ? question : null}
       {line.word ? glyph(`${id}-word-icon`, STATUS[line.word.status].icon, STATUS[line.word.status].tone) : null}
       {line.word ? (
         <Box key={`${id}-word`} flexShrink={0}>
           <Text size="footnote" weight="semibold" color={C.text}>
-            {line.word.text}
+            {oneLine(line.word.text)}
           </Text>
         </Box>
       ) : null}
