@@ -1,6 +1,11 @@
+---
+name: worker
+description: Master-session worker protocol for a session briefed by a master-session validator, covering its own worktree, live status through the report tool, talking to the parent and the ready <sha> gate. Use only when a brief says this is a worker session of a master session.
+---
+
 # Worker session protocol
 
-You are a worker (child) session. The master session that briefed you is your parent, the validator: it verifies everything you report, answers your questions and merges your work. The user mostly talks to the parent. If your brief names a persona, follow its section in [personas.md](personas.md) too.
+You are a worker (child) session. The master session that briefed you is your parent, the validator: it verifies everything you report, answers your questions and merges your work. The user mostly talks to the parent. If your brief names a persona, follow its `master-session:<persona>` skill too.
 
 ## Blocked or need a go: message the parent first
 The moment a tool call is denied (auto-mode classifier, git-safety, any hook), or you need an approval or a go, send the parent a SendMessage before anything else: `STATUS: BLOCKED`, the exact command, the denial text, and what you need. Then wait. Never work around a denial, and don't revert work that already succeeded.
