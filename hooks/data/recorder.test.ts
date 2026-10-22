@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import { REPORTS_TOOL, REPORT_TOOL, askText } from './contract'
 import type { Report } from './contract'
-import { commitOf, isTestCommand, recordTurnEnd, recorder, repoOf, roleOf, startRecorder, summaryOf, syncAgents } from './recorder'
+import { commitOf, isTestCommand, recordTurnEnd, recorder, repoOf, roleOf, startRecorder, summaryOf, syncAgents, testsOf } from './recorder'
 import { boardPath, reportPath } from './status'
 
 const HOME = '/home/me'
@@ -145,7 +145,7 @@ test('the helpers read a commit line, test runners, the last output line and the
   expect(commitOf('git log --oneline', '[main 1a2b3c4] feat: x')).toBeUndefined()
   expect(commitOf('git commit --amend', 'nothing to commit')).toBeUndefined()
   for (const command of ['pytest -q', 'npm test', 'pnpm run test', 'claude plugin test ~/mod', '/opt/homebrew/bin/tsc -p . --noEmit', 'python3 tests/test_hooks.py']) expect(isTestCommand(command)).toBe(true)
-  for (const command of ['ls', 'git status', 'cat test.txt']) expect(isTestCommand(command)).toBe(false)
+  for (const command of ['ls', 'git status', 'cat test.txt', 'cat hooks/data/agent-prompts.test.tsx', 'sed -n 1,20p hooks/persona.test.sh', 'ls tests/', 'grep -n tsc tsconfig.json', 'echo "plugin test exit $?"', "python3 - <<'EOF'\nimport pytest\nEOF"]) expect(isTestCommand(command)).toBe(false)
   expect(summaryOf('a\n\n  13 passed  \n\n')).toBe('13 passed')
   expect(repoOf('cd ~/dotfiles && git commit -m x', HOME)).toBe(`${HOME}/dotfiles`)
   expect(repoOf('git -C "/repo/one" commit -m x', HOME)).toBe('/repo/one')
@@ -227,8 +227,8 @@ test('commits, test runs and edits are recorded from tool calls; failures and ot
   const tested = run.reportNow()
   expect(tested?.commits.map(one => one.sha)).toEqual(['1a2b3c4'])
   expect(tested?.tests.map(one => [one.cmd, one.ok, one.summary])).toEqual([
-    ['pytest -q tests FAIL', false, '1 failed, 3 passed in 0.2s'],
-    ['tsc -p . --noEmit', true, ''],
+    ['pytest · 3 passed · 1 failed', false, ''],
+    ['tsc · exit 0', true, ''],
   ])
   await run.fire('tool.call', { tool: 'Edit', tool_use_id: 'e1', file_path: '/repo/a.ts', old_string: 'a', new_string: 'b' })
   const edited = run.reportNow()?.seq ?? 0
@@ -304,4 +304,42 @@ test('a save never drops a change another save made while it waited', async () =
   await reporting
   await settle()
   expect([run.reportNow()?.now, run.reportNow()?.run.isRunning]).toEqual(['writing tests', true])
+})
+
+const GATE = [
+  'cd "$HOME/.claude/worktrees/wt-master-session-plugin-band-v3"; L="/private/tmp/scratch/gate.log"; E="/Applications/claude"',
+  '"$E" plugin validate --strict . > "$L" 2>&1; echo "validate exit $?"; grep -E "✔|✘" "$L"',
+  '"$E" plugin test . > "$L" 2>&1; echo "plugin test exit $?"; tail -4 "$L"',
+  'tsc -p . --noEmit > "$L" 2>&1; echo "tsc exit $?"',
+  "sh hooks/persona.test.sh > \"$L\"; python3 - \"$L\" <<'EOF'\nimport sys\nprint(open(sys.argv[1]).read().count('ok'))\nEOF",
+].join('\n')
+
+const GATE_OUT = 'validate exit 0\n✔ Validation passed\nplugin test exit 0\n\n 186 pass\n 0 fail\nRan 186 tests across 16 files. [12.02s]\ntsc exit 0\n12'
+
+test('a multi-line gate script records one short "<tool> · <result>" label per check it runs, in order, never the raw script', () => {
+  const tests = testsOf(GATE, GATE_OUT, false)
+  expect(tests).toEqual([
+    { cmd: 'validate · passed', ok: true, summary: '' },
+    { cmd: 'plugin test · 186 pass', ok: true, summary: '' },
+    { cmd: 'tsc · exit 0', ok: true, summary: '' },
+    { cmd: 'persona.test · exit 0', ok: true, summary: '' },
+  ])
+  expect(tests.every(one => !/[\n/]|\$|cd /.test(one.cmd) && one.cmd.length <= 60)).toBe(true)
+  expect(testsOf('"$E" plugin test .', ' 184 pass\n 2 fail', true)).toEqual([{ cmd: 'plugin test · 184 pass · 2 fail', ok: false, summary: '' }])
+  expect(testsOf('tsc -p . --noEmit', 'a.ts(1,1): error TS2322: x\nb.ts(2,2): error TS7006: y', true)).toEqual([{ cmd: 'tsc · 2 errors', ok: false, summary: '' }])
+  expect(testsOf('sh hooks/persona.test.sh', 'ok   a\nok   b\nFAIL c (exit 1)', true)).toEqual([{ cmd: 'persona.test · 2 ok · 1 fail', ok: false, summary: '' }])
+  expect(testsOf('go test ./...', 'Exit code 2\nFAIL', true)).toEqual([{ cmd: 'go test · exit 2', ok: false, summary: '' }])
+  expect(testsOf('python3 tests/test_hooks.py', '123 passed', false)).toEqual([{ cmd: 'test_hooks.py · 123 passed', ok: true, summary: '' }])
+})
+
+test('a gate script run through Bash stores the labels; a non-test call with "test" in a path stores nothing', async () => {
+  const run = world()
+  await run.start()
+  await run.fire('tool.call', { tool: 'Bash', tool_use_id: 'gate', command: GATE })
+  expect(run.reportNow()?.tests.map(one => one.cmd)).toEqual(['validate · exit 0', 'plugin test · exit 0', 'tsc · exit 0', 'persona.test · exit 0'])
+  const seq = run.reportNow()?.seq
+  await run.bash('cat hooks/data/agent-prompts.test.tsx')
+  await run.bash('sed -n 1,20p hooks/persona.test.sh')
+  expect(run.reportNow()?.seq).toBe(seq)
+  expect(run.reportNow()?.tests).toHaveLength(4)
 })

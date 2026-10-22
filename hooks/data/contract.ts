@@ -213,7 +213,7 @@ function latestOf(reports: readonly Report[]) {
 const gitText = (git: NonNullable<Report['git']>) =>
   [git.branch, git.dirty ? `${git.dirty} uncommitted` : 'clean', git.ahead ? `${git.ahead} ahead` : ''].filter(Boolean).join(' · ')
 
-const testText = (test: Report['tests'][number]) => [test.cmd, test.ok ? 'passed' : 'failed', test.summary].filter(Boolean).join(' · ')
+const testText = (test: Report['tests'][number]) => (test.summary ? [test.cmd, test.ok ? 'passed' : 'failed', test.summary].join(' · ') : test.cmd)
 
 function noteOf(state: SessionState, isVerified: boolean, isIdle: boolean, isRunning: boolean, age: number | undefined) {
   if (state === 'done' && !isVerified) return 'done · unverified'

@@ -16,7 +16,6 @@ export type Role = { role: 'worker' | 'master' | ''; self: string; parent: strin
 
 const NO_ROLE: Role = { role: '', self: '', parent: '', engineId: '' }
 const COMMIT_LINE = /^\[[^\]\s]+(?: \([^)]*\))? ([0-9a-f]{7,40})\] (.+)$/m
-const TEST_RUNNER = /\b(?:pytest|jest|vitest|mocha|bats|go test|cargo test|(?:npm|pnpm|yarn|bun)(?: run)? test|plugin test|tsc|test_\w+\.(?:py|sh))\b/
 const REPO = /(?:^|&&|;)\s*cd\s+("[^"]+"|'[^']+'|[^\s;&|]+)|\bgit\s+-C\s+("[^"]+"|'[^']+'|[^\s;&|]+)/
 const NUDGE = `Status check from your master session: call ${REPORT_TOOL} at your next step boundary. No chat reply.`
 const ASKING = new Set(['permission_prompt', 'elicitation_dialog', 'elicitation_url_dialog', 'agent_needs_input'])
@@ -43,7 +42,76 @@ export const commitOf = (command: string, output: string) => {
   return match ? { sha: match[1] ?? '', subject: (match[2] ?? '').trim() } : undefined
 }
 
-export const isTestCommand = (command: string) => TEST_RUNNER.test(command)
+type Result = { text: string; ok: boolean }
+
+type Check = { tool: (match: RegExpMatchArray) => string; pattern: RegExp; result?: (output: string) => Result | undefined }
+
+const LABEL_CAP = 60
+
+const lastNumber = (output: string, pattern: RegExp) => [...output.matchAll(pattern)].map(match => Number(match[1])).at(-1)
+
+const tally = (output: string, passed: RegExp, failed: RegExp, word: [string, string]): Result | undefined => {
+  const good = lastNumber(output, passed)
+  const bad = lastNumber(output, failed) ?? 0
+  if (good === undefined && !bad) return undefined
+  return { text: [`${good ?? 0} ${word[0]}`, bad ? `${bad} ${word[1]}` : ''].filter(Boolean).join(' · '), ok: !bad }
+}
+
+const counts = (output: string) => tally(output, /\b(\d+) passed\b/g, /\b(\d+) failed\b/g, ['passed', 'failed'])
+
+const RUN = String.raw`(?:^|[;&|(\n])\s*(?:npx\s+|python3?\s+-m\s+)?(?:\S*/)?`
+
+const CHECKS: Check[] = [
+  { tool: () => 'plugin test', pattern: /\bplugin\s+test\b/, result: output => tally(output, /^\s*(\d+) pass\s*$/gm, /^\s*(\d+) fail\s*$/gm, ['pass', 'fail']) },
+  {
+    tool: () => 'validate',
+    pattern: /\bplugin\s+validate\b/,
+    result: output => (/Validation passed/.test(output) ? { text: 'passed', ok: true } : /Validation failed|✘/.test(output) ? { text: 'failed', ok: false } : undefined),
+  },
+  {
+    tool: () => 'tsc',
+    pattern: new RegExp(`${RUN}tsc(?=\\s|$)`),
+    result: output => {
+      const errors = output.match(/\berror TS\d+/g)?.length ?? 0
+      return errors ? { text: `${errors} error${errors === 1 ? '' : 's'}`, ok: false } : undefined
+    },
+  },
+  {
+    tool: () => 'persona.test',
+    pattern: /(?:\b(?:sh|bash)\s+\S*|\.\/\S*)persona\.test\.sh\b/,
+    result: output => {
+      const good = output.match(/^ok\s/gm)?.length ?? 0
+      const bad = output.match(/^FAIL\s/gm)?.length ?? 0
+      return good || bad ? { text: [`${good} ok`, bad ? `${bad} fail` : ''].filter(Boolean).join(' · '), ok: !bad } : undefined
+    },
+  },
+  { tool: match => `${match[1]} test`, pattern: /\b(npm|pnpm|yarn|bun)(?:\s+run)?\s+test\b/, result: counts },
+  { tool: match => match[1] ?? '', pattern: new RegExp(`${RUN}(pytest|vitest|jest|mocha|bats)\\b`), result: counts },
+  { tool: match => `${match[1]} test`, pattern: /\b(go|cargo)\s+test\b/ },
+  { tool: match => match[1] ?? '', pattern: /(?:\bpython3?\s+|\b(?:sh|bash)\s+|\.\/)\S*?\b(test_\w+\.(?:py|sh))\b/, result: counts },
+]
+
+const runnable = (command: string) =>
+  command
+    .replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\b/g, '')
+    .replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, '""')
+
+const exitOf = (output: string, isError: boolean): Result => (isError ? { text: `exit ${output.match(/^Exit code (\d+)/m)?.[1] ?? 1}`, ok: false } : { text: 'exit 0', ok: true })
+
+export function testsOf(command: string, output: string, isError: boolean) {
+  const code = runnable(command)
+  const found = CHECKS.flatMap(check => {
+    const match = code.match(check.pattern)
+    return match && match.index !== undefined ? [{ at: match.index, tool: check.tool(match), result: check.result?.(output) ?? exitOf(output, isError) }] : []
+  })
+  const seen = new Set<string>()
+  return found
+    .sort((left, right) => left.at - right.at)
+    .filter(one => !seen.has(one.tool) && !!seen.add(one.tool))
+    .map(one => ({ cmd: `${one.tool} · ${one.result.text}`.slice(0, LABEL_CAP), ok: one.result.ok, summary: '' }))
+}
+
+export const isTestCommand = (command: string) => testsOf(command, '', false).length > 0
 
 const fieldOf = (input: unknown, key: string) => {
   const value = typeof input === 'object' && input ? (input as Record<string, unknown>)[key] : undefined
@@ -167,7 +235,8 @@ async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?:
   if (e.tool !== 'Bash') return
   const output = out.text ?? ''
   const commit = out.isError ? undefined : commitOf(e.command, output)
-  const isTest = isTestCommand(e.command)
+  const tests = testsOf(e.command, output, !!out.isError)
+  const isTest = tests.length > 0
   const place = repoOf(e.command, home)
   const isMoved = !!place && place !== gitCwd
   if (!commit && !isTest && !isMoved) return
@@ -180,7 +249,7 @@ async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?:
     {
       ...before,
       commits: commit ? [...before.commits.filter(one => one.sha !== commit.sha), { ...commit, at: now }] : before.commits,
-      tests: isTest ? [...before.tests, { cmd: e.command.slice(0, 200), ok: !out.isError, summary: summaryOf(output), at: now }] : before.tests,
+      tests: isTest ? [...before.tests, ...tests.map(one => ({ ...one, at: now }))] : before.tests,
       activity: commit ? [...before.activity, { at: now, text: `committed ${commit.sha}` }] : before.activity,
       git: git ?? before.git,
     },
