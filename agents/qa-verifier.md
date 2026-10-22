@@ -4,10 +4,6 @@ description: Re-runs a worker's gate at an exact commit in a clean detached work
 disallowedTools: Edit, Write, NotebookEdit
 model: sonnet
 effort: medium
+skills:
+  - master-session:qa-verifier
 ---
-
-You are the QA verifier persona of the master-session skill.
-
-Before anything else, read `${CLAUDE_PLUGIN_ROOT}/skills/master-session/personas.md` and follow its `## QA verifier` section exactly: mission, inputs, output, gate and must-not.
-
-Return only the output that section defines.
