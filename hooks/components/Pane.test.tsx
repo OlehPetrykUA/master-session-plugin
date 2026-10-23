@@ -21,7 +21,9 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
     'hit-chip-archived',
     'hit-row-local_env',
     'hit-chat-local_env',
+    'hit-row-local_env-chevron',
     'hit-row-local_setup',
+    'hit-row-local_setup-chevron',
     'hit-archived-show',
     'hit-ask',
     'hit-refresh',
@@ -122,7 +124,7 @@ test('subagents and workflows are rows with their kind and the same groups: runn
   for (const word of ['review:bugs', 'workflow-subagent', 'master-session:researcher', 'haiku', 'sonnet']) expect(texts).not.toContain(word)
   const heads = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
   expect(heads).toEqual(['group-head-needs-you', 'group-head-working', 'group-head-waiting', 'group-head-done', 'group-head-archived'])
-  expect((await hitsOf(ui)).filter(hit => hit.startsWith('hit-row-'))).toEqual(['hit-row-local_env', 'hit-row-wf_7', 'hit-row-Review auth flow', 'hit-row-local_setup', 'hit-row-Find token usages'])
+  expect((await hitsOf(ui)).filter(hit => hit.startsWith('hit-row-') && !hit.endsWith('-chevron'))).toEqual(['hit-row-local_env', 'hit-row-wf_7', 'hit-row-Review auth flow', 'hit-row-local_setup', 'hit-row-Find token usages'])
   expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Workflow', 'Subagent', 'Session', '1 of 2', 'working', 'done']))
   expect((await ui.find({ key: 'block-subagents' }))?.text).toContain('1 running')
   expect((await ui.find({ key: 'block-workflows' }))?.text).toContain('1/2 agents')

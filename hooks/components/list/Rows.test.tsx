@@ -42,6 +42,18 @@ test('a subagent waiting on a prompt in a worker chat: a red row with its parent
   await ui.unmount()
 })
 
+test('a press on a subagent chevron chip toggles its row', async ($, on) => {
+  seeded(on, [agent('a2', { asking: ASK })])
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ key: 'detail-a2' })).toBeUndefined()
+  await click(ui, 'hit-row-a2-chevron')
+  expect(await ui.find({ key: 'detail-a2' })).toBeDefined()
+  await click(ui, 'hit-top-a2-chevron')
+  expect(await ui.find({ key: 'detail-a2' })).toBeUndefined()
+  await ui.unmount()
+})
+
 test('a subagent of the Validator has no Open chat: the row shows its time and expands, and the card says to answer here', async ($, on) => {
   seeded(on, [agent('a2', { asking: ASK })])
   await started($, on)

@@ -141,6 +141,17 @@ test('the press target spans the header: a row its full width and height, a card
   await ui.unmount()
 })
 
+test('a press on the chevron chip toggles the row like the header: the chip carries its own press target', async ($, on) => {
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ key: 'detail-local_setup' })).toBeUndefined()
+  await click(ui, 'hit-row-local_setup-chevron')
+  expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
+  await click(ui, 'hit-top-local_setup-chevron')
+  expect(await ui.find({ key: 'detail-local_setup' })).toBeUndefined()
+  await ui.unmount()
+})
+
 test('the expanded card draws its top as the row: a 3 px inset from the card border, the same content place', async ($, on) => {
   await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], title: 'Implementer · Archive safety for side sessions in other repos' }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })

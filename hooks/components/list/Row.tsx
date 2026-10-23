@@ -190,6 +190,7 @@ export function Row(ui: Ui, props: RowProps) {
         <Box key={`${id}-chevron-hot`} position="absolute" top={0} right={0} bottom={0} left={0} flexDirection="row" alignItems="center" justifyContent="center" display="none" hover={{ scope, display: 'flex' }}>
           {Icon(ui, { id: `${id}-chevron-icon-hot`, name: chevron, size: 14, tone: 'text', weight: 2, alt: chevron })}
         </Box>
+        {ui.Client ? Hit(ui, { id: `${id}-chevron`, width: 24, height: 24, onPress: props.onOpen }) : null}
       </Box>
     </Box>
   )
