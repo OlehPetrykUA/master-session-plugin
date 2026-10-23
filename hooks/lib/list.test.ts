@@ -105,9 +105,10 @@ test('every kind names itself persona · task and says its state word and curren
   const done = itemsOf([], agents.map(agent => ({ ...agent, state: 'done' as const, endedAt: agent.endedAt ?? NOW })), workflows).find(item => item.kind === 'workflow')
   expect(said(done!)).toEqual(['done', 'Workflow · review-changes', 'done · 3 of 3 agents'])
   expect([kindOfType('a:b:c'), kindOfType('Explore'), modelFamilyOf('claude-opus-5-5'), modelFamilyOf('haiku'), modelFamilyOf(undefined)]).toEqual(['c', 'Explore', 'opus', 'haiku', ''])
-  const personas = ['implementer', 'refactorer', 'reviewer', 'qa-verifier', 'design-checker', 'researcher', 'designer', 'validator'].map(type => personaOfType(`master-session:${type}`))
+  const personas = ['implementer', 'refactorer', 'reviewer', 'qa-verifier', 'design-checker', 'researcher', 'designer', 'architect', 'validator'].map(type => personaOfType(`master-session:${type}`))
   expect(personas.map(persona => PERSONA_GLYPH[persona] && PERSONA_GLYPH[persona] in I)).toEqual(personas.map(() => true))
   expect([personaOfType('general-purpose'), personaOfType('workflow-subagent'), personaOfType('master-session:qa-verifier'), personaOfType('Explore'), personaOfType('')]).toEqual(['Agent', 'Agent', 'QA verifier', 'Explore', 'Subagent'])
+  expect([personaOfType('master-session:architect'), PERSONA_GLYPH.Architect]).toEqual(['Architect', 'architect'])
 })
 
 test('a session reads idle, ready, verified or merged from its live state, board and worktree; a persona on the board or the title names it', () => {

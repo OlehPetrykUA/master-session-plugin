@@ -662,6 +662,8 @@ test('the needs-you pill names the asker as the pane does: its persona glyph at 
   expect(bandViewOf(100, current, progress, '', false, IDLE, act).pillText).toBe('Implementer · verify-personas needs you · Allow Bash: npm test')
   const remote = viewOf(WORKING.map(one => (one.id === 'local_b' ? { ...one, state: 'needs-you' as const, needsYou: 'Allow Bash: rm -rf dist' } : one)), CREW({ remote: true })).view
   expect([remote.asker?.glyph, viewOf(WORKING, CREW({ flow: true })).view.asker?.glyph, viewOf(NEEDS, CREW()).view.asker?.glyph]).toEqual(['reviewer', 'agent', 'session'])
+  const architect = boardOf([{ ...sessions[0]!, persona: 'Architect' }, ...WORKING])
+  expect(bandViewOf(100, architect, bandProgress(architect, plain)!, '', false, IDLE, act).asker?.glyph).toBe('architect')
   await band($, on, sessions)
   const ui = await mount($)
   const pill = (await ui.findAll({ type: 'Svg' }))[0]

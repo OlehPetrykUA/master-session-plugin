@@ -64,6 +64,7 @@ const PERSONA: Record<string, string> = {
   'design-checker': 'Design checker',
   researcher: 'Researcher',
   designer: 'Designer',
+  architect: 'Architect',
   validator: 'Validator',
 }
 

@@ -14,6 +14,7 @@ check 'master-session:implementer gets the worker protocol' '{"agent_type":"mast
 check 'master-session:reviewer gets its skill' '{"session_id":"x","agent_type": "master-session:reviewer","source":"resume"}' '# Reviewer'
 check 'master-session:designer gets its skill' '{"agent_type":"master-session:designer"}' '# Designer'
 check 'master-session:spec-writer gets its skill' '{"agent_type":"master-session:spec-writer"}' '# Spec writer'
+check 'master-session:architect gets its skill' '{"agent_type":"master-session:architect"}' '# Architect'
 check 'bare reviewer, a user agent, gets nothing' '{"agent_type":"reviewer"}' ''
 check 'another plugin reviewer gets nothing' '{"agent_type":"other:reviewer"}' ''
 check 'master-session:start gets nothing' '{"agent_type":"master-session:start"}' ''

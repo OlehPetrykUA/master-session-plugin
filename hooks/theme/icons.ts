@@ -64,6 +64,7 @@ export const I = {
   designChecker: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z M12 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6Z',
   researcher: 'M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5Z M5 19.5A1.5 1.5 0 0 0 6.5 21H19 M9 7h6',
   designer: 'M15 4l5 5L9 20H4v-5Z M13 6l5 5',
+  architect: 'M12 3l9 4.5-9 4.5-9-4.5Z M3 12l9 4.5 9-4.5 M3 16.5l9 4.5 9-4.5',
   validator: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5Z',
   session: 'M3 5h18v14H3Z M7 10l3 2-3 2 M12 14h5',
   agent: 'M6 8h12v11H6Z M12 4v4 M9.5 12.5v1 M14.5 12.5v1 M9.5 16h5',
@@ -82,6 +83,7 @@ export const PERSONA_GLYPH: Record<string, IconName> = {
   'Design checker': 'designChecker',
   Researcher: 'researcher',
   Designer: 'designer',
+  Architect: 'architect',
   Validator: 'validator',
 }
 

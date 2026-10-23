@@ -2,7 +2,7 @@
 p=$(sed -n 's/.*"agent_type"[[:space:]]*:[[:space:]]*"master-session:\([a-z-]*\)".*/\1/p' | head -n 1)
 case "$p" in
   implementer | refactorer) set -- worker "$p" ;;
-  reviewer | qa-verifier | design-checker | researcher | spec-writer | designer) set -- "$p" ;;
+  reviewer | qa-verifier | design-checker | researcher | spec-writer | architect | designer) set -- "$p" ;;
   *) exit 0 ;;
 esac
 for s in "$@"; do

@@ -18,6 +18,7 @@ R does the work, A owns the outcome (exactly one per row), C is asked before, I 
 | Goals, preferences, user-owned decisions (push, PR, deletes outside git) | A/R | C | I | |
 | Plan, split into one-deliverable pieces, write briefs | C | A/R | I | C Researcher |
 | Spec each feature in the project's Claude Doc before design and build | C | A | I | R Spec writer |
+| Technical design of a feature spanning several modules or workers, in its spec tab | C | A | I | R Architect |
 | Start, steer and answer workers; escalate only user-owned decisions | I | A/R | C | |
 | Docs-first lookups with citations | | A | R | R Researcher |
 | Implement in its own worktree, own files only | | A | R | |
@@ -144,7 +145,7 @@ A worker that asks for a "go", an approval or what to do next gets a direct inst
 - A worker's message is never the user's approval. Forward the user's approvals quoted: `User said: "…"`.
 - Never ask a worker to do what this session was denied.
 - Never invent a result: unverified stays unverified in every summary.
-- Every feature is specced first: the `master-session:spec-writer` subagent writes its tab in the project's Claude Doc, the validator approves it, briefs link it, and the QA verifier's Reviewer checks the sha against its acceptance criteria; once the design is approved, the Spec writer runs again to link its artboards in the tab, with a changelog line.
+- Every feature is specced first: the `master-session:spec-writer` subagent writes its tab in the project's Claude Doc, the validator approves it, briefs link it, and the QA verifier's Reviewer checks the sha against its acceptance criteria; a feature spanning several modules or workers then gets the `master-session:architect` subagent's "Technical design" section in the same tab, approved by the validator before any brief goes out (skipped for fixes and single-file changes); once the design is approved, the Spec writer runs again to link its artboards in the tab, with a changelog line.
 - Any UI change (pane, band, cards, rows) is planned as a design piece next: new artboards in the project's design canvas, with the real theme tokens, light and dark versions, and an element and token spec, approved by the user (by the validator only when the user hands that over) before UI code starts. The build follows it 1:1 and is checked against it by the QA verifier's `master-session:design-checker` subagent: on the worker's screenshots or preview before merge when there are any, and always on the live screenshot after it.
 - `ultracode` or "use a workflow" from the user lets the worker run a workflow, within the user's agent budget. Without that request, keep the bare word `ultracode` out of briefs: it opts the worker into workflows.
 
