@@ -5,7 +5,7 @@ import { displayNameOf, nameText } from '../lib/list'
 import { PANE } from '../lib/constants'
 import { getAgents, getLive, getRepos, getWorkflows, saveBoard } from '../state/atoms'
 import { detected, halt, roleOf } from './recorder'
-import { boardOf, forget, homeOf, isMaster, isPaneOpen, isWorker } from './sources'
+import { boardOf, forget, homeOf, isMaster, isPaneOpen, isWorker, written } from './sources'
 import { boardPath, reportPath, writeTombstone } from './status'
 
 const NOTHING = 'This session is not a master session: nothing to stop.'
@@ -32,6 +32,7 @@ export async function stopMode($: EngineInterface, isForced: boolean) {
   await halt($)
   await saveBoard($, () => null)
   forget()
+  await written()
   const isRetired = !self || (await writeTombstone($, isOwner ? boardPath(homeOf(), self) : reportPath(homeOf(), self), self, await $.clock.now()).then(() => true, () => false))
   const failed = isRetired ? '' : ` The ${isOwner ? 'board' : 'report'} file could not be cleared; ${isOwner ? 'a worker started now may still take this session as its master' : "the master may still show this session's last report"}.`
   if (await isPaneOpen($)) await $.ui.close({ id: PANE }).catch(() => undefined)

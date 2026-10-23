@@ -21,6 +21,7 @@ import { askForUpdates, readReports, writeBoard } from './status'
 let home = ''
 let published = ''
 let publishedAt = 0
+let writing: Promise<unknown> | undefined
 let flight: Promise<void> | undefined
 let isQueued = false
 const seenTrees = new Map<string, { key: string; at: number; tree: Worktree }>()
@@ -114,8 +115,10 @@ export async function republishBoard($: EngineInterface) {
   if (isOff()) return
   published = sign
   publishedAt = at
-  await writeBoard($, home, { at, masterId, board: { ...merged, repos } })
+  await (writing = writeBoard($, home, { at, masterId, board: { ...merged, repos } }))
 }
+
+export const written = () => writing?.catch(() => undefined)
 
 export async function askAll($: EngineInterface) {
   const me = await getLive($)

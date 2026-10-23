@@ -48,6 +48,7 @@ const NO_MASTER = 'This session has no master session: report status in chat ins
 const START = { skill: 'master-session:start', text: 'Validator.', frontmatter: {}, source: 'plugin' } as const
 const WORKER = { skill: 'master-session:worker', text: 'Worker.', frontmatter: {}, source: 'plugin' } as const
 let failing = false
+let holding: Promise<void> | undefined
 let files: Record<string, string> = {}
 const OWN = boardPath(HOME, SELF)
 const ONLY_WORKING = { ...BOARD, sessions: [{ ...BOARD.sessions[0], state: 'working', needsYou: undefined }, BOARD.sessions[1]], needsYou: [] }
@@ -63,8 +64,12 @@ function recorders(on: On) {
   const writes: { path: string; text: string }[] = []
   const closed: string[] = []
   failing = false
-  on('fs.write', (_, e) => {
+  holding = undefined
+  on('fs.write', async (_, e) => {
     if (failing) throw new Error('disk full')
+    const gate = holding
+    holding = undefined
+    if (gate) await gate
     writes.push({ path: e.path, text: e.text })
     return { value: undefined }
   })
@@ -592,8 +597,9 @@ test('AC14 a republish in flight when the master stops never writes over the tom
     return next(e)
   })
   const run = await master($, on)
+  const held = { ...BOARD, needsYou: ['held'], repos: [`${HOME}/dotfiles`, `${HOME}/Work/toolkit`] }
   isHeld = true
-  const call = $.tool.call({ tool: BOARD_TOOL, ...BOARD })
+  const call = $.tool.call({ tool: BOARD_TOOL, ...held })
   await run.clock.advance(10)
   expect(isHeld).toBe(false)
   expect((await $.command.run(typed(STOP, 'force'))).text).toBe(M3)
@@ -602,8 +608,24 @@ test('AC14 a republish in flight when the master stops never writes over the tom
   await run.clock.settle()
   const kinds = () => run.writes.filter(one => one.path === OWN).map(one => JSON.parse(one.text).kind)
   expect(kinds().at(-1)).toBe('stopped')
-  await $.skill.prompt(START)
-  await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
+  await $.skill.prompt(WORKER)
+  await $.tool.call({ tool: BOARD_TOOL, ...held })
   await run.clock.settle()
   expect(kinds().at(-1)).toBe('board')
+})
+
+test('AC14 a board write held inside fs.write when the master stops lands before the tombstone', async ($, on) => {
+  let release = () => {}
+  const run = await master($, on)
+  holding = new Promise<void>(resolve => (release = resolve))
+  const call = $.tool.call({ tool: BOARD_TOOL, ...BOARD, needsYou: ['held'] })
+  await run.clock.advance(10)
+  const stop = $.command.run(typed(STOP, 'force'))
+  await run.clock.advance(10)
+  release()
+  await call
+  expect((await stop).text).toBe(M3)
+  await run.clock.settle()
+  const kinds = run.writes.filter(one => one.path === OWN).map(one => JSON.parse(one.text).kind)
+  expect(kinds).toEqual(['board', 'stopped'])
 })
