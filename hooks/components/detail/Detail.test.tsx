@@ -782,3 +782,13 @@ test('the open tool expands a workflow agent inside its run, in the terminal as 
     await ui.unmount()
   }
 })
+
+test('the terminal session card lists tests like the desktop pills: failed first as "✗ <name> · failed", then newest first with ✓, one per command', async ($, on) => {
+  const tests = ['tsc -p . --noEmit · exit 0', 'archive.test.ts · 3 failing', 'plugin test · passed · 226 pass', 'lint · passed', 'plugin test · passed · 228 pass', 'tsc · 2 errors']
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], tests }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'row-open-local_setup' })
+  const line = (await textsOf(ui)).find(text => text.startsWith('Tests: '))
+  expect(line).toBe('Tests: ✗ tsc · failed · ✗ archive.test.ts · failed · ✓ plugin test · 228 pass · ✓ lint')
+  await ui.unmount()
+})

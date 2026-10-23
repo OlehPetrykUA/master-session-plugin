@@ -9,6 +9,7 @@ import type { Actions, TextUi } from '../types'
 import { LOST } from './ArchiveBox'
 import { durationOf, tokensOf } from './format'
 import { lossesOf } from './losses'
+import { pillsOf } from './Tests'
 
 type Line = { text: string; color?: string }
 
@@ -67,7 +68,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
       where ? `Git: ${where.dirty ? `${where.dirty} uncommitted` : 'clean'} · ${syncOf(where)}` : facts?.git ? `Git: ${facts.git}` : '',
       now ? `Time: ${now.createdAt !== undefined ? `started ${clockOf(now.createdAt)}` : (facts?.time ?? '')} · ${now.isRunning ? 'active now' : `idle ${compactOf(at - now.lastActivityAt)}`}` : facts?.time ? `Time: ${facts.time}` : '',
       ...(facts?.commits ?? []).slice(0, 3).map(line => `Commit ${line}`),
-      facts?.tests?.length ? `Tests: ${facts.tests.map(test => `✓ ${test}`).join(' · ')}` : '',
+      facts?.tests?.length ? `Tests: ${pillsOf(facts.tests).map(pill => `${pill.isFailed ? '✗' : '✓'} ${pill.full}`).join(' · ')}` : '',
       files.length ? `Files owned: ${[...files.slice(0, 3), ...(files.length > 3 ? [`+${files.length - 3} more`] : [])].join(' · ')}` : '',
       now?.permissionMode || model ? `Permission: ${now?.permissionMode ?? '—'} · Model: ${model || '—'}` : '',
       facts?.verified ? `Verified: ${facts.verified}` : '',
