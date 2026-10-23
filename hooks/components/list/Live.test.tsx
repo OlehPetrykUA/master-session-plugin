@@ -5,6 +5,9 @@ import type { AgentRecord } from '../../../types'
 
 import { across, bodyWidthOf, faceWidth, tall, textWidth } from '../../lib/layout'
 import { rowsOf } from '../../lib/list'
+import { blocksOf } from '../../lib/list'
+import type { RunSummary } from '../../lib/totals'
+import { subOf, tileInnerOf } from './Summary'
 import { C } from '../../theme/tokens'
 import { BOARD, BOARD_TOOL, HOME, PANE, SELF, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 
@@ -243,4 +246,47 @@ test('KPI subs never truncate from 47 to 60 columns: each tile draws the first o
         for (const text of texts) expect([bodyColumns, key, text, textWidth(text, 11, { isBold: text === texts[0] }) <= inner]).toEqual([bodyColumns, key, text, true])
     }
   }
+})
+
+test('when "N blockers" is wider than the tile, Needs you draws the bare count', async ($, on) => {
+  const count = 100
+  seeded(on, Array.from({ length: count }, (_, index) => ({ id: `n${index}`, type: 'master-session:reviewer', description: `Review ${index}`, state: 'running' as const, startedAt: 3_500_000, parentSessionId: 'local_setup', asking: { text: 'Allow Bash: ls', since: 3_590_000 } })))
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[1]], needsYou: [] })
+  const inner = (bodyWidthOf(47) - 3 * 8) / 4 - 2 - 16
+  expect([textWidth(`${count} blockers`, 11) > inner, textWidth(String(count), 11) <= inner]).toEqual([true, true])
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 47 } })
+  expect((await ui.find({ key: 'block-needs-you' }))?.text).toBe(`Needs you${count}`)
+  await ui.unmount()
+})
+
+test('each tile draws the FIRST of [sub, ...shorts] whose width fits, at 47 and at 60 columns, for long, short and empty data', () => {
+  const base: RunSummary = {
+    sessions: { total: 3, 'needs-you': 0, waiting: 1, working: 1, done: 1, archived: 0 },
+    needsYou: { sessions: 0, subagents: 12 },
+    subagents: { total: 14, running: 12, done: 2, failed: 0, asking: 12 },
+    workflows: { total: 1, running: 1, done: 0, failed: 0, asking: 0, agents: 17, agentsDone: 14 },
+    commits: { total: 14, repos: 3 },
+    tests: { value: '52614', sub: 'smoke 398 · hooks 128 · e2e 52088 across 4 workers' },
+    duration: { since: 0, ms: 4_000_000 },
+    git: { dirty: 5 },
+  }
+  const cases: [RunSummary, string | undefined][] = [
+    [base, '20:04'],
+    [base, undefined],
+    [{ ...base, needsYou: { sessions: 1, subagents: 1000 }, tests: { value: '6 checks', sub: 'passed · no counts' } }, undefined],
+    [{ ...base, needsYou: { sessions: 0, subagents: 0 }, subagents: { total: 2, running: 0, done: 2, failed: 0, asking: 0 }, tests: { value: '—', sub: 'none reported' } }, '20:04'],
+  ]
+  for (const bodyColumns of [47, 60]) {
+    const inner = tileInnerOf(bodyWidthOf(bodyColumns), 4)
+    for (const [totals, end] of cases)
+      for (const block of blocksOf(totals, true, end)) {
+        if (block.dots) continue
+        const subs = [block.sub, ...(block.shorts ?? [])]
+        const first = subs.findIndex(text => textWidth(text, 11) <= inner)
+        expect([bodyColumns, block.key, subOf(block, inner)]).toEqual([bodyColumns, block.key, subs[first < 0 ? subs.length - 1 : first]])
+        expect(subs.slice(0, first < 0 ? subs.length - 1 : first).every(text => textWidth(text, 11) > inner)).toBe(true)
+      }
+  }
+  const needs = blocksOf({ ...base, needsYou: { sessions: 1, subagents: 1000 } }, true)[1]
+  expect(needs && subOf(needs, tileInnerOf(bodyWidthOf(47), 4))).toBe('1001')
 })
