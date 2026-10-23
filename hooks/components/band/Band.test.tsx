@@ -775,3 +775,53 @@ test('without a Client the narrow Board button is still named Open board', async
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
   await ui.unmount()
 })
+
+const barProps = (view: ReturnType<typeof viewOf>['view']): Record<string, unknown> | undefined => {
+  const seen: Record<string, unknown>[] = []
+  const keys: unknown[] = []
+  const stub = (props: Record<string, unknown>) => props.children ?? null
+  const Box = (props: Record<string, unknown>) => {
+    if (typeof props.key === 'string' && props.key.startsWith('bar-')) keys.push(props.key)
+    return props.children ?? null
+  }
+  const Svg = (props: Record<string, unknown>) => {
+    if (props.isInteractive === true) seen.push(props)
+    return null
+  }
+  const ui = { Box, Text: stub, Button: stub, Svg } as unknown as Parameters<typeof Band>[0]
+  Band(ui, { view })
+  return seen[0] ? { ...seen[0], key: keys[0] } : undefined
+}
+
+test('the bar frame is sized to the bar and keyed by width and run state: stable across a percent-only change, new when the band stops running', () => {
+  const first = viewOf(WORKING, IDLE)
+  const bar = barProps(first.view)
+  expect(bar?.width).toBe(first.view.barWidth)
+  expect(bar?.key).toBe(`bar-${first.view.barWidth}-run`)
+  const moved = viewOf(WORKING.map(one => (one.id === 'local_b' ? { ...one, progress: 'step 4 of 5 — pane' } : one)), IDLE)
+  expect(moved.view.overall).not.toBe(first.view.overall)
+  expect(barProps(moved.view)?.key).toBe(bar?.key)
+  const still = viewOf(WORKING.map(one => ({ ...one, state: 'waiting' as const })), IDLE)
+  expect(still.view.isRunning).toBe(false)
+  expect(barProps(still.view)?.key).toBe(`bar-${still.view.barWidth}-still`)
+  expect(barProps(still.view)?.key).not.toBe(bar?.key)
+})
+
+test('the first agent started with the pane closed draws the bar on the band’s first frame, and a data change redraws it with no pane open', async ($, on) => {
+  const crew = crewOf($, on)
+  const { clock } = await band($, on, WORKING)
+  const ui = await mount($)
+  const before = String((await stripOf(ui))?.props.alt)
+  await crew.subagent('docs')
+  await clock.settle()
+  const drawn = await stripOf(ui)
+  expect(String(drawn?.props.alt)).not.toBe(before)
+  expect(String(drawn?.props.alt)).toContain('1 subagent')
+  expect(String(drawn?.props.source)).toContain('animateTransform')
+  expect(drawn?.props.width).toBe(await barWidthOf(ui))
+  expect((await ui.findAll({ type: 'Box' })).map(one => one.key).filter(one => one?.startsWith('bar-'))).toEqual([`bar-${await barWidthOf(ui)}-run`])
+  await ui.unmount()
+  const fresh = await mount($)
+  expect(String((await stripOf(fresh))?.props.source)).toContain('animateTransform')
+  await fresh.unmount()
+})
