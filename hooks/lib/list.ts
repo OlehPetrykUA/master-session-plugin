@@ -8,6 +8,7 @@ import type { WorkflowAgent, WorkflowRun } from './agents'
 import { stepOf } from './board'
 import { compactOf } from './format'
 import { textWidth } from './layout'
+import type { Face } from './layout'
 import { activityOf, elapsedOf, titleOf, whereOf } from './rows'
 import type { Row } from './rows'
 import type { RunSummary } from './totals'
@@ -115,14 +116,14 @@ export function askOf(text: string | undefined) {
 
 export const tildeOf = (text: string, home: string) => (homeOf(home) ? text.split(`${homeOf(home)}/`).join('~/') : text)
 
-const fits = (text: string, room: number, size: number, isMono: boolean, isBold = false) => textWidth(text, size, isMono, isBold) <= room
+const fits = (text: string, room: number, size: number, face: Face) => textWidth(text, size, face) <= room
 
-function fitOf(chars: readonly string[], room: number, size: number, isMono: boolean, isBold: boolean) {
+function fitOf(chars: readonly string[], room: number, size: number, face: Face) {
   let low = 0
   let high = chars.length
   while (low < high) {
     const mid = Math.ceil((low + high) / 2)
-    if (fits(`${chars.slice(0, mid).join('')}…`, room, size, isMono, isBold)) low = mid
+    if (fits(`${chars.slice(0, mid).join('')}…`, room, size, face)) low = mid
     else high = mid - 1
   }
   return `${chars.slice(0, low).join('').trimEnd()}…`
@@ -135,7 +136,9 @@ function headOf(text: string, limit: number) {
   }
 }
 
-export function rowsOf(text: string, room: number, size: number, count: number, isMono = false, isBold = false): string[] {
+const WORD = /[\p{L}\p{N}]/u
+
+export function rowsOf(text: string, room: number, size: number, count: number, face: Face = {}): string[] {
   const all = Array.from(headOf(text, Math.ceil((Math.max(0, room) / (0.28 * size)) * count) + 2))
   const rows: string[] = []
   let start = 0
@@ -143,12 +146,21 @@ export function rowsOf(text: string, room: number, size: number, count: number, 
     let width = 0
     let end = start
     let space = -1
+    let spaceWidth = 0
+    let slash = -1
+    let hyphen = -1
+    let token = start ? all.lastIndexOf(' ', start - 1) + 1 : 0
     while (end < all.length) {
-      const next = width + textWidth(all[end] ?? '', size, isMono, isBold)
+      const next = width + textWidth(all[end] ?? '', size, face)
       if (next > room) break
       width = next
-      if (all[end] === ' ') space = end
-      else if (all[end] === '-') space = end + 1
+      const ch = all[end]
+      if (ch === ' ') {
+        space = end
+        spaceWidth = width
+        token = end + 1
+      } else if (ch === '/') slash = end + 1
+      else if (ch === '-' && !face.isMono && WORD.test(all[end - 1] ?? '') && WORD.test(all[end + 1] ?? '') && all[token] !== '-' && !all.slice(token, end).includes('/')) hyphen = end + 1
       end += 1
     }
     if (end >= all.length) {
@@ -156,10 +168,11 @@ export function rowsOf(text: string, room: number, size: number, count: number, 
       break
     }
     if (rows.length === count - 1) {
-      rows.push(fitOf(all.slice(start, end + 1), room, size, isMono, isBold))
+      rows.push(fitOf(all.slice(start, end + 1), room, size, face))
       break
     }
-    const cut = space > start ? space : Math.max(end, start + 1)
+    const isShort = slash > space && spaceWidth < room / 2
+    const cut = space > start && !isShort ? space : slash > start ? slash : hyphen > start ? hyphen : Math.max(end, start + 1)
     rows.push(all.slice(start, cut).join('').trimEnd())
     start = all[cut] === ' ' ? cut + 1 : cut
   }
@@ -168,10 +181,10 @@ export function rowsOf(text: string, room: number, size: number, count: number, 
 
 export function foldPath(path: string, room: number, size = 12) {
   const parts = path.split('/')
-  if (parts.length < 3 || fits(path, room, size, true)) return path
+  if (parts.length < 3 || fits(path, room, size, { isMono: true })) return path
   for (let keep = parts.length - 2; keep >= 1; keep -= 1) {
     const folded = [parts[0], '…', ...parts.slice(parts.length - keep)].join('/')
-    if (fits(folded, room, size, true)) return folded
+    if (fits(folded, room, size, { isMono: true })) return folded
   }
   return [parts[0], '…', parts.at(-1)].join('/')
 }

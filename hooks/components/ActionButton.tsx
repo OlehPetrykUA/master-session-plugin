@@ -39,7 +39,7 @@ export function ActionButton(ui: Ui, props: ActionButtonProps) {
   if (look && ui.Client && (props.kind === 'primary' || !isWide)) {
     const [, start] = SIZES[props.size ?? 's']
     const text = props.isIconOnly ? '' : props.label
-    const left = isWide ? Math.max(start, (width - iconSize - gap - widthOf(props.label, true)) / 2) : start
+    const left = isWide ? Math.max(start, (width - iconSize - gap - widthOf(props.label, { isBold: true, isTabular: true })) / 2) : start
     return (
       <Box key={`face-${props.id}`} flexDirection="row" flexShrink={isWide ? 1 : 0} width={isWide ? '100%' : across(width)} minWidth={0} height={tall(height)} paddingX={0} paddingY={0}>
         <Svg key={`${props.id}-face`} source={buttonFace(width, height, props.icon, text, look.rest, left, gap, iconSize)} alt={props.label} width={width} height={height} />

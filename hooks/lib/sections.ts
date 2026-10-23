@@ -26,9 +26,9 @@ export const ROW = 56
 export const BLOCK = 1 + 8 + 16 + 24 + 16 + 8 + 1
 export const NARROW_PX = 340
 
-export const chipWidthOf = (chip: ChipSize) => 2 + 12 + (chip.hasMark ? chip.markWidth + 8 : 0) + widthOf(chip.label, true) + 8 + widthOf(String(chip.count), true) + 12
+export const chipWidthOf = (chip: ChipSize) => 2 + 12 + (chip.hasMark ? chip.markWidth + 8 : 0) + widthOf(chip.label, { isBold: true }) + 8 + widthOf(String(chip.count), { isBold: true, isTabular: true }) + 12
 
-export const repoWidthOf = (name: string) => 8 + 12 + 4 + textWidth(name, 12, true) + 8
+export const repoWidthOf = (name: string) => 8 + 12 + 4 + textWidth(name, 12, { isMono: true }) + 8
 
 export function linesOf(widths: readonly number[], room: number, gap: number) {
   let lines = 1
@@ -49,7 +49,7 @@ export function scrollMessage(to: string, asked: number | undefined, landed: num
   return `Scrolled the pane to ${to}${where}. The pane is ${columns} columns wide.`
 }
 
-export const noticePxOf = (notice: string, columns: number) => (notice ? 12 + 16 + Math.max(1, Math.ceil(textWidth(notice, 12, false, true) / (bodyWidthOf(columns) - 24 - 16 - 8))) * 16 : 0)
+export const noticePxOf = (notice: string, columns: number) => (notice ? 12 + 16 + Math.max(1, Math.ceil(textWidth(notice, 12, { isBold: true }) / (bodyWidthOf(columns) - 24 - 16 - 8))) * 16 : 0)
 
 type HeaderInput = Pick<SectionInput, 'columns' | 'repos' | 'isNarrow' | 'notice' | 'status' | 'buttons'>
 

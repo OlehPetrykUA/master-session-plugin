@@ -82,7 +82,7 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
         icon: 'now',
         label: 'Task',
         children: [
-          Lines(ui, { id: `task-title-${id}`, rows: rowsOf(description, room, 13, 2, false, true), weight: 'semibold', color: C.text }),
+          Lines(ui, { id: `task-title-${id}`, rows: rowsOf(description, room, 13, 2, { isBold: true }), weight: 'semibold', color: C.text }),
           promptRows.length ? Lines(ui, { id: `task-prompt-${id}`, rows: promptRows, size: 'footnote', color: C.muted }) : null,
           isPromptCut ? Quiet(ui, { text: `${promptLines}-line prompt · the whole prompt is in ${holder}`, isFull: true }) : null,
         ],

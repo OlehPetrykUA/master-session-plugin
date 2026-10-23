@@ -18,11 +18,11 @@ export function pillOf(test: string) {
   const failed = isFailed(test)
   const text = failed ? name : count ? `${name} · ${count} pass` : name
   const tail = failed ? FAILED : ''
-  const head = rowsOf(text, LABEL_MAX - textWidth(tail, 12, false, true), 12, 1, false, true)[0] ?? text
+  const head = rowsOf(text, LABEL_MAX - textWidth(tail, 12, { isBold: true }), 12, 1, { isBold: true })[0] ?? text
   return { name, isFailed: failed, head, tail, label: `${head}${tail}` }
 }
 
-const pillWidthOf = (label: string) => 6 + 12 + 4 + Math.min(LABEL_MAX, textWidth(label, 12, false, true)) + 8
+const pillWidthOf = (label: string) => 6 + 12 + 4 + Math.min(LABEL_MAX, textWidth(label, 12, { isBold: true })) + 8
 
 export function testsShownOf(tests: readonly string[], room: number) {
   const latest = [...tests]
@@ -30,7 +30,7 @@ export function testsShownOf(tests: readonly string[], room: number) {
     .map(pillOf)
     .filter((pill, index, all) => all.findIndex(one => one.name === pill.name) === index)
   const pills = [...latest.filter(pill => pill.isFailed), ...latest.filter(pill => !pill.isFailed)]
-  const moreWidth = (count: number) => (count ? 4 + textWidth(`+${count} more`, 12, false, true) : 0)
+  const moreWidth = (count: number) => (count ? 4 + textWidth(`+${count} more`, 12, { isBold: true }) : 0)
   let used = 0
   let shown = 0
   for (const pill of pills) {

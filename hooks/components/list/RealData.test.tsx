@@ -3,12 +3,13 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord, Board } from '../../../types'
 
-import { across, textWidth } from '../../lib/layout'
+import { across, bodyWidthOf, textWidth } from '../../lib/layout'
 import { foldPath, relativeOf, rowsOf } from '../../lib/list'
 import { rowsOf as sessionRowsOf } from '../../lib/rows'
 import { isFailed, testsOf } from '../../lib/totals'
 import { pillOf, testsShownOf } from '../detail/Tests'
 import { C } from '../../theme/tokens'
+import { ASKS, ELLIPSIS } from '../../testing/widths'
 import { BOARD, HOME, PANE, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 
 const COMMAND = `cd ${HOME}/.claude/worktrees/wt-master-session-plugin-rows-v3 && npm run build -- --filter hooks && node --test hooks/lib/list.test.ts hooks/lib/band.test.ts hooks/components/detail/Detail.test.tsx 2>&1 | tee /private/tmp/claude-501/rows-v3-gate.log && git status --porcelain && git log --oneline -3`
@@ -29,8 +30,8 @@ test('rows: split by width, at most n, the last ends in "…"; emoji count by co
   expect(rows.length).toBe(3)
   expect(rows.at(-1)?.endsWith('…')).toBe(true)
   for (const row of rows) expect(textWidth(row, 13)).toBeLessThanOrEqual(280)
-  for (const row of rowsOf('Archive can lose work until this lands: 2 commits exist only on archive-guard. '.repeat(4), 200, 13, 3, false, true)) expect(textWidth(row, 13, false, true)).toBeLessThanOrEqual(200)
-  for (const row of rowsOf(COMMAND, 200, 12, 6, true)) expect(textWidth(row, 12, true)).toBeLessThanOrEqual(200)
+  for (const row of rowsOf('Archive can lose work until this lands: 2 commits exist only on archive-guard. '.repeat(4), 200, 13, 3, { isBold: true })) expect(textWidth(row, 13, { isBold: true })).toBeLessThanOrEqual(200)
+  for (const row of rowsOf(COMMAND, 200, 12, 6, { isMono: true })) expect(textWidth(row, 12, { isMono: true })).toBeLessThanOrEqual(200)
   const rockets = rowsOf('🚀'.repeat(96), 300, 12, 4)
   expect(rockets.join('').endsWith('…')).toBe(false)
   expect(Array.from(rockets.join('')).length).toBe(96)
@@ -168,7 +169,7 @@ test('the Tests tile takes the first source that applies: testsPassed, then summ
   const rerun = board([{ id: 'f', name: 'f', state: 'working', tests: ['tsc -p . --noEmit · exit 0', 'tsc · 3 errors', 'lint · passed'] }])
   expect(testsOf(rows(rerun), rerun)).toEqual({ value: '1 check', sub: 'passed · no counts' })
   expect(testsShownOf(['tsc -p . --noEmit · exit 0', 'tsc · 3 errors'], 600).pills.map(pill => pill.label)).toEqual(['tsc · failed'])
-  for (const label of ['e2e · fail', 'e2e · fails', 'e2e · failed', 'smoke · 3 failing', 'bun test · 120 pass · 8 fail', 'tsc · 1 error', 'build · exit 2']) expect([label, isFailed(label)]).toEqual([label, true])
+  for (const label of ['e2e · fail', 'e2e · fails', 'e2e · failed', 'smoke · 3 failing', 'bun test · 120 pass · 8 fail', 'tsc · 1 error', 'build · exit 2', 'e2e · failing', 'smoke · 2 failures', 'lint · 1 failure']) expect([label, isFailed(label)]).toEqual([label, true])
   for (const label of ['bun test · 128 pass · 0 fail', 'smoke · 0 failing', 'tsc · exit 0', 'plugin test · passed · 252 pass', 'failover test · passed']) expect([label, isFailed(label)]).toEqual([label, false])
 })
 
@@ -182,11 +183,11 @@ test('tests pills: a failed run is a red pill with the failed glyph and “· fa
   const many = ['archive.test.ts · 3 failing', ...Array.from({ length: 13 }, (_, index) => `check-${index} · exit 0`), 'tsc · exit 0']
   const shown = testsShownOf(many, 300)
   expect([shown.pills[0]?.label, shown.pills[1]?.label, shown.pills.length + shown.more]).toEqual(['archive.test.ts · failed', 'tsc', 15])
-  const pillPx = (label: string) => 6 + 12 + 4 + textWidth(label, 12, false, true) + 8
+  const pillPx = (label: string) => 6 + 12 + 4 + textWidth(label, 12, { isBold: true }) + 8
   expect(testsShownOf(['lint · exit 0', 'tsc · exit 0'], pillPx('tsc') + 4 + pillPx('lint')).more).toBe(0)
   expect(testsShownOf(['lint · exit 0', 'tsc · exit 0'], pillPx('tsc') + 4 + pillPx('lint') - 1).more).toBe(1)
   const long = pillOf('integration-suite-for-the-master-session-pane-and-band.test.ts · 2 failing')
-  expect([long.head.endsWith('…'), long.tail, textWidth(long.label, 12, false, true) <= 140]).toEqual([true, ' · failed', true])
+  expect([long.head.endsWith('…'), long.tail, textWidth(long.label, 12, { isBold: true }) <= 140]).toEqual([true, ' · failed', true])
   await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], tests: ['bun test · 120 pass · 8 fail', 'plugin test · passed · 228 pass'] }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 80 } })
   await click(ui, 'hit-row-local_setup')
@@ -243,7 +244,7 @@ test('L8 at 46 columns with real glyph widths: "Reviewer · band diff" keeps the
   await ui.unmount()
 })
 
-test('textWidth follows anthropic-sans as Chrome measures it: 0–5 % above the real width, with its own semibold widths', () => {
+test('textWidth follows anthropic-sans at opsz 16 as Chrome renders it at 12–14 px: 1.5–5 % above the real width (the ×1.02 margin), with its own semibold widths', () => {
   const measured: [string, number, boolean, number][] = [
     ['band diff', 14, false, 59.95],
     ['Prompt status data', 14, false, 125.61],
@@ -251,9 +252,71 @@ test('textWidth follows anthropic-sans as Chrome measures it: 0–5 % above the 
     ['Designer', 14, true, 60.93],
     ['Open chat', 13, true, 65.4],
     ['Allow Read outside the project: ~/.agents/RULES.md?', 12, true, 309.1],
+    ['(1) [2] {3}: a.b, c; d! e? f.', 12, false, 126.82],
+    ['(1) [2] {3}: a.b, c; d! e? f.', 12, true, 130.92],
+    ['Allow Bash: ls -1 ./a/ | wc -l; ls -1 ./b/ | wc -l; ls -1 ./c/ | wc -l?', 12, true, 320.48],
+    ['Allow Bash: rm -f ./a.js ./b.js ./c.js ./d.js ./e.js ./f.js ./g.js?', 12, true, 307.28],
   ]
   for (const [text, size, isBold, real] of measured) {
-    const ratio = textWidth(text, size, false, isBold) / real
-    expect([text, ratio >= 1 && ratio <= 1.05]).toEqual([text, true])
+    const ratio = textWidth(text, size, { isBold }) / real
+    expect([text, size, isBold, ratio >= 1.015 && ratio <= 1.05]).toEqual([text, size, isBold, true])
+  }
+})
+
+const realOf = (text: string, row: string, from: number) => {
+  const prefixes = ASKS.find(one => one.text === text)?.prefixes ?? []
+  const body = row.endsWith('…') ? row.slice(0, -1) : row
+  return (prefixes[from + Array.from(body).length] ?? Infinity) - (prefixes[from] ?? 0) + (row.endsWith('…') ? ELLIPSIS : 0)
+}
+
+const rowsByRealWidth = (text: string, room: number) => {
+  const rows = rowsOf(text, room, 12, 2, { isBold: true })
+  const from = rows[0] ? text.indexOf(rows[1]?.replace(/…$/, '') ?? '', Array.from(rows[0]).length) : 0
+  return rows.map((row, index) => ({ row, real: realOf(text, row, index ? from : 0) }))
+}
+
+test('ask rows by real width: seven asks across rooms 120–330, each row measured in Chrome at 600/12, never wider than its room', () => {
+  for (const { text } of ASKS)
+    for (let room = 120; room <= 330; room += 5)
+      for (const { row, real } of rowsByRealWidth(text, room)) expect([room, row, real <= room]).toEqual([room, row, true])
+  expect(rowsByRealWidth(ASKS[0]?.text ?? '', 192.25).every(one => one.real <= 192.25)).toBe(true)
+  expect(rowsByRealWidth(ASKS[1]?.text ?? '', 302).every(one => one.real <= 302)).toBe(true)
+})
+
+test('rows break at spaces first, then after a slash in a path; never after a hyphen that starts a token or inside a path', () => {
+  const rows = rowsOf('Allow Bash: node --test hooks/lib/list.test.ts && cd ~/.claude/worktrees/wt-master-session-plugin-rows-v3', 150, 12, 4, { isBold: true })
+  expect(rows.some(row => /-$/.test(row) || /^-[^-]/.test(row))).toBe(false)
+  expect(rows.some(row => row.endsWith('wt-') || row.endsWith('master-'))).toBe(false)
+  const command = rowsOf('cd ~/.claude/worktrees/wt-master-session-plugin-rows-v3 && npm run build', 200, 12, 3, { isMono: true })
+  expect(command[0]).toBe('cd ~/.claude/worktrees/')
+  expect(rowsOf('every-worktree-is-merged-back-into-main-before-the-archive', 120, 12, 3)[0]?.endsWith('-')).toBe(true)
+  const isFull = (row: string, rest: string, room: number) => textWidth(`${row}${Array.from(rest)[0] ?? ''}`, 12) > room
+  const flag = '--test-name-pattern=every-row-of-the-band-suite'
+  const [first = ''] = rowsOf(flag, 100, 12, 2)
+  expect(isFull(first, flag.slice(first.length), 100)).toBe(true)
+  const path = 'cd ~/x/wt-master-session-plugin-rows-v3-with-a-longer-name && npm test'
+  const [, second = ''] = rowsOf(path, 100, 12, 3)
+  expect([second.includes('-'), isFull(second, path.slice(path.indexOf(second) + second.length), 100)]).toEqual([true, true])
+})
+
+test('tabular digits: the elapsed time is measured at 0.64 em per digit as it renders, so the ask beside it stays inside its real column', async ($, on) => {
+  expect(textWidth('11m', 12, { isTabular: true })).toBeGreaterThanOrEqual(25.81)
+  seeded(on, [
+    { id: 't1', name: 'band diff', type: 'master-session:reviewer', description: 'Review', state: 'running', startedAt: 2_940_000, asking: { text: 'Allow Bash: bun install && bun run build && bun test?', since: 3_590_000 } },
+    { id: 't2', name: 'canvas v3 check', type: 'master-session:reviewer', description: 'Check', state: 'running', startedAt: 3_589_000, asking: { text: 'Allow Read outside the project: ~/.agents/RULES.md?', since: 3_590_000 } },
+  ])
+  await started($, on)
+  for (const [bodyColumns, id, elapsed, real] of [[46, 't1', '11m', 25.81], [44, 't2', '11s', 21.52]] as const) {
+    const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
+    expect(textsIn((await ui.find({ key: `row-${id}` }))?.children)).toContain(elapsed)
+    const text = ASKS.find(one => one.text.startsWith(id === 't1' ? 'Allow Bash: bun' : 'Allow Read'))?.text ?? ''
+    const column = bodyWidthOf(bodyColumns) - 88 - (16 + real + 12) - 16
+    const rows = ((await ui.find({ key: `row-${id}-ask-rows` }))?.children ?? []).map(row => String(textsIn(row).at(-1)))
+    let from = 0
+    for (const row of rows) {
+      expect([bodyColumns, row, realOf(text, row, from) <= column]).toEqual([bodyColumns, row, true])
+      from = text.indexOf(rows[rows.indexOf(row) + 1]?.replace(/…$/, '') ?? '', from + Array.from(row).length)
+    }
+    await ui.unmount()
   }
 })

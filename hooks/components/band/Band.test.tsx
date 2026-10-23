@@ -6,7 +6,7 @@ import type { Board, BoardSession, Live, WorkflowRecord } from '../../../types'
 
 import { agentCountsOf, bandAction, bandProgress, bandProgressWith, bandViewOf, extrasOf, fitBand, slotWidth } from '../../lib/band'
 import type { AgentCounts } from '../../lib/band'
-import { CH, COLUMN, across, tall, widthOf } from '../../lib/layout'
+import { CH, COLUMN, across, tall, textWidth, widthOf } from '../../lib/layout'
 import { freshReport, merge } from '../../data/contract'
 import { progressOf } from '../../lib/board'
 import { rowsOf } from '../../lib/rows'
@@ -747,10 +747,15 @@ test('a plain session that runs a subagent, with no board of its own and no work
 
 test('with the strip hidden, the short pill gets the whole room: it fits whole at room = pill chrome + text and truncates only below', () => {
   const short = 'Session needs you'
-  const exact = 2 + 8 + 15 + 6 + 12 + widthOf(short, true)
+  const exact = 2 + 8 + 15 + 6 + 12 + widthOf(short, { isBold: true })
   const input = { gap: 12, items: sessionsOf(5), counts: 0, full: `${short} · commit blocked`, short }
   expect(fitBand({ ...input, room: exact })).toEqual({ pill: short, showCounts: false, isDots: true, strip: 0, isHidden: true })
   expect(fitBand({ ...input, room: exact - 1 }).pill).toMatch(/…$/)
+})
+
+test('tabular slots: band digits count 0.64 em each, the width they render at', () => {
+  expect(slotWidth('12', 13)).toBe(2 * 0.64 * 13)
+  expect(slotWidth('100%', 13)).toBe(textWidth('%', 13, { isBold: true }) + 3 * 0.64 * 13)
 })
 
 test('lane 7 at 300 px: a session asker hides the strip with an icon-only Open chat; a workflow agent asker has no Open chat, so the dots fit', () => {

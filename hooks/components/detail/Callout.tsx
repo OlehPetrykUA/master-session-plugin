@@ -23,7 +23,7 @@ export function Callout(ui: Ui, props: CalloutProps) {
         <Text size="caption" weight="semibold" color={C.text}>
           {props.label.toUpperCase()}
         </Text>
-        {props.lines.map((line, index) => (line.rows ? Lines(ui, { id: `callout-${props.id}-rows-${index}`, rows: rowsOf(line.text, (props.width ?? 0) - 56, line.isStrong ? 13 : 12, line.rows, line.isMono, line.isStrong), size: line.isStrong ? undefined : 'footnote', weight: line.isStrong ? 'semibold' : undefined, color: line.isStrong || line.isMono ? C.text : C.muted, isMono: line.isMono }) : line.isStrong ? Strong(ui, { text: line.text, isFull: !line.isOneLine }) : Quiet(ui, { text: line.text, isFull: !line.isOneLine })))}
+        {props.lines.map((line, index) => (line.rows ? Lines(ui, { id: `callout-${props.id}-rows-${index}`, rows: rowsOf(line.text, (props.width ?? 0) - 56, line.isStrong ? 13 : 12, line.rows, { isMono: line.isMono, isBold: line.isStrong }), size: line.isStrong ? undefined : 'footnote', weight: line.isStrong ? 'semibold' : undefined, color: line.isStrong || line.isMono ? C.text : C.muted, isMono: line.isMono }) : line.isStrong ? Strong(ui, { text: line.text, isFull: !line.isOneLine }) : Quiet(ui, { text: line.text, isFull: !line.isOneLine })))}
       </Box>
     </Box>
   )
