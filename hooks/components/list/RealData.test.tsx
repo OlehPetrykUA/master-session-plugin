@@ -6,8 +6,8 @@ import type { AgentRecord, Board } from '../../../types'
 import { across, textWidth } from '../../lib/layout'
 import { foldPath, relativeOf, rowsOf } from '../../lib/list'
 import { rowsOf as sessionRowsOf } from '../../lib/rows'
-import { testsOf } from '../../lib/totals'
-import { testsShownOf } from '../detail/Tests'
+import { isFailed, testsOf } from '../../lib/totals'
+import { pillOf, testsShownOf } from '../detail/Tests'
 import { C } from '../../theme/tokens'
 import { BOARD, HOME, PANE, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 
@@ -28,12 +28,12 @@ test('rows: split by width, at most n, the last ends in "…"; emoji count by co
   const rows = rowsOf('Archive can lose work until this lands: 2 commits exist only on archive-guard, and Archive all would remove its worktree. '.repeat(3), 280, 13, 3)
   expect(rows.length).toBe(3)
   expect(rows.at(-1)?.endsWith('…')).toBe(true)
-  for (const row of rows) expect(textWidth(row, 13) * 1.08).toBeLessThanOrEqual(280)
-  for (const row of rowsOf('Archive can lose work until this lands: 2 commits exist only on archive-guard. '.repeat(4), 200, 13, 3)) expect(textWidth(row, 13) * 1.08).toBeLessThanOrEqual(200)
+  for (const row of rows) expect(textWidth(row, 13)).toBeLessThanOrEqual(280)
+  for (const row of rowsOf('Archive can lose work until this lands: 2 commits exist only on archive-guard. '.repeat(4), 200, 13, 3, false, true)) expect(textWidth(row, 13, false, true)).toBeLessThanOrEqual(200)
   for (const row of rowsOf(COMMAND, 200, 12, 6, true)) expect(textWidth(row, 12, true)).toBeLessThanOrEqual(200)
-  const rockets = rowsOf('🚀'.repeat(148), 300, 12, 4)
+  const rockets = rowsOf('🚀'.repeat(96), 300, 12, 4)
   expect(rockets.join('').endsWith('…')).toBe(false)
-  expect(Array.from(rockets.join('')).length).toBe(148)
+  expect(Array.from(rockets.join('')).length).toBe(96)
   const cut = rowsOf('🚀'.repeat(400), 300, 12, 2)
   expect(cut.at(-1)?.endsWith('…')).toBe(true)
   expect(/[\uD800-\uDBFF]…$/.test(cut.at(-1) ?? '')).toBe(false)
@@ -165,15 +165,29 @@ test('the Tests tile takes the first source that applies: testsPassed, then summ
   expect(testsOf(rows(reruns), reruns)).toEqual({ value: '128', sub: 'from 1 session’s checks' })
   const broken = board([{ id: 'e', name: 'e', state: 'working', tests: ['bun test · 128 pass · 0 fail', 'bun test · 120 pass · 8 fail', 'tsc · 3 errors'] }])
   expect(testsOf(rows(broken), broken)).toEqual({ value: '—', sub: 'none reported' })
+  const rerun = board([{ id: 'f', name: 'f', state: 'working', tests: ['tsc -p . --noEmit · exit 0', 'tsc · 3 errors', 'lint · passed'] }])
+  expect(testsOf(rows(rerun), rerun)).toEqual({ value: '1 check', sub: 'passed · no counts' })
+  expect(testsShownOf(['tsc -p . --noEmit · exit 0', 'tsc · 3 errors'], 600).pills.map(pill => pill.label)).toEqual(['tsc · failed'])
+  for (const label of ['e2e · fail', 'e2e · fails', 'e2e · failed', 'smoke · 3 failing', 'bun test · 120 pass · 8 fail', 'tsc · 1 error', 'build · exit 2']) expect([label, isFailed(label)]).toEqual([label, true])
+  for (const label of ['bun test · 128 pass · 0 fail', 'smoke · 0 failing', 'tsc · exit 0', 'plugin test · passed · 252 pass', 'failover test · passed']) expect([label, isFailed(label)]).toEqual([label, false])
 })
 
 test('tests pills: a failed run is a red pill with the failed glyph and “· failed”, never green; only the newest label per command shows', async ($, on) => {
-  expect(testsShownOf(['bun test · 120 pass · 8 fail', 'tsc · 3 errors', 'bun test · 128 pass · 0 fail', 'tsc -p . --noEmit · exit 2'], 600).pills).toEqual([
-    { name: 'tsc', isFailed: true, label: 'tsc · failed' },
-    { name: 'bun test', isFailed: false, label: 'bun test · 128 pass' },
+  const labels = (tests: string[], room = 600) => testsShownOf(tests, room).pills.map(pill => [pill.label, pill.isFailed])
+  expect(labels(['bun test · 120 pass · 8 fail', 'tsc · 3 errors', 'bun test · 128 pass · 0 fail', 'tsc -p . --noEmit · exit 2'])).toEqual([
+    ['tsc · failed', true],
+    ['bun test · 128 pass', false],
   ])
-  expect(testsShownOf(['bun test · 128 pass · 0 fail', 'bun test · 120 pass · 8 fail'], 600).pills).toEqual([{ name: 'bun test', isFailed: true, label: 'bun test · failed' }])
-  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], tests: ['plugin test · passed · 228 pass', 'bun test · 120 pass · 8 fail'] }] })
+  expect(labels(['bun test · 128 pass · 0 fail', 'bun test · 120 pass · 8 fail'])).toEqual([['bun test · failed', true]])
+  const many = ['archive.test.ts · 3 failing', ...Array.from({ length: 13 }, (_, index) => `check-${index} · exit 0`), 'tsc · exit 0']
+  const shown = testsShownOf(many, 300)
+  expect([shown.pills[0]?.label, shown.pills[1]?.label, shown.pills.length + shown.more]).toEqual(['archive.test.ts · failed', 'tsc', 15])
+  const pillPx = (label: string) => 6 + 12 + 4 + textWidth(label, 12, false, true) + 8
+  expect(testsShownOf(['lint · exit 0', 'tsc · exit 0'], pillPx('tsc') + 4 + pillPx('lint')).more).toBe(0)
+  expect(testsShownOf(['lint · exit 0', 'tsc · exit 0'], pillPx('tsc') + 4 + pillPx('lint') - 1).more).toBe(1)
+  const long = pillOf('integration-suite-for-the-master-session-pane-and-band.test.ts · 2 failing')
+  expect([long.head.endsWith('…'), long.tail, textWidth(long.label, 12, false, true) <= 140]).toEqual([true, ' · failed', true])
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], tests: ['bun test · 120 pass · 8 fail', 'plugin test · passed · 228 pass'] }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 80 } })
   await click(ui, 'hit-row-local_setup')
   const [failed, passed] = [await ui.find({ key: 'test-local_setup-0' }), await ui.find({ key: 'test-local_setup-1' })]
@@ -211,4 +225,35 @@ test('the header wraps a long status line and grows; offline shows I.offline mut
   expect(JSON.stringify(notice?.children)).toContain('"alt":"offline"')
   expect((await ui.findAll({ type: 'Text' })).find(one => String(one.text).startsWith('Can’t read sessions'))?.props.color).toBe(C.text)
   await ui.unmount()
+})
+
+test('L8 at 46 columns with real glyph widths: "Reviewer · band diff" keeps the Open chat label, and a Validator prompt "Allow Read outside the project: ~/.agents/RULES.md?" takes 2 whole rows', async ($, on) => {
+  seeded(on, [
+    { id: 'b1', name: 'band diff', type: 'master-session:reviewer', description: 'Review the band diff', state: 'running', startedAt: 3_540_000, parentSessionId: 'local_setup', asking: { text: 'Allow Bash: rm -rf dist?', since: 3_590_000 } },
+    { id: 'c1', name: 'canvas v3 check', type: 'master-session:reviewer', description: 'Check the canvas', state: 'running', startedAt: 3_570_000, asking: { text: 'Allow Read outside the project: ~/.agents/RULES.md?', since: 3_590_000 } },
+  ])
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
+  expect((await ui.find({ key: 'face-chat-b1' }))?.props.width).not.toBe(across(32))
+  expect(textsIn((await ui.find({ key: 'row-b1' }))?.children)).toEqual(expect.arrayContaining(['Reviewer', 'band diff']))
+  expect(await hitsOf(ui)).not.toContain('hit-chat-c1')
+  const rows = (await ui.find({ key: 'row-c1-ask-rows' }))?.children ?? []
+  const texts = rows.map(row => textsIn(row).at(-1))
+  expect(texts).toEqual(['Allow Read outside the project:', '~/.agents/RULES.md?'])
+  await ui.unmount()
+})
+
+test('textWidth follows anthropic-sans as Chrome measures it: 0–5 % above the real width, with its own semibold widths', () => {
+  const measured: [string, number, boolean, number][] = [
+    ['band diff', 14, false, 59.95],
+    ['Prompt status data', 14, false, 125.61],
+    ['Implementer', 14, true, 86.76],
+    ['Designer', 14, true, 60.93],
+    ['Open chat', 13, true, 65.4],
+    ['Allow Read outside the project: ~/.agents/RULES.md?', 12, true, 309.1],
+  ]
+  for (const [text, size, isBold, real] of measured) {
+    const ratio = textWidth(text, size, false, isBold) / real
+    expect([text, ratio >= 1 && ratio <= 1.05]).toEqual([text, true])
+  }
 })

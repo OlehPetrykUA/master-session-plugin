@@ -747,7 +747,7 @@ test('a plain session that runs a subagent, with no board of its own and no work
 
 test('with the strip hidden, the short pill gets the whole room: it fits whole at room = pill chrome + text and truncates only below', () => {
   const short = 'Session needs you'
-  const exact = 2 + 8 + 15 + 6 + 12 + widthOf(short)
+  const exact = 2 + 8 + 15 + 6 + 12 + widthOf(short, true)
   const input = { gap: 12, items: sessionsOf(5), counts: 0, full: `${short} · commit blocked`, short }
   expect(fitBand({ ...input, room: exact })).toEqual({ pill: short, showCounts: false, isDots: true, strip: 0, isHidden: true })
   expect(fitBand({ ...input, room: exact - 1 }).pill).toMatch(/…$/)

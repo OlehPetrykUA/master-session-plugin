@@ -181,5 +181,5 @@ export function chipFace(width: number, height: number, mark: ChipMark, text: st
   const markWidth = mark ? ('dot' in mark ? 8 : 14) : 0
   const markSvg = !mark ? '' : 'dot' in mark ? `<circle cx="17" cy="${height / 2}" r="4" style="fill:var(--${mark.dot})"/>` : glyphAt(mark.icon, 13, height, 14, look.ink)
   const textX = 13 + (markWidth ? markWidth + 8 : 0)
-  return svg(width, height, shell(width, height, look) + markSvg + label(text, textX, height, look.ink, 600) + label(count, textX + Math.ceil(textWidth(text, 13) * 1.08) + 8, height, look.ink, 600))
+  return svg(width, height, shell(width, height, look) + markSvg + label(text, textX, height, look.ink, 600) + label(count, textX + Math.ceil(textWidth(text, 13, false, true)) + 8, height, look.ink, 600))
 }

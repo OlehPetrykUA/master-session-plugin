@@ -26,7 +26,7 @@ export const ROW = 56
 export const BLOCK = 1 + 8 + 16 + 24 + 16 + 8 + 1
 export const NARROW_PX = 340
 
-export const chipWidthOf = (chip: ChipSize) => 2 + 12 + (chip.hasMark ? chip.markWidth + 8 : 0) + widthOf(chip.label) * 1.08 + 8 + widthOf(String(chip.count)) * 1.08 + 12
+export const chipWidthOf = (chip: ChipSize) => 2 + 12 + (chip.hasMark ? chip.markWidth + 8 : 0) + widthOf(chip.label, true) + 8 + widthOf(String(chip.count), true) + 12
 
 export const repoWidthOf = (name: string) => 8 + 12 + 4 + textWidth(name, 12, true) + 8
 
@@ -49,15 +49,17 @@ export function scrollMessage(to: string, asked: number | undefined, landed: num
   return `Scrolled the pane to ${to}${where}. The pane is ${columns} columns wide.`
 }
 
-export const noticePxOf = (notice: string, columns: number) => (notice ? 12 + 16 + Math.max(1, Math.ceil((textWidth(notice, 12) * 1.08) / (bodyWidthOf(columns) - 24 - 16 - 8))) * 16 : 0)
+export const noticePxOf = (notice: string, columns: number) => (notice ? 12 + 16 + Math.max(1, Math.ceil(textWidth(notice, 12, false, true) / (bodyWidthOf(columns) - 24 - 16 - 8))) * 16 : 0)
 
 type HeaderInput = Pick<SectionInput, 'columns' | 'repos' | 'isNarrow' | 'notice' | 'status' | 'buttons'>
 
-export function statusLinesOf(input: HeaderInput) {
+export function statusRoomOf(input: HeaderInput) {
   const width = input.columns * COLUMN - 16 - 8
-  const room = input.isNarrow ? width : width - 8 * (input.buttons.length + 1) - input.buttons.reduce((sum, label) => sum + faceWidth(label, 'b32'), 0)
-  return Math.max(1, rowsOf(input.status, room - 12 - 4, 12, 20).length)
+  const room = input.isNarrow ? width : width - 8 * (input.buttons.length + 1) - input.buttons.reduce((sum, label) => sum + faceWidth(label, 'b32') + 1, 0)
+  return room - 12 - 4
 }
+
+export const statusLinesOf = (input: HeaderInput) => Math.max(1, rowsOf(input.status, statusRoomOf(input), 12, 20).length)
 
 export function headerPxOf(input: HeaderInput) {
   const lines = statusLinesOf(input)

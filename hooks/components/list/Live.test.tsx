@@ -69,7 +69,7 @@ test('Open chat keeps its label when the task fits whole beside it, or when at l
     return width === across(32) ? 'icon' : 'label'
   }
   const room = (bodyColumns: number) => bodyWidthOf(bodyColumns) - 88 - faceWidth('Open chat', 'b32') - 1 - 12
-  const shown = (persona: string, task: string, bodyColumns: number) => rowsOf(task, room(bodyColumns) - textWidth(persona, 14) * 1.08 - 16, 14, 1)[0] ?? ''
+  const shown = (persona: string, task: string, bodyColumns: number) => rowsOf(task, room(bodyColumns) - textWidth(persona, 14, false, true) - 8 - textWidth('·', 14), 14, 1)[0] ?? ''
   expect(shown('Designer', 'Pane v2', 52)).toBe('Pane v2')
   expect(await face('local_pane', 52)).toBe('label')
   const cut = shown('Implementer', 'Prompt status data and more', 60)

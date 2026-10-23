@@ -31,7 +31,7 @@ export type BandItem = StripItem & { id: string; isRunning: boolean; asker?: Ask
 
 export const slotWidth = (text: string, size: number) => {
   const padded = text.replace(/\d+/g, digits => '0'.repeat(Math.max(2, digits.length)))
-  return textWidth(padded.replace(/0/g, ''), size) + DIGIT * size * (padded.match(/0/g)?.length ?? 0)
+  return textWidth(padded.replace(/0/g, ''), size, false, true) + DIGIT * size * (padded.match(/0/g)?.length ?? 0)
 }
 
 export const bandAction = (element: string) => {
@@ -163,11 +163,11 @@ export function fitBand({ room, gap, items, counts, full, short }: FitInput) {
     ? [{ text: full, isDots: true }, { text: brief, isDots: true }]
     : [{ text: full, isDots: false }, { text: brief, isDots: false }, { text: brief, isDots: true }]
   for (const { text, isDots } of tries) {
-    const left = room - PILL_WIDTH - widthOf(text)
+    const left = room - PILL_WIDTH - widthOf(text, true)
     if (left >= (isDots ? dots : bars)) return { pill: text, showCounts: false, isDots, strip: Math.round(isDots ? dots : left), isHidden: false }
   }
-  if (room - PILL_WIDTH - widthOf(brief) >= 0) return { pill: brief, showCounts: false, isDots: true, strip: 0, isHidden: true }
-  return { pill: fit(brief, room - PILL_WIDTH), showCounts: false, isDots: true, strip: 0, isHidden: true }
+  if (room - PILL_WIDTH - widthOf(brief, true) >= 0) return { pill: brief, showCounts: false, isDots: true, strip: 0, isHidden: true }
+  return { pill: fit(brief, room - PILL_WIDTH, true), showCounts: false, isDots: true, strip: 0, isHidden: true }
 }
 
 export function bandProgress(current: Board | null, live: Live) {
@@ -216,7 +216,7 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
     : isPaneOpen
       ? undefined
       : { name: 'board' as const, label: isNarrow ? 'Board' : 'Open board', icon: 'panel' as const, isIconOnly: false, press: act.board }
-  const actionWidth = action ? (action.isIconOnly ? BUTTON.height : 2 + BUTTON.left + BUTTON.icon + BUTTON.gap + widthOf(action.label) + BUTTON.right) : 0
+  const actionWidth = action ? (action.isIconOnly ? BUTTON.height : 2 + BUTTON.left + BUTTON.icon + BUTTON.gap + widthOf(action.label, true) + BUTTON.right) : 0
   const padLeft = asker ? 8 : isNarrow ? 12 : 16
   const padRight = isNarrow ? 6 : 8
   const gap = BAR.gap

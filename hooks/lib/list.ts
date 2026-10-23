@@ -115,14 +115,14 @@ export function askOf(text: string | undefined) {
 
 export const tildeOf = (text: string, home: string) => (homeOf(home) ? text.split(`${homeOf(home)}/`).join('~/') : text)
 
-const fits = (text: string, room: number, size: number, isMono: boolean) => textWidth(text, size, isMono) <= room
+const fits = (text: string, room: number, size: number, isMono: boolean, isBold = false) => textWidth(text, size, isMono, isBold) <= room
 
-function fitOf(chars: readonly string[], room: number, size: number, isMono: boolean) {
+function fitOf(chars: readonly string[], room: number, size: number, isMono: boolean, isBold: boolean) {
   let low = 0
   let high = chars.length
   while (low < high) {
     const mid = Math.ceil((low + high) / 2)
-    if (fits(`${chars.slice(0, mid).join('')}…`, room, size, isMono)) low = mid
+    if (fits(`${chars.slice(0, mid).join('')}…`, room, size, isMono, isBold)) low = mid
     else high = mid - 1
   }
   return `${chars.slice(0, low).join('').trimEnd()}…`
@@ -135,8 +135,7 @@ function headOf(text: string, limit: number) {
   }
 }
 
-export function rowsOf(text: string, box: number, size: number, count: number, isMono = false): string[] {
-  const room = isMono ? box : box / 1.08
+export function rowsOf(text: string, room: number, size: number, count: number, isMono = false, isBold = false): string[] {
   const all = Array.from(headOf(text, Math.ceil((Math.max(0, room) / (0.28 * size)) * count) + 2))
   const rows: string[] = []
   let start = 0
@@ -145,7 +144,7 @@ export function rowsOf(text: string, box: number, size: number, count: number, i
     let end = start
     let space = -1
     while (end < all.length) {
-      const next = width + textWidth(all[end] ?? '', size, isMono)
+      const next = width + textWidth(all[end] ?? '', size, isMono, isBold)
       if (next > room) break
       width = next
       if (all[end] === ' ') space = end
@@ -157,7 +156,7 @@ export function rowsOf(text: string, box: number, size: number, count: number, i
       break
     }
     if (rows.length === count - 1) {
-      rows.push(fitOf(all.slice(start, end + 1), room, size, isMono))
+      rows.push(fitOf(all.slice(start, end + 1), room, size, isMono, isBold))
       break
     }
     const cut = space > start ? space : Math.max(end, start + 1)

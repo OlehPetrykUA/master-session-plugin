@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { LH, down, liftOf, tall } from './layout'
-import { BLOCK, ROW, chipWidthOf, contentHeightOf, headerPxOf, headerRowsOf, linesOf, noticePxOf, scrollMessage, scrollRowOf, sectionTopsOf, statusLinesOf } from './sections'
+import { COLUMN, LH, down, faceWidth, liftOf, tall } from './layout'
+import { BLOCK, ROW, chipWidthOf, contentHeightOf, headerPxOf, headerRowsOf, linesOf, noticePxOf, scrollMessage, scrollRowOf, sectionTopsOf, statusLinesOf, statusRoomOf } from './sections'
 import type { SectionInput } from './sections'
 
 const chips = ['All', 'Needs you', 'Waiting', 'Working', 'Done', 'Archived'].map((label, index) => ({ label, count: index, hasMark: true, markWidth: index % 5 ? 8 : 14 }))
@@ -89,4 +89,10 @@ test('a header status that wraps adds its extra lines to the header and moves ev
   expect(headerPxOf(narrow) - headerPxOf({ ...narrow, status: 'updated just now' })).toBe(16 * (statusLinesOf(narrow) - 1))
   expect((sectionTopsOf(wide)['section-summary'] ?? 0) - (sectionTopsOf({ ...wide, status: 'updated just now' })['section-summary'] ?? 0)).toBe((headerRowsOf(wide) - headerRowsOf({ ...wide, status: 'updated just now' })) * LH)
   expect(headerRowsOf(wide)).toBeGreaterThan(headerRowsOf({ ...wide, status: 'updated just now' }))
+})
+
+test('the header status room leaves the buttons their drawn width: each face plus 1 for the 16 px icon, and the gaps', () => {
+  const px = (value: number) => Math.round(value * 100) / 100
+  expect(px(statusRoomOf({ ...input, columns: 46 }))).toBe(px(46 * COLUMN - 16 - 8 - 8 * 3 - (faceWidth('Ask', 'b32') + 1) - (faceWidth('Refresh', 'b32') + 1) - 12 - 4))
+  expect(px(statusRoomOf({ ...input, columns: 46, isNarrow: true }))).toBe(px(46 * COLUMN - 16 - 8 - 12 - 4))
 })
