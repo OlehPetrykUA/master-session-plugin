@@ -4,7 +4,7 @@ export const ORDER: readonly SessionState[] = ['needs-you', 'waiting', 'working'
 
 const BY_ICON: Record<string, SessionState> = { '🔴': 'needs-you', '🟡': 'waiting', '🟢': 'working', '✅': 'done' }
 
-const FIELDS = ['title', 'persona', 'now', 'next', 'progress', 'time', 'done', 'verified', 'git', 'location', 'risk', 'needsYou', 'sha'] as const
+const FIELDS = ['title', 'persona', 'now', 'next', 'progress', 'time', 'done', 'verified', 'git', 'location', 'risk', 'needsYou', 'sha', 'cwd'] as const
 
 type Field = (typeof FIELDS)[number]
 
@@ -58,6 +58,7 @@ export function boardFromJson(raw: unknown, source: Board['source'] = 'file'): B
     repos: stringsOf(data.repos),
     testsPassed: passed,
     testsNote: textOf(data.testsNote),
+    since: typeof data.since === 'number' && Number.isFinite(data.since) ? data.since : undefined,
     source,
   }
 }

@@ -69,7 +69,7 @@ export async function readReports($: Io, home: string) {
 }
 
 export function writeBoard($: Io, home: string, shared: Shared) {
-  return $.fs.write(boardPath(home, shared.masterId), JSON.stringify({ v: 1, kind: 'board', ...shared, board: { ...shared.board, source: undefined, since: undefined } }))
+  return $.fs.write(boardPath(home, shared.masterId), JSON.stringify({ v: 1, kind: 'board', ...shared, board: { ...shared.board, source: undefined } }))
 }
 
 function sharedOf(raw: unknown): Shared | undefined {
