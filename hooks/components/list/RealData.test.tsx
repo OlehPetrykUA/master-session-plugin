@@ -9,7 +9,7 @@ import { rowsOf as sessionRowsOf } from '../../lib/rows'
 import { isFailed, testsOf } from '../../lib/totals'
 import { pillOf, testsShownOf } from '../detail/Tests'
 import { C } from '../../theme/tokens'
-import { ASKS, ELLIPSIS } from '../../testing/widths'
+import { ASKS, ELLIPSIS, WIDE_ASKS } from '../../testing/widths'
 import { BOARD, HOME, PANE, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 
 const COMMAND = `cd ${HOME}/.claude/worktrees/wt-master-session-plugin-rows-v3 && npm run build -- --filter hooks && node --test hooks/lib/list.test.ts hooks/lib/band.test.ts hooks/components/detail/Detail.test.tsx 2>&1 | tee /private/tmp/claude-501/rows-v3-gate.log && git status --porcelain && git log --oneline -3`
@@ -263,24 +263,28 @@ test('textWidth follows anthropic-sans at opsz 16 as Chrome renders it at 12–1
   }
 })
 
-const realOf = (text: string, row: string, from: number) => {
-  const prefixes = ASKS.find(one => one.text === text)?.prefixes ?? []
+type Measured = { text: string; prefixes: readonly number[]; ellipsis?: number }
+
+const realOf = (entry: Measured, row: string, from: number) => {
   const body = row.endsWith('…') ? row.slice(0, -1) : row
-  return (prefixes[from + Array.from(body).length] ?? Infinity) - (prefixes[from] ?? 0) + (row.endsWith('…') ? ELLIPSIS : 0)
+  return (entry.prefixes[from + Array.from(body).length] ?? Infinity) - (entry.prefixes[from] ?? 0) + (row.endsWith('…') ? (entry.ellipsis ?? ELLIPSIS) : 0)
 }
 
-const rowsByRealWidth = (text: string, room: number) => {
-  const rows = rowsOf(text, room, 12, 2, { isBold: true })
-  const from = rows[0] ? text.indexOf(rows[1]?.replace(/…$/, '') ?? '', Array.from(rows[0]).length) : 0
-  return rows.map((row, index) => ({ row, real: realOf(text, row, index ? from : 0) }))
+const rowsByRealWidth = (entry: Measured, room: number, size = 12, isBold = true) => {
+  const rows = rowsOf(entry.text, room, size, 2, { isBold })
+  const chars = Array.from(entry.text)
+  const second = Array.from(rows[1]?.replace(/…$/, '') ?? '')
+  let from = Array.from(rows[0] ?? '').length
+  while (from < chars.length && chars.slice(from, from + second.length).join('') !== second.join('')) from += 1
+  return rows.map((row, index) => ({ row, real: realOf(entry, row, index ? from : 0) }))
 }
 
 test('ask rows by real width: seven asks across rooms 120–330, each row measured in Chrome at 600/12, never wider than its room', () => {
-  for (const { text } of ASKS)
+  for (const ask of ASKS)
     for (let room = 120; room <= 330; room += 5)
-      for (const { row, real } of rowsByRealWidth(text, room)) expect([room, row, real <= room]).toEqual([room, row, true])
-  expect(rowsByRealWidth(ASKS[0]?.text ?? '', 192.25).every(one => one.real <= 192.25)).toBe(true)
-  expect(rowsByRealWidth(ASKS[1]?.text ?? '', 302).every(one => one.real <= 302)).toBe(true)
+      for (const { row, real } of rowsByRealWidth(ask, room)) expect([room, row, real <= room]).toEqual([room, row, true])
+  expect(ASKS[0] && rowsByRealWidth(ASKS[0], 192.25).every(one => one.real <= 192.25)).toBe(true)
+  expect(ASKS[1] && rowsByRealWidth(ASKS[1], 302).every(one => one.real <= 302)).toBe(true)
 })
 
 test('rows break at spaces first, then after a slash in a path; never after a hyphen that starts a token or inside a path', () => {
@@ -309,14 +313,37 @@ test('tabular digits: the elapsed time is measured at 0.64 em per digit as it re
   for (const [bodyColumns, id, elapsed, real] of [[46, 't1', '11m', 25.81], [44, 't2', '11s', 21.52]] as const) {
     const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
     expect(textsIn((await ui.find({ key: `row-${id}` }))?.children)).toContain(elapsed)
-    const text = ASKS.find(one => one.text.startsWith(id === 't1' ? 'Allow Bash: bun' : 'Allow Read'))?.text ?? ''
+    const ask = ASKS.find(one => one.text.startsWith(id === 't1' ? 'Allow Bash: bun' : 'Allow Read')) ?? { text: '', prefixes: [] }
     const column = bodyWidthOf(bodyColumns) - 88 - (16 + real + 12) - 16
     const rows = ((await ui.find({ key: `row-${id}-ask-rows` }))?.children ?? []).map(row => String(textsIn(row).at(-1)))
     let from = 0
     for (const row of rows) {
-      expect([bodyColumns, row, realOf(text, row, from) <= column]).toEqual([bodyColumns, row, true])
-      from = text.indexOf(rows[rows.indexOf(row) + 1]?.replace(/…$/, '') ?? '', from + Array.from(row).length)
+      expect([bodyColumns, row, realOf(ask, row, from) <= column]).toEqual([bodyColumns, row, true])
+      from = ask.text.indexOf(rows[rows.indexOf(row) + 1]?.replace(/…$/, '') ?? '', from + Array.from(row).length)
     }
     await ui.unmount()
   }
+})
+
+test('wide glyphs by real width: Æ Œ, Cyrillic, arrows and box drawing, ✓ ★ — every row of each repro, measured in Chrome, fits its room at any width', () => {
+  for (const ask of WIDE_ASKS)
+    for (let room = 100; room <= 330; room += 5)
+      for (const { row, real } of rowsByRealWidth(ask, room, ask.size, ask.isBold)) expect([ask.size, room, row, real <= room]).toEqual([ask.size, room, row, true])
+  for (const [index, room] of [[0, 156], [1, 120], [2, 291], [3, 150]] as const) {
+    const ask = WIDE_ASKS[index]
+    expect(ask && rowsByRealWidth(ask, room, ask.size, ask.isBold).every(one => one.real <= room)).toBe(true)
+  }
+  expect(textWidth('Æ', 12)).toBeGreaterThanOrEqual(1.1 * 12)
+  expect(textWidth('é', 12)).toBe(textWidth('e', 12))
+  expect(textWidth('Å', 12, { isBold: true })).toBe(textWidth('A', 12, { isBold: true }))
+  expect(textWidth('Ж', 13, { isBold: true })).toBeGreaterThanOrEqual(1.1 * 13)
+  expect(Math.round(textWidth('漢', 12) * 1000)).toBe(Math.round(1.02 * 12 * 1.02 * 1000))
+})
+
+test('tabular digits count 0.64 em each, whatever the proportional digit width; other characters keep their own widths', () => {
+  const px = (value: number) => Math.round(value * 1000) / 1000
+  expect(px(textWidth('1111', 12, { isTabular: true }))).toBe(px(4 * 0.64 * 12 * 1.02))
+  expect(textWidth('1111', 12)).toBeLessThan(textWidth('1111', 12, { isTabular: true }))
+  expect(px(textWidth('11m', 12, { isTabular: true }) - textWidth('m', 12))).toBe(px(2 * 0.64 * 12 * 1.02))
+  expect(px(textWidth('0', 12, { isTabular: true, isBold: true }))).toBe(px(0.64 * 12 * 1.02))
 })
