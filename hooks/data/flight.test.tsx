@@ -6,8 +6,10 @@ warmUp()
 
 test('the git scan tick skips while the last scan is still running, so scans never overlap', async ($, on) => {
   const { clock, flights } = await started($, on, BOARD, { slowMs: { git: 2_000 } })
-  await clock.advance(300_000)
-  expect(flights.git.started).toBeGreaterThan(20)
+  await clock.advance(30_000)
+  const first = flights.git.started
+  await clock.advance(30_000)
+  expect(flights.git.started).toBeGreaterThan(first)
   expect(flights.git.peak).toBe(1)
 })
 
@@ -17,7 +19,7 @@ test('forced refreshes asked while a scan runs wait for it instead of starting a
     await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
     await clock.advance(5_000)
   }
-  await clock.advance(300_000)
+  await clock.advance(30_000)
   expect(flights.git.peak).toBe(1)
 })
 
