@@ -234,13 +234,13 @@ test('the header wraps a long status line and grows; offline shows I.offline mut
   await ui.unmount()
 })
 
-test('L8 at 46 columns with real glyph widths: "Reviewer · band diff" keeps the Open chat label, and a Validator prompt "Allow Read outside the project: ~/.agents/RULES.md?" takes 2 whole rows', async ($, on) => {
+test('L8 at 47 columns with real glyph widths: "Reviewer · band diff" keeps the Open chat label, and a Validator prompt "Allow Read outside the project: ~/.agents/RULES.md?" takes 2 whole rows', async ($, on) => {
   seeded(on, [
     { id: 'b1', name: 'band diff', type: 'master-session:reviewer', description: 'Review the band diff', state: 'running', startedAt: 3_540_000, parentSessionId: 'local_setup', asking: { text: 'Allow Bash: rm -rf dist?', since: 3_590_000 } },
     { id: 'c1', name: 'canvas v3 check', type: 'master-session:reviewer', description: 'Check the canvas', state: 'running', startedAt: 3_570_000, asking: { text: 'Allow Read outside the project: ~/.agents/RULES.md?', since: 3_590_000 } },
   ])
   await started($, on)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 47 } })
   expect((await ui.find({ key: 'face-chat-b1' }))?.props.width).not.toBe(across(32))
   expect(textsIn((await ui.find({ key: 'row-b1' }))?.children)).toEqual(expect.arrayContaining(['Reviewer', 'band diff']))
   expect(await hitsOf(ui)).not.toContain('hit-chat-c1')
@@ -248,6 +248,9 @@ test('L8 at 46 columns with real glyph widths: "Reviewer · band diff" keeps the
   const texts = rows.map(row => textsIn(row).at(-1))
   expect(texts).toEqual(['Allow Read outside the project:', '~/.agents/RULES.md?'])
   await ui.unmount()
+  const tight = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
+  expect((await tight.find({ key: 'face-chat-b1' }))?.props.width).toBe(across(32))
+  await tight.unmount()
 })
 
 test('textWidth follows anthropic-sans at opsz 16 as Chrome renders it at 12–14 px: 1.5–5 % above the real width (the ×1.02 margin), with its own semibold widths', () => {

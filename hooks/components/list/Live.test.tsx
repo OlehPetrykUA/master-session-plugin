@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord } from '../../../types'
 
-import { across, bodyWidthOf, faceWidth, tall, textWidth } from '../../lib/layout'
+import { CH, LH, across, bodyWidthOf, down, faceWidth, tall, textWidth } from '../../lib/layout'
 import { rowsOf } from '../../lib/list'
 import { blocksOf } from '../../lib/list'
 import type { RunSummary } from '../../lib/totals'
@@ -73,7 +73,7 @@ test('Open chat keeps its label when the task fits whole beside it, or when at l
     await ui.unmount()
     return width === across(32) ? 'icon' : 'label'
   }
-  const room = (bodyColumns: number) => bodyWidthOf(bodyColumns) - 88 - faceWidth('Open chat', 'b32') - 1 - 12
+  const room = (bodyColumns: number) => bodyWidthOf(bodyColumns) - 94 - faceWidth('Open chat', 'b32') - 1 - 12
   const shown = (persona: string, task: string, bodyColumns: number) => rowsOf(task, room(bodyColumns) - textWidth(persona, 14, { isBold: true }) - 8 - textWidth('·', 14), 14, 1)[0] ?? ''
   expect(shown('Designer', 'Pane v2', 52)).toBe('Pane v2')
   expect(await face('local_pane', 52)).toBe('label')
@@ -127,14 +127,30 @@ test('every open call moves the pane back to the top, or to the expanded card', 
   expect(Number(landed.at(-1))).toBeLessThan(30)
 })
 
-test('the expanded card draws its top exactly as the row: no inset from the card border', async ($, on) => {
+test('the press target spans the header: a row its full width and height, a card top the same less its 3 px margins', async ($, on) => {
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const width = bodyWidthOf(60)
+  const size = async (key: string) => {
+    const props = (await ui.find({ key }))?.props
+    return [props?.width, props?.height]
+  }
+  expect(await size('hit-row-local_setup')).toEqual([Math.ceil(width / CH), Math.ceil(56 / LH)])
+  await click(ui, 'hit-row-local_setup')
+  expect(await size('hit-top-local_setup')).toEqual([Math.ceil((width - 6) / CH), Math.ceil(50 / LH)])
+  await ui.unmount()
+})
+
+test('the expanded card draws its top as the row: a 3 px inset from the card border, the same content place', async ($, on) => {
   await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], title: 'Implementer · Archive safety for side sessions in other repos' }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const row = (await ui.find({ key: 'row-local_setup' }))?.props
   await click(ui, 'hit-row-local_setup')
   expect((await ui.find({ key: 'detail-local_setup' }))?.props).toEqual(expect.objectContaining({ paddingX: 0, paddingY: 0, borderStyle: 'round' }))
   const top = (await ui.find({ key: 'top-local_setup' }))?.props
-  for (const side of ['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom', 'gap', 'minHeight'] as const) expect(top?.[side]).toBe(row?.[side])
+  expect(top?.gap).toBe(row?.gap)
+  expect(top).toEqual(expect.objectContaining({ marginTop: down(3), marginBottom: down(3), marginLeft: across(3), marginRight: across(3), paddingTop: down(4), paddingBottom: down(4), paddingLeft: across(8), paddingRight: across(0), minHeight: tall(50), borderStyle: 'round', borderColor: C.clear }))
+  expect(row).toEqual(expect.objectContaining({ paddingTop: down(8), paddingBottom: down(8), paddingLeft: across(12), paddingRight: across(4) }))
   await ui.unmount()
 })
 

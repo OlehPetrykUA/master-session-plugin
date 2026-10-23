@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord } from '../../../types'
 
-import { across, tall } from '../../lib/layout'
+import { across, down, tall } from '../../lib/layout'
 import { oneLine } from '../../lib/list'
 import { phaseStrip } from '../../theme/detail'
 import { C } from '../../theme/tokens'
@@ -118,7 +118,7 @@ test('every row ends in a chevron: expand while closed, collapse on the card top
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const inside = async (key: string) => JSON.stringify((await ui.find({ key }))?.children ?? null)
-  expect((await ui.find({ key: 'row-local_setup-chevron' }))?.props).toEqual(expect.objectContaining({ width: across(14), flexShrink: 0 }))
+  expect((await ui.find({ key: 'row-local_setup-chevron' }))?.props).toEqual(expect.objectContaining({ width: across(24), height: tall(24), flexShrink: 0, borderStyle: 'round', borderColor: C.clear }))
   expect(await inside('row-local_setup-chevron')).toContain('"alt":"expand"')
   expect(await inside('row-local_setup-chevron')).toContain('M6 9l6 6 6-6')
   expect(await inside('row-local_setup-chevron')).toContain('stroke:var(--muted);stroke-width:2;')
@@ -139,6 +139,69 @@ test('every row ends in a chevron: expand while closed, collapse on the card top
   expect(all.length).toBeGreaterThan(0)
   expect(all.every(one => one.props.weight === 'semibold')).toBe(true)
   await plain.unmount()
+})
+
+test('every toggle header lights as one: row and card top, session and needs-you subagent, share a scope; the chip shows and the chevron brightens; the body stays out', async ($, on) => {
+  seeded(on, [agent('a1', { asking: ASK, parentSessionId: 'local_setup' })])
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  type Node = { props?: Record<string, unknown>; hover?: unknown; children?: unknown[] }
+  const walk = (node: unknown, key: string): Node | undefined => {
+    const one = node as Node
+    if (!one || typeof one !== 'object') return undefined
+    if (one.props?.key === key) return one
+    for (const child of one.children ?? []) {
+      const hit = walk(child, key)
+      if (hit) return hit
+    }
+    return undefined
+  }
+  const check = async (head: string, id: string, isTop: boolean, isNeeds: boolean) => {
+    const scope = `toggle-${head}-${id}`
+    const tree = await ui.drawn()
+    const box = walk(tree, `${head}-${id}`)
+    expect(box?.hover).toEqual(isTop ? { scope, backgroundColor: C.tileHover } : { scope, backgroundColor: C.tileHover, borderColor: isNeeds ? C.red : C.accentRing })
+    expect(box?.props).toEqual(expect.objectContaining({ borderStyle: 'round', paddingTop: down(isTop ? 4 : 8), paddingLeft: across(isTop ? 8 : 12), paddingRight: across(isTop ? 0 : 4) }))
+    const chip = walk(tree, `${head}-${id}-chevron`)
+    expect(chip?.hover).toEqual({ scope, backgroundColor: C.hoverBg, borderColor: C.borderStrong })
+    expect(chip?.props?.backgroundColor).toBeUndefined()
+    const hot = walk(tree, `${head}-${id}-chevron-hot`)
+    expect(hot?.props).toEqual(expect.objectContaining({ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, display: 'none' }))
+    expect(hot?.hover).toEqual({ scope, display: 'flex' })
+    expect(JSON.stringify(hot?.children)).toContain('stroke:var(--text);stroke-width:2;')
+  }
+  await check('row', 'local_setup', false, false)
+  await check('row', 'a1', false, true)
+  await click(ui, 'hit-row-local_setup')
+  await check('top', 'local_setup', true, false)
+  await click(ui, 'hit-top-local_setup')
+  await click(ui, 'hit-row-a1')
+  await check('top', 'a1', true, true)
+  expect((await ui.find({ key: 'top-a1' }))?.props).toEqual(expect.objectContaining({ marginTop: down(3), marginLeft: across(3), borderColor: C.clear, minHeight: tall(50) }))
+  expect(walk(await ui.drawn(), 'body-a1')?.hover).toBeUndefined()
+  await ui.unmount()
+})
+
+test('a long id caps the toggle scope at 64 characters, shared by the header, chip and bright chevron', async ($, on) => {
+  const id = 'x'.repeat(80)
+  seeded(on, [agent(id, { asking: ASK })])
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const find = (node: unknown, key: string): { hover?: { scope?: string }; children?: unknown[]; props?: Record<string, unknown> } | undefined => {
+    const one = node as { props?: Record<string, unknown>; children?: unknown[] }
+    if (!one || typeof one !== 'object') return undefined
+    if (one.props?.key === key) return one
+    for (const child of one.children ?? []) {
+      const hit = find(child, key)
+      if (hit) return hit
+    }
+    return undefined
+  }
+  const tree = await ui.drawn()
+  const scopes = [`row-${id}`, `row-${id}-chevron`, `row-${id}-chevron-hot`].map(key => find(tree, key)?.hover?.scope)
+  expect(scopes).toEqual([`toggle-row-${id}`.slice(0, 64), `toggle-row-${id}`.slice(0, 64), `toggle-row-${id}`.slice(0, 64)])
+  expect(scopes[0]?.length).toBe(64)
+  await ui.unmount()
 })
 
 test('an open archived card or workflow agent card counts as expanded, so the pane can scroll to its end', async ($, on) => {

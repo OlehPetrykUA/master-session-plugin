@@ -35,6 +35,7 @@ export function Row(ui: Ui, props: RowProps) {
   const dirty = item.kind === 'session' && where ? dirtyOf(where, item.row.board?.files ?? [], props.home) : 0
   const git = dirty ? gitPill(dirty) : undefined
   const id = `${props.isInCard ? 'top' : 'row'}-${item.id}`
+  const scope = `toggle-${id}`.slice(0, 64)
   const muted = (text: string, key: string) => (
     <Box key={key} flexShrink={0}>
       <Text size="footnote" color={C.muted}>
@@ -50,7 +51,7 @@ export function Row(ui: Ui, props: RowProps) {
   const isChat = isNeeds && !!props.chat
   const isMeta = !isChat && !isNarrow
   const metaWidth = isMeta ? Math.max(elapsed ? 16 + textWidth(elapsed, 12) : 0, item.kind === 'session' && !isNeeds ? (git?.width ?? 0) + 4 + 14 : 0) : 0
-  const base = props.width - 2 - 12 - 8 - 28 - 12 - 14 - 12 - (metaWidth ? metaWidth + 12 : 0) - (steps && !isChat ? 34 + 12 : 0)
+  const base = props.width - 2 - 12 - 4 - 28 - 12 - 24 - 12 - (metaWidth ? metaWidth + 12 : 0) - (steps && !isChat ? 34 + 12 : 0)
   const chatWidth = (isIcon: boolean) => (isChat ? (isIcon ? 32 : faceWidth(props.chat?.label ?? '', 'b32') + 1) + 12 : 0)
   const personaWidth = textWidth(name.persona, 14, { isBold: true }) + (name.task ? 8 + textWidth('·', 14) : 0)
   const [shown = ''] = isChat && name.task ? rowsOf(name.task, base - chatWidth(false) - personaWidth, 14, 1) : []
@@ -123,15 +124,19 @@ export function Row(ui: Ui, props: RowProps) {
       flexDirection="row"
       alignItems="center"
       gap={across(12)}
-      minHeight={tall(ROW_HEIGHT)}
-      paddingTop={down(8)}
-      paddingBottom={down(8)}
-      paddingLeft={across(12)}
-      paddingRight={across(8)}
-      borderStyle={props.isInCard ? undefined : 'round'}
-      borderColor={props.isInCard ? undefined : isNeeds ? C.red : C.border}
+      minHeight={tall(props.isInCard ? ROW_HEIGHT - 6 : ROW_HEIGHT)}
+      marginTop={props.isInCard ? down(3) : undefined}
+      marginBottom={props.isInCard ? down(3) : undefined}
+      marginLeft={props.isInCard ? across(3) : undefined}
+      marginRight={props.isInCard ? across(3) : undefined}
+      paddingTop={down(props.isInCard ? 4 : 8)}
+      paddingBottom={down(props.isInCard ? 4 : 8)}
+      paddingLeft={across(props.isInCard ? 8 : 12)}
+      paddingRight={across(props.isInCard ? 0 : 4)}
+      borderStyle="round"
+      borderColor={props.isInCard ? C.clear : isNeeds ? C.red : C.border}
       backgroundColor={props.isInCard ? undefined : C.surface}
-      hover={props.isInCard ? undefined : { backgroundColor: C.tileHover, borderColor: isNeeds ? C.red : C.accentRing }}
+      hover={props.isInCard ? { scope, backgroundColor: C.tileHover } : { scope, backgroundColor: C.tileHover, borderColor: isNeeds ? C.red : C.accentRing }}
     >
       <Svg key={`${id}-badge`} source={statusBadge(item.status, 28)} alt={line.word?.text ?? status.word} width={28} height={28} />
       <Box flexDirection="column" gap={down(2)} flexGrow={1} flexShrink={1} minWidth={0}>
@@ -165,10 +170,26 @@ export function Row(ui: Ui, props: RowProps) {
       </Box>
       {meta}
       {steps && !(isNeeds && props.chat) ? <Svg key={`${id}-ring`} source={toneRing(steps.done, steps.total, status.tone)} alt={`${steps.done} of ${steps.total}`} width={34} height={34} /> : null}
-      {ui.Client ? Hit(ui, { id, width: props.width, height: ROW_HEIGHT, onPress: props.onOpen }) : null}
+      {ui.Client ? Hit(ui, { id, width: props.isInCard ? props.width - 6 : props.width, height: props.isInCard ? ROW_HEIGHT - 6 : ROW_HEIGHT, onPress: props.onOpen }) : null}
       {isNeeds && props.chat ? ActionButton(ui, { id: `chat-${item.id}`, kind: 'primary', icon: 'chat', label: props.chat.label, onPress: props.chat.onPress, size: 'b32', iconSize: 16, isIconOnly: isChatIcon }) : null}
-      <Box key={`${id}-chevron`} flexDirection="row" alignItems="center" justifyContent="center" width={across(14)} flexShrink={0}>
+      <Box
+        key={`${id}-chevron`}
+        flexDirection="row"
+        alignItems="center"
+        justifyContent="center"
+        width={across(24)}
+        height={tall(24)}
+        flexShrink={0}
+        paddingX={0}
+        paddingY={0}
+        borderStyle="round"
+        borderColor={C.clear}
+        hover={{ scope, backgroundColor: C.hoverBg, borderColor: C.borderStrong }}
+      >
         {Icon(ui, { id: `${id}-chevron-icon`, name: chevron, size: 14, tone: 'muted', weight: 2, alt: chevron })}
+        <Box key={`${id}-chevron-hot`} position="absolute" top={0} right={0} bottom={0} left={0} flexDirection="row" alignItems="center" justifyContent="center" display="none" hover={{ scope, display: 'flex' }}>
+          {Icon(ui, { id: `${id}-chevron-icon-hot`, name: chevron, size: 14, tone: 'text', weight: 2, alt: chevron })}
+        </Box>
       </Box>
     </Box>
   )

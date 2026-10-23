@@ -38,7 +38,7 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
   for (const word of ['1 session', 'none', '—', 'Session', 'Approve the settings.json edit', 'Redo toolkit setup UI', 'waiting', 'waiting for the go', '50m']) expect(texts).toContain(word)
   expect(texts.some(text => /^since \d\d:\d\d$/.test(text))).toBe(true)
   expect((await ui.find({ key: 'block-needs-you' }))?.props).toEqual(expect.objectContaining({ backgroundColor: C.redTint, borderColor: C.red, borderStyle: 'round' }))
-  expect((await ui.find({ key: 'row-local_env' }))?.props).toEqual(expect.objectContaining({ borderColor: C.red, minHeight: tall(56), paddingLeft: across(12), paddingRight: across(8), gap: across(12) }))
+  expect((await ui.find({ key: 'row-local_env' }))?.props).toEqual(expect.objectContaining({ borderColor: C.red, minHeight: tall(56), paddingLeft: across(12), paddingRight: across(4), gap: across(12) }))
   expect((await ui.find({ key: 'row-local_setup' }))?.props).toEqual(expect.objectContaining({ borderColor: C.border, backgroundColor: C.surface, borderStyle: 'round' }))
   expect((await ui.find({ key: 'face-chat-local_env' }))?.props).toEqual(expect.objectContaining({ height: tall(32) }))
   const faces = async (alt: string) => (await ui.findAll({ type: 'Svg' })).filter(one => one.props.alt === alt).map(one => String(one.props.source))
