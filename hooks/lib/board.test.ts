@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { CHAT_BOARD, GIT, HOME, TOOLKIT, WORKTREE, liveOf } from '../testing/world'
-import { boardFromChat, progressOf, stepOf } from './board'
+import { boardFromChat, boardFromJson, progressOf, stepOf } from './board'
 import { dirtyOf, parseStatus, parseWorktrees } from './git'
 
 test('the helpers read a chat board, steps and git porcelain', async () => {
@@ -44,4 +44,10 @@ test('progress: segment fills in board order, archived left out', async () => {
   ])
   const archived = progressOf(boardOf([session('a', 'done'), session('b', 'working', 'step 2 of 4'), session('c', 'waiting'), session('d', 'done')]), liveOf(['d']))
   expect([archived.segments.map(one => one.id), archived.total]).toEqual([['a', 'b', 'c'], 3])
+})
+
+test('a board read from JSON drops a row without an id or a valid state and keeps the good one', async () => {
+  const good = { id: 'local_a', state: 'working' }
+  for (const bad of [{ id: 'x' }, { state: 'working' }, { id: 'x', state: 'nope' }, 'text'])
+    expect(boardFromJson({ sessions: [good, bad] }, 'file')?.sessions.map(one => one.id)).toEqual(['local_a'])
 })

@@ -104,7 +104,7 @@ export function world(on: On, child: Child = {}) {
   mock.env(on, { HOME })
   const clock = mock.clock(on, { now: 3_600_000 })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
-  on('session.surfaces', () => ({ value: ['desktop' as const] }))
+  on('session.surfaces', () => ({ value: [...(child.surfaces ?? ['desktop' as const])] }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('tool.register', (_, e) => {
     tools.push(e.name)
@@ -116,9 +116,9 @@ export function world(on: On, child: Child = {}) {
   })
   on('ui.open', (_, e) => {
     opened.push(e.id)
-    return { value: { isPlaced: true } }
+    return { value: child.isPlaced === false ? { isPlaced: false as const, reason: 'no surface draws it' } : { isPlaced: true as const } }
   })
-  on('ui.panes', () => ({ value: child.isPaneOpen === false ? [] : [{ id: 'master-session', title: 'Master session', isShown: !child.isPaneHidden, isFocused: false, isPlaced: true }] }))
+  on('ui.panes', () => ({ value: child.isPaneOpen === false ? [] : [{ id: 'master-session', title: 'Master session', isShown: !child.isPaneHidden, isFocused: false, isPlaced: child.isPlaced ?? true }] }))
   on('ui.toast', (_, e) => {
     toasts.push(e.text)
     return { value: undefined }
@@ -169,7 +169,9 @@ export function world(on: On, child: Child = {}) {
     const failure = e.tool === 'list_sessions' ? child.listError?.() : undefined
     if (failure) return { value: { content: [{ type: 'text' as const, text: failure }], isError: true } }
     if (e.tool === 'list_sessions') return text(sessions.filter(one => e.args.include_archived === true || !one.isArchived).slice(0, Number(e.args.limit ?? 20)))
-    if (e.tool === 'archive_session' || e.tool === 'unarchive_session') {
+    const refusal = e.tool === 'archive_session' ? child.archiveError : e.tool === 'unarchive_session' ? child.unarchiveError : undefined
+    if (refusal) return { value: { content: [{ type: 'text' as const, text: refusal }], isError: true } }
+    if ((e.tool === 'archive_session' && !child.stuck) || e.tool === 'unarchive_session') {
       const isArchived = e.tool === 'archive_session'
       sessions = sessions.map(one => (one.sessionId === e.args.session_id ? { ...one, isArchived } : one))
     }
@@ -255,7 +257,7 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean }
+export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean; isPlaced?: boolean; surfaces?: readonly ('desktop' | 'terminal')[]; archiveError?: string; unarchiveError?: string; stuck?: boolean }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, board })

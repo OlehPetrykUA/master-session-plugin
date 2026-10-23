@@ -132,6 +132,7 @@ test('a plain session that started side chats shows no band and runs no scans, t
 
 test('a side chat of a plain session is a plain session: no band, no scans, no reports written', async ($, on) => {
   engineBand(on)
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
   const writes: string[] = []
   on('fs.write', (_, e) => {
     writes.push(e.path)
@@ -142,7 +143,7 @@ test('a side chat of a plain session is a plain session: no band, no scans, no r
   await run.clock.advance(120_000)
   const answer = (await $.tool.call({ tool: REPORT_TOOL, state: 'working' })) as { deny?: string }
   expect(String(answer.deny)).toContain('no master session')
-  await $.turn.start({ turnId: 't1', text: 'go' } as never).catch(() => undefined)
+  await $.turn.start({ turnId: 't1', text: 'go' })
   await run.clock.advance(10_000)
   expect(writes).toEqual([])
   expect(run.gits.length).toBe(0)

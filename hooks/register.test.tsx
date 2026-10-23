@@ -1,13 +1,17 @@
 import { expect, test } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 
 import type { On } from 'claude-code'
 
 import type { AgentRecord, WorkflowRecord } from '../types'
 
 import { subagentsOf, workflowRunsOf } from './lib/agents'
+import type { Child } from './testing/world'
 import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, click, started, textsOf, typed, warmUp, world } from './testing/world'
 
 warmUp()
+
+const PLUGIN_ORIGIN = { kind: 'plugin', name: 'master-session' }
 
 test('/master-session:start status opens the pane; with a task it also runs the skill', async ($, on) => {
   const { opened, ran, clock } = world(on)
@@ -22,14 +26,21 @@ test('/master-session:start status opens the pane; with a task it also runs the 
 })
 
 test('/master-session:info opens the pane without running its skill, and ask asks the workers', async ($, on) => {
-  const { opened, ran, clock } = world(on)
-  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
-  await clock.settle()
+  const { opened, ran, calls } = await started($, on)
   expect((await $.command.run(typed('master-session:info', ''))).text).toBe('Master session pane opened.')
   expect(opened).toEqual(['master-session'])
-  expect((await $.command.run(typed('master-session:info', 'ask'))).text).toMatch(/^No running workers to ask|^Asked \d+ running worker/)
+  expect((await $.command.run(typed('master-session:info', 'ask'))).text).toBe('Asked 1 running worker · 1 idle skipped')
+  expect(calls.filter(one => one.tool === 'send_message').map(one => one.args.session_id)).toEqual(['local_env'])
   expect(opened).toEqual(['master-session'])
   expect(ran).toEqual([])
+})
+
+test('/master-session:info ask with no board has no one to ask and sends nothing', async ($, on) => {
+  const { calls, clock } = world(on)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  expect((await $.command.run(typed('master-session:info', 'ask'))).text).toBe('No running workers to ask')
+  expect(calls.some(one => one.tool === 'send_message')).toBe(false)
 })
 
 test('the skill prompt says the pane is on and points at the board tool', async ($, on) => {
@@ -60,7 +71,7 @@ test('the scroll tool moves the desktop pane to every drawn section and refuses 
     const row = Number(/\(row (\d+)\)/.exec(text)?.[1] ?? -1)
     expect(text).toBe(`Not scrolled (row ${row}): no implementation for ui.scroll`)
     landed.length = 0
-    await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 20, contentRows: 400, origin: { kind: 'plugin', name: 'master-session' } })
+    await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 20, contentRows: 400, origin: PLUGIN_ORIGIN })
     expect(landed).toEqual([row])
     return row
   }
@@ -79,12 +90,12 @@ test('the scroll tool moves the desktop pane to every drawn section and refuses 
   expect(String(answer.deny)).toContain('section-expanded is not drawn')
   await click(ui, 'hit-row-local_env')
   expect(await move('section-expanded')).toBe(tiles)
-  await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 7, by: 7, bodyRows: 20, contentRows: 400, origin: { kind: 'plugin', name: 'master-session' } })
+  await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 7, by: 7, bodyRows: 20, contentRows: 400, origin: PLUGIN_ORIGIN })
   expect(landed.at(-1)).toBe(7)
   const asked = await move('section-list')
   await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'section-list' })
   landed.length = 0
-  await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 20, contentRows: 22, origin: { kind: 'plugin', name: 'master-session' } })
+  await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 20, contentRows: 22, origin: PLUGIN_ORIGIN })
   expect(landed).toEqual([asked])
   await ui.unmount()
 })
@@ -189,19 +200,72 @@ test('the master republishes a merged board with its reports and repos when a wo
   expect(row.commits).toEqual(['abc1234 fix'])
 })
 
-test('a hidden pane stays hidden: nothing scrolls and ticks never reopen it', async ($, on) => {
+async function landedAfterOpen($: Engine, on: On, child: Child) {
   const landed: number[] = []
   on('ui.scroll', ((_: unknown, e: { offset: number }) => {
     landed.push(e.offset)
     return { value: {} }
   }) as never)
-  const { opened, clock } = await started($, on, BOARD, { isPaneHidden: true })
+  const run = await started($, on, BOARD, child)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await $.tool.call({ tool: 'mcp__master-session__open', expand: 'local_setup' })
+  await run.clock.settle()
+  const raise = $.ui as unknown as { scroll: (input: unknown) => Promise<unknown> }
+  await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 20, contentRows: 400, origin: PLUGIN_ORIGIN })
+  await ui.unmount()
+  return { landed, run }
+}
+
+test('opening the pane aims the next plugin scroll at the expanded card', async ($, on) => {
+  const { landed } = await landedAfterOpen($, on, {})
+  expect(landed.length).toBe(1)
+  expect(landed[0]).toBeGreaterThan(0)
+})
+
+test('a hidden pane stays hidden: the scroll tool refuses, no aim is kept and ticks never reopen it', async ($, on) => {
+  const { landed, run } = await landedAfterOpen($, on, { isPaneHidden: true })
   const scrolled = (await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'start' })) as { deny?: string }
-  expect(String(scrolled.deny)).toContain('the pane is hidden')
-  await clock.advance(60_000)
+  expect(scrolled.deny).toBe('Not scrolled: the pane is hidden; open it first.')
+  const opened = run.opened.length
+  await run.clock.advance(60_000)
+  await run.clock.settle()
+  expect(run.opened.length).toBe(opened)
+  expect(run.opened).toContain('master-session')
+  expect(landed).toEqual([0])
+})
+
+test('a pane that is open but not placed yet counts as closed: the scroll tool refuses and no aim is kept', async ($, on) => {
+  const { landed, run } = await landedAfterOpen($, on, { isPlaced: false })
+  expect(landed).toEqual([0])
+  const scrolled = (await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'start' })) as { deny?: string }
+  expect(scrolled.deny).toBe('Not scrolled: the pane is hidden; open it first.')
+  expect(run.opened).toEqual(['master-session'])
+})
+
+test('the open tool says to post the board in chat when no surface draws the pane', async ($, on) => {
+  await started($, on, BOARD, { isPlaced: false })
+  const answer = (await $.tool.call({ tool: 'mcp__master-session__open' })) as { result?: string }
+  expect(answer.result).toBe('The pane is open, but no attached surface draws it: post the board in chat.')
+})
+
+test('the board tool says to post the board in chat when no surface is attached', async ($, on) => {
+  const { answer } = await started($, on, BOARD, { surfaces: [] })
+  expect((answer as { result?: string }).result).toBe('Board updated, but no surface is attached to draw it: post the board in chat.')
+})
+
+test('the board tool with a surface counts the sessions it published', async ($, on) => {
+  const { answer } = await started($, on)
+  expect((answer as { result?: string }).result).toBe('Board updated: 2 sessions in the pane and the band. Post only 🔴 needs-you lines in chat.')
+})
+
+test('a malformed board is refused with what it needs and changes nothing', async ($, on) => {
+  const { clock } = await started($, on)
   await clock.settle()
-  expect([landed, opened]).toEqual([[], []])
-  await $.tool.call({ tool: 'mcp__master-session__open' })
-  await clock.settle()
-  expect([landed, opened]).toEqual([[], ['master-session']])
+  for (const board of [{}, { tick: '10:00' }, { sessions: [{ id: 'x' }] }, { sessions: [{ id: 'local_env', state: 'working' }, { state: 'working' }] }]) {
+    const answer = (await $.tool.call({ tool: BOARD_TOOL, ...board })) as { deny?: string }
+    expect(answer.deny).toBe('The board needs a sessions array whose items carry id and state.')
+  }
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ key: 'hit-row-local_env' })).toBeDefined()
+  await ui.unmount()
 })

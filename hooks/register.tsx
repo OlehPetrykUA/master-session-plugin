@@ -23,7 +23,7 @@ import {
   republishBoard,
   startSources,
 } from './data/sources'
-import { addFault, clearFaults, clearPresses, hasFaults, nextRetryMs, runPress } from './data/presses'
+import { clearPresses, hasFaults, recoverFault, runPress } from './data/presses'
 import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
 import { skipWhileBusy } from './data/flight'
 import { briefed, claim, engage, inPlan, isActive, recordTurnEnd, recorder, startRecorder } from './data/recorder'
@@ -175,7 +175,8 @@ export const register: Register = on => {
 
   on('tool.call', { tool: 'mcp__master-session__board' }, async ($, e) => {
     const next = boardFromJson(e, 'tool')
-    if (!next) return { deny: 'The board needs a sessions array whose items carry id and state.' }
+    const sent = Array.isArray(e.sessions) ? e.sessions.length : 0
+    if (!next || next.sessions.length < sent) return { deny: 'The board needs a sessions array whose items carry id and state.' }
     claim()
     void engage($)
     const at = await $.clock.now()
@@ -231,7 +232,7 @@ export const register: Register = on => {
   })
 
   on('ui.fault', async ($, e, next) => {
-    if (addFault(e.element)) $.clock.after(nextRetryMs(), () => (clearFaults(), $.ui.invalidate('ui.render')))
+    recoverFault($, e.element)
     return next(e)
   })
 
