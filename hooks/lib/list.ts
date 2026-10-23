@@ -404,19 +404,19 @@ export const EMPTY_TEXT: Record<Filter, { title: string; body: string }> = {
   archived: { title: 'Nothing archived yet', body: 'Archived sessions land here.' },
 }
 
-export type Block = { key: string; label: string; value: string; sub: string; dots?: readonly { tone: 'green' | 'amber' | 'grey'; count: number }[]; isAlert: boolean }
+export type Block = { key: string; label: string; value: string; sub: string; short?: string; dots?: readonly { tone: 'green' | 'amber' | 'grey'; count: number }[]; isAlert: boolean }
 
 export function blocksOf(totals: RunSummary, hasWork: boolean, end?: string): Block[] {
   const { sessions, subagents, workflows, commits, tests, duration, git } = totals
   const needs = totals.needsYou.sessions + totals.needsYou.subagents
   return [
     { key: 'sessions', label: 'Sessions', value: String(sessions.total), sub: '', dots: [{ tone: 'green', count: sessions.working }, { tone: 'amber', count: sessions.waiting }, { tone: 'grey', count: sessions.done }], isAlert: false },
-    { key: 'needs-you', label: 'Needs you', value: String(needs), sub: needs ? [totals.needsYou.sessions ? plural(totals.needsYou.sessions, 'session') : '', totals.needsYou.subagents ? plural(totals.needsYou.subagents, 'subagent') : ''].filter(Boolean).join(' · ') : 'nothing waiting', isAlert: needs > 0 },
+    { key: 'needs-you', label: 'Needs you', value: String(needs), sub: needs ? [totals.needsYou.sessions ? plural(totals.needsYou.sessions, 'session') : '', totals.needsYou.subagents ? plural(totals.needsYou.subagents, 'subagent') : ''].filter(Boolean).join(' · ') : 'nothing waiting', short: needs ? (totals.needsYou.sessions && totals.needsYou.subagents ? plural(needs, 'blocker') : undefined) : 'none', isAlert: needs > 0 },
     { key: 'subagents', label: 'Subagents', value: String(subagents.total), sub: subagents.running ? `${subagents.running} running` : subagents.total ? 'all finished' : 'none', isAlert: false },
     { key: 'workflows', label: 'Workflows', value: String(workflows.total), sub: workflows.total ? `${workflows.agentsDone}/${workflows.agents} agents` : 'none', isAlert: false },
     { key: 'commits', label: 'Commits', value: String(commits.total), sub: commits.total ? plural(commits.repos, 'repo') : '—', isAlert: false },
-    { key: 'tests', label: 'Tests', value: tests.value, sub: tests.sub, isAlert: false },
-    { key: 'duration', label: 'Duration', value: hasWork ? compactOf(duration.ms) : '—', sub: !hasWork ? 'not started' : end ? `${clockOf(duration.since)} – ${end}` : `since ${clockOf(duration.since)}`, isAlert: false },
+    { key: 'tests', label: 'Tests', value: tests.value, sub: tests.sub, short: tests.sub.replace(/^from (\d+ sessions?)’s? checks$/, '$1').replace(/ · no counts$/, ''), isAlert: false },
+    { key: 'duration', label: 'Duration', value: hasWork ? compactOf(duration.ms) : '—', sub: !hasWork ? 'not started' : end ? `${clockOf(duration.since)} – ${end}` : `since ${clockOf(duration.since)}`, short: end ? `until ${end}` : undefined, isAlert: false },
     { key: 'git', label: 'Git', value: String(git.dirty), sub: git.dirty ? 'to commit' : 'clean', isAlert: false },
   ]
 }

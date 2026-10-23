@@ -29,6 +29,7 @@ import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/b
 import { boardFromJson } from './lib/board'
 import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
 import { messageOf } from './lib/format'
+import { openIdOf } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
 import { getAgents, getBoard, getLive, getReports, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
@@ -127,7 +128,7 @@ export const register: Register = on => {
     const expand = typeof e.expand === 'string' ? e.expand.trim() : ''
     const isArchived = e.archived === true
     const data = await paneData($, columns || 48)
-    const item = paneViewOf(data).items.find(one => one.id === expand || (one.kind === 'workflow' && one.run.agents.some(agent => agent.id === expand)))
+    const item = paneViewOf(data).items.find(one => openIdOf(one, [expand]) !== undefined)
     const isOldOne = data.archived.some(one => one.id === expand)
     const card = isArchived ? (isOldOne ? expand : '') : item ? expand : ''
     const isShown = !!expand && !!card

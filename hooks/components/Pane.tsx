@@ -1,5 +1,5 @@
 import { TITLE } from '../lib/constants'
-import { across, down, tall } from '../lib/layout'
+import { across, bodyWidthOf, down, tall } from '../lib/layout'
 import { headerButtonsOf, noticeOf, paneViewOf, pinOf } from '../lib/view'
 import { C } from '../theme/tokens'
 import { FilterChips } from './FilterChips'
@@ -16,7 +16,7 @@ export function Pane(ui: Ui, data: PaneData, view = paneViewOf(data), pin = pinO
   return (
     <Box flexDirection="column" flexShrink={0} overflow="hidden">
       <Box key="header-space" height={headerRows} />
-      {Summary(ui, { blocks: view.blocks, perRow: view.perRow })}
+      {Summary(ui, { blocks: view.blocks, perRow: view.perRow, width: bodyWidthOf(data.columns) })}
       {FilterChips(ui, { chips: view.chips, chosen: data.chosen, onFilter: data.actions.filter })}
       {List(ui, data, view)}
       <Box key="header-pin" position="absolute" top={0} left={0} right={0} height={tall(lift) + headerRows} flexDirection="column" paddingTop={down(lift)}>

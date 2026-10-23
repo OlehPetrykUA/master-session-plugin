@@ -12,7 +12,10 @@ import { lossesOf } from './losses'
 
 type Line = { text: string; color?: string }
 
-type TextCardProps = { id: string; title: string; head: Line; lines: readonly (Line | string)[]; isNeeds?: boolean; onCollapse: () => void; actions?: RenderChildren }
+type TextCardProps = { id: string; title: string; head: Line; lines: readonly (Line | string)[]; body?: RenderChildren; tail?: readonly (Line | string)[]; isNeeds?: boolean; onCollapse: () => void; actions?: RenderChildren }
+
+const textLines = ({ Text }: TextUi, lines: readonly (Line | string)[]) =>
+  lines.map(line => (typeof line === 'string' ? { text: line } : line)).map(line => (line.color ? <Text color={line.color}>{line.text}</Text> : <Text dimColor>{line.text}</Text>))
 
 function TextCard(ui: TextUi, props: TextCardProps) {
   const { Box, Text, Button } = ui
@@ -24,7 +27,9 @@ function TextCard(ui: TextUi, props: TextCardProps) {
         <Button key={`collapse-${props.id}`} plain label="Collapse" onPress={props.onCollapse} />
       </Box>
       <Text color={props.head.color}>{props.head.text}</Text>
-      {props.lines.map(line => (typeof line === 'string' ? { text: line } : line)).map(line => (line.color ? <Text color={line.color}>{line.text}</Text> : <Text dimColor>{line.text}</Text>))}
+      {textLines(ui, props.lines)}
+      {props.body}
+      {textLines(ui, props.tail ?? [])}
       {props.actions}
     </Box>
   )
@@ -92,9 +97,10 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
   })
 }
 
-export type TextWorkflowProps = { item: Extract<ListItem, { kind: 'workflow' }>; context: Context; onCollapse: () => void }
+export type TextWorkflowProps = { item: Extract<ListItem, { kind: 'workflow' }>; context: Context; open: readonly string[]; onToggle: (id: string) => void; onCollapse: () => void }
 
 export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
+  const { Box, Text, Button } = ui
   const { item, context } = props
   const { run } = item
   const { counts } = run
@@ -106,10 +112,20 @@ export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
     title: nameText(displayNameOf(item)),
     isNeeds: item.status === 'needs',
     head: headOfItem(item, context),
-    lines: [
-      `run ${run.id} · ${counts.done}/${counts.total} done`,
-      ...failed.map(agent => ({ text: `Failed: ${agent.label}${agent.result ? ` — ${agent.result}` : ''}`, color: 'error' })),
-      ...runAgentsOf(run, context.agents).map(agent => ({ text: `${nameText(displayNameOf(agent))} · ${lineTextOf(lineOf(agent, context))} · ${elapsedOfItem(agent, at)}`, color: agent.status === 'needs' ? 'error' : undefined })),
+    lines: [`run ${run.id} · ${counts.done}/${counts.total} done`, ...failed.map(agent => ({ text: `Failed: ${agent.label}${agent.result ? ` — ${agent.result}` : ''}`, color: 'error' }))],
+    body: runAgentsOf(run, context.agents).map(agent =>
+      agent.kind === 'agent' && props.open.includes(agent.id) ? (
+        TextSubagentDetail(ui, { item: agent, context, onCollapse: () => props.onToggle(run.id) })
+      ) : (
+        <Box key={`agent-${agent.id}`} flexDirection="row" gap="sm">
+          <Button key={`agent-open-${agent.id}`} plain label={nameText(displayNameOf(agent))} onPress={() => props.onToggle(agent.id)} />
+          <Text color={agent.status === 'needs' ? 'error' : undefined} dimColor={agent.status !== 'needs' || undefined} wrap="truncate-end">
+            {[lineTextOf(lineOf(agent, context)), elapsedOfItem(agent, at)].filter(Boolean).join(' · ')}
+          </Text>
+        </Box>
+      ),
+    ),
+    tail: [
       run.state === 'running' ? `Time: running ${durationOf(at - run.startedAt)} · started ${clockOf(run.startedAt)}` : `Time: took ${durationOf(end - run.startedAt)} · ${clockOf(run.startedAt)} – ${clockOf(end)}`,
       `Usage: ${plural(counts.total, 'agent')}${run.tokens ? ` · ${tokensOf(run.tokens)}` : ''}`,
     ],
@@ -117,15 +133,16 @@ export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
   })
 }
 
-export type TextSubagentProps = { item: Extract<ListItem, { kind: 'subagent' }>; context: Context; onCollapse: () => void }
+export type TextSubagentProps = { item: Extract<RowItem, { kind: 'subagent' | 'agent' }>; context: Context; onCollapse: () => void }
 
 export function TextSubagentDetail(ui: TextUi, props: TextSubagentProps) {
   const { item, context } = props
   const { agent } = item
   const at = context.at
   const end = agent.endedAt ?? at
-  const model = modelFamilyOf(agent.requestedModel || agent.model)
+  const model = modelFamilyOf(item.kind === 'subagent' ? item.agent.requestedModel || item.agent.model : agent.model)
   const isRunning = agent.state === 'running'
+  const how = item.kind === 'agent' ? `workflow agent ${item.agent.index} of ${item.run.counts.total}` : item.agent.isBackground ? 'background' : 'foreground'
   return TextCard(ui, {
     id: agent.id,
     title: nameText(displayNameOf(item)),
@@ -133,10 +150,10 @@ export function TextSubagentDetail(ui: TextUi, props: TextSubagentProps) {
     head: headOfItem(item, context),
     lines: [
       ...(item.status === 'needs' && agent.asking ? [{ text: `Permission: ${agent.asking.text}`, color: 'error' }] : []),
-      `Task: ${agent.description}`,
-      agent.prompt ?? '',
+      `Task: ${item.kind === 'subagent' ? item.agent.description : item.agent.label}`,
+      item.kind === 'subagent' ? (item.agent.prompt ?? '') : '',
       `Model: ${model || '—'} · ${agent.type}`,
-      `Started by: ${parentsOf(item, context).map(nameText).join(' › ')} · ${agent.isBackground ? 'background' : 'foreground'}`,
+      `Started by: ${parentsOf(item, context).map(nameText).join(' › ')} · ${how}`,
       isRunning ? `Time: running ${durationOf(at - agent.startedAt)} · started ${clockOf(agent.startedAt)}` : `Time: took ${durationOf(end - agent.startedAt)} · ${clockOf(agent.startedAt)} – ${clockOf(end)}`,
       !isRunning && agent.result ? `${agent.state === 'failed' ? 'Error' : 'Result'}: ${agent.result}` : '',
       !isRunning && agent.tokens ? tokensOf(agent.tokens) : '',

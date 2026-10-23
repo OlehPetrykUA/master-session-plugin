@@ -21,7 +21,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
 
   const detail = (item: ListItem) => {
     const collapse = () => actions.collapse(openIdOf(item, data.open) ?? item.id)
-    if (item.kind === 'workflow') return TextWorkflowDetail(ui, { item, context, onCollapse: collapse })
+    if (item.kind === 'workflow') return TextWorkflowDetail(ui, { item, context, open: data.open, onToggle: actions.toggle, onCollapse: collapse })
     if (item.kind === 'subagent') return TextSubagentDetail(ui, { item, context, onCollapse: collapse })
     return TextSessionDetail(ui, { item, context, asking, isReadOnly, actions })
   }

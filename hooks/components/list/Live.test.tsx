@@ -194,9 +194,27 @@ test('the Tests block sums the pass counts of each session’s latest test label
   const one = ['plugin test · passed · 212 pass', 'persona.test · passed · 14 passed', 'plugin test · passed · 214 pass']
   const two = ['tsc -p . --noEmit · exit 0', 'plugin test · passed · 298 pass']
   await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], tests: one }, { ...BOARD.sessions[1], tests: two }] })
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 80 } })
   expect((await ui.find({ key: 'block-tests' }))?.text).toBe('Testsfrom 2 sessions’ checks')
   expect((await ui.findAll({ type: 'Svg' })).some(svg => svg.props.alt === 'Tests 526')).toBe(true)
   await ui.unmount()
+})
+
+test('KPI tiles at 47 columns keep every label and sub whole: Needs you drops its glyph, the subs take their short form; wide tiles keep both', async ($, on) => {
+  seeded(on, [{ id: 'k1', type: 'master-session:reviewer', description: 'Review', state: 'running', startedAt: 3_540_000, parentSessionId: 'local_setup', asking: { text: 'Allow Bash: ls', since: 3_590_000 } }])
+  const one = ['plugin test · passed · 212 pass']
+  const two = ['plugin test · passed · 298 pass']
+  await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], tests: one }, { ...BOARD.sessions[1], tests: two }] })
+  const tile = async (bodyColumns: number) => {
+    const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
+    const found = { needs: (await ui.find({ key: 'block-needs-you' }))?.text, icon: JSON.stringify((await ui.find({ key: 'block-needs-you' }))?.children).includes('"alt":"needs"'), tests: (await ui.find({ key: 'block-tests' }))?.text }
+    await ui.unmount()
+    return found
+  }
+  expect(await tile(47)).toEqual({ needs: 'Needs you2 blockers', icon: false, tests: 'Tests2 sessions' })
+  expect(await tile(100)).toEqual({ needs: 'Needs you1 session · 1 subagent', icon: true, tests: 'Testsfrom 2 sessions’ checks' })
+  const inner = (bodyWidthOf(47) - 3 * 8) / 4 - 2 - 16
+  for (const text of ['Needs you', '2 blockers', '2 sessions']) expect([text, textWidth(text, 11, { isBold: text === 'Needs you' }) <= inner]).toEqual([text, true])
+  expect(textWidth('Needs you', 11, { isBold: true }) + 16).toBeGreaterThan(inner)
 })
 

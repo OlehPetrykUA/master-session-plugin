@@ -1,16 +1,19 @@
 import type { Block } from '../../lib/list'
-import { across, down } from '../../lib/layout'
+import { across, down, textWidth } from '../../lib/layout'
 import { dot, numeral } from '../../theme/icons'
 import { C } from '../../theme/tokens'
 import { Icon } from '../Icon'
 import type { Ui } from '../types'
 
-export type SummaryProps = { blocks: readonly Block[]; perRow: number }
+export type SummaryProps = { blocks: readonly Block[]; perRow: number; width: number }
 
 export function Summary(ui: Ui, props: SummaryProps) {
   const { Box, Text, Svg } = ui
+  const inner = (props.width - (props.perRow - 1) * 8) / props.perRow - 2 - 16
   const block = (one: Block) => {
     const value = numeral(one.value, 'text')
+    const hasIcon = one.isAlert && textWidth(one.label, 11, { isBold: true }) + 12 + 4 <= inner
+    const sub = one.short && textWidth(one.sub, 11) > inner ? one.short : one.sub
     return (
       <Box
         key={`block-${one.key}`}
@@ -26,7 +29,7 @@ export function Summary(ui: Ui, props: SummaryProps) {
         backgroundColor={one.isAlert ? C.redTint : C.surface}
       >
         <Box flexDirection="row" alignItems="center" gap={across(4)} minWidth={0}>
-          {one.isAlert ? Icon(ui, { id: `block-icon-${one.key}`, name: 'needs', size: 12, tone: 'red', weight: 2.2 }) : null}
+          {hasIcon ? Icon(ui, { id: `block-icon-${one.key}`, name: 'needs', size: 12, tone: 'red', weight: 2.2 }) : null}
           <Box flexShrink={1} minWidth={0}>
             <Text size="caption" weight="semibold" color={C.muted} wrap="truncate-end">
               {one.label}
@@ -47,7 +50,7 @@ export function Summary(ui: Ui, props: SummaryProps) {
           </Box>
         ) : (
           <Text size="caption" color={C.muted} wrap="truncate-end">
-            {one.sub}
+            {sub}
           </Text>
         )}
       </Box>

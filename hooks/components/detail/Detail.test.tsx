@@ -213,7 +213,14 @@ test('the terminal draws each detail as text: session actions and the archive bo
   await ui.press({ key: 'row-open-wf_7' })
   const flow = await textsOf(ui)
   expect(flow).toEqual(expect.arrayContaining(['Workflow · review-changes', 'run wf_7 · 1/3 done', 'Failed: verify:band.ts — agent() threw: tsc exited 2 in hooks/lib/band.ts', 'Usage: 3 agents']))
-  expect(flow.some(text => /^Agent · verify:band\.ts · failed · agent\(\) threw: tsc exited 2 in hooks\/lib\/band\.ts · \d+s$/.test(text))).toBe(true)
+  expect(flow.some(text => /^failed · agent\(\) threw: tsc exited 2 in hooks\/lib\/band\.ts · \d+s$/.test(text))).toBe(true)
+  expect(await ui.find({ key: 'agent-open-w2' })).toBeDefined()
+  await ui.press({ key: 'agent-open-w2' })
+  expect(await ui.find({ key: 'detail-wf_7' })).toBeDefined()
+  expect(await ui.find({ key: 'detail-w2' })).toBeDefined()
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Task: verify:band.ts', 'Started by: Workflow · review-changes · workflow agent 2 of 3', 'Error: agent() threw: tsc exited 2 in hooks/lib/band.ts']))
+  await ui.press({ key: 'collapse-w2' })
+  expect([!!(await ui.find({ key: 'detail-wf_7' })), !!(await ui.find({ key: 'detail-w2' }))]).toEqual([true, false])
   await ui.press({ key: 'row-open-Find token usages' })
   expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Task: Find token usages', 'Result: 14 calls found; 12 cite their source.', '18.4k tokens']))
   await ui.press({ key: 'collapse-Find token usages' })
@@ -763,4 +770,15 @@ test('a merged worktree with a reported sha sits in Done, which needs its git st
   expect(after).toContain('undo-bar-done')
   expect(after).not.toContain('undo-bar-waiting')
   await ui.unmount()
+})
+
+test('the open tool expands a workflow agent inside its run, in the terminal as on the desktop', async ($, on) => {
+  await agentsStarted($, on)
+  const answer = (await $.tool.call({ tool: 'mcp__master-session__open', expand: 'w3' })) as { result?: string }
+  expect(answer.result).toBe('The master session pane is open beside the chat, showing w3 expanded in wf_7.')
+  for (const surface of ['desktop', 'terminal'] as const) {
+    const ui = await $.ui.mount({ ...PANE, surface })
+    expect([surface, !!(await ui.find({ key: 'detail-wf_7' })), !!(await ui.find({ key: 'detail-w3' }))]).toEqual([surface, true, true])
+    await ui.unmount()
+  }
 })
