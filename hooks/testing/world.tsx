@@ -88,6 +88,8 @@ export function world(on: On, child: Child = {}) {
   const opened: string[] = []
   const toasts: string[] = []
   const ran: string[] = []
+  const scans = { messages: 0 }
+  const tools: string[] = []
   let sessions = [
     { sessionId: 'local_env', name: 'env-e2e-test', title: 'Test and validate local agent environment', cwd: `${HOME}/dotfiles`, isRunning: true, isArchived: false, lastActivityAt: AT, startedBy: SELF },
     { sessionId: 'local_setup', name: 'setup-ui-redo', title: 'Redo toolkit setup UI', cwd: WORKTREE, isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: SELF },
@@ -104,7 +106,10 @@ export function world(on: On, child: Child = {}) {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.surfaces', () => ({ value: ['desktop' as const] }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
-  on('tool.register', (_, e) => ({ value: { tool: `mcp__master-session__${e.name}` } }))
+  on('tool.register', (_, e) => {
+    tools.push(e.name)
+    return { value: { tool: `mcp__master-session__${e.name}` } }
+  })
   on('command.run', (_, e) => {
     ran.push(`${e.command} ${e.args}`)
     return { text: 'skill ran' }
@@ -118,7 +123,10 @@ export function world(on: On, child: Child = {}) {
     toasts.push(e.text)
     return { value: undefined }
   })
-  on('session.messages', () => ({ value: [] }))
+  on('session.messages', () => {
+    scans.messages += 1
+    return { value: [] }
+  })
   on('fs.stat', (_, e) => {
     const file = child.files?.[e.path]
     if (file === undefined) throw new Error('ENOENT')
@@ -175,7 +183,7 @@ export function world(on: On, child: Child = {}) {
     const stdout = verb === 'for-each-ref' ? 'x\nxorigin/main\n' : (child.git?.[`${cwd} ${e.argv.slice(4).join(' ')}`] ?? child.git?.[`${cwd} ${verb}`] ?? GIT[`${cwd} ${verb}`] ?? '')
     return { value: { exitCode: stdout ? 0 : 128, stdout, stderr: stdout ? '' : 'not a git repository', isStdoutTruncated: false, isStderrTruncated: false } }
   })
-  return { calls, opened, toasts, ran, clock, gits, flights }
+  return { calls, opened, toasts, ran, clock, gits, flights, scans, tools }
 }
 
 export const PANE = {

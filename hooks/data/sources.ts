@@ -16,11 +16,10 @@ import type { Row } from '../lib/rows'
 import { getAgents, getBoard, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
 import { keptAgents } from './agents'
-import { detected, roleOf } from './recorder'
+import { claim, detected, inPlan, isActive, roleOf, sessionFacts } from './recorder'
 import { askForUpdates, readReports, writeBoard } from './status'
 
 let home = ''
-let fileStamp = -1
 let published = ''
 let publishedAt = 0
 let flight: Promise<void> | undefined
@@ -31,13 +30,11 @@ const gitDirs = new Map<string, string>()
 
 export function startSources(value: string) {
   home = value
-  fileStamp = -1
   published = ''
   publishedAt = 0
   flight = undefined
   isQueued = false
   seenTrees.clear()
-  titles.clear()
   seenRepos.clear()
   gitDirs.clear()
 }
@@ -53,36 +50,14 @@ export async function call($: EngineInterface, server: string, tool: string, arg
   return body
 }
 
-async function sessionOf($: EngineInterface, id: string) {
-  return JSON.parse(await call($, 'ccd_session_mgmt', 'get_session', { session_id: id })) as Record<string, unknown>
-}
-
 export async function whoAmI($: EngineInterface) {
   const known = await getLive($)
   if (known.self) return known
-  const me = await sessionOf($, 'self')
+  const me = await sessionFacts($, 'self')
   const self = String(me.sessionId ?? '')
   const title = String(me.title ?? '')
   await saveLive($, prev => ({ ...prev, self, title }))
   return { ...known, self, title }
-}
-
-function statePath(self: string) {
-  return self && home ? `${home}/.claude/state/master-session/${self}.json` : ''
-}
-
-export async function refreshFile($: EngineInterface) {
-  const path = statePath((await getLive($)).self)
-  const stat = path ? await $.fs.stat(path).catch(() => undefined) : undefined
-  if (!stat || stat.kind !== 'file') {
-    fileStamp = -1
-    return false
-  }
-  if (stat.mtimeMs === fileStamp) return true
-  fileStamp = stat.mtimeMs
-  const next = boardFromJson(JSON.parse(await $.fs.read(path)), 'file')
-  if (next) await saveBoard($, prev => ({ ...next, since: prev?.since ?? stat.mtimeMs }))
-  return true
 }
 
 async function refreshTranscript($: EngineInterface) {
@@ -92,15 +67,16 @@ async function refreshTranscript($: EngineInterface) {
     const used = [...message.toolUses].reverse().find(one => one.tool === BOARD_TOOL && !one.isError)
     const next = used ? boardFromJson(used.input, 'tool') : message.text.includes('🕐 **Tick') ? boardFromChat(message.text) : null
     if (next) {
+      claim()
       await saveBoard($, () => next)
       return
     }
   }
 }
 
-export async function refreshBoard($: EngineInterface) {
-  if ((await getBoard($))?.source === 'tool') return
-  if (!(await refreshFile($))) await refreshTranscript($)
+export async function refreshBoard($: EngineInterface, isForced = false) {
+  if ((!isForced && !isActive()) || (await getBoard($))?.source === 'tool' || (await isWorker($))) return
+  await refreshTranscript($)
 }
 
 export async function boardOf($: EngineInterface): Promise<{ board: Board | null }> {
@@ -157,7 +133,7 @@ async function listSessions($: EngineInterface, known: readonly LiveSession[], a
     list.map(async (row): Promise<LiveSession> => {
       const id = String(row.sessionId ?? '')
       const seen = before.get(id)
-      const facts = !hasFacts || (seen?.createdAt !== undefined && seen.model) ? undefined : await sessionOf($, id).catch(() => ({}) as Record<string, unknown>)
+      const facts = !hasFacts || (seen?.createdAt !== undefined && seen.model) ? undefined : await sessionFacts($, id).catch(() => ({}) as Record<string, unknown>)
       const createdAt = seen?.createdAt ?? Date.parse(String(facts?.createdAt ?? ''))
       const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
       return {
@@ -372,7 +348,7 @@ async function scan($: EngineInterface, isForced: boolean) {
 }
 
 export async function refreshAll($: EngineInterface, isForced = false) {
-  if (!isForced && !(await isMaster($))) return
+  if (!isForced && (inPlan() || !isActive() || !(await isMaster($)))) return
   if (flight) {
     isQueued ||= isForced
     return flight
@@ -391,18 +367,16 @@ export async function refreshAll($: EngineInterface, isForced = false) {
 }
 
 export async function markMaster($: EngineInterface) {
+  claim()
   const at = await $.clock.now()
   await saveBoard($, prev => prev ?? { sessions: [], needsYou: [], repos: [], source: 'tool', since: at, at })
 }
 
-const titles = new Map<string, string>()
-
 export async function workerNote($: EngineInterface) {
-  await detected($)
+  await detected()
   const { parent } = roleOf()
   if (!(await isWorker($))) return ''
-  const title = titles.get(parent) ?? String((await sessionOf($, parent).catch(() => ({}) as Record<string, unknown>)).title ?? '')
-  if (title) titles.set(parent, title)
+  const title = String((await sessionFacts($, parent).catch(() => ({}) as Record<string, unknown>)).title ?? '')
   return `This is a worker session of ${title ? `"${title}" (${parent})` : parent}: the master session pane is only in that session.`
 }
 
@@ -420,10 +394,6 @@ export async function openSession($: EngineInterface, id: string, name: string) 
   } catch (error) {
     $.ui.toast(`Couldn't open ${name}: ${messageOf(error)}`)
   }
-}
-
-export async function openSummary($: EngineInterface) {
-  await openPane($)
 }
 
 export async function openAsking($: EngineInterface) {

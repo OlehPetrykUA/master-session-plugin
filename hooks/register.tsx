@@ -18,17 +18,15 @@ import {
   openSession,
   refreshAll,
   refreshBoard,
-  refreshFile,
   refreshReports,
   workerNote,
   republishBoard,
   startSources,
-  whoAmI,
 } from './data/sources'
 import { addFault, clearFaults, clearPresses, hasFaults, nextRetryMs, runPress } from './data/presses'
 import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
 import { skipWhileBusy } from './data/flight'
-import { briefed, recordTurnEnd, recorder, startRecorder } from './data/recorder'
+import { briefed, claim, engage, inPlan, isActive, recordTurnEnd, recorder, startRecorder } from './data/recorder'
 import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
 import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
@@ -55,6 +53,14 @@ async function scrollToRow($: EngineInterface, row: number) {
   await $.ui.scroll({ in: PANE, to: 'start', block: 'start' }).catch(() => undefined)
 }
 
+const wake = async ($: EngineInterface) => {
+  await engage($)
+  await republishBoard($).catch(() => undefined)
+  void refreshBoard($, true)
+    .then(() => refreshAll($))
+    .catch(() => undefined)
+}
+
 export const register: Register = on => {
   recorder(on)
 
@@ -62,6 +68,14 @@ export const register: Register = on => {
     const started = await next(e)
     startSources(String((await $.env.get('HOME')) ?? ''))
     await startRecorder($)
+    $.clock.every(
+      FILE_MS,
+      skipWhileBusy(async () => {
+        if (isActive() && (await isMaster($))) await refreshReports($)
+      }),
+    )
+    $.clock.every(FILE_MS, skipWhileBusy(async () => (isActive() ? refreshAgents($) : undefined)))
+    $.clock.every(LIVE_MS, () => void refreshAll($).catch(() => undefined))
     await $.tool.register({
       name: 'open',
       description: 'Opens the master session pane beside the chat. Use it when the user asks to see the sessions board or the status pane. expand opens one item’s card; archived: true opens the Archived list.',
@@ -78,21 +92,6 @@ export const register: Register = on => {
       description: `Scrolls the open master session pane to "start", "end" or a section (${SECTIONS.join(', ')}), so each part can be checked without the mouse. Answers with the pane width in columns.`,
       inputSchema: SCROLL_SCHEMA,
     })
-    void whoAmI($)
-      .catch(() => undefined)
-      .then(() => refreshBoard($))
-      .then(() => refreshAll($))
-      .catch(() => undefined)
-    $.clock.every(
-      FILE_MS,
-      skipWhileBusy(async () => {
-        if (!(await isMaster($))) return
-        await refreshFile($)
-        await refreshReports($)
-      }),
-    )
-    $.clock.every(FILE_MS, skipWhileBusy(() => refreshAgents($)))
-    $.clock.every(LIVE_MS, () => void refreshAll($).catch(() => undefined))
     return started
   })
 
@@ -117,6 +116,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('command.run', { command: INFO }, async ($, e) => {
+    await wake($)
     const note = await workerNote($)
     if (note) return { text: note }
     if (e.args.trim() === 'ask') return { text: await askAll($) }
@@ -126,6 +126,7 @@ export const register: Register = on => {
 
   on('command.run', { command: SKILL }, async ($, e, next) => {
     if (e.args.trim() === 'status') {
+      await wake($)
       const note = await workerNote($)
       if (note) return { text: note }
       await markMaster($)
@@ -142,11 +143,13 @@ export const register: Register = on => {
 
   on('skill.prompt', { skill: SKILL }, async ($, e, next) => {
     await markMaster($).catch(() => undefined)
+    void wake($)
     const note = `\n\nStatus pane: on. Publish every board with the ${BOARD_TOOL} tool (load it with ToolSearch select:${BOARD_TOOL}) as section 3 describes. In chat, post only 🔴 needs-you lines and the final summary.`
     return next({ ...e, text: e.text + note })
   }).catch(($, e, next) => next(e))
 
   on('tool.call', { tool: 'mcp__master-session__open' }, async ($, e) => {
+    await engage($)
     const note = await workerNote($)
     if (note) return { result: note }
     const expand = typeof e.expand === 'string' ? e.expand.trim() : ''
@@ -173,10 +176,12 @@ export const register: Register = on => {
   on('tool.call', { tool: 'mcp__master-session__board' }, async ($, e) => {
     const next = boardFromJson(e, 'tool')
     if (!next) return { deny: 'The board needs a sessions array whose items carry id and state.' }
+    claim()
+    void engage($)
     const at = await $.clock.now()
     await saveBoard($, prev => ({ ...next, since: prev?.since ?? at, at }))
     await republishBoard($).catch(() => undefined)
-    void refreshAll($, true).catch(() => undefined)
+    void refreshAll($, !inPlan()).catch(() => undefined)
     const surfaces = await $.session.surfaces()
     return {
       result: surfaces.length

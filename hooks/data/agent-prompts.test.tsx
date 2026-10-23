@@ -50,6 +50,8 @@ test('a subagent prompt in the master marks that subagent asking with the prompt
   const { clock } = world(on)
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
   await clock.settle()
+  await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
+  await clock.settle()
   await $.agent.spawn({ ...SPAWN, description: 'Find callers', subagentType: 'Explore' })
   await $.agent.spawn({ ...SPAWN, description: 'Check one caller', subagentType: 'Explore', parentAgentId: 'a1' })
   expect((await agentsOf($)).map(one => [one.id, one.parentAgentId, one.asking])).toEqual([
@@ -79,6 +81,8 @@ test('a workflow agent prompt shows on that agent and in its run counts, and cle
   loops(on, [])
   const { clock } = world(on)
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
   await clock.settle()
   await $.agent.spawn({ ...SPAWN, description: 'alpha-scan', subagentType: 'workflow-subagent', workflow: { runId: 'wf_7', agentIndex: 1 } })
   await $.agent.spawn({ ...SPAWN, description: 'beta-scan', subagentType: 'workflow-subagent', workflow: { runId: 'wf_7', agentIndex: 2 } })

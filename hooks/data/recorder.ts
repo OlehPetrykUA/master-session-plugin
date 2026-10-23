@@ -2,7 +2,7 @@ import type { EngineInterface, On, ToolCallInput, TurnCompleteInput } from 'clau
 
 import { asked, reportAgentsOf, reportRunsOf } from '../lib/agents'
 import { expandHome, parseStatus } from '../lib/git'
-import { getAgents, getBoard, getLive, getWorkflows, saveAgents } from '../state/atoms'
+import { getAgents, getBoard, getLive, getWorkflows, saveAgents, saveLive } from '../state/atoms'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
 import type { ReportAgent, ReportRun, SessionState } from '../../types'
@@ -30,7 +30,10 @@ let home = ''
 let role = NO_ROLE
 let current: Report | undefined
 let detecting: Promise<void> | undefined
-let isBriefed = false
+let isClaimed = false
+let isPlan = false
+let facts = new Map<string, Record<string, unknown>>()
+let failures = new Map<string, { error: Error; at: number }>()
 let gitCwd = ''
 let held = new Map<string, Held>()
 let outbox: ReportAgent[] = []
@@ -38,6 +41,16 @@ let runsOut: ReportRun[] = []
 let syncing: Promise<void> = Promise.resolve()
 
 export const roleOf = () => role
+
+export const isActive = () => isClaimed || role.role === 'worker'
+
+export const claim = () => {
+  isClaimed = true
+}
+
+export const inPlan = () => isPlan
+
+const FACTS_RETRY_MS = 60_000
 
 export const commitOf = (command: string, output: string) => {
   const match = /\bgit\b/.test(command) && /\bcommit\b/.test(command) ? output.match(COMMIT_LINE) : null
@@ -168,11 +181,24 @@ export const repoOf = (command: string, base: string) => {
   return path ? expandHome(path, base) : ''
 }
 
-async function callJson($: EngineInterface, server: string, tool: string, args: Record<string, unknown>) {
-  const result = await $.mcp.call(server, tool, args)
-  const body = result.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
-  if (result.isError) throw new Error(body || `${tool} failed`)
-  return JSON.parse(body) as Record<string, unknown>
+export async function sessionFacts($: EngineInterface, id: string) {
+  const seen = facts.get(id)
+  if (seen) return seen
+  const now = await $.clock.now()
+  const failed = failures.get(id)
+  if (failed && now - failed.at < FACTS_RETRY_MS) throw failed.error
+  try {
+    const result = await $.mcp.call('ccd_session_mgmt', 'get_session', { session_id: id })
+    const body = result.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
+    if (result.isError) throw new Error(body || 'get_session failed')
+    const data = JSON.parse(body) as Record<string, unknown>
+    failures.delete(id)
+    if (id === 'self' ? typeof data.sessionId === 'string' : typeof data.model === 'string' && data.model) facts.set(id, data)
+    return data
+  } catch (error) {
+    failures.set(id, { error: error instanceof Error ? error : new Error(String(error)), at: now })
+    throw error
+  }
 }
 
 async function save($: EngineInterface, next: Report, now: number) {
@@ -218,18 +244,19 @@ async function agentCleared($: EngineInterface, id: string) {
 }
 
 async function detect($: EngineInterface) {
-  const me = await callJson($, 'ccd_session_mgmt', 'get_session', { session_id: 'self' }).catch(() => ({}) as Record<string, unknown>)
+  const me = await sessionFacts($, 'self').catch(() => ({}) as Record<string, unknown>)
   const self = typeof me.sessionId === 'string' ? me.sessionId : ''
-  if (!self) return
+  if (!self) return false
+  await saveLive($, prev => ({ ...prev, self, title: String(me.title ?? '') }))
   const isChild = typeof me.parentSessionId === 'string' && !!me.parentSessionId && me.detached !== true
   const asked = isChild ? String(me.parentSessionId) : ''
-  const isMasterParent = !!asked && (isBriefed || (await $.fs.stat(boardPath(home, asked)).then(stat => stat.kind === 'file', () => false)))
+  const isMasterParent = !!asked && (await $.fs.stat(boardPath(home, asked)).then(stat => stat.kind === 'file', () => false))
   const parent = isChild ? (isMasterParent ? asked : '') : await parentFromBoards($, home, self)
   const engineId = await $.session.id()
   role = { role: parent ? 'worker' : 'master', self, parent, engineId }
   if (!parent) {
     await $.tool.register(REPORTS_SPEC)
-    return
+    return true
   }
   const now = await $.clock.now()
   const known = await readReport($, home, self)
@@ -237,16 +264,19 @@ async function detect($: EngineInterface) {
   runsOut = reportRunsOf(await getWorkflows($))
   await $.tool.register(REPORT_SPEC)
   await save($, { ...(known ?? freshReport(self, parent, engineId, now)), parent, engineId }, now)
+  return true
 }
 
-export function detected($: EngineInterface) {
+export function engage($: EngineInterface) {
   detecting ??= detect($)
-    .catch(() => undefined)
-    .then(() => {
-      if (!role.role) detecting = undefined
+    .catch(() => false)
+    .then(isDone => {
+      if (!isDone) detecting = undefined
     })
   return detecting
 }
+
+export const detected = () => detecting ?? Promise.resolve()
 
 async function gitOf($: EngineInterface, now: number) {
   const where = gitCwd ? ['-C', gitCwd] : []
@@ -289,7 +319,7 @@ async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?:
 }
 
 async function promptOpened($: EngineInterface, text: string, tool: string, agentId?: string) {
-  await detected($)
+  if (!isActive()) return
   const key = await keyOf($, agentId)
   if (key !== MAIN) return agentAsked($, key, text, tool)
   if (!current) return
@@ -362,7 +392,7 @@ async function turnEnded($: EngineInterface, e: TurnCompleteInput) {
 }
 
 async function reported($: EngineInterface, input: unknown) {
-  await detected($)
+  await engage($)
   if (!current) return { deny: 'This session has no master session: report status in chat instead.' }
   const parsed = parseIntent(input)
   if (parsed.error !== undefined) return { deny: parsed.error }
@@ -372,7 +402,7 @@ async function reported($: EngineInterface, input: unknown) {
 }
 
 async function listed($: EngineInterface) {
-  await detected($)
+  await engage($)
   const now = await $.clock.now()
   const shared = role.self ? await readBoard($, home, role.self, now) : undefined
   const live = await getLive($)
@@ -384,22 +414,23 @@ export async function startRecorder($: EngineInterface) {
   role = NO_ROLE
   current = undefined
   detecting = undefined
-  isBriefed = false
+  isClaimed = false
+  isPlan = false
+  facts = new Map()
+  failures = new Map()
   gitCwd = ''
   held = new Map()
   outbox = []
   runsOut = []
   syncing = Promise.resolve()
-  void detected($)
 }
 
 export async function briefed($: EngineInterface) {
   if (await getBoard($)) return
-  isBriefed = true
   if (role.role === 'worker') return
   role = NO_ROLE
   detecting = undefined
-  await detected($)
+  void engage($)
 }
 
 export async function recordTurnEnd($: EngineInterface, e: TurnCompleteInput) {
@@ -408,12 +439,17 @@ export async function recordTurnEnd($: EngineInterface, e: TurnCompleteInput) {
   await turnEnded($, e).catch(() => undefined)
 }
 
+const modeSeen = (e: { permission_mode?: string; agent_id?: string }) => {
+  if (e.agent_id === undefined && e.permission_mode !== undefined) isPlan = e.permission_mode === 'plan'
+}
+
 export function recorder(on: On) {
   on('tool.call', async ($, e, next) => {
     if (String(e.tool) === REPORT_TOOL) return reported($, e)
     if (String(e.tool) === REPORTS_TOOL) return listed($)
     if (String(e.tool) === QUESTION_TOOL) await promptOpened($, promptTextOf(QUESTION_TOOL, e), QUESTION_TOOL, e.agentId).catch(() => undefined)
     const out = await next(e)
+    if (String(e.tool) === 'ExitPlanMode' && e.agentId === undefined && !out.isError && out.deny === undefined) isPlan = false
     await promptClosed($, String(e.tool), e.agentId).catch(() => undefined)
     if (current && out.deny === undefined) await recordTool($, e, out).catch(() => undefined)
     return out
@@ -423,11 +459,29 @@ export function recorder(on: On) {
   })
 
   on('classic.PermissionRequest', async ($, e, next) => {
+    modeSeen(e)
     await promptOpened($, promptTextOf(e.tool_name, e.tool_input), e.tool_name, e.agent_id).catch(() => undefined)
     return next(e)
   }).catch(($, e, next) => next(e))
 
+  on('classic.UserPromptSubmit', async ($, e, next) => {
+    modeSeen(e)
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('classic.Stop', async ($, e, next) => {
+    modeSeen(e)
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('prompt.attachment', async ($, e, next) => {
+    if (e.agentId === undefined && (e.type === 'plan_mode' || e.type === 'plan_mode_reentry')) isPlan = true
+    if (e.agentId === undefined && e.type === 'plan_mode_exit') isPlan = false
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
   on('classic.Notification', async ($, e, next) => {
+    modeSeen(e)
     if (ASKING.has(e.notification_type) && !held.has(await keyOf($, e.agent_id))) await promptOpened($, e.message || e.title || 'Claude needs your input', '', e.agent_id).catch(() => undefined)
     if (ANSWERED.has(e.notification_type)) await promptClosed($, undefined, e.agent_id).catch(() => undefined)
     return next(e)
@@ -435,14 +489,14 @@ export function recorder(on: On) {
 
   on('turn.start', async ($, e, next) => {
     const started = await next(e)
-    if (e.agentId === undefined) await detected($).then(() => turnStarted($)).catch(() => undefined)
+    if (e.agentId === undefined) await detected().then(() => turnStarted($)).catch(() => undefined)
     else await agentCleared($, e.agentId).catch(() => undefined)
     return started
   })
 
   on('session.receive', async ($, e, next) => {
     if (e.agentId !== undefined || !askOf(e.text)) return next(e)
-    await detected($)
+    await engage($)
     if (!current) return next(e)
     const now = await $.clock.now()
     if (current.run.isRunning && now - current.modelAt >= FRESH_MS) return next({ ...e, text: NUDGE })

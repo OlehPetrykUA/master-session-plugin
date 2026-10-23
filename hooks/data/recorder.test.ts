@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import { REPORTS_TOOL, REPORT_TOOL, askText } from './contract'
 import type { Report } from './contract'
-import { commitOf, isTestCommand, recordTurnEnd, recorder, repoOf, roleOf, startRecorder, summaryOf, syncAgents, testsOf } from './recorder'
+import { commitOf, engage, isTestCommand, recordTurnEnd, recorder, repoOf, roleOf, sessionFacts, startRecorder, summaryOf, syncAgents, testsOf } from './recorder'
 import { boardPath, reportPath } from './status'
 
 const HOME = '/home/me'
@@ -46,9 +46,11 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
   const registered: { name: string; isDeferred?: unknown }[] = []
   const ran: string[][] = []
   const atoms: Record<string, { value: unknown; version: number }> = {}
-  const holding = { now: 0, get: 0 }
+  const holding = { now: 0, get: 0, mcp: 0 }
+  const asked: string[] = []
+  let failing = ''
   const waiting: (() => void)[] = []
-  const gated = <T>(kind: 'now' | 'get', value: () => T): Promise<T> => {
+  const gated = <T>(kind: 'now' | 'get' | 'mcp', value: () => T): Promise<T> => {
     if (!holding[kind]) return Promise.resolve(value())
     holding[kind] -= 1
     return new Promise<T>(resolve => waiting.push(() => resolve(value())))
@@ -58,10 +60,15 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
     session: { id: async () => ENGINE, cwd: async () => HOME },
     clock: { now: () => gated('now', () => NOW) },
     mcp: {
-      call: async (_server: string, tool: string) => ({
-        content: [{ type: 'text', text: JSON.stringify(tool === 'get_session' ? { sessionId: SELF, ...(parent ? { parentSessionId: parent } : {}) } : []) }],
-        isError: false,
-      }),
+      call: (_server: string, tool: string, args: Record<string, unknown>) =>
+        gated('mcp', () => {
+          asked.push(`${tool} ${String(args.session_id)}`)
+          const isFailing = failing === args.session_id
+          return {
+            content: [{ type: 'text', text: isFailing ? 'no such session' : JSON.stringify(tool === 'get_session' ? { sessionId: SELF, ...(args.session_id === 'local_nomodel' ? {} : { model: 'claude-opus-5-5' }), ...(parent ? { parentSessionId: parent } : {}) } : []) }],
+            isError: isFailing,
+          }
+        }),
     },
     tool: {
       register: async (spec: { name: string; isDeferred?: unknown }) => {
@@ -118,8 +125,12 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
     }
     return (await run(0, e)) as Event
   }
-  const start = async () => {
+  const begin = async () => {
     await startRecorder($ as never)
+  }
+  const start = async () => {
+    await begin()
+    await engage($ as never)
     await settle()
   }
   const end = (e: Event) => recordTurnEnd($ as never, e as never)
@@ -127,7 +138,10 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
   const bash = (command: string) => fire('tool.call', { tool: 'Bash', tool_use_id: command, command })
   const report = (input: Event) => fire('tool.call', { tool: REPORT_TOOL, tool_use_id: 'report', ...input })
   const receive = (text: string) => fire('session.receive', { origin: { kind: 'peer' }, text })
-  const hold = (kind: 'now' | 'get') => {
+  const fail = (id: string) => {
+    failing = id
+  }
+  const hold = (kind: 'now' | 'get' | 'mcp') => {
     holding[kind] += 1
   }
   const release = () => waiting.splice(0).forEach(resume => resume())
@@ -135,7 +149,7 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
     atoms[key] = { value, version: 1 }
   }
   const sync = () => syncAgents($ as never)
-  return { fire, start, end, registered, ran, reportNow, bash, report, receive, hold, release, seed, sync }
+  return { $, fire, begin, start, end, registered, ran, asked, reportNow, bash, report, receive, hold, release, seed, sync, fail }
 }
 
 const ended = (turnId: string, patch: Event = {}) => ({ answer: '', durationMs: 1, isAborted: false, turnId, reason: 'answer', ...patch })
@@ -374,4 +388,69 @@ test('launchers and env prefixes still count; tsc version and help flags do not;
   for (const command of ['tsc --version', 'tsc -v', 'tsc -h', 'tsc --help']) expect([command, isTestCommand(command)]).toEqual([command, false])
   expect(isTestCommand('cat <<EOF > x && pytest\nbody\nEOF')).toBe(true)
   expect(labels('bun test', ' 12 pass\n 1 fail', true)).toEqual([['bun test · 12 pass · 1 fail', false]])
+})
+
+test('a session nobody engaged records nothing and asks the app nothing, whatever the events', async () => {
+  const run = world()
+  await run.begin()
+  await run.fire('turn.start', { text: 'go', turnId: 't1' })
+  await run.fire('classic.PermissionRequest', { tool_name: 'Bash', tool_input: { command: 'ls' } })
+  await run.bash('cd ~/dotfiles && git commit -m "feat(mods): x"')
+  await settle()
+  expect(run.asked).toEqual([])
+  expect(run.reportNow()).toBeUndefined()
+})
+
+test('the role is asked once and cached, plain or worker, however many events follow', async () => {
+  for (const parent of ['', MASTER]) {
+    const run = world(parent)
+    await run.start()
+    for (const turnId of ['t1', 't2', 't3']) {
+      await run.fire('turn.start', { text: 'go', turnId })
+      await run.fire('classic.PermissionRequest', { tool_name: 'Bash', tool_input: { command: 'ls' } })
+      await run.fire('classic.Notification', { notification_type: 'permission_prompt', message: 'Allow Bash' })
+      await run.end(ended(turnId))
+    }
+    await engage(run.$ as never)
+    expect(run.asked).toEqual(['get_session self'])
+  }
+})
+
+test('a permission request never waits for the app: it answers while the role lookup is still open', async () => {
+  const run = world()
+  await run.begin()
+  run.hold('mcp')
+  void engage(run.$ as never)
+  await settle()
+  const answered = run.fire('classic.PermissionRequest', { tool_name: 'Bash', tool_input: { command: 'rm -rf build' } }).then(() => true)
+  expect(await Promise.race([answered, settle().then(() => false)])).toBe(true)
+  const notified = run.fire('classic.Notification', { notification_type: 'permission_prompt', message: 'Allow Bash' }).then(() => true)
+  expect(await Promise.race([notified, settle().then(() => false)])).toBe(true)
+  run.release()
+})
+
+test('a session read is cached per id, and a failed one is not asked again before the retry time', async () => {
+  const run = world()
+  await run.begin()
+  run.fail('local_gone')
+  const ask = (id: string) => sessionFacts(run.$ as never, id).then(() => 'ok', () => 'failed')
+  expect([await ask('local_a'), await ask('local_a'), await ask('local_a')]).toEqual(['ok', 'ok', 'ok'])
+  expect([await ask('local_gone'), await ask('local_gone'), await ask('local_gone')]).toEqual(['failed', 'failed', 'failed'])
+  expect(run.asked).toEqual(['get_session local_a', 'get_session local_gone'])
+})
+
+test('a restarted worker engages on the master’s ask and consumes it', async () => {
+  const before = { v: 1, kind: 'status', session: SELF, engineId: 'old', parent: MASTER, seq: 41, at: 1, run: { isRunning: false }, modelAt: 1, state: 'waiting', activity: [], commits: [], tests: [], files: [] }
+  const run = world(MASTER, { [FILE]: JSON.stringify(before) })
+  await run.begin()
+  expect(await run.receive(askText({ from: MASTER, at: NOW }))).toEqual({ consumed: expect.stringContaining('ask') })
+  expect(run.reportNow()?.seq).toBe(43)
+})
+
+test('a body without a model is asked again, one with a model is cached', async () => {
+  const run = world()
+  await run.begin()
+  await sessionFacts(run.$ as never, 'local_nomodel')
+  await sessionFacts(run.$ as never, 'local_nomodel')
+  expect(run.asked).toEqual(['get_session local_nomodel', 'get_session local_nomodel'])
 })

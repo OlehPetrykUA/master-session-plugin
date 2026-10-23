@@ -152,16 +152,28 @@ test('a side chat of a plain session is a plain session: no band, no scans, no r
   expect((await $.command.run(typed('master-session:info', ''))).text).toBe('Master session pane opened.')
 })
 
-test('a side chat becomes a worker once its brief loads the worker skill', async ($, on) => {
+test('a side chat becomes a worker once its brief loads the worker skill, and report is registered without a call', async ($, on) => {
+  on('fs.write', () => ({ value: undefined }))
+  on('skill.prompt', (_, e) => ({ text: e.text }))
+  const run = world(on, { parent: MASTER })
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.advance(10_000)
+  expect(run.tools).not.toContain('report')
+  await $.skill.prompt({ skill: 'master-session:worker', text: 'Worker.', frontmatter: {}, source: 'plugin' })
+  await run.clock.advance(1_000)
+  expect(run.tools).toContain('report')
+  expect(((await $.tool.call({ tool: REPORT_TOOL, state: 'working' })) as { result?: string }).result).toMatch(/^ok #\d+$/)
+})
+
+test('a child of a plain parent stays plain when its brief or a subagent loads the worker skill', async ($, on) => {
   on('fs.write', () => ({ value: undefined }))
   on('skill.prompt', (_, e) => ({ text: e.text }))
   const run = world(on, { parent: 'local_plain' })
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
-  await run.clock.advance(10_000)
-  expect(String(((await $.tool.call({ tool: REPORT_TOOL, state: 'working' })) as { deny?: string }).deny)).toContain('no master session')
   await $.skill.prompt({ skill: 'master-session:worker', text: 'Worker.', frontmatter: {}, source: 'plugin' })
-  await run.clock.advance(1_000)
-  expect(((await $.tool.call({ tool: REPORT_TOOL, state: 'working' })) as { result?: string }).result).toMatch(/^ok #\d+$/)
+  await run.clock.advance(10_000)
+  expect(run.tools).not.toContain('report')
+  expect(String(((await $.tool.call({ tool: REPORT_TOOL, state: 'working' })) as { deny?: string }).deny)).toContain('no master session')
 })
 
 test('a real master with a briefed worker still scans, draws its band and shows the worker’s needs-you', async ($, on) => {

@@ -44,6 +44,7 @@ test('the agents tick skips while the last agent list is still running', async (
     return { value: [] }
   })
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
   await run.clock.advance(60_000)
   expect(calls).toBeGreaterThanOrEqual(3)
   expect(calls).toBeLessThanOrEqual(5)
