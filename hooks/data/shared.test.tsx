@@ -147,7 +147,7 @@ test('a worker Duration tile starts at the master board since, not at its own ro
 
 test('a family session missing from the worker live still reads merged to the base when its sha is on it', async ($, on) => {
   const child = childOf(3_600_000, { ...CALM, sessions: [{ id: 'local_far', name: 'Impl', state: 'done', sha: '9bd146c', cwd: TOOLKIT }] })
-  const run = world(on, { ...child, git: { [`${TOOLKIT} worktree`]: `worktree ${TOOLKIT}\nHEAD d575596be1713c300bf1d8737355ceda0cb3ded3\nbranch refs/heads/main\n\n`, [`${TOOLKIT} rev-parse`]: 'd575596\n' } })
+  const run = world(on, { ...child, git: { [`${TOOLKIT} worktree`]: `worktree ${TOOLKIT}\nHEAD d575596be1713c300bf1d8737355ceda0cb3ded3\nbranch refs/heads/main\n\n`, [`${TOOLKIT} rev-parse`]: 'd575596\n', [`${TOOLKIT} merge-base --is-ancestor 9bd146c refs/heads/main`]: 'ok' } })
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
   await run.clock.advance(6_000)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })

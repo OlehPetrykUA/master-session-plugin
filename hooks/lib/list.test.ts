@@ -126,7 +126,7 @@ test('a session reads idle, ready, verified or merged from its live state, board
     sessionStatusOf(row('done', { sha: 'abc' }), tree(0, 1)),
     sessionStatusOf(row('done')),
   ]).toEqual(['idle', 'idle', 'waiting', 'ready', 'verified', 'merged', 'ready', 'ready', 'done'])
-  const main = (branch: string, dirty = 0): Repo[] => [{ path: '/r/wt', name: 'r', localOnly: 0, base: 'main', worktrees: [{ path: '/r/wt', branch, sha: 'abc', isMain: true, dirty, paths: [], upstream: '', ahead: 0, behind: 0, unmerged: 0 }] }]
+  const main = (branch: string, dirty = 0): Repo[] => [{ path: '/r/wt', name: 'r', localOnly: 0, base: 'main', onBase: ['abc'], worktrees: [{ path: '/r/wt', branch, sha: 'abc', isMain: true, dirty, paths: [], upstream: '', ahead: 0, behind: 0, unmerged: 0 }] }]
   expect([
     sessionStatusOf(row('done', { sha: 'abc' }), main('main')),
     sessionStatusOf(row('done'), main('main')),

@@ -248,6 +248,19 @@ export async function repoOf($: EngineInterface, path: string): Promise<Repo | u
   }
 }
 
+async function provenOf($: EngineInterface, repos: Repo[], rows: readonly Row[]) {
+  const proven = new Map<string, Set<string>>()
+  for (const row of rows) {
+    const sha = row.board?.sha ?? ''
+    const cwd = row.live?.cwd ?? row.board?.cwd
+    const found = cwd ? locate(cwd, repos) : undefined
+    if (!found?.repo.base || !found.tree.isMain || !/^[0-9a-f]{7,40}$/i.test(sha)) continue
+    const isOnBase = await git($, found.repo.path, ['merge-base', '--is-ancestor', sha, `refs/heads/${found.repo.base}`]).then(() => true, () => false)
+    if (isOnBase) proven.set(found.repo.path, (proven.get(found.repo.path) ?? new Set()).add(sha))
+  }
+  return repos.map(repo => (proven.has(repo.path) ? { ...repo, onBase: [...(proven.get(repo.path) as Set<string>)] } : repo))
+}
+
 async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[]) {
   const { board: current } = await boardOf($)
   const live = await getLive($)
@@ -270,7 +283,7 @@ async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[
     const outer = locate(path, [...found.values()])
     if (outer && outer.tree.path !== path) found.set(outer.repo.path, { ...outer.repo, worktrees: [...outer.repo.worktrees, { path, branch: '', sha: '', isMain: false, dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }] })
   }
-  const repos = [...found.values()]
+  const repos = await provenOf($, [...found.values()], rows)
   await saveRepos($, () => repos)
   return repos
 }
