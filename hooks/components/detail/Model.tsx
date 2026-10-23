@@ -1,5 +1,5 @@
+import { modelFamilyOf } from '../../lib/format'
 import { across } from '../../lib/layout'
-import { modelFamilyOf } from '../../lib/list'
 import type { IconName } from '../../theme/icons'
 import { Icon } from '../Icon'
 import type { Ui } from '../types'

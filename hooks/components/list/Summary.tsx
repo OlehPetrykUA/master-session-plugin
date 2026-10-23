@@ -1,3 +1,4 @@
+import { shownDots } from '../../lib/list'
 import type { Block } from '../../lib/list'
 import { across, down, textWidth } from '../../lib/layout'
 import { dot, numeral } from '../../theme/icons'
@@ -47,9 +48,9 @@ export function Summary(ui: Ui, props: SummaryProps) {
         </Box>
         <Svg key={`block-value-${one.key}`} source={value.source} alt={`${one.label} ${one.value}`} width={value.width} height={24} />
         {one.dots ? (
-          <Box flexDirection="row" alignItems="center" gap={across(4)}>
-            {one.dots.map(mark => (
-              <Box key={`block-${one.key}-${mark.tone}`} flexDirection="row" alignItems="center" gap={across(2)}>
+          <Box key={`block-dots-${one.key}`} flexDirection="row" alignItems="center" flexWrap="wrap" columnGap={across(4)} rowGap={0}>
+            {shownDots(one).map(mark => (
+              <Box key={`block-dot-box-${one.key}-${mark.tone}`} flexDirection="row" alignItems="center" gap={across(2)}>
                 <Svg key={`block-dot-${one.key}-${mark.tone}`} source={dot(mark.tone, 6)} alt={mark.tone} width={6} height={6} />
                 <Text size="caption" weight="semibold" color={C.muted} tabular>
                   {String(mark.count)}

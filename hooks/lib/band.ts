@@ -8,8 +8,8 @@ import { workflowRunsOf } from './agents'
 import type { WorkflowRun } from './agents'
 import { progressOf } from './board'
 import type { Progress } from './board'
-import { COLUMN, fit, textWidth, widthOf } from './layout'
-import { GROUP_OF, nameText, personaOfType, sessionNameOf, sessionStatusOf } from './list'
+import { CH, fit, textWidth, widthOf } from './layout'
+import { CHAT_LABEL, GROUP_OF, nameText, personaOfType, sessionNameOf, sessionStatusOf } from './list'
 import { rowsOf } from './rows'
 import type { Row } from './rows'
 
@@ -199,7 +199,7 @@ export function bandProgressWith(current: Board | null, live: Live, { agents, wo
 }
 
 export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live?: Live, trees: readonly Repo[] = []) {
-  const width = columns * COLUMN - 16
+  const width = columns * CH - 16
   const isNarrow = width < COUNTS_BELOW
   const units = bandUnitsOf(progress.segments, current, agents, live, trees)
   const asker = firstAskerOf(units)
@@ -220,7 +220,7 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
   const chat = asker?.chat && asker.chat.id !== live?.self ? asker.chat : undefined
   const action = asker
     ? chat
-      ? { name: 'chat' as const, label: 'Open chat', accessibleName: 'Open chat', icon: 'chat' as const, isIconOnly: isNarrow, press: () => act.chat(chat.id, chat.name) }
+      ? { name: 'chat' as const, label: CHAT_LABEL, accessibleName: CHAT_LABEL, icon: 'chat' as const, isIconOnly: isNarrow, press: () => act.chat(chat.id, chat.name) }
       : undefined
     : isPaneOpen
       ? undefined

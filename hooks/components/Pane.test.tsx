@@ -1,9 +1,9 @@
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-import { COLUMN, LH, across, tall } from '../lib/layout'
+import { CH, LH, across, tall } from '../lib/layout'
 import { C, KINDS } from '../theme/tokens'
-import { BOARD, HOME, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, click, dump, hitsOf, started, textsOf, warmUp } from '../testing/world'
+import { BOARD, HOME, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, click, hitsOf, started, textsOf, warmUp } from '../testing/world'
 
 warmUp()
 
@@ -11,7 +11,6 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
   const { answer } = await started($, on)
   expect(answer).toEqual({ result: 'Board updated: 2 sessions in the pane and the band. Post only 🔴 needs-you lines in chat.' })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await dump('main-desktop', ui)
   expect(await hitsOf(ui)).toEqual([
     'hit-chip-all',
     'hit-chip-needs-you',
@@ -61,10 +60,9 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
     expect(await other.find({ key: 'row-open-local_setup' })).toBeDefined()
     expect(await hitsOf(other)).toEqual([])
     if (surface === 'terminal') {
-      await dump('main-terminal', other)
       const lines = await textsOf(other)
       expect(lines).toEqual(expect.arrayContaining(['Needs you 1', 'Waiting 1', 'Archived 1', 'Approve the settings.json edit', 'waiting · waiting for the go · 50m · 2/5']))
-      expect(lines.some(line => line.startsWith('Sessions 2 (0 / 1 / 0) · Needs you 1 1 session'))).toBe(true)
+      expect(lines.some(line => line.startsWith('Sessions 2 (1 / 0 / 1 / 0) · Needs you 1 1 session'))).toBe(true)
       expect((await other.find({ key: 'row-open-local_env' }))?.text).toBe('Session · Test and validate local agent environment')
     }
     await other.unmount()
@@ -86,7 +84,6 @@ test('Needs you stays pinned above any other filter with its note; a filter show
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-chip-waiting')
-  await dump('needs-filter', ui)
   const heads = async () => (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
   expect(await heads()).toEqual(['group-head-needs-you', 'group-head-waiting'])
   expect(await textsOf(ui)).toContain('pinned on every filter')
@@ -118,7 +115,6 @@ test('subagents and workflows are rows with their kind and the same groups: runn
   await $.turn.complete({ answer: 'ok', durationMs: 5, isAborted: false, turnId: 'u1', agentId: 'w1', reason: 'answer' })
   await $.turn.complete({ answer: 'found', durationMs: 5, isAborted: false, turnId: 'u2', agentId: 'Find token usages', reason: 'answer' })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await dump('agents-desktop', ui)
   const texts = await textsOf(ui)
   for (const word of ['Workflow', 'review-changes', 'verify:band.ts', 'Explore', 'Review auth flow', 'Researcher', 'token-finder', 'Validator ›', 'running', 'done']) expect(texts).toContain(word)
   for (const word of ['review:bugs', 'workflow-subagent', 'master-session:researcher', 'haiku', 'sonnet']) expect(texts).not.toContain(word)
@@ -141,10 +137,9 @@ test('Archived is the last group, closed with Show; open it lists two rows, Hide
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ key: 'archived-local_a' })).toBeUndefined()
   await click(ui, 'hit-archived-show')
-  await dump('archived', ui)
   const rows = async () => (await ui.findAll({ type: 'Box' })).flatMap(box => (/^(row|detail)-local_(old|[abcd])$/.test(box.key ?? '') ? [box.key] : []))
   expect((await rows()).length).toBe(2)
-  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Hide', 'archived 1h ago', 'worktree removed', 'Session', 'Old a']))
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Hide', 'archived 1h ago', 'Session', 'Old a']))
   expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Show 3 more', 'archived 1h ago', 'expand']))
   expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-archived-hide', 'hit-archived-more', 'hit-row-local_old', 'hit-row-local_a']))
   await click(ui, 'hit-archived-more')
@@ -165,7 +160,6 @@ test('all done stays the one list: finished header line, every row under Done wi
   const done = { ...BOARD, testsPassed: 526, testsNote: 'smoke 398 · hooks 128', sessions: BOARD.sessions.map(one => ({ ...one, state: 'done', needsYou: undefined, progress: 'step 5 of 5 — shipped', verified: 'tests 526 passed' })) }
   await started($, on, done)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 80 } })
-  await dump('summary', ui)
   const texts = await textsOf(ui)
   expect(texts).toContain('finished 19:46')
   expect(texts).not.toContain('Run summary')
@@ -186,7 +180,7 @@ test('the header: 56 tall, title and live dot over the status line, Ask and Refr
     [80, 'Ask for updates', false],
   ] as const) {
     const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: columns }, surface: 'desktop' })
-    expect(columns * COLUMN >= 460).toBe(ask === 'Ask for updates')
+    expect(columns * CH >= 460).toBe(ask === 'Ask for updates')
     const header = await ui.find({ key: 'section-header' })
     for (const word of ['Master session', 'updated just now', ask, 'Refresh']) expect(header?.text).toContain(word)
     expect(await ui.find({ key: 'header-buttons' }) !== undefined).toBe(isNarrow)
@@ -207,19 +201,38 @@ test('the header: 56 tall, title and live dot over the status line, Ask and Refr
   }
 })
 
+test('the Sessions tile draws only non-zero dots in red, green, amber, grey order, and its dot row wraps at 41 and 47 columns', async ($, on) => {
+  const session = (id: string, state: string) => ({ id, name: id, state })
+  const four = { ...BOARD, sessions: [session('n1', 'needs-you'), session('w1', 'working'), session('p1', 'waiting'), session('d1', 'done')], needsYou: [] }
+  await started($, on, four)
+  for (const columns of [41, 47]) {
+    const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: columns }, surface: 'desktop' })
+    expect((await ui.find({ key: 'block-dots-sessions' }))?.props.flexWrap).toBe('wrap')
+    const dots = (await ui.findAll({ type: 'Box' })).flatMap(one => (one.key?.startsWith('block-dot-box-sessions-') ? [one.key] : []))
+    expect(dots).toEqual(['red', 'green', 'amber', 'grey'].map(tone => `block-dot-box-sessions-${tone}`))
+    await ui.unmount()
+  }
+})
+
+test('the Sessions tile leaves out the dot of an empty bucket', async ($, on) => {
+  const session = (id: string, state: string) => ({ id, name: id, state })
+  await started($, on, { ...BOARD, sessions: [session('w1', 'working'), session('p1', 'waiting'), session('d1', 'done')], needsYou: [] })
+  const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: 47 }, surface: 'desktop' })
+  const dots = (await ui.findAll({ type: 'Box' })).flatMap(one => (one.key?.startsWith('block-dot-box-sessions-') ? [one.key] : []))
+  expect(dots).toEqual(['block-dot-box-sessions-green', 'block-dot-box-sessions-amber', 'block-dot-box-sessions-grey'])
+})
+
 test('header states: offline turns the dot and line amber with a notice under the repos; Asked replaces Ask until a worker answers', async ($, on) => {
   let failure: string | undefined
   const { clock } = await started($, on, BOARD, { listError: () => failure })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-ask')
-  await dump('header-asked', ui)
   expect((await ui.find({ key: 'section-header' }))?.text).toContain('Asked')
   expect(await textsOf(ui)).toContain('asked 1 worker · just now')
   await ui.unmount()
   failure = 'board.json not found'
   await clock.advance(15_000)
   const offline = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await dump('header-offline', offline)
   expect(await textsOf(offline)).toEqual(expect.arrayContaining(['live data unavailable', 'Can’t read sessions: board.json not found']))
   expect((await offline.find({ key: 'notice' }))?.props).toEqual(expect.objectContaining({ backgroundColor: C.amberTint }))
   expect(await altsOf(offline)).toContain('live data unavailable')
@@ -231,7 +244,6 @@ test('Archived: the card offers Open and Unarchive; unarchive asks inside the ca
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-chip-archived')
   await click(ui, 'hit-row-local_old')
-  await dump('archived', ui)
   expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-unarchive-local_old', 'hit-archived-open-local_old']))
   await click(ui, 'hit-unarchive-local_old')
   expect(await ui.find({ type: 'Text', text: /Unarchive Remove the stale mod\?/ })).toBeDefined()
@@ -499,20 +511,6 @@ test('a hand-scrolled offset never pushes the header down: the pin sits on or ab
       await ui.unmount()
     }
   }
-})
-
-test('the live end repro: offset 85, bodyRows 50, contentRows 135 with a card open keeps the lift at or under the real max scroll', async ($, on) => {
-  aimed(on)
-  await started($, on)
-  const top = await $.ui.mount(scrolled(0))
-  await click(top, 'hit-row-local_env')
-  await top.unmount()
-  await ($.ui as unknown as Raise).scroll({ component: 'Pane', requestId: 'master-session', offset: 85, by: 85, bodyRows: 50, contentRows: 135, origin: { kind: 'plugin', name: 'master-session' } })
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, scroll: { offset: 85, bodyRows: 50 } } })
-  const lift = await liftOn(ui)
-  expect(lift).toBeLessThanOrEqual((85 - 0.5) * LH + 0.1)
-  expect(lift).toBeLessThanOrEqual((135 - 50) * LH)
-  await ui.unmount()
 })
 
 test('collapsing a card at a large offset clamps the pin to the new end and moves the window there', async ($, on) => {

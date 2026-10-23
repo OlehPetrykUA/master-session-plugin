@@ -2,7 +2,7 @@ import type { BoxProps, ButtonProps, ClientProps, ElementConstructor, SvgProps, 
 
 import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Repo, SessionState, Undone, WorkflowRecord } from '../../types'
 
-import type { Counts, Row } from '../lib/rows'
+import type { Row } from '../lib/rows'
 import type { RunSummary } from '../lib/totals'
 
 export type TextUi = {
@@ -37,7 +37,6 @@ export type PaneData = {
   agents: readonly AgentRecord[]
   workflows: readonly WorkflowRecord[]
   totals: RunSummary
-  counts: Counts
   chosen: Filter
   open: readonly string[]
   asking: string

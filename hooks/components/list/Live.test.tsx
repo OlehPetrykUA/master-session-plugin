@@ -288,7 +288,7 @@ test('when "N blockers" is wider than the tile, Needs you draws the bare count',
 
 test('each tile draws the FIRST of [sub, ...shorts] whose width fits, and it fits, at every width from 47 to 60 columns, for long, short and empty data', () => {
   const base: RunSummary = {
-    sessions: { total: 3, 'needs-you': 0, waiting: 1, working: 1, done: 1, archived: 0 },
+    sessions: { total: 3, waiting: 1, working: 1, done: 1 },
     needsYou: { sessions: 0, subagents: 12 },
     subagents: { total: 14, running: 12, done: 2, failed: 0, asking: 12 },
     workflows: { total: 1, running: 1, done: 0, failed: 0, asking: 0, agents: 17, agentsDone: 14 },

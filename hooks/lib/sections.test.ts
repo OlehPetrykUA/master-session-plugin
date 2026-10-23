@@ -1,8 +1,13 @@
 import { expect, test } from 'claude-code/testing'
 
-import { COLUMN, LH, down, faceWidth, liftOf, tall } from './layout'
+import { CH, LH, down, faceWidth, liftOf, tall } from './layout'
 import { BLOCK, ROW, chipWidthOf, contentHeightOf, headerPxOf, headerRowsOf, linesOf, noticePxOf, scrollMessage, scrollRowOf, sectionTopsOf, statusLinesOf, statusRoomOf } from './sections'
 import type { SectionInput } from './sections'
+import type { Board } from '../../types'
+import type { PaneData } from '../components/types'
+import { liveOf } from '../testing/world'
+import { runSummaryOf } from './totals'
+import { sectionsOf } from './view'
 
 const chips = ['All', 'Needs you', 'Waiting', 'Working', 'Done', 'Archived'].map((label, index) => ({ label, count: index, hasMark: true, markWidth: index % 5 ? 8 : 14 }))
 
@@ -14,11 +19,12 @@ const input: SectionInput = {
   status: 'updated just now',
   buttons: ['Ask', 'Refresh'],
   blockRows: 2,
+  blockExtra: 0,
   chips,
   groups: [
-    { rows: 1, isArchived: false },
-    { rows: 2, isArchived: false },
-    { rows: 0, isArchived: true },
+    { rows: 1, extra: 0, isArchived: false },
+    { rows: 2, extra: 0, isArchived: false },
+    { rows: 0, extra: 0, isArchived: true },
   ],
   hasMore: false,
   isEmpty: false,
@@ -72,6 +78,7 @@ test('the header lift is one tree row per scroll row: the scroll cell is the tre
 test('content height is known only where every row has a fixed height: closed details, no empty box', () => {
   const top = sectionTopsOf({ ...input, columns: 101 })['section-list'] ?? 0
   expect(contentHeightOf(input)).toBe(top + 16 + (32 + 4 + ROW) + (32 + 4 + 2 * ROW + 4) + 32 + 2 * 16 + 16)
+  expect(contentHeightOf({ ...input, groups: input.groups.map(group => ({ ...group, extra: group.rows ? 16 : 0 })) })).toBe((contentHeightOf(input) ?? 0) + 32)
   expect(contentHeightOf({ ...input, hasMore: true })).toBe((contentHeightOf(input) ?? 0) + 16 + 32)
   expect(contentHeightOf({ ...input, hasExpanded: true })).toBeUndefined()
   expect(contentHeightOf({ ...input, isEmpty: true })).toBeUndefined()
@@ -93,6 +100,25 @@ test('a header status that wraps adds its extra lines to the header and moves ev
 
 test('the header status room leaves the buttons their drawn width: each face plus 1 for the 16 px icon, and the gaps', () => {
   const px = (value: number) => Math.round(value * 100) / 100
-  expect(px(statusRoomOf({ ...input, columns: 46 }))).toBe(px(46 * COLUMN - 16 - 8 - 8 * 3 - (faceWidth('Ask', 'b32') + 1) - (faceWidth('Refresh', 'b32') + 1) - 12 - 4))
-  expect(px(statusRoomOf({ ...input, columns: 46, isNarrow: true }))).toBe(px(46 * COLUMN - 16 - 8 - 12 - 4))
+  expect(px(statusRoomOf({ ...input, columns: 46 }))).toBe(px(46 * CH - 16 - 8 - 8 * 3 - (faceWidth('Ask', 'b32') + 1) - (faceWidth('Refresh', 'b32') + 1) - 12 - 4))
+  expect(px(statusRoomOf({ ...input, columns: 46, isNarrow: true }))).toBe(px(46 * CH - 16 - 8 - 12 - 4))
+})
+
+test('a wrapped dot line pushes every section top below the tiles down by exactly that line', () => {
+  const tops = sectionTopsOf(input)
+  const shifted = sectionTopsOf({ ...input, blockExtra: 16 })
+  for (const key of ['section-chips', 'section-list', 'section-archived'] as const) expect(shifted[key]).toBe((tops[key] ?? 0) + 16)
+  expect(shifted['section-summary']).toBe(tops['section-summary'])
+  expect(contentHeightOf({ ...input, blockExtra: 16 })).toBe((contentHeightOf(input) ?? 0) + 16)
+})
+
+test('the view of a board whose Sessions dots wrap moves the chips down one dot line more than a one-dot board: at 41 and 47 columns, not at 60', () => {
+  const chipsGap = ([red, working, waiting, done]: number[], columns: number) => {
+    const board: Board = { sessions: [], needsYou: [], repos: [], source: 'tool' }
+    const totals = runSummaryOf({ rows: [], sessions: [], agents: [], workflows: [], board, trees: [], at: 10_000_000 })
+    const counted = { ...totals, sessions: { total: red! + working! + waiting! + done!, working: working!, waiting: waiting!, done: done! }, needsYou: { ...totals.needsYou, sessions: red! } }
+    const tops = sectionsOf({ board, live: liveOf(), trees: [], rows: [], archived: [], agents: [], workflows: [], totals: counted, chosen: 'all', open: [], asking: '', archiveView: 'open', asked: null, undone: null, isRefreshing: false, at: 10_000_000, home: '/h', columns, offset: 0, bodyRows: 60, isAligned: true } as unknown as PaneData)
+    return (tops['section-chips'] ?? 0) - (tops['section-summary'] ?? 0)
+  }
+  expect([41, 47, 60].map(columns => chipsGap([12, 3, 7, 1], columns) - chipsGap([0, 1, 0, 0], columns))).toEqual([16, 16, 0])
 })

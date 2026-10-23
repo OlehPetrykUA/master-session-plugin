@@ -2,9 +2,8 @@ import { isArchivable } from '../data/contract'
 import { TITLE } from '../lib/constants'
 import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, openIdOf, plural, sessionOfAgent, shownArchived, stepsOfItem } from '../lib/list'
-import type { Context, ListGroup, ListItem, RowItem } from '../lib/list'
-import { familyOf } from '../lib/rows'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, openIdOf, plural, shownArchived, stepsOfItem } from '../lib/list'
+import type { ListGroup, ListItem, RowItem } from '../lib/list'
 import type { Row } from '../lib/rows'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
 import { TERMINAL_COLOR } from '../theme/tokens'
@@ -16,7 +15,7 @@ import { UnarchiveConfirm } from './UnarchiveConfirm'
 export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
   const { Box, Text, Button } = ui
   const { actions, asking, at, trees } = data
-  const context: Context = { at, trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows }
+  const { context } = view
 
   const detail = (item: ListItem) => {
     const collapse = () => actions.collapse(openIdOf(item, data.open) ?? item.id)
@@ -25,29 +24,23 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
     return TextSessionDetail(ui, { item, context, asking, actions })
   }
 
-  const chatOf = (item: RowItem) => {
-    if (item.status !== 'needs') return undefined
-    if (item.kind === 'session') return item.row
-    return item.kind === 'subagent' ? sessionOfAgent(item.agent, data) : undefined
-  }
-
   const undone = data.undone
   const undoLine = () =>
     undone ? (
       <Box key="undo" flexDirection="row" gap="sm">
-        <Text dimColor>{undone.name ? `${undone.name} archived, worktree removed` : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with work to keep` : ''}`}</Text>
+        <Text dimColor>{undone.name ? `${undone.name} archived` : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with work to keep` : ''}`}</Text>
         {undone.ids.length ? <Button key="undo-archive" plain label="Undo" onPress={actions.undo} /> : null}
       </Box>
     ) : null
 
   const archiveAll = (rows: readonly Row[]) => {
-    const clean = rows.filter(one => !lossesOf(one, trees, familyOf(data.live)).length)
+    const clean = rows.filter(one => !lossesOf(one, trees, context.sessions).length)
     actions.archive(clean, { group: 'done', skipped: rows.length - clean.length })
   }
 
   const line = (item: RowItem) => {
     const steps = stepsOfItem(item)
-    const chat = chatOf(item)
+    const chat = chatTargetOf(item, context)
     const isNeeds = item.status === 'needs'
     const tail = [lineTextOf(lineOf(item, context)), isNeeds ? '' : elapsedOfItem(item, at), steps && !isNeeds ? `${steps.done}/${steps.total}` : ''].filter(Boolean).join(' · ')
     return (
@@ -58,7 +51,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
           {tail}
         </Text>
         <Box flexGrow={1} />
-        {chat ? <Button key={`chat-${item.id}`} variant="primary" label="Open chat" onPress={() => actions.open(chat.id, chat.name)} /> : null}
+        {chat ? <Button key={`chat-${item.id}`} variant="primary" label={CHAT_LABEL} onPress={() => actions.open(chat.id, chat.name)} /> : null}
       </Box>
     )
   }

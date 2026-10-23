@@ -5,7 +5,7 @@ import type { AgentInfo, On } from 'claude-code'
 import type { AgentRecord, Report } from '../../types'
 
 import { workflowRunsOf } from '../lib/agents'
-import { BOARD, BOARD_TOOL, HOME, MASTER, PANE, SPAWN, warmUp, world } from '../testing/world'
+import { BAND, BOARD, BOARD_TOOL, HOME, MASTER, PANE, SPAWN, started, textsOf, warmUp, world } from '../testing/world'
 import { merge } from './contract'
 import { reportPath } from './status'
 
@@ -31,9 +31,10 @@ async function agentsOf($: Engine) {
 
 const listing = (...ids: string[]): AgentInfo[] => ids.map(id => ({ id, description: `task ${id}`, type: 'general-purpose', status: 'running' }))
 
-function loops(on: On, ids: string[]) {
+function loops(on: On, ids: string[], spawns: string[] = []) {
+  let spawned = 0
   on('agent.list', () => ({ value: listing(...ids) }))
-  on('agent.spawn', (_, e) => ({ model: 'claude-haiku-5-5', agentId: e.workflow ? `w${e.workflow.agentIndex}` : e.parentAgentId ? 'a2' : 'a1' }))
+  on('agent.spawn', (_, e) => ({ model: 'claude-haiku-5-5', agentId: spawns.length ? (spawns[spawned++] ?? 'a9') : e.workflow ? `w${e.workflow.agentIndex}` : e.parentAgentId ? 'a2' : 'a1' }))
   on('classic.PermissionRequest', () => ({}))
   on('classic.Notification', () => ({}))
   on('turn.complete', (_, e) => ({ text: e.answer }))
@@ -75,6 +76,24 @@ test('a subagent prompt in the master marks that subagent asking with the prompt
   await $.turn.complete({ answer: 'done', durationMs: 5, isAborted: false, turnId: 't3', agentId: 'a1', reason: 'answer' })
   const over = (await agentsOf($)).find(one => one.id === 'a1')
   expect([over?.state, over?.asking]).toEqual(['done', undefined])
+})
+
+test('two of three subagents finish and three minutes of refresh ticks pass: the store keeps all three and the band percent does not drop', { plugins: [PROBE] }, async ($, on) => {
+  loops(on, ['a1', 'a2', 'a3'], ['a1', 'a2', 'a3'])
+  const { clock } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[1]], needsYou: [] })
+  for (const task of ['one', 'two', 'three']) await $.agent.spawn({ ...SPAWN, description: task, subagentType: 'Explore' })
+  for (const agentId of ['a1', 'a2']) await $.turn.complete({ answer: 'done', durationMs: 5, isAborted: false, turnId: `t-${agentId}`, agentId, reason: 'answer' })
+  const readBand = async () => {
+    const agents = await agentsOf($)
+    const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    const percent = (await textsOf(band)).find(text => /^\d+%$/.test(text))
+    await band.unmount()
+    return [agents.map(one => [one.id, one.state]), percent]
+  }
+  const before = await readBand()
+  expect(before).toEqual([[['a1', 'done'], ['a2', 'done'], ['a3', 'running']], '48%'])
+  await clock.advance(180_000)
+  expect(await readBand()).toEqual(before)
 })
 
 test('a workflow agent prompt shows on that agent and in its run counts, and clears when answered', { plugins: [PROBE] }, async ($, on) => {

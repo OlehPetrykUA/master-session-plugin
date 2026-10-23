@@ -2,14 +2,10 @@ import type { AgentInfo, AgentSpawnInput, AgentSpawnResult, AgentStatus, EngineI
 
 import type { AgentRecord, AgentState, WorkflowRecord } from '../../types'
 
-import { workflowRunsOf } from '../lib/agents'
-import { AGENT_SHOWN_MS } from '../lib/constants'
-import { getAgents, getWorkflows, saveAgents, saveWorkflows } from '../state/atoms'
+import { saveAgents, saveWorkflows } from '../state/atoms'
 import { syncAgents } from './recorder'
 
 const ENDED: Partial<Record<AgentStatus, AgentState>> = { completed: 'done', failed: 'failed', killed: 'failed' }
-
-const isOld = (at: number | undefined, now: number) => at !== undefined && now - at >= AGENT_SHOWN_MS
 
 const TEXT_MAX = 2_000
 
@@ -120,20 +116,7 @@ export function launched(workflows: WorkflowRecord[], toolUseId: string, result:
   return known ? workflows.map(one => (one.id === id ? record : one)) : [...workflows, record]
 }
 
-function staleRunsOf(agents: AgentRecord[], workflows: WorkflowRecord[], now: number) {
-  const runs = workflowRunsOf(agents, workflows)
-  return new Set(runs.filter(run => (run.agents.length ? run.state !== 'running' && isOld(run.endedAt, now) : isOld(run.startedAt, now))).map(run => run.id))
-}
-
-export function keptAgents(agents: AgentRecord[], workflows: WorkflowRecord[], now: number) {
-  const stale = staleRunsOf(agents, workflows, now)
-  return agents.filter(one => (one.run ? !stale.has(one.run.id) : !isOld(one.endedAt, now)))
-}
-
-export function keptWorkflows(workflows: WorkflowRecord[], agents: AgentRecord[], now: number) {
-  const stale = staleRunsOf(agents, workflows, now)
-  return workflows.filter(one => !stale.has(one.id))
-}
+export const keptAgents = (agents: AgentRecord[], _workflows: readonly WorkflowRecord[], _now: number) => agents
 
 export async function recordSpawn($: EngineInterface, e: AgentSpawnInput, out: AgentSpawnResult) {
   const now = await $.clock.now()
@@ -161,9 +144,6 @@ export async function recordWorkflow($: EngineInterface, e: { tool_use_id: strin
 export async function refreshAgents($: EngineInterface) {
   const infos = await $.agent.list()
   const now = await $.clock.now()
-  const workflows = await getWorkflows($)
-  await saveAgents($, agents => keptAgents(listed(agents, infos, now), workflows, now))
-  const agents = await getAgents($)
-  await saveWorkflows($, current => keptWorkflows(current, agents, now))
+  await saveAgents($, agents => listed(agents, infos, now))
   await syncAgents($)
 }

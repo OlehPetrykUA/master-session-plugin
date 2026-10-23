@@ -4,9 +4,8 @@ import type { AgentInfo } from 'claude-code'
 import type { AgentRecord, WorkflowRecord } from '../../types'
 
 import { workflowRunsOf } from '../lib/agents'
-import { AGENT_SHOWN_MS } from '../lib/constants'
 import { SPAWN } from '../testing/world'
-import { ended, keptAgents, keptWorkflows, launched, listed, phasesOf, spawned, tokensOf } from './agents'
+import { ended, launched, listed, phasesOf, spawned, tokensOf } from './agents'
 
 const NOW = 1_000_000
 
@@ -84,25 +83,6 @@ test("phases are the titles of the script meta's phases, in order; quotes, brack
   expect(phasesOf("export const meta = { name: 'no phases' }\nconst y = { phases: [{ title: 'Body' }] }")).toEqual([])
   expect(phasesOf('const meta = 1')).toEqual([])
   expect(phasesOf('')).toEqual([])
-})
-
-test('finished subagents stay a short while; a workflow run stays whole until all its agents ended a while ago', () => {
-  const over: AgentRecord = { ...RUNNING, state: 'done', endedAt: NOW }
-  expect(keptAgents([over], [], NOW + AGENT_SHOWN_MS - 1)).toEqual([over])
-  expect(keptAgents([over], [], NOW + AGENT_SHOWN_MS)).toEqual([])
-  const flow: AgentRecord[] = [
-    { ...RUNNING, id: 'w1', run: { id: 'wf_9', index: 1 }, state: 'done', endedAt: NOW },
-    { ...RUNNING, id: 'w2', run: { id: 'wf_9', index: 2 } },
-  ]
-  const runs: WorkflowRecord[] = [{ id: 'wf_9', toolUseId: 't', startedAt: NOW }]
-  expect(keptAgents(flow, runs, NOW + 10 * AGENT_SHOWN_MS)).toEqual(flow)
-  expect(keptWorkflows(runs, flow, NOW + 10 * AGENT_SHOWN_MS)).toEqual(runs)
-  const allOver = ended(flow, 'w2', true, NOW + 1)
-  expect(keptAgents(allOver, runs, NOW + AGENT_SHOWN_MS)).toEqual(allOver)
-  expect(keptAgents(allOver, runs, NOW + 1 + AGENT_SHOWN_MS)).toEqual([])
-  expect(keptWorkflows(runs, allOver, NOW + 1 + AGENT_SHOWN_MS)).toEqual([])
-  expect(keptWorkflows(runs, [], NOW + AGENT_SHOWN_MS - 1)).toEqual(runs)
-  expect(keptWorkflows(runs, [], NOW + AGENT_SHOWN_MS)).toEqual([])
 })
 
 test('the live event sequence of one workflow run, as engine 2.1.304 raised it, yields one named run with labelled agents', () => {

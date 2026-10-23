@@ -3,8 +3,9 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord } from '../../../types'
 
-import { across, down, tall } from '../../lib/layout'
+import { CH, LH, across, bodyWidthOf, down, tall } from '../../lib/layout'
 import { oneLine } from '../../lib/list'
+import { hitPxOf } from '../../lib/rowfit'
 import { phaseStrip } from '../../theme/detail'
 import { C } from '../../theme/tokens'
 import { BOARD, PANE, altsOf, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
@@ -101,7 +102,7 @@ test('an archived card shows Last, Time, Worktree, Git and Model, then Open and 
   await click(ui, 'hit-chip-archived')
   await click(ui, 'hit-row-local_old')
   const texts = await textsOf(ui)
-  for (const word of ['Last', 'Time', 'Worktree', 'Git', 'Model', 'dotfiles', 'Open', 'Unarchive', 'Remove the stale mod', 'archived 10m ago', 'worktree removed', 'ran 40m', 'opus · xhigh']) expect(texts).toContain(word)
+  for (const word of ['Last', 'Time', 'Worktree', 'Git', 'Model', 'dotfiles', 'Open', 'Unarchive', 'Remove the stale mod', 'archived 10m ago', 'ran 40m', 'opus · xhigh']) expect(texts).toContain(word)
   expect(texts).not.toContain('removed at archive; made again on its next turn')
   expect(texts.some(text => /^archived \d\d:\d\d$/.test(text))).toBe(true)
   expect(texts.some(text => /^last turn /.test(text))).toBe(true)
@@ -292,4 +293,21 @@ test('a status line with newlines stays one line on a narrow row and in the term
   expect(await textsOf(terminal)).toContain('waiting · waiting for the go · 50m · 2/5')
   expect((await textsOf(terminal)).some(text => text.includes('\n'))).toBe(false)
   await terminal.unmount()
+})
+
+test('the press target of a needs-you row with a two-line question is its drawn 72 px, and 64 px in a card', async ($, on) => {
+  const ask = 'Approve the settings.json edit and then restart every hook so that the new rules apply to all workers'
+  await started($, on, { ...BOARD, sessions: BOARD.sessions.map(one => (one.id === 'local_env' ? { ...one, needsYou: ask } : one)) })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const width = bodyWidthOf(60)
+  const size = async (key: string) => {
+    const props = (await ui.find({ key }))?.props
+    return [props?.width, props?.height]
+  }
+  expect((await ui.find({ key: 'row-local_env' }))?.props.minHeight).toBe(tall(56))
+  expect(await size('hit-row-local_env')).toEqual([Math.ceil(width / CH), Math.ceil(72 / LH)])
+  expect([hitPxOf(72, false), hitPxOf(72, true), hitPxOf(56, true)]).toEqual([72, 64, 50])
+  await click(ui, 'hit-row-local_env')
+  expect(await size('hit-top-local_env')).toEqual([Math.ceil((width - 6) / CH), Math.ceil(64 / LH)])
+  await ui.unmount()
 })

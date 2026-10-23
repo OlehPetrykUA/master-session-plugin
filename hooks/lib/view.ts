@@ -1,14 +1,17 @@
 import type { Chip } from '../components/FilterChips'
 import { markWidthOf } from '../components/FilterChips'
 import type { HeaderButton } from '../components/Header'
+import { tileInnerOf } from '../components/list/Summary'
 import type { PaneData } from '../components/types'
 import type { IconName } from '../theme/icons'
 import type { Tone } from '../theme/tokens'
 import { shortOf, updatedOf } from './format'
-import { COLUMN, LH, liftOf } from './layout'
+import { CH, LH, bodyWidthOf, liftOf } from './layout'
 import { familyOf } from './rows'
-import { ARCHIVED_PEEK, ageOf, blocksOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf } from './list'
-import { NARROW_PX, contentHeightOf, headerRowsOf, sectionTopsOf } from './sections'
+import { ARCHIVED_PEEK, CHAT_LABEL, ageOf, blocksOf, chatTargetOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf } from './list'
+import type { Context } from './list'
+import { rowFitOf } from './rowfit'
+import { NARROW_PX, ROW, contentHeightOf, dotExtraOf, headerRowsOf, sectionTopsOf } from './sections'
 import type { SectionInput } from './sections'
 
 export const noticeOf = (error: string) => `Can’t read sessions: ${error}`
@@ -25,11 +28,12 @@ export function statusOf(data: PaneData, isDone: boolean): { text: string; icon:
 }
 
 export function paneViewOf(data: PaneData) {
-  const items = itemsOf(data.rows, data.agents, data.workflows, { trees: data.trees, sessions: familyOf(data.live) })
+  const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows }
+  const items = itemsOf(data.rows, data.agents, data.workflows, context)
   const counts = countsOfItems(items, data.archived.length)
   const groups = groupsOf(items, data.archived, data.chosen, data.archiveView, data.undone?.group)
   const isDone = isAllDone(items)
-  const isNarrow = data.columns * COLUMN < NARROW_PX
+  const isNarrow = data.columns * CH < NARROW_PX
   const chips: Chip[] = [
     { id: 'all', label: 'All', count: counts.all, icon: 'all' },
     { id: 'needs-you', label: 'Needs you', count: counts['needs-you'], tone: 'red' },
@@ -40,6 +44,7 @@ export function paneViewOf(data: PaneData) {
   ]
   const isEmpty = data.chosen === 'all' ? !items.length : !counts[data.chosen]
   return {
+    context,
     items,
     counts,
     groups,
@@ -61,11 +66,12 @@ export function headerButtonsOf(data: PaneData, onAsk: () => void, onRefresh: ()
     ? []
     : data.asked
       ? [{ id: 'ask', icon: 'check', label: 'Asked', onPress: onAsk, isQuiet: true }]
-      : [{ id: 'ask', icon: 'chat', label: data.columns * COLUMN >= ASK_WIDE_PX ? ASK_WIDE : 'Ask', onPress: onAsk }]
+      : [{ id: 'ask', icon: 'chat', label: data.columns * CH >= ASK_WIDE_PX ? ASK_WIDE : 'Ask', onPress: onAsk }]
   return [...ask, { id: 'refresh', icon: 'refresh', label: 'Refresh', onPress: onRefresh, isPressed: data.isRefreshing }]
 }
 
 function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
+  const { context } = view
   return {
     columns: data.columns,
     repos: data.trees.map(repo => shortOf(repo.name)),
@@ -74,10 +80,15 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
     status: view.status.text,
     buttons: headerButtonsOf(data, () => undefined, () => undefined).map(button => button.label),
     blockRows: Math.ceil(view.blocks.length / view.perRow),
+    blockExtra: dotExtraOf(view.blocks.find(block => block.key === 'sessions'), tileInnerOf(bodyWidthOf(data.columns), view.perRow)),
     chips: view.chips.map(chip => ({ label: chip.label, count: chip.count, hasMark: !!markWidthOf(chip), markWidth: markWidthOf(chip) })),
     groups: view.groups
       .filter(group => group.id === 'archived' || group.items.length)
-      .map(group => ({ rows: group.id === 'archived' ? (group.isOpen ? (data.chosen === 'archived' || data.archiveView === 'all' ? group.archived.length : Math.min(ARCHIVED_PEEK, group.archived.length)) : 0) : group.items.length, isArchived: group.id === 'archived' })),
+      .map(group => ({
+        rows: group.id === 'archived' ? (group.isOpen ? (data.chosen === 'archived' || data.archiveView === 'all' ? group.archived.length : Math.min(ARCHIVED_PEEK, group.archived.length)) : 0) : group.items.length,
+        extra: group.items.reduce((sum, item) => sum + rowFitOf(item, context, { width: bodyWidthOf(data.columns), isNarrow: view.isNarrow, home: data.home, chat: chatTargetOf(item, context) ? CHAT_LABEL : undefined }).height - ROW, 0),
+        isArchived: group.id === 'archived',
+      })),
     hasMore: view.hasMore,
     isEmpty: view.isEmpty,
     hasExpanded:

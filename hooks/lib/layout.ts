@@ -6,7 +6,6 @@ export const CH = 8.3
 export const LH = 19
 
 export const liftOf = (offset: number) => offset * LH
-export const COLUMN = 8.3
 export const PAD = 4
 
 const THIN = 13 / 5
@@ -56,12 +55,7 @@ export function fit(text: string, px: number, face: Face = {}) {
   return `${out}…`
 }
 
-export const fill = (text: string, px: number) => {
-  const shown = fit(text, px)
-  return shown + spaces((px - widthOf(shown)) * 0.8 - CH)
-}
-
-export const bodyWidthOf = (columns: number) => columns * COLUMN - 32
+export const bodyWidthOf = (columns: number) => columns * CH - 32
 
 export function faceWidth(label: string, size: Size = 's') {
   const [, left, right, gap] = SIZES[size]

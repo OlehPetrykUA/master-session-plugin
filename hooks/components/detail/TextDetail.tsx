@@ -1,7 +1,7 @@
 import type { RenderChildren } from 'claude-code'
 
-import { compactOf, modelOf } from '../../lib/format'
-import { clockOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, modelFamilyOf, nameText, parentsOf, plural, runAgentsOf, shortNameOf } from '../../lib/list'
+import { compactOf, modelFamilyOf, modelOf } from '../../lib/format'
+import { clockOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, parentsOf, plural, runAgentsOf, shortNameOf } from '../../lib/list'
 import type { Context, ListItem, RowItem } from '../../lib/list'
 import { headOf, syncOf, whereOf } from '../../lib/rows'
 import { CARD_BORDER, TERMINAL_COLOR } from '../../theme/tokens'

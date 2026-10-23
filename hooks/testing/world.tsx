@@ -209,8 +209,6 @@ export const BAND = {
   props: { hasSurvey: false, isWorking: false, maxRows: 6, bodyColumns: 100, scroll: { offset: 0, bodyRows: 6 }, view: {} },
 } as const
 
-declare const console: { log: (...values: unknown[]) => void }
-
 export type Ui = { find: (query: ElementQuery) => Promise<FoundElement | undefined>; findAll: (query: ElementQuery) => Promise<FoundElement[]> }
 
 export type Clickable = { pointer: (event: MountPointerEvent) => Promise<void> }
@@ -221,12 +219,6 @@ export async function click(ui: Clickable, key: string, x = 1, y = 1) {
 }
 
 export const hitsOf = async (ui: Ui) => (await ui.findAll({ type: 'Client' })).map(one => one.key ?? '')
-
-export async function dump(name: string, ui: Ui) {
-  const all = await ui.findAll({})
-  const rows = all.map(one => [one.type, one.key ?? '', one.text, one.type === 'Svg' ? one.props.alt : one.type === 'Box' ? (one.props.width ?? '') : ''])
-  console.log(`DUMP ${name} ${JSON.stringify(rows)}`)
-}
 
 export async function started($: Engine, on: On, board: unknown = BOARD, child: Child = {}) {
   const run = world(on, child)

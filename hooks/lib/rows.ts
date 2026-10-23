@@ -1,8 +1,8 @@
 import type { Board, BoardSession, Live, LiveSession, Repo, SessionState, Worktree } from '../../types'
 
-import { ORDER, stepOf } from './board'
+import { ORDER } from './board'
 import { compactOf } from './format'
-import { expandHome, isRepoClean, locate } from './git'
+import { expandHome, locate } from './git'
 
 export type Row = {
   id: string
@@ -12,8 +12,6 @@ export type Row = {
   board?: BoardSession
   live?: LiveSession
 }
-
-export type Counts = Record<SessionState, number> & { dirty: number; clean: number }
 
 export function rowsOf(board: Board | null, live: Live): Row[] {
   const onBoard = new Set(board?.sessions.map(one => one.id))
@@ -37,13 +35,6 @@ export function rowsOf(board: Board | null, live: Live): Row[] {
     })
   }
   return [...rows.values()].sort((left, right) => ORDER.indexOf(left.state) - ORDER.indexOf(right.state))
-}
-
-export function countsOf(rows: readonly Row[], repos: readonly Repo[]): Counts {
-  const counts: Counts = { 'needs-you': 0, waiting: 0, working: 0, done: 0, dirty: 0, clean: 0 }
-  for (const row of rows) counts[row.state] += 1
-  for (const repo of repos) counts[isRepoClean(repo) ? 'clean' : 'dirty'] += 1
-  return counts
 }
 
 export const archivedOf = (live: Live) => live.sessions.filter(one => one.isArchived)

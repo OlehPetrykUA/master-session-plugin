@@ -1,11 +1,12 @@
-import { COLUMN, LH, bodyWidthOf, faceWidth, textWidth, widthOf } from './layout'
-import { rowsOf } from './list'
+import { CH, LH, bodyWidthOf, faceWidth, textWidth, widthOf } from './layout'
+import { rowsOf, shownDots } from './list'
+import type { Block } from './list'
 
 export type SectionKey = 'section-header' | 'section-summary' | 'section-chips' | 'section-list' | 'section-expanded' | 'section-archived'
 
 export type ChipSize = { label: string; count: number; hasMark: boolean; markWidth: number }
 
-export type GroupSize = { rows: number; isArchived: boolean }
+export type GroupSize = { rows: number; extra: number; isArchived: boolean }
 
 export type SectionInput = {
   columns: number
@@ -15,6 +16,7 @@ export type SectionInput = {
   status: string
   buttons: readonly string[]
   blockRows: number
+  blockExtra: number
   chips: readonly ChipSize[]
   groups: readonly GroupSize[]
   hasMore: boolean
@@ -27,6 +29,9 @@ export const BLOCK = 1 + 8 + 16 + 24 + 16 + 8 + 1
 export const NARROW_PX = 340
 
 export const chipWidthOf = (chip: ChipSize) => 2 + 12 + (chip.hasMark ? chip.markWidth + 8 : 0) + widthOf(chip.label, { isBold: true }) + 8 + widthOf(String(chip.count), { isBold: true }) + 12
+
+export const dotExtraOf = (block: Block | undefined, inner: number) =>
+  (linesOf((block ? shownDots(block) : []).map(mark => 6 + 2 + textWidth(String(mark.count), 11, { isBold: true })), inner, 4) - 1) * 16
 
 export const repoWidthOf = (name: string) => 8 + 12 + 4 + textWidth(name, 12, { isMono: true }) + 8
 
@@ -54,7 +59,7 @@ export const noticePxOf = (notice: string, columns: number) => (notice ? 12 + 16
 type HeaderInput = Pick<SectionInput, 'columns' | 'repos' | 'isNarrow' | 'notice' | 'status' | 'buttons'>
 
 export function statusRoomOf(input: HeaderInput) {
-  const width = input.columns * COLUMN - 16 - 8
+  const width = input.columns * CH - 16 - 8
   const room = input.isNarrow ? width : width - 8 * (input.buttons.length + 1) - input.buttons.reduce((sum, label) => sum + faceWidth(label, 'b32') + 1, 0)
   return room - 12 - 4
 }
@@ -71,13 +76,13 @@ export function headerPxOf(input: HeaderInput) {
 
 export const headerRowsOf = (input: HeaderInput) => Math.ceil(headerPxOf(input) / LH)
 
-const groupPxOf = (group: GroupSize) => 32 + (group.rows ? 4 + group.rows * ROW + (group.rows - 1) * 4 : 0)
+const groupPxOf = (group: GroupSize) => 32 + (group.rows ? 4 + group.rows * ROW + group.extra + (group.rows - 1) * 4 : 0)
 
 export function sectionTopsOf(input: SectionInput) {
   const tops: Partial<Record<SectionKey, number>> = { 'section-header': 0 }
   let top = headerRowsOf(input) * LH
   tops['section-summary'] = top
-  top += 12 + input.blockRows * BLOCK + (input.blockRows - 1) * 8
+  top += 12 + input.blockRows * BLOCK + (input.blockRows - 1) * 8 + input.blockExtra
   tops['section-chips'] = top
   const lines = linesOf(input.chips.map(chipWidthOf), bodyWidthOf(input.columns), 8)
   top += 12 + lines * 32 + (lines - 1) * 8

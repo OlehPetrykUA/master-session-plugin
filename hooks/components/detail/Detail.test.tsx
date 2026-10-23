@@ -107,7 +107,7 @@ test('a clean idle session archives in one click; its row turns into an Undo bar
   expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
   expect(toasts).toEqual([])
   expect(await ui.find({ key: 'undo-bar-done' })).toBeDefined()
-  expect(await textsOf(ui)).toContain('conductor-redo archived, worktree removed')
+  expect(await textsOf(ui)).toContain('conductor-redo archived')
   await click(ui, 'hit-undo-done')
   expect(calls.filter(one => one.tool === 'unarchive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
   expect(await ui.find({ key: 'undo-bar-done' })).toBeUndefined()

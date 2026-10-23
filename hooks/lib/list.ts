@@ -6,6 +6,7 @@ import type { Status } from '../theme/icons'
 import { workflowRunsOf } from './agents'
 import type { WorkflowAgent, WorkflowRun } from './agents'
 import { stepOf } from './board'
+import { AGENT_SHOWN_MS } from './constants'
 import { compactOf } from './format'
 import { textWidth } from './layout'
 import type { Face } from './layout'
@@ -36,6 +37,8 @@ export const GROUPS: readonly SessionState[] = ['needs-you', 'working', 'waiting
 export const GROUP_LABEL: Record<SessionState | 'archived', string> = { 'needs-you': 'Needs you', working: 'Working', waiting: 'Waiting', done: 'Done', archived: 'Archived' }
 
 export const ARCHIVED_PEEK = 2
+
+export const CHAT_LABEL = 'Open chat'
 
 const KIND_ORDER = { session: 0, workflow: 1, subagent: 2 }
 
@@ -75,8 +78,6 @@ const GENERIC = ['general-purpose', 'workflow-subagent']
 export const kindOfType = (type: string) => type.split(':').at(-1) ?? type
 
 export const personaOfType = (type: string) => (GENERIC.includes(kindOfType(type)) ? 'Agent' : (PERSONA[kindOfType(type)] ?? (kindOfType(type) || 'Subagent')))
-
-export const modelFamilyOf = (model: string | undefined) => (model ? (model.replace(/^claude-/, '').split('-')[0] ?? model) : '')
 
 const firstLine = (text: string | undefined) => (text ?? '').split('\n').find(line => line.trim())?.trim() ?? ''
 
@@ -217,7 +218,11 @@ export function runStatusOf(run: WorkflowRun): Status {
   return run.state === 'failed' ? 'failed' : 'done'
 }
 
-export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'trees' | 'sessions'>> = {}): ListItem[] {
+export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> = {}): ListItem[] {
+  const isOld = (at: number | undefined) => context.at !== undefined && at !== undefined && context.at - at >= AGENT_SHOWN_MS
+  const stale = new Set(workflowRunsOf(agents, workflows).filter(one => (one.agents.length ? one.state !== 'running' && isOld(one.endedAt) : isOld(one.startedAt))).map(one => one.id))
+  const shown = agents.filter(agent => (agent.run ? !stale.has(agent.run.id) : !isOld(agent.endedAt)))
+  const runs = workflows.filter(one => !stale.has(one.id))
   const session = (row: Row): ListItem => {
     const status = sessionStatusOf(row, context.trees, context.sessions)
     return { kind: 'session', id: row.id, group: GROUP_OF[status], status, row }
@@ -227,10 +232,10 @@ export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], wo
     return { kind: 'workflow', id: one.id, group: GROUP_OF[status], status, run: one }
   }
   const helper = (agent: AgentRecord): ListItem => {
-    const status = agentStatusOf(agent, agents)
+    const status = agentStatusOf(agent, shown)
     return { kind: 'subagent', id: agent.id, group: GROUP_OF[status], status, agent }
   }
-  return [...rows.map(session), ...workflowRunsOf(agents, workflows).map(run), ...agents.filter(agent => !agent.run).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
+  return [...rows.map(session), ...workflowRunsOf(shown, runs).map(run), ...shown.filter(agent => !agent.run).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
 }
 
 export function runAgentsOf(run: WorkflowRun, agents: readonly AgentRecord[] = []): RowItem[] {
@@ -297,6 +302,12 @@ export function sessionOfAgent(agent: AgentRecord, context: Pick<Context, 'agent
   return undefined
 }
 
+export function chatTargetOf(item: RowItem, context: Pick<Context, 'agents' | 'rows'>): Row | undefined {
+  if (item.status !== 'needs') return undefined
+  if (item.kind === 'session') return item.row
+  return item.kind === 'subagent' ? sessionOfAgent(item.agent, context) : undefined
+}
+
 export function chainOf(item: RowItem, context: Context) {
   if (item.kind !== 'subagent') return ''
   const names = parentsOf(item, context)
@@ -351,7 +362,7 @@ function runLineOf(run: WorkflowRun, status: Status): Line {
 export function lineOf(item: RowItem, context: Context): Line {
   if (item.kind === 'session') return sessionLineOf(item.row, item.status, context)
   if (item.kind === 'workflow') return runLineOf(item.run, item.status)
-  if (item.kind === 'archived') return { chain: '', word: { status: 'archived', text: `archived ${ageOf(context.at - item.one.lastActivityAt)}` }, text: 'worktree removed', isQuestion: false }
+  if (item.kind === 'archived') return { chain: '', word: { status: 'archived', text: `archived ${ageOf(context.at - item.one.lastActivityAt)}` }, text: '', isQuestion: false }
   return agentLineOf(item.agent, item.status, chainOf(item, context), context)
 }
 
@@ -405,14 +416,16 @@ export const EMPTY_TEXT: Record<Filter, { title: string; body: string }> = {
   archived: { title: 'Nothing archived yet', body: 'Archived sessions land here.' },
 }
 
-export type Block = { key: string; label: string; value: string; sub: string; shorts?: readonly string[]; dots?: readonly { tone: 'green' | 'amber' | 'grey'; count: number }[]; isAlert: boolean }
+export type Block = { key: string; label: string; value: string; sub: string; shorts?: readonly string[]; dots?: readonly { tone: 'red' | 'green' | 'amber' | 'grey'; count: number }[]; isAlert: boolean }
+
+export const shownDots = (block: Block) => (block.dots ?? []).filter(mark => mark.count > 0)
 
 export function blocksOf(totals: RunSummary, hasWork: boolean, end?: string): Block[] {
   const { sessions, subagents, workflows, commits, tests, duration, git } = totals
   const needs = totals.needsYou.sessions + totals.needsYou.subagents
   const since = clockOf(duration.since)
   return [
-    { key: 'sessions', label: 'Sessions', value: String(sessions.total), sub: '', dots: [{ tone: 'green', count: sessions.working }, { tone: 'amber', count: sessions.waiting }, { tone: 'grey', count: sessions.done }], isAlert: false },
+    { key: 'sessions', label: 'Sessions', value: String(sessions.total), sub: '', dots: [{ tone: 'red', count: totals.needsYou.sessions }, { tone: 'green', count: sessions.working }, { tone: 'amber', count: sessions.waiting }, { tone: 'grey', count: sessions.done }], isAlert: false },
     {
       key: 'needs-you',
       label: 'Needs you',

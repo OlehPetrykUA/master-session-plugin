@@ -6,7 +6,7 @@ import type { AgentRecord, Board, BoardSession, Live, WorkflowRecord } from '../
 
 import { BAR_MIN, PILL_WIDTH, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, overallOf, percentOf } from '../../lib/band'
 import type { AgentCounts } from '../../lib/band'
-import { CH, COLUMN, across, tall, widthOf } from '../../lib/layout'
+import { CH, across, tall, widthOf } from '../../lib/layout'
 import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, started, text, warmUp, world } from '../../testing/world'
 import { glowOf, strip } from '../../theme/strip'
 import { C } from '../../theme/tokens'
@@ -92,9 +92,9 @@ function crewOf($: Engine, on: On) {
 }
 
 
-const wideColumns = Math.ceil((900 + 16) / COLUMN)
+const wideColumns = Math.ceil((900 + 16) / CH)
 
-const columnsFor = (width: number) => Math.ceil((width + 16) / COLUMN)
+const columnsFor = (width: number) => Math.ceil((width + 16) / CH)
 
 type Found = { findAll: (query: { type?: string }) => Promise<FoundElement[]>; find: (query: { key?: string }) => Promise<FoundElement | undefined> }
 
@@ -486,7 +486,7 @@ test('narrow needs you and all done keep the bar at 48 or more: the pill truncat
 test('a pill truncated to fit leaves the row inside the band width', () => {
   for (let px = 240; px <= 500; px += 4) {
     const view = viewOf(NEEDS, IDLE, columnsFor(px)).view
-    const width = columnsFor(px) * COLUMN - 16
+    const width = columnsFor(px) * CH - 16
     const sides = [PILL_WIDTH + widthOf(view.pillText, { isBold: true }), view.actionWidth].filter(Boolean)
     const row = view.padLeft + view.padRight + 2 + sides.reduce((sum, one) => sum + one, 0) + sides.length * view.gap + view.barWidth
     expect(row).toBeLessThanOrEqual(width + 0.5)
@@ -507,7 +507,7 @@ test('the bar takes the room the button leaves: with the pane open it grows by t
   const wide = await barWidthOf(at100)
   await at100.unmount()
   const at120 = await mount($, 120)
-  expect((await barWidthOf(at120)) - wide).toBe(Math.round(20 * COLUMN))
+  expect((await barWidthOf(at120)) - wide).toBe(Math.round(20 * CH))
   await at120.unmount()
 })
 

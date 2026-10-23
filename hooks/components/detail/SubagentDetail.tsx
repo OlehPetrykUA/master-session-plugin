@@ -1,5 +1,6 @@
+import { modelFamilyOf } from '../../lib/format'
 import { across, tall } from '../../lib/layout'
-import { askOf, clockOf, displayNameOf, modelFamilyOf, nameText, parentsOf, rowsOf, sessionOfAgent, spanOf, tildeOf } from '../../lib/list'
+import { askOf, clockOf, displayNameOf, nameText, parentsOf, rowsOf, sessionOfAgent, spanOf, tildeOf } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'

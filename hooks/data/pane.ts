@@ -1,9 +1,10 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { PaneData } from '../components/types'
-import { archivedOf, countsOf, rowsOf } from '../lib/rows'
+import { archivedOf, familyOf, rowsOf } from '../lib/rows'
 import { runSummaryOf } from '../lib/totals'
 import { UNDO_MS } from '../lib/constants'
+import { messageOf } from '../lib/format'
 import { getAgents, getArchiveView, getAsked, getConfirming, getExpanded, getFilter, getLive, getRefreshing, getReports, getRepos, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter } from '../state/atoms'
 import { archive, askAll, boardOf, homeOf, openSession, refreshAll, stopSession, unarchive, undoArchive } from './sources'
 
@@ -12,7 +13,6 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
   const live = await getLive($)
   const trees = await getRepos($)
   const rows = rowsOf(current, live)
-  const counts = countsOf(rows, trees)
   const archived = archivedOf(live)
   const agents = await getAgents($)
   const workflows = await getWorkflows($)
@@ -20,6 +20,7 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
   const asked = await getAsked($)
   const isAnswered = !!asked && (await getReports($)).some(one => one.modelAt > asked.at)
   const undone = await getUndone($)
+  const settle = (task: Promise<unknown>) => void task.catch((error: unknown) => $.ui.toast(messageOf(error)))
   return {
     board: current,
     live,
@@ -28,8 +29,7 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
     archived,
     agents,
     workflows,
-    totals: runSummaryOf({ rows, counts, archived: archived.length, agents, workflows, board: current, trees, at }),
-    counts,
+    totals: runSummaryOf({ rows, sessions: familyOf(live), agents, workflows, board: current, trees, at }),
     chosen: await getFilter($),
     open: await getExpanded($),
     asking: await getConfirming($),
@@ -44,18 +44,18 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
     bodyRows,
     isAligned,
     actions: {
-      refresh: () => void refreshAll($, true),
+      refresh: () => settle(refreshAll($, true)),
       archiveView: value => setArchiveView($, value),
       filter: id => setFilter($, id),
       toggle: id => setExpanded($, open => (open.includes(id) ? [] : [id])),
       collapse: id => setExpanded($, open => open.filter(one => one !== id)),
       confirm: what => setConfirming($, what),
-      archive: (targets, all, confirmed) => void archive($, targets, all, confirmed),
-      undo: () => void undoArchive($),
-      stop: (id, name) => void stopSession($, id, name),
-      unarchive: one => void unarchive($, one),
-      open: (id, name) => void openSession($, id, name),
-      ask: () => void askAll($).then(text => $.ui.toast(text)),
+      archive: (targets, all, confirmed) => settle(archive($, targets, all, confirmed)),
+      undo: () => settle(undoArchive($)),
+      stop: (id, name) => settle(stopSession($, id, name)),
+      unarchive: one => settle(unarchive($, one)),
+      open: (id, name) => settle(openSession($, id, name)),
+      ask: () => settle(askAll($).then(text => $.ui.toast(text))),
     },
   }
 }

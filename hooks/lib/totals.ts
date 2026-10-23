@@ -1,12 +1,12 @@
-import type { AgentRecord, Board, Repo, WorkflowRecord } from '../../types'
+import type { AgentRecord, Board, LiveSession, Repo, SessionState, WorkflowRecord } from '../../types'
 
 import { stateCountsOf, subagentsOf, workflowRunsOf } from './agents'
-import type { Counts, Row } from './rows'
+import { GROUP_OF, sessionStatusOf } from './list'
+import type { Row } from './rows'
 
 export type RunSummaryInput = {
   rows: readonly Row[]
-  counts: Counts
-  archived: number
+  sessions: readonly LiveSession[]
   agents: readonly AgentRecord[]
   workflows: readonly WorkflowRecord[]
   board: Board | null
@@ -41,15 +41,17 @@ export function testsOf(rows: readonly Row[], board: Board | null) {
 export const runStartOf = (rows: readonly Row[], agents: readonly AgentRecord[], board: Board | null, at: number) =>
   Math.min(...rows.flatMap(row => (row.live?.createdAt !== undefined ? [row.live.createdAt] : [])), ...agents.map(one => one.startedAt), board?.since ?? at)
 
-export function runSummaryOf({ rows, counts, archived, agents, workflows, board, trees, at }: RunSummaryInput) {
+export function runSummaryOf({ rows, sessions, agents, workflows, board, trees, at }: RunSummaryInput) {
+  const groups = rows.map(row => GROUP_OF[sessionStatusOf(row, trees, sessions)])
+  const count = (group: SessionState) => groups.filter(one => one === group).length
   const runs = workflowRunsOf(agents, workflows)
   const asking = agents.filter(one => one.state === 'running' && one.asking)
   const since = runStartOf(rows, agents, board, at)
   return {
-    sessions: { total: rows.length, 'needs-you': counts['needs-you'], waiting: counts.waiting, working: counts.working, done: counts.done, archived },
-    needsYou: { sessions: counts['needs-you'], subagents: asking.filter(one => !one.run).length + new Set(asking.flatMap(one => (one.run ? [one.run.id] : []))).size },
+    sessions: { total: rows.length, working: count('working'), waiting: count('waiting'), done: count('done') },
+    needsYou: { sessions: count('needs-you'), subagents: asking.filter(one => !one.run).length + new Set(asking.flatMap(one => (one.run ? [one.run.id] : []))).size },
     subagents: stateCountsOf(subagentsOf(agents)),
-    workflows: { ...stateCountsOf(runs), agents: runs.reduce((sum, run) => sum + run.agents.length, 0), agentsDone: runs.reduce((sum, run) => sum + run.counts.done, 0) },
+    workflows: { ...stateCountsOf(runs), agents: runs.reduce((sum, run) => sum + run.agents.length, 0), agentsDone: runs.reduce((sum, run) => sum + run.counts.done + run.counts.failed, 0) },
     commits: { total: Math.max(rows.reduce((sum, row) => sum + (row.board?.commits?.length ?? 0), 0), trees.reduce((sum, repo) => sum + (repo.landed ?? 0), 0)), repos: trees.length },
     tests: testsOf(rows, board),
     duration: { since, ms: at - since },

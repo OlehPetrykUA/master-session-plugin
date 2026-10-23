@@ -2,9 +2,8 @@ import type { RenderChildren } from 'claude-code'
 
 import { isArchivable } from '../../data/contract'
 import { bodyWidthOf, across, down } from '../../lib/layout'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, archivedItemOf, openIdOf, plural, sessionOfAgent, shownArchived } from '../../lib/list'
-import type { Context, ListGroup, RowItem } from '../../lib/list'
-import { familyOf } from '../../lib/rows'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, openIdOf, plural, shownArchived } from '../../lib/list'
+import type { ListGroup, RowItem } from '../../lib/list'
 import type { Row as SessionRow } from '../../lib/rows'
 import type { PaneView } from '../../lib/view'
 import type { Tone } from '../../theme/tokens'
@@ -29,7 +28,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
   const { Box } = ui
   const { actions } = data
   const width = bodyWidthOf(data.columns)
-  const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows }
+  const { context } = view
   const empty = (id: string) => {
     const text = EMPTY_TEXT[data.chosen]
     const isAll = data.chosen === 'all'
@@ -43,11 +42,8 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
     })
   }
   const chatOf = (item: RowItem): RowChat | undefined => {
-    if (item.status !== 'needs') return undefined
-    if (item.kind === 'session') return { label: 'Open chat', onPress: () => actions.open(item.row.id, item.row.name) }
-    if (item.kind !== 'subagent') return undefined
-    const parent = sessionOfAgent(item.agent, data)
-    return parent ? { label: 'Open chat', onPress: () => actions.open(parent.id, parent.name) } : undefined
+    const target = chatTargetOf(item, context)
+    return target ? { label: CHAT_LABEL, onPress: () => actions.open(target.id, target.name) } : undefined
   }
   const itemOf = (item: RowItem, room: number): RenderChildren => {
     const onOpen = () => {
@@ -74,12 +70,12 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       ? UndoBar(ui, {
           id: undone.group,
           name: undone.name || undefined,
-          text: undone.name ? 'archived, worktree removed' : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with work to keep` : ''}`,
+          text: undone.name ? 'archived' : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with work to keep` : ''}`,
           onUndo: undone.ids.length ? actions.undo : undefined,
         })
       : null
   const archiveAll = (rows: readonly SessionRow[]) => {
-    const clean = rows.filter(row => !lossesOf(row, data.trees, familyOf(data.live)).length)
+    const clean = rows.filter(row => !lossesOf(row, data.trees, context.sessions).length)
     actions.archive(clean, { group: 'done', skipped: rows.length - clean.length })
   }
   const groupOf = (group: ListGroup) => {
