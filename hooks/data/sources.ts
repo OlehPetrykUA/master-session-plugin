@@ -6,28 +6,39 @@ import { lossesOf, sideOf } from '../components/detail/losses'
 import { withReported, withReportedRuns } from '../lib/agents'
 import { agentCountsOf, askingChatOf } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
-import { ARCHIVE_LIMIT, BOARD_TOOL, LIVE_LIMIT, PANE, TITLE, UNDO_MS } from '../lib/constants'
+import { ARCHIVE_LIMIT, BOARD_TOOL, GIT_CAP, LIVE_LIMIT, PANE, TITLE, TREE_STALE_MS, UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
 import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
 import { familyOf, rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
-import { getAgents, getBoard, getLive, getReports, getRepos, getShared, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
+import { getAgents, getBoard, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
 import { keptAgents } from './agents'
-import { roleOf } from './recorder'
-import { askForUpdates, readBoard, readReports, writeBoard } from './status'
+import { detected, roleOf } from './recorder'
+import { askForUpdates, readReports, writeBoard } from './status'
 
 let home = ''
 let fileStamp = -1
 let published = ''
 let publishedAt = 0
+let flight: Promise<void> | undefined
+let isQueued = false
+const seenTrees = new Map<string, { key: string; at: number; tree: Worktree }>()
+const seenRepos = new Map<string, { key: string; at: number; base: string | undefined; localOnly: number }>()
+const gitDirs = new Map<string, string>()
 
 export function startSources(value: string) {
   home = value
   fileStamp = -1
   published = ''
   publishedAt = 0
+  flight = undefined
+  isQueued = false
+  seenTrees.clear()
+  titles.clear()
+  seenRepos.clear()
+  gitDirs.clear()
 }
 
 export function homeOf() {
@@ -91,20 +102,10 @@ export async function refreshBoard($: EngineInterface) {
   if (!(await refreshFile($))) await refreshTranscript($)
 }
 
-export async function boardOf($: EngineInterface): Promise<{ board: Board | null; from: string }> {
+export async function boardOf($: EngineInterface): Promise<{ board: Board | null }> {
   const own = await getBoard($)
   const at = await $.clock.now()
-  const merged = merge(own, await getReports($), await getLive($), at)
-  if (own || merged.sessions.length) return { board: merged, from: '' }
-  const copy = await getShared($)
-  return copy && at - copy.at <= BOARD_MAX_AGE_MS ? { board: copy.board, from: copy.masterTitle } : { board: null, from: '' }
-}
-
-export async function refreshShared($: EngineInterface) {
-  if (await getBoard($)) return
-  const { parent } = roleOf()
-  const copy = parent ? await readBoard($, home, parent, await $.clock.now()) : undefined
-  await saveShared($, () => copy ?? null)
+  return { board: own ? merge(own, await getReports($), await getLive($), at) : null }
 }
 
 export async function refreshReports($: EngineInterface) {
@@ -120,43 +121,19 @@ export async function refreshReports($: EngineInterface) {
   await republishBoard($)
 }
 
-const SHARED_AGENTS = 40
-
 export async function republishBoard($: EngineInterface) {
   const own = await getBoard($)
   const me = await getLive($)
   const masterId = me.self || roleOf().self
   if (!own || !masterId) return
   const at = await $.clock.now()
-  const everyone = await getAgents($)
-  const agents = [...everyone.filter(one => one.state === 'running'), ...everyone.filter(one => one.state !== 'running')].slice(0, SHARED_AGENTS)
-  const workflows = await getWorkflows($)
   const merged = merge(own, await getReports($), me, at)
   const repos = [...new Set([...merged.repos, ...(await getRepos($)).map(one => one.path)])]
-  const sign = JSON.stringify([merged.sessions.map(one => [one.id, one.name, one.state, one.progress, one.now, one.next, one.needsYou, one.commits?.length, one.tests?.length]), merged.needsYou, repos, agents.map(one => [one.id, one.state, one.parentSessionId, one.asking?.text]), workflows.map(one => [one.id, one.parentSessionId])])
+  const sign = JSON.stringify([merged.sessions.map(one => [one.id, one.name, one.state, one.progress, one.now, one.next, one.needsYou, one.commits?.length, one.tests?.length]), merged.needsYou, repos])
   if (sign === published && at - publishedAt < BOARD_MAX_AGE_MS / 3) return
   published = sign
   publishedAt = at
-  await writeBoard($, home, { at, masterId, masterTitle: me.title || TITLE, board: { ...merged, repos }, agents, workflows })
-}
-
-async function copyOf($: EngineInterface) {
-  return (await getBoard($)) ? null : await getShared($)
-}
-
-export async function sharedAgentsOf($: EngineInterface) {
-  const copy = await copyOf($)
-  const own = await getAgents($)
-  const mine = new Set(own.map(one => one.id))
-  const theirs = (copy?.agents ?? []).filter(one => !mine.has(one.id))
-  return [...own, ...theirs]
-}
-
-export async function sharedWorkflowsOf($: EngineInterface) {
-  const copy = await copyOf($)
-  const own = await getWorkflows($)
-  const mine = new Set(own.map(one => one.id))
-  return [...own, ...(copy?.workflows ?? []).filter(one => !mine.has(one.id))]
+  await writeBoard($, home, { at, masterId, board: { ...merged, repos } })
 }
 
 export async function askAll($: EngineInterface) {
@@ -211,46 +188,93 @@ async function refreshLive($: EngineInterface, isForced = false) {
   }
 }
 
-export async function git($: EngineInterface, cwd: string, args: readonly string[]) {
+type Tick = { spent: number; isForced: boolean }
+
+class Capped extends Error {}
+
+const isOut = (tick: Tick) => !tick.isForced && tick.spent >= GIT_CAP
+
+const soft =
+  <T,>(fallback: T) =>
+  (error: unknown) => {
+    if (error instanceof Capped) throw error
+    return fallback
+  }
+
+export async function git($: EngineInterface, cwd: string, args: readonly string[], tick: Tick) {
+  if (isOut(tick)) throw new Capped('git cap')
+  tick.spent += 1
   const ran = await $.process.run(['git', '--no-optional-locks', '-C', cwd, ...args], { timeoutMs: 10_000 })
   if (ran.exitCode !== 0) throw new Error(ran.stderr.trim() || `git ${args[0]} failed`)
   return ran.stdout
 }
 
-async function baseOf($: EngineInterface, path: string) {
-  const remote = (await git($, path, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).catch(() => '')).trim()
+async function baseOf($: EngineInterface, path: string, tick: Tick) {
+  const remote = (await git($, path, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], tick).catch(soft(''))).trim()
   for (const name of [remote.replace(/^origin\//, ''), 'main', 'master'].filter(Boolean)) {
-    if ((await git($, path, ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`]).catch(() => '')).trim()) return name
+    if ((await git($, path, ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`], tick).catch(soft(''))).trim()) return name
   }
   return undefined
 }
 
-async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined): Promise<Worktree> {
-  const status = await git($, tree.path, ['status', '--porcelain=v2', '--branch', '--untracked-files=all', '--ignore-submodules=none']).catch(() => undefined)
-  const count = !status ? '' : tree.isMain ? '0' : base ? (await git($, tree.path, ['rev-list', '--count', `refs/heads/${base}..HEAD`]).catch(() => '')).trim() : ''
-  const known = status ? parseStatus(status) : { dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }
-  return { path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...known, unmerged: /^\d+$/.test(count) ? Number(count) : undefined }
+async function gitDirOf($: EngineInterface, path: string) {
+  const known = gitDirs.get(path)
+  if (known) return known
+  const pointer = /^gitdir: (.+)$/m.exec(await $.fs.read(`${path}/.git`).catch(() => ''))?.[1]?.trim()
+  const dir = pointer ? (pointer.startsWith('/') ? pointer : `${path}/${pointer}`) : `${path}/.git`
+  gitDirs.set(path, dir)
+  return dir
 }
 
-export async function repoOf($: EngineInterface, path: string): Promise<Repo | undefined> {
-  const trees = parseWorktrees(await git($, path, ['worktree', 'list', '--porcelain']))
+async function keyOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined) {
+  const index = await $.fs.stat(`${await gitDirOf($, tree.path)}/index`).catch(() => undefined)
+  return index ? `${tree.sha}|${tree.branch}|${base ?? ''}|${index.mtimeMs}|${index.size}` : ''
+}
+
+async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined, tick: Tick, now: number): Promise<Worktree> {
+  const key = await keyOf($, tree, base)
+  const before = seenTrees.get(tree.path)
+  if (!tick.isForced && key && before?.key === key && now - before.at < TREE_STALE_MS) return before.tree
+  if (!tick.isForced && tick.spent + (tree.isMain ? 1 : 2) > GIT_CAP) return before?.tree ?? { path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }
+  const status = await git($, tree.path, ['status', '--porcelain=v2', '--branch', '--untracked-files=all', '--ignore-submodules=none'], tick).catch(soft(undefined))
+  const count = !status ? '' : tree.isMain ? '0' : base ? (await git($, tree.path, ['rev-list', '--count', `refs/heads/${base}..HEAD`], tick).catch(soft(''))).trim() : ''
+  const known = status ? parseStatus(status) : { dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }
+  const scanned = { path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...known, unmerged: /^\d+$/.test(count) ? Number(count) : undefined }
+  if (status !== undefined) seenTrees.set(tree.path, { key, at: now, tree: scanned })
+  return scanned
+}
+
+export async function repoOf($: EngineInterface, path: string, tick: Tick): Promise<Repo | undefined> {
+  const listing = await git($, path, ['worktree', 'list', '--porcelain'], tick)
+  const trees = parseWorktrees(listing)
   const main = trees.find(tree => tree.isMain) ?? trees[0]
   if (!main) return undefined
-  const base = await baseOf($, path)
-  const worktrees = await Promise.all(trees.map(tree => treeOf($, tree, base)))
-  const refs = await git($, path, ['for-each-ref', 'refs/heads', '--format=x%(upstream:short)']).catch(() => '')
+  const now = await $.clock.now()
+  const seen = seenRepos.get(main.path)
+  const facts =
+    !tick.isForced && seen?.key === listing && now - seen.at < TREE_STALE_MS
+      ? seen
+      : {
+          key: listing,
+          at: now,
+          base: await baseOf($, path, tick),
+          localOnly: (await git($, path, ['for-each-ref', 'refs/heads', '--format=x%(upstream:short)'], tick).catch(soft(''))).split('\n').filter(line => line === 'x').length,
+        }
+  seenRepos.set(main.path, facts)
+  const worktrees: Worktree[] = []
+  for (const tree of trees) worktrees.push(await treeOf($, tree, facts.base, tick, now))
   return {
     path: main.path,
     name: home && main.path.startsWith(`${home}/`) ? `~${main.path.slice(home.length)}` : main.path,
-    localOnly: refs.split('\n').filter(line => line === 'x').length,
-    base,
+    localOnly: facts.localOnly,
+    base: facts.base,
     worktrees,
   }
 }
 
 const ancestry = new Map<string, { isOn: boolean; head: string }>()
 
-async function provenOf($: EngineInterface, repos: Repo[], rows: readonly Row[]) {
+async function provenOf($: EngineInterface, repos: Repo[], rows: readonly Row[], tick: Tick) {
   const proven = new Map<string, Set<string>>()
   const heads = new Map<string, string>()
   const seen = new Set<string>()
@@ -264,21 +288,23 @@ async function provenOf($: EngineInterface, repos: Repo[], rows: readonly Row[])
     if (seen.has(key)) continue
     seen.add(key)
     let known = ancestry.get(key)
-    if (!known?.isOn) {
-      if (!heads.has(path)) heads.set(path, (await git($, path, ['rev-parse', `refs/heads/${base}`]).catch(() => '')).trim())
+    if (!known?.isOn && (tick.isForced || tick.spent + 2 <= GIT_CAP)) {
+      if (!heads.has(path)) heads.set(path, (await git($, path, ['rev-parse', `refs/heads/${base}`], tick).catch(soft(''))).trim())
       const head = heads.get(path) as string
       if (!known || known.head !== head) {
-        const isOn = await git($, path, ['merge-base', '--is-ancestor', sha, `refs/heads/${base}`]).then(() => true, () => false)
+        const isOn = await git($, path, ['merge-base', '--is-ancestor', sha, `refs/heads/${base}`], tick).then(() => true, soft(false))
         known = { isOn, head }
         ancestry.set(key, known)
       }
     }
-    if (known.isOn) proven.set(path, (proven.get(path) ?? new Set()).add(sha))
+    if (known?.isOn) proven.set(path, (proven.get(path) ?? new Set()).add(sha))
   }
   return repos.map(repo => (proven.has(repo.path) ? { ...repo, onBase: [...(proven.get(repo.path) as Set<string>)] } : repo))
 }
 
-async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[]) {
+async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[], isForced = false) {
+  const tick: Tick = { spent: 0, isForced }
+  const prior = await getRepos($)
   const { board: current } = await boardOf($)
   const live = await getLive($)
   const rows = rowsOf(current, live)
@@ -292,15 +318,21 @@ async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[
   const failed: string[] = []
   for (const path of new Set(paths)) {
     if ([...found.values()].some(repo => repo.worktrees.some(tree => tree.path === path))) continue
-    const repo = await repoOf($, path).catch(() => undefined)
-    if (repo) found.set(repo.path, repo)
-    else failed.push(path)
+    try {
+      const repo = await repoOf($, path, tick)
+      if (repo) found.set(repo.path, repo)
+      else failed.push(path)
+    } catch (error) {
+      const old = error instanceof Capped ? locate(path, prior) : undefined
+      if (old) found.set(old.repo.path, old.repo)
+      else if (!(error instanceof Capped)) failed.push(path)
+    }
   }
   for (const path of failed) {
     const outer = locate(path, [...found.values()])
     if (outer && outer.tree.path !== path) found.set(outer.repo.path, { ...outer.repo, worktrees: [...outer.repo.worktrees, { path, branch: '', sha: '', isMain: false, dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }] })
   }
-  const repos = await provenOf($, [...found.values()], rows)
+  const repos = await provenOf($, [...found.values()], rows, tick)
   await saveRepos($, () => repos)
   return repos
 }
@@ -309,19 +341,62 @@ export async function isPaneOpen($: EngineInterface) {
   return (await $.ui.panes()).some(pane => pane.id === PANE)
 }
 
-export async function refreshAll($: EngineInterface, isForced = false) {
-  if (!isForced && !(await boardOf($)).board && !(await isPaneOpen($))) return
+export async function isMaster($: EngineInterface) {
+  return !!(await getBoard($))
+}
+
+export async function isWorker($: EngineInterface) {
+  return roleOf().role === 'worker' && !(await isMaster($))
+}
+
+async function scan($: EngineInterface, isForced: boolean) {
   isForced && (await setRefreshing($, true))
   try {
     await refreshLive($, isForced)
-    await refreshRepos($)
+    await refreshRepos($, undefined, isForced)
     await republishBoard($)
   } finally {
     isForced && (await setRefreshing($, false))
   }
 }
 
+export async function refreshAll($: EngineInterface, isForced = false) {
+  if (!isForced && !(await isMaster($))) return
+  if (flight) {
+    isQueued ||= isForced
+    return flight
+  }
+  flight = (async () => {
+    await scan($, isForced)
+    while (isQueued) {
+      isQueued = false
+      await scan($, true)
+    }
+  })().finally(() => {
+    flight = undefined
+    isQueued = false
+  })
+  return flight
+}
+
+export async function markMaster($: EngineInterface) {
+  const at = await $.clock.now()
+  await saveBoard($, prev => prev ?? { sessions: [], needsYou: [], repos: [], source: 'tool', since: at, at })
+}
+
+const titles = new Map<string, string>()
+
+export async function workerNote($: EngineInterface) {
+  await detected($)
+  const { parent } = roleOf()
+  if (!(await isWorker($))) return ''
+  const title = titles.get(parent) ?? String((await sessionOf($, parent).catch(() => ({}) as Record<string, unknown>)).title ?? '')
+  if (title) titles.set(parent, title)
+  return `This is a worker session of ${title ? `"${title}" (${parent})` : parent}: the master session pane is only in that session.`
+}
+
 export async function openPane($: EngineInterface) {
+  if (await isWorker($)) return false
   const opened = await $.ui.open({ id: PANE, title: TITLE, focus: true })
   void refreshAll($, true).catch(() => undefined)
   return opened.isPlaced
@@ -341,7 +416,7 @@ export async function openSummary($: EngineInterface) {
 
 export async function openAsking($: EngineInterface) {
   const { board: current } = await boardOf($)
-  const agents = agentCountsOf(await sharedAgentsOf($), await sharedWorkflowsOf($))
+  const agents = agentCountsOf(await getAgents($), await getWorkflows($))
   const chat = askingChatOf(current, await getLive($), agents, await getRepos($))
   if (chat) await openSession($, chat.id, chat.name)
 }
@@ -367,7 +442,7 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
     return
   }
   await saveLive($, prev => ({ ...prev, family: sessions }))
-  const trees = await refreshRepos($, sessions).catch(() => [] as Repo[])
+  const trees = await refreshRepos($, sessions, true).catch(() => [] as Repo[])
   const fresh = rowsOf((await boardOf($)).board, live)
   const targets = rows.flatMap(row => fresh.filter(one => one.id === row.id))
   const busyOf = (row: Row) => sideOf(row, sessions, trees).find(one => one.isRunning || fresh.some(each => each.id === one.id && each.state === 'needs-you'))

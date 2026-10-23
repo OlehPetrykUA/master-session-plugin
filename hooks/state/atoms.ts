@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, Repo, Report, Shared, Undone, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, Repo, Report, Undone, WorkflowRecord } from '../../types'
 
 const board = atom({ plugin: 'master-session', key: 'board' } as const, null)
 const live = atom({ plugin: 'master-session', key: 'live' } as const, { self: '', title: '', sessions: [], error: '', at: 0 })
@@ -13,7 +13,6 @@ const archiveView = atom({ plugin: 'master-session', key: 'archiveView' } as con
 const asked = atom({ plugin: 'master-session', key: 'asked' } as const, null)
 const undone = atom({ plugin: 'master-session', key: 'undone' } as const, null)
 const isRefreshing = atom({ plugin: 'master-session', key: 'isRefreshing' } as const, false)
-const shared = atom({ plugin: 'master-session', key: 'shared' } as const, null)
 const reports = atom({ plugin: 'master-session', key: 'reports' } as const, [])
 const agents = atom({ plugin: 'master-session', key: 'agents' } as const, [])
 const workflows = atom({ plugin: 'master-session', key: 'workflows' } as const, [])
@@ -106,15 +105,6 @@ export function getRefreshing($: EngineInterface) {
 
 export function setRefreshing($: EngineInterface, value: boolean) {
   return update($, isRefreshing, () => value)
-}
-
-export function getShared($: EngineInterface) {
-  return read($, shared)
-}
-
-export async function saveShared($: EngineInterface, change: (value: Shared | null) => Shared | null) {
-  const before = await read($, shared)
-  if (!isSame(change(before), before)) await update($, shared, change)
 }
 
 export function getReports($: EngineInterface) {

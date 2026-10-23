@@ -14,7 +14,7 @@ import { Block } from './Block'
 import { ModelValue } from './Model'
 import { Pair } from './Pair'
 
-export type ArchivedDetailProps = { item: Extract<RowItem, { kind: 'archived' }>; context: Context; rowProps: RowProps; asking: string; isReadOnly: boolean; innerWidth: number; actions: Actions }
+export type ArchivedDetailProps = { item: Extract<RowItem, { kind: 'archived' }>; context: Context; rowProps: RowProps; asking: string; innerWidth: number; actions: Actions }
 
 export const UNARCHIVE_TEXT = 'It comes back in its group with its chat. Its worktree is made again on its next turn.'
 
@@ -46,14 +46,12 @@ export function ArchivedDetail(ui: Ui, props: ArchivedDetailProps) {
   )
   const buttons = (
     <Box key={`archived-actions-${id}`} flexDirection="row" gap={across(8)}>
-      <Box flexDirection="row" width={props.isReadOnly ? '100%' : '50%'} flexShrink={1} minWidth={0}>
-        {ActionButton(ui, { id: `archived-open-${id}`, kind: 'secondary', icon: 'open', label: 'Open', size: 'b40', iconSize: 16, wide: props.isReadOnly ? width : (width - 8) / 2, onPress: () => actions.open(id, label) })}
+      <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
+        {ActionButton(ui, { id: `archived-open-${id}`, kind: 'secondary', icon: 'open', label: 'Open', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.open(id, label) })}
       </Box>
-      {props.isReadOnly ? null : (
-        <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
-          {ActionButton(ui, { id: `unarchive-${id}`, kind: 'secondary', icon: 'unarchive', label: 'Unarchive', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.confirm(`unarchive:${id}`) })}
-        </Box>
-      )}
+      <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
+        {ActionButton(ui, { id: `unarchive-${id}`, kind: 'secondary', icon: 'unarchive', label: 'Unarchive', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.confirm(`unarchive:${id}`) })}
+      </Box>
     </Box>
   )
   return Card(ui, {

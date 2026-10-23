@@ -15,7 +15,6 @@ import { UnarchiveConfirm } from './UnarchiveConfirm'
 
 export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
   const { Box, Text, Button } = ui
-  const isReadOnly = !!data.from
   const { actions, asking, at, trees } = data
   const context: Context = { at, trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows }
 
@@ -23,7 +22,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
     const collapse = () => actions.collapse(openIdOf(item, data.open) ?? item.id)
     if (item.kind === 'workflow') return TextWorkflowDetail(ui, { item, context, open: data.open, onToggle: actions.toggle, onCollapse: collapse })
     if (item.kind === 'subagent') return TextSubagentDetail(ui, { item, context, onCollapse: collapse })
-    return TextSessionDetail(ui, { item, context, asking, isReadOnly, actions })
+    return TextSessionDetail(ui, { item, context, asking, actions })
   }
 
   const chatOf = (item: RowItem) => {
@@ -72,7 +71,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
       <Box key={`archived-${one.id}`} flexDirection="column">
         <Box flexDirection="row" gap="sm">
           {line(item)}
-          {isReadOnly ? null : <Button key={`unarchive-${one.id}`} label="Unarchive" onPress={() => actions.confirm(`unarchive:${one.id}`)} />}
+          <Button key={`unarchive-${one.id}`} label="Unarchive" onPress={() => actions.confirm(`unarchive:${one.id}`)} />
           <Button key={`archived-open-${one.id}`} label="Open" onPress={() => actions.open(one.id, one.name || one.title)} />
         </Box>
         {asking === `unarchive:${one.id}` ? UnarchiveConfirm(ui, { item, actions }) : null}
@@ -111,7 +110,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
           <Text weight="semibold" color={TERMINAL_COLOR[one.id]}>{`${GROUP_LABEL[one.id]} ${one.items.length}`}</Text>
           {one.isPinned ? <Text dimColor>pinned on every filter</Text> : null}
           <Box flexGrow={1} />
-          {one.id === 'done' && idle.length && !isReadOnly ? <Button key="archive-all" plain label="Archive all" onPress={() => archiveAll(idle)} /> : null}
+          {one.id === 'done' && idle.length ? <Button key="archive-all" plain label="Archive all" onPress={() => archiveAll(idle)} /> : null}
         </Box>
         {undone?.group === one.id ? [...one.items.slice(0, undone.index).map(row), undoLine(), ...one.items.slice(undone.index).map(row)] : one.items.map(row)}
       </Box>

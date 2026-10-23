@@ -42,6 +42,7 @@ const settle = async () => {
 }
 
 function world(parent = MASTER, files: Record<string, string> = {}) {
+  if (parent && !files[boardPath(HOME, parent)]) files[boardPath(HOME, parent)] = '{}'
   const registered: { name: string; isDeferred?: unknown }[] = []
   const ran: string[][] = []
   const atoms: Record<string, { value: unknown; version: number }> = {}

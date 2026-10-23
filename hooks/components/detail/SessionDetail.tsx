@@ -22,9 +22,9 @@ import { ModelValue } from './Model'
 import { Pair } from './Pair'
 import { Tests } from './Tests'
 
-export type SessionDetailProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; rowProps: RowProps; home: string; asking: string; isReadOnly: boolean; innerWidth: number; actions: Actions }
+export type SessionDetailProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; rowProps: RowProps; home: string; asking: string; innerWidth: number; actions: Actions }
 
-type ActionRowProps = { row: Row; name: string; losses: readonly string[]; width: number; isAsking: boolean; isReadOnly: boolean; actions: Actions }
+type ActionRowProps = { row: Row; name: string; losses: readonly string[]; width: number; isAsking: boolean; actions: Actions }
 
 function ActionRow(ui: Ui, props: ActionRowProps) {
   const { Box } = ui
@@ -32,7 +32,7 @@ function ActionRow(ui: Ui, props: ActionRowProps) {
   const id = row.id
   const isRunning = !!row.live?.isRunning
   const isNeeds = row.state === 'needs-you'
-  const canArchive = !!row.live && !isRunning && !isNeeds && !props.isReadOnly
+  const canArchive = !!row.live && !isRunning && !isNeeds
   const archive = () => (losses.length ? actions.confirm(`archive:${id}`) : actions.archive([row], undefined, losses))
   if (props.isAsking && canArchive) return ArchiveBox(ui, { id, name: props.name, losses, width, onCancel: () => actions.confirm(''), onArchive: () => actions.archive([row], undefined, losses) })
   const second =
@@ -186,7 +186,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
             right: half('Model', 'modelChip', ModelValue(ui, { id: row.id, model: now?.model, text: model || '—' }), 'model', 8),
           })
         : null,
-      ActionRow(ui, { row, name: shortNameOf(item), losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, isReadOnly: props.isReadOnly, actions }),
+      ActionRow(ui, { row, name: shortNameOf(item), losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, actions }),
     ],
   })
 }

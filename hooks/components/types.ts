@@ -30,7 +30,6 @@ export type Actions = {
 
 export type PaneData = {
   board: Board | null
-  from: string
   live: Live
   trees: readonly Repo[]
   rows: readonly Row[]

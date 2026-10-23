@@ -77,10 +77,7 @@ export type Live = {
 export type Shared = {
   at: number
   masterId: string
-  masterTitle: string
   board: Board
-  agents?: AgentRecord[]
-  workflows?: WorkflowRecord[]
 }
 
 export type Worktree = {
@@ -210,7 +207,6 @@ declare module 'claude-code' {
       asked: Asked | null
       undone: Undone | null
       isRefreshing: boolean
-      shared: Shared | null
       reports: Report[]
       agents: AgentRecord[]
       workflows: WorkflowRecord[]

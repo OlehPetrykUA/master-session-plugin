@@ -190,14 +190,14 @@ export function askingChatOf(current: Board | null, live: Live, agents: AgentCou
 
 const IDLE_PROGRESS: Progress = { segments: [], percent: 0, done: 0, total: 0 }
 
-export function bandProgressWith(current: Board | null, live: Live, { agents, workflows }: AgentCounts, isMaster: boolean) {
+export function bandProgressWith(current: Board | null, live: Live, { agents, workflows }: AgentCounts) {
   const progress = bandProgress(current, live)
-  if (progress || !isMaster) return progress
+  if (progress) return progress
   const isBusy = agents.some(one => one.state === 'running') || workflowRunsOf(agents, workflows).some(run => run.state === 'running')
   return isBusy ? IDLE_PROGRESS : undefined
 }
 
-export function bandViewOf(columns: number, current: Board | null, progress: Progress, from: string, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live?: Live, trees: readonly Repo[] = []) {
+export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live?: Live, trees: readonly Repo[] = []) {
   const width = columns * COLUMN - 16
   const isNarrow = width < COUNTS_BELOW
   const units = bandUnitsOf(progress.segments, current, agents, live, trees)
@@ -209,14 +209,13 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
   const tone: BarTone = asker ? 'red' : isAllDone || isRunning ? 'green' : 'grey'
   const hasPercent = !asker && !isAllDone && width >= PERCENT_BELOW
   const parts = asker ? [] : countsOf(units, isAllDone)
-  const via = from ? `, from ${from}` : ''
   const full = asker ? `${headOf(asker)}${asker.reason ? ` · ${asker.reason}` : ''}` : ''
   const short = asker ? `${asker.short}${NEEDS}` : ''
   const alt = asker
-    ? `Master session: ${headOf(asker)}${asker.reason ? `, ${asker.reason}` : ''}${via}`
+    ? `Master session: ${headOf(asker)}${asker.reason ? `, ${asker.reason}` : ''}`
     : isAllDone
-      ? `Master session: all ${units.length} done${via}`
-      : `Master session: ${[`${percent} percent`, ...countsText(parts).split(SEPARATOR)].join(', ')}${via}`
+      ? `Master session: all ${units.length} done`
+      : `Master session: ${[`${percent} percent`, ...countsText(parts).split(SEPARATOR)].join(', ')}`
   const chat = asker?.chat && asker.chat.id !== live?.self ? asker.chat : undefined
   const action = asker
     ? chat

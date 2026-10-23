@@ -9,24 +9,25 @@ import { paneData } from './data/pane'
 import {
   askAll,
   boardOf,
+  isMaster,
   isPaneOpen,
   openAsking,
+  markMaster,
   openPane,
   openSession,
   refreshAll,
   refreshBoard,
   refreshFile,
   refreshReports,
-  refreshShared,
+  workerNote,
   republishBoard,
-  sharedAgentsOf,
-  sharedWorkflowsOf,
   startSources,
   whoAmI,
 } from './data/sources'
 import { addFault, clearFaults, clearPresses, hasFaults, nextRetryMs, runPress } from './data/presses'
 import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
-import { recordTurnEnd, recorder, startRecorder } from './data/recorder'
+import { skipWhileBusy } from './data/flight'
+import { briefed, recordTurnEnd, recorder, startRecorder } from './data/recorder'
 import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
 import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
@@ -34,7 +35,7 @@ import { messageOf } from './lib/format'
 import { openIdOf } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
-import { getAgents, getBoard, getLive, getReports, getRepos, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
+import { getAgents, getLive, getRepos, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
 
 let columns = 0
 let pending: { row: number; at: number } | undefined
@@ -77,11 +78,17 @@ export const register: Register = on => {
     void whoAmI($)
       .catch(() => undefined)
       .then(() => refreshBoard($))
-      .then(() => refreshShared($))
       .then(() => refreshAll($))
       .catch(() => undefined)
-    $.clock.every(FILE_MS, () => void refreshFile($).then(() => refreshShared($)).then(() => refreshReports($)).catch(() => undefined))
-    $.clock.every(FILE_MS, () => void refreshAgents($).catch(() => undefined))
+    $.clock.every(
+      FILE_MS,
+      skipWhileBusy(async () => {
+        if (!(await isMaster($))) return
+        await refreshFile($)
+        await refreshReports($)
+      }),
+    )
+    $.clock.every(FILE_MS, skipWhileBusy(() => refreshAgents($)))
     $.clock.every(LIVE_MS, () => void refreshAll($).catch(() => undefined))
     return started
   })
@@ -107,6 +114,8 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('command.run', { command: INFO }, async ($, e) => {
+    const note = await workerNote($)
+    if (note) return { text: note }
     if (e.args.trim() === 'ask') return { text: await askAll($) }
     await openPane($)
     return { text: OPENED }
@@ -114,19 +123,29 @@ export const register: Register = on => {
 
   on('command.run', { command: SKILL }, async ($, e, next) => {
     if (e.args.trim() === 'status') {
+      const note = await workerNote($)
+      if (note) return { text: note }
+      await markMaster($)
       await openPane($)
       return { text: OPENED }
     }
-    await openPane($).catch(() => undefined)
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('skill.prompt', { skill: 'master-session:worker' }, async ($, e, next) => {
+    await briefed($).catch(() => undefined)
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('skill.prompt', { skill: SKILL }, async ($, e, next) => {
+    await markMaster($).catch(() => undefined)
     const note = `\n\nStatus pane: on. Publish every board with the ${BOARD_TOOL} tool (load it with ToolSearch select:${BOARD_TOOL}) as section 3 describes. In chat, post only 🔴 needs-you lines and the final summary.`
     return next({ ...e, text: e.text + note })
   }).catch(($, e, next) => next(e))
 
   on('tool.call', { tool: 'mcp__master-session__open' }, async ($, e) => {
+    const note = await workerNote($)
+    if (note) return { result: note }
     const expand = typeof e.expand === 'string' ? e.expand.trim() : ''
     const isArchived = e.archived === true
     const data = await paneData($, columns || 48)
@@ -227,11 +246,11 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, event, next) => {
-    const { board: current, from } = await boardOf($)
-    const agents = agentCountsOf(await sharedAgentsOf($), await sharedWorkflowsOf($))
-    const isMaster = !!(await getBoard($)) || (await getReports($)).length > 0
+    if (!(await isMaster($))) return next(event)
+    const { board: current } = await boardOf($)
+    const agents = agentCountsOf(await getAgents($), await getWorkflows($))
     const live = await getLive($)
-    const progress = bandProgressWith(current, live, agents, isMaster)
+    const progress = bandProgressWith(current, live, agents)
     if (event.props.hasSurvey || !progress) return next(event)
     const table = $.ui.resolve(event)
     const bandColumns = event.props.bodyColumns || 100
@@ -239,7 +258,7 @@ export const register: Register = on => {
     const { Box, Button, Text } = table
     const Svg = event.surface !== 'terminal' && 'Svg' in table ? guardSvg(table.Svg, Text) : undefined
     const Client = event.surface === 'desktop' && 'Client' in table && !hasFaults() ? table.Client : undefined
-    const view = bandViewOf(bandColumns, current, progress, from, isOpen, agents, {
+    const view = bandViewOf(bandColumns, current, progress, isOpen, agents, {
       board: () => void openPane($),
       chat: (id, name) => void openSession($, id, name),
     }, live, await getRepos($))
@@ -249,6 +268,8 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const table = $.ui.resolve(e)
     const { Box, Button, Text } = table
+    const note = await workerNote($)
+    if (note) return <Text>{note}</Text>
     const Svg = e.surface !== 'terminal' && 'Svg' in table ? guardSvg(table.Svg, Text) : undefined
     const Client = e.surface === 'desktop' && 'Client' in table && !hasFaults() ? table.Client : undefined
     columns = e.props.bodyColumns || 48

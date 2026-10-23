@@ -95,11 +95,10 @@ test('the board file round-trips for child chats, is re-read on change only and 
   const home = '/home/board'
   const { $, files, reads } = disk()
   const board = { sessions: [{ id: 'local_a', name: 'alpha', state: 'working' as const }], needsYou: [], repos: ['~/dotfiles'], source: 'tool' as const, since: 5 }
-  await writeBoard($, home, { at: 60 * MIN, masterId: MASTER, masterTitle: 'Validator', board })
+  await writeBoard($, home, { at: 60 * MIN, masterId: MASTER, board })
   expect(await readBoard($, home, MASTER, 70 * MIN)).toEqual({
     at: 60 * MIN,
     masterId: MASTER,
-    masterTitle: 'Validator',
     board: expect.objectContaining({ sessions: [expect.objectContaining({ id: 'local_a', state: 'working' })], repos: ['~/dotfiles'] }),
   })
   expect(JSON.parse(files[boardPath(home, MASTER)]?.text ?? '{}').board.source).toBeUndefined()
@@ -107,7 +106,7 @@ test('the board file round-trips for child chats, is re-read on change only and 
   expect((await readBoard($, home, MASTER, 80 * MIN))?.masterId).toBe(MASTER)
   expect(reads.length).toBe(1)
   files[boardPath(home, MASTER)] = { text: '{broken', mtimeMs: 9 }
-  expect((await readBoard($, home, MASTER, 80 * MIN))?.masterTitle).toBe('Validator')
+  expect((await readBoard($, home, MASTER, 80 * MIN))?.masterId).toBe(MASTER)
   expect(await readBoard($, home, MASTER, 91 * MIN)).toBeUndefined()
   expect(await readBoard($, home, 'local_missing', 70 * MIN)).toBeUndefined()
 })

@@ -95,6 +95,10 @@ export function world(on: On, child: Child = {}) {
     { sessionId: 'local_parent', name: 'parent', title: 'Someone else', cwd: '/elsewhere', isRunning: false, isArchived: false, lastActivityAt: AT },
     ...(child.sessions ?? []),
   ]
+  if (child.parent === MASTER) {
+    child.files ??= {}
+    child.files[`${HOME}/.claude/state/master-session/boards/${MASTER}.json`] ??= '{}'
+  }
   mock.env(on, { HOME })
   const clock = mock.clock(on, { now: 3_600_000 })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -109,7 +113,7 @@ export function world(on: On, child: Child = {}) {
     opened.push(e.id)
     return { value: { isPlaced: true } }
   })
-  on('ui.panes', () => ({ value: [] }))
+  on('ui.panes', () => ({ value: child.isPaneOpen ? [{ id: 'master-session', title: 'Master session', isShown: true, isFocused: false, isPlaced: true }] : [] }))
   on('ui.toast', (_, e) => {
     toasts.push(e.text)
     return { value: undefined }
@@ -126,11 +130,23 @@ export function world(on: On, child: Child = {}) {
     return { value: file }
   })
   on('session.id', () => ({ value: 'engine-test' }))
-  on('fs.list', (_, e) => ({
-    value: Object.entries(child.files ?? {})
-      .filter(([path]) => path.startsWith(`${e.path}/`))
-      .map(([path, file]) => ({ name: path.slice(e.path.length + 1), kind: 'file' as const, size: file.length, mtimeMs: stampOf(file), isLink: false })),
-  }))
+  const flights = { git: { active: 0, peak: 0, started: 0 }, list: { active: 0, peak: 0, started: 0 } }
+  const slowly = async (kind: 'git' | 'list', ms: number | undefined) => {
+    const flight = flights[kind]
+    flight.active += 1
+    flight.started += 1
+    flight.peak = Math.max(flight.peak, flight.active)
+    if (ms) await clock.sleep(ms)
+    flight.active -= 1
+  }
+  on('fs.list', async (_, e) => {
+    await slowly('list', child.slowMs?.list)
+    return {
+      value: Object.entries(child.files ?? {})
+        .filter(([path]) => path.startsWith(`${e.path}/`))
+        .map(([path, file]) => ({ name: path.slice(e.path.length + 1), kind: 'file' as const, size: file.length, mtimeMs: stampOf(file), isLink: false })),
+    }
+  })
   on('mcp.call', (_, e) => {
     calls.push({ tool: e.tool, args: e.args })
     if (e.tool === 'get_session') {
@@ -140,7 +156,7 @@ export function world(on: On, child: Child = {}) {
               ? { sessionId: 'local_worker', title: 'Worker chat', parentSessionId: child.parent }
               : { sessionId: SELF, title: 'Orbit Agents Toolkit Validator', ...(child.origin ? { parentSessionId: child.origin, detached: child.isDetached ?? true } : {}) },
           )
-        : text({ sessionId: e.args.session_id, createdAt: '1970-01-01T00:10:00.000Z', model: 'claude-opus-5-5', effort: 'xhigh', permissionMode: 'auto' })
+        : text({ sessionId: e.args.session_id, ...(e.args.session_id === child.parent ? { title: MASTER_TITLE } : {}), createdAt: '1970-01-01T00:10:00.000Z', model: 'claude-opus-5-5', effort: 'xhigh', permissionMode: 'auto' })
     }
     const failure = e.tool === 'list_sessions' ? child.listError?.() : undefined
     if (failure) return { value: { content: [{ type: 'text' as const, text: failure }], isError: true } }
@@ -152,13 +168,14 @@ export function world(on: On, child: Child = {}) {
     return text({ ok: true })
   })
   const gits: string[][] = []
-  on('process.run', (_, e) => {
+  on('process.run', async (_, e) => {
     gits.push([...e.argv])
+    await slowly('git', child.slowMs?.git)
     const [, , , cwd, verb] = e.argv
     const stdout = verb === 'for-each-ref' ? 'x\nxorigin/main\n' : (child.git?.[`${cwd} ${e.argv.slice(4).join(' ')}`] ?? child.git?.[`${cwd} ${verb}`] ?? GIT[`${cwd} ${verb}`] ?? '')
     return { value: { exitCode: stdout ? 0 : 128, stdout, stderr: stdout ? '' : 'not a git repository', isStdoutTruncated: false, isStderrTruncated: false } }
   })
-  return { calls, opened, toasts, ran, clock, gits }
+  return { calls, opened, toasts, ran, clock, gits, flights }
 }
 
 export const PANE = {
@@ -230,10 +247,10 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string> }
+export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
-  const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, masterTitle: MASTER_TITLE, board })
+  const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, board })
   return { parent: MASTER, files: { [`${HOME}/.claude/state/master-session/boards/${MASTER}.json`]: file } }
 }
 

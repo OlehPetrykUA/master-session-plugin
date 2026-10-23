@@ -17,7 +17,6 @@ export const ASK_WIDE = 'Ask for updates'
 export const ASK_WIDE_PX = 460
 
 export function statusOf(data: PaneData, isDone: boolean): { text: string; icon: IconName; tone: Tone } {
-  if (data.from) return { text: `from ${data.from}`, icon: 'clock', tone: 'muted' }
   if (data.live.error) return { text: 'live data unavailable', icon: 'offline', tone: 'muted' }
   if (data.isRefreshing) return { text: 'refreshing…', icon: 'clock', tone: 'muted' }
   if (data.asked) return { text: `asked ${data.asked.count} worker${data.asked.count === 1 ? '' : 's'} · ${ageOf(data.at - data.asked.at)}`, icon: 'chat', tone: 'muted' }
@@ -58,11 +57,9 @@ export function paneViewOf(data: PaneData) {
 export type PaneView = ReturnType<typeof paneViewOf>
 
 export function headerButtonsOf(data: PaneData, onAsk: () => void, onRefresh: () => void): HeaderButton[] {
-  const ask: HeaderButton[] = data.from
-    ? []
-    : data.asked
-      ? [{ id: 'ask', icon: 'check', label: 'Asked', onPress: onAsk, isQuiet: true }]
-      : [{ id: 'ask', icon: 'chat', label: data.columns * COLUMN >= ASK_WIDE_PX ? ASK_WIDE : 'Ask', onPress: onAsk }]
+  const ask: HeaderButton[] = data.asked
+    ? [{ id: 'ask', icon: 'check', label: 'Asked', onPress: onAsk, isQuiet: true }]
+    : [{ id: 'ask', icon: 'chat', label: data.columns * COLUMN >= ASK_WIDE_PX ? ASK_WIDE : 'Ask', onPress: onAsk }]
   return [...ask, { id: 'refresh', icon: 'refresh', label: 'Refresh', onPress: onRefresh, isPressed: data.isRefreshing }]
 }
 

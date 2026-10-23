@@ -5,7 +5,7 @@ import type { On } from 'claude-code'
 import type { AgentRecord, WorkflowRecord } from '../types'
 
 import { subagentsOf, workflowRunsOf } from './lib/agents'
-import { BAND, BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, altsOf, childOf, click, started, textsOf, typed, warmUp, world } from './testing/world'
+import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, click, started, textsOf, typed, warmUp, world } from './testing/world'
 
 warmUp()
 
@@ -18,7 +18,7 @@ test('/master-session:start status opens the pane; with a task it also runs the 
   expect((await $.command.run(typed('master-session:start', 'fix the hooks'))).text).toBe('skill ran')
   expect(ran).toEqual(['master-session:start fix the hooks'])
   expect((await $.command.run(typed('start', 'status'))).text).toBe('skill ran')
-  expect(opened).toEqual(['master-session', 'master-session'])
+  expect(opened).toEqual(['master-session'])
 })
 
 test('/master-session:info opens the pane without running its skill, and ask asks the workers', async ($, on) => {
@@ -43,23 +43,6 @@ test('the skill prompt says the pane is on and points at the board tool', async 
   expect(bare.text).toBe('Start.')
   const other = await $.skill.prompt({ skill: 'commit', text: 'Commit.', frontmatter: {}, source: 'userSettings' })
   expect(other.text).toBe('Commit.')
-})
-
-test('a master board older than 30 minutes is ignored', async ($, on) => {
-  const run = world(on, childOf(0))
-  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
-    const { Text } = $.ui.resolve(e)
-    return <Text>engine</Text>
-  })
-  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
-  await run.clock.advance(3_000)
-  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect(await altsOf(band)).toEqual([])
-  expect((await band.find({ type: 'Text', text: 'engine' }))?.text).toBe('engine')
-  await band.unmount()
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect(await textsOf(ui)).not.toContain('from Orbit Agents Toolkit Validator')
-  await ui.unmount()
 })
 
 test('the scroll tool moves the desktop pane to every drawn section and refuses the others', async ($, on) => {
@@ -182,7 +165,7 @@ test('the open tool can expand one card and open the Archived list, so a check c
   expect(opened.length).toBeGreaterThanOrEqual(3)
 })
 
-test('the master republishes a merged board with its reports, agents and repos when a worker reports, and a worker band and pane follow it', async ($, on) => {
+test('the master republishes a merged board with its reports and repos when a worker reports', async ($, on) => {
   const writes = new Map<string, string>()
   on('fs.write', (_, e) => {
     writes.set(e.path, e.text)
@@ -204,21 +187,4 @@ test('the master republishes a merged board with its reports, agents and repos w
   const row = second.board.sessions.find((one: { id: string }) => one.id === 'local_setup')
   expect(row.state).toBe('done')
   expect(row.commits).toEqual(['abc1234 fix'])
-})
-
-test('a worker band redraws when the master rewrites its board, and counts the master’s subagents', async ($, on) => {
-  const child = childOf(3_600_000)
-  const path = Object.keys(child.files ?? {})[0] ?? ''
-  const run = world(on, child)
-  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
-  await run.clock.advance(3_000)
-  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await altsOf(band)).join()).toContain('needs you')
-  const next = { ...BOARD, sessions: BOARD.sessions.map(one => ({ ...one, state: 'done' as const })), needsYou: [] }
-  const agent = { id: 'ag1', name: 'Band strip order', type: 'x', description: 'd', state: 'running', startedAt: 1 }
-  const files = child.files ?? {}
-  files[path] = JSON.stringify({ v: 1, kind: 'board', at: 3_650_000, masterId: 'local_master', masterTitle: 'M', board: next, agents: [agent] })
-  await run.clock.advance(6_000)
-  expect((await altsOf(band)).join()).toContain('66 percent, 0 working, 0 waiting, 1 subagent')
-  await band.unmount()
 })

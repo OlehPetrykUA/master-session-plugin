@@ -2,11 +2,11 @@ import type { EngineInterface, On, ToolCallInput, TurnCompleteInput } from 'clau
 
 import { asked, reportAgentsOf, reportRunsOf } from '../lib/agents'
 import { expandHome, parseStatus } from '../lib/git'
-import { getAgents, getLive, getWorkflows, saveAgents } from '../state/atoms'
+import { getAgents, getBoard, getLive, getWorkflows, saveAgents } from '../state/atoms'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
 import type { ReportAgent, ReportRun, SessionState } from '../../types'
-import { parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
+import { boardPath, parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
 type Held = { text: string; tool: string; state: SessionState; needsYou?: string; by?: string }
 
@@ -30,6 +30,7 @@ let home = ''
 let role = NO_ROLE
 let current: Report | undefined
 let detecting: Promise<void> | undefined
+let isBriefed = false
 let gitCwd = ''
 let held = new Map<string, Held>()
 let outbox: ReportAgent[] = []
@@ -221,7 +222,9 @@ async function detect($: EngineInterface) {
   const self = typeof me.sessionId === 'string' ? me.sessionId : ''
   if (!self) return
   const isChild = typeof me.parentSessionId === 'string' && !!me.parentSessionId && me.detached !== true
-  const parent = isChild ? String(me.parentSessionId) : await parentFromBoards($, home, self)
+  const asked = isChild ? String(me.parentSessionId) : ''
+  const isMasterParent = !!asked && (isBriefed || (await $.fs.stat(boardPath(home, asked)).then(stat => stat.kind === 'file', () => false)))
+  const parent = isChild ? (isMasterParent ? asked : '') : await parentFromBoards($, home, self)
   const engineId = await $.session.id()
   role = { role: parent ? 'worker' : 'master', self, parent, engineId }
   if (!parent) {
@@ -236,7 +239,7 @@ async function detect($: EngineInterface) {
   await save($, { ...(known ?? freshReport(self, parent, engineId, now)), parent, engineId }, now)
 }
 
-function detected($: EngineInterface) {
+export function detected($: EngineInterface) {
   detecting ??= detect($)
     .catch(() => undefined)
     .then(() => {
@@ -381,12 +384,22 @@ export async function startRecorder($: EngineInterface) {
   role = NO_ROLE
   current = undefined
   detecting = undefined
+  isBriefed = false
   gitCwd = ''
   held = new Map()
   outbox = []
   runsOut = []
   syncing = Promise.resolve()
   void detected($)
+}
+
+export async function briefed($: EngineInterface) {
+  if (await getBoard($)) return
+  isBriefed = true
+  if (role.role === 'worker') return
+  role = NO_ROLE
+  detecting = undefined
+  await detected($)
 }
 
 export async function recordTurnEnd($: EngineInterface, e: TurnCompleteInput) {

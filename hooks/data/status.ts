@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRecord, Shared, WorkflowRecord } from '../../types'
+import type { Shared } from '../../types'
 import { boardFromJson } from '../lib/board'
 import { BOARD_MAX_AGE_MS, REPORT_CAP, accept, askText, capped } from './contract'
 import type { Report } from './contract'
@@ -77,8 +77,7 @@ function sharedOf(raw: unknown): Shared | undefined {
   const data = raw as Record<string, unknown>
   const board = boardFromJson(data.board, 'tool')
   if (data.kind !== 'board' || !board || typeof data.masterId !== 'string' || !Number.isFinite(data.at)) return undefined
-  const list = <T,>(value: unknown) => (Array.isArray(value) ? (value as T[]) : undefined)
-  return { at: Number(data.at), masterId: data.masterId, masterTitle: typeof data.masterTitle === 'string' ? data.masterTitle : '', board, agents: list<AgentRecord>(data.agents), workflows: list<WorkflowRecord>(data.workflows) }
+  return { at: Number(data.at), masterId: data.masterId, board }
 }
 
 export async function readBoard($: Io, home: string, masterId: string, now: number) {

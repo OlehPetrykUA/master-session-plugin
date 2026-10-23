@@ -40,7 +40,7 @@ export const colorOf = (item: RowItem) => (item.status === 'archived' ? 'subtle'
 
 const headOfItem = (item: RowItem, context: Context): Line => ({ text: [lineTextOf(lineOf(item, context)), elapsedOfItem(item, context.at)].filter(Boolean).join(' · '), color: colorOf(item) })
 
-export type TextSessionProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; asking: string; isReadOnly: boolean; actions: Actions }
+export type TextSessionProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; asking: string; actions: Actions }
 
 export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
   const { Box, Text, Button } = ui
@@ -53,7 +53,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
   const files = facts?.files ?? []
   const model = modelOf(now?.model, now?.effort)
   const losses = lossesOf(row, context.trees, context.sessions)
-  const canArchive = !!now && !now.isRunning && row.state !== 'needs-you' && !props.isReadOnly
+  const canArchive = !!now && !now.isRunning && row.state !== 'needs-you'
   const isStoppable = !!now?.isRunning && row.state !== 'needs-you'
   return TextCard(ui, {
     id: row.id,

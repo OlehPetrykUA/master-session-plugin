@@ -149,7 +149,7 @@ const viewOf = (sessions: BoardSession[], crew: AgentCounts, columns = 100) => {
   const progress = bandProgress(current, live)
   if (!progress) throw new Error('no band')
   const chats: string[] = []
-  const view = bandViewOf(columns, current, progress, '', false, crew, { board: () => chats.push('board'), chat: (id, name) => chats.push(`${id} ${name}`) }, live)
+  const view = bandViewOf(columns, current, progress, false, crew, { board: () => chats.push('board'), chat: (id, name) => chats.push(`${id} ${name}`) }, live)
   return { view, chats }
 }
 
@@ -419,7 +419,7 @@ test('without a Client: one native Button per face, each press runs its action',
     if (!progress) throw new Error('no band')
     const table = $.ui.resolve(event)
     const { Box, Button, Text } = table
-    const view = bandViewOf(event.props.bodyColumns, current, progress, '', false, IDLE, {
+    const view = bandViewOf(event.props.bodyColumns, current, progress, false, IDLE, {
       board: () => pressed.push('board'),
       chat: (id, name) => pressed.push(`chat ${id} ${name}`),
     })
@@ -533,11 +533,10 @@ test('terminal: all done is the check and a full bar with "All N done" only when
 test('with no worker sessions, running subagents still show the band: 0%, the subagent count, and Open board', async ($, on) => {
   const crew = crewOf($, on)
   await band($, on, [], false, [])
-  expect(bandProgressWith(boardOf([]), liveOf([], []), IDLE, true)).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'done')], workflows: [] }, true)).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'running')], workflows: [] }, true)?.total).toBe(0)
-  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'running')], workflows: [] }, false)).toBeUndefined()
-  expect(bandProgressWith(boardOf(WORKING), liveOf([], WORKING), IDLE, false)?.total).toBe(4)
+  expect(bandProgressWith(boardOf([]), liveOf([], []), IDLE)).toBeUndefined()
+  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'done')], workflows: [] })).toBeUndefined()
+  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'running')], workflows: [] })?.total).toBe(0)
+  expect(bandProgressWith(boardOf(WORKING), liveOf([], WORKING), IDLE)?.total).toBe(4)
   await crew.subagent('docs')
   await crew.subagent('review')
   const ui = await mount($)
@@ -749,7 +748,7 @@ test('without a Client the narrow Board button is still named Open board', async
     if (!progress) throw new Error('no band')
     const table = $.ui.resolve(event)
     const { Box, Button, Text } = table
-    const view = bandViewOf(columnsFor(500), current, progress, '', false, IDLE, { board: () => undefined, chat: () => undefined })
+    const view = bandViewOf(columnsFor(500), current, progress, false, IDLE, { board: () => undefined, chat: () => undefined })
     return 'Svg' in table ? Band({ Box, Text, Button, Svg: guardSvg(table.Svg, Text) }, { view, progress }) : <Text>none</Text>
   })
   const ui = await $.ui.mount({ plugin: 'master-session', component: 'Pane', requestId: PROBE, surface: 'vscode', props: { title: 'band', isFocused: false, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 6 }, view: {} } })

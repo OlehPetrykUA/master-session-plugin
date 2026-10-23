@@ -28,7 +28,6 @@ const CARD_INSET = 2 + 24
 export function List(ui: Ui, data: PaneData, view: PaneView) {
   const { Box } = ui
   const { actions } = data
-  const isReadOnly = !!data.from
   const width = bodyWidthOf(data.columns)
   const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows }
   const empty = (id: string) => {
@@ -60,8 +59,8 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
     const innerWidth = room - CARD_INSET
     if (item.kind === 'workflow') return WorkflowDetail(ui, { item, context, rowProps, innerWidth, agentOf: agent => itemOf(agent, innerWidth - 24) })
     if (item.kind === 'subagent' || item.kind === 'agent') return SubagentDetail(ui, { item, context, rowProps, innerWidth, actions })
-    if (item.kind === 'archived') return ArchivedDetail(ui, { item, context, rowProps, asking: data.asking, isReadOnly, innerWidth, actions })
-    return SessionDetail(ui, { item, context, rowProps, home: data.home, asking: data.asking, isReadOnly, innerWidth, actions })
+    if (item.kind === 'archived') return ArchivedDetail(ui, { item, context, rowProps, asking: data.asking, innerWidth, actions })
+    return SessionDetail(ui, { item, context, rowProps, home: data.home, asking: data.asking, innerWidth, actions })
   }
   const items = (group: ListGroup) => {
     const drawn = group.items.map(item => itemOf(item, width))
@@ -110,7 +109,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       count: group.items.length,
       tone: TONE[group.id],
       isPinned: group.isPinned,
-      action: idle.length && !isReadOnly ? { id: 'archive-all', icon: 'archive', label: 'Archive all', onPress: () => archiveAll(idle) } : undefined,
+      action: idle.length ? { id: 'archive-all', icon: 'archive', label: 'Archive all', onPress: () => archiveAll(idle) } : undefined,
       children: items(group),
     })
   }

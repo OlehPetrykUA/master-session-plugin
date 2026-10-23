@@ -5,7 +5,7 @@ import type { AgentInfo, On } from 'claude-code'
 import type { AgentRecord, Report } from '../../types'
 
 import { workflowRunsOf } from '../lib/agents'
-import { HOME, MASTER, PANE, SPAWN, warmUp, world } from '../testing/world'
+import { BOARD, BOARD_TOOL, HOME, MASTER, PANE, SPAWN, warmUp, world } from '../testing/world'
 import { merge } from './contract'
 import { reportPath } from './status'
 
@@ -140,6 +140,7 @@ test("the master merges a worker's reported subagents under that worker within o
   const { clock } = world(on, { files })
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
   await clock.settle()
+  await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
   await $.agent.spawn({ ...SPAWN, description: 'Docs lookup' })
   await clock.advance(3_000)
   expect((await agentsOf($)).map(one => [one.id, one.parentSessionId, one.parentAgentId, one.asking])).toEqual([

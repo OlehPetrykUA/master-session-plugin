@@ -3,7 +3,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { COLUMN, LH, across, tall } from '../lib/layout'
 import { C, KINDS } from '../theme/tokens'
-import { BOARD, HOME, MASTER_TITLE, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, childOf, click, dump, hitsOf, started, textsOf, warmUp, world } from '../testing/world'
+import { BOARD, HOME, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, click, dump, hitsOf, started, textsOf, warmUp } from '../testing/world'
 
 warmUp()
 
@@ -239,21 +239,6 @@ test('Archived: the card offers Open and Unarchive; unarchive asks inside the ca
   await click(ui, 'hit-unarchive-yes-local_old')
   expect(calls.filter(one => one.tool === 'unarchive_session').map(one => one.args.session_id)).toEqual(['local_old'])
   expect(toasts.at(-1)).toBe('Unarchived stale-removal.')
-  await ui.unmount()
-})
-
-test('a worker chat shows its master board read-only, from the master’s board file', async ($, on) => {
-  const run = world(on, childOf(3_000_000))
-  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
-  await run.clock.advance(3_000)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await dump('shared', ui)
-  expect(await textsOf(ui)).toContain(`from ${MASTER_TITLE}`)
-  expect(await hitsOf(ui)).not.toContain('hit-ask')
-  await click(ui, 'hit-row-local_setup')
-  expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
-  expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-top-local_setup', 'hit-open-local_setup']))
-  expect(await hitsOf(ui)).not.toContain('hit-archive-local_setup')
   await ui.unmount()
 })
 
