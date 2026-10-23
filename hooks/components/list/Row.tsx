@@ -1,6 +1,6 @@
 import { dirtyOf } from '../../lib/git'
-import { across, down, tall } from '../../lib/layout'
-import { displayNameOf, elapsedOfItem, lineOf, oneLine, stepsOfItem } from '../../lib/list'
+import { across, down, faceWidth, tall, textWidth } from '../../lib/layout'
+import { clampText, displayNameOf, elapsedOfItem, lineOf, oneLine, stepsOfItem } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { whereOf } from '../../lib/rows'
 import { STATUS, gitPill, statusBadge, toneRing } from '../../theme/icons'
@@ -46,12 +46,17 @@ export function Row(ui: Ui, props: RowProps) {
       {Icon(ui, { id: key, name: icon, size: 12, tone, weight: 2.2, alt })}
     </Box>
   )
+  const isChat = isNeeds && !!props.chat
+  const titleNeed = (textWidth(name.persona, 14) + (name.task ? textWidth(` · ${name.task.slice(0, 12)}…`, 14) : 0)) * 1.08 + 8
+  const columnOf = (button: number) => props.width - 2 - 12 - 8 - 28 - 12 - 14 - 12 - (isChat ? button + 12 : 0)
+  const isChatIcon = isNarrow || (isChat && columnOf(faceWidth(props.chat?.label ?? '', 'b32') + 1) < titleNeed)
+  const column = columnOf(isChatIcon ? 32 : faceWidth(props.chat?.label ?? '', 'b32') + 1)
   const question = (
     <Box key={`${id}-ask`} flexDirection="row" alignItems="flex-start" gap={across(4)} minWidth={0} flexShrink={1}>
       {glyph(`${id}-ask-icon`, 'needs', 'red')}
       <Box flexShrink={1} minWidth={0}>
         <Text size="footnote" weight="semibold" color={C.red} wrap="wrap">
-          {oneLine(line.text)}
+          {clampText(line.text, column - 16, 2, 12)}
         </Text>
       </Box>
     </Box>
@@ -157,7 +162,7 @@ export function Row(ui: Ui, props: RowProps) {
       {meta}
       {steps && !(isNeeds && props.chat) ? <Svg key={`${id}-ring`} source={toneRing(steps.done, steps.total, status.tone)} alt={`${steps.done} of ${steps.total}`} width={34} height={34} /> : null}
       {ui.Client ? Hit(ui, { id, width: props.width, height: ROW_HEIGHT, onPress: props.onOpen }) : null}
-      {isNeeds && props.chat ? ActionButton(ui, { id: `chat-${item.id}`, kind: 'primary', icon: 'chat', label: props.chat.label, onPress: props.chat.onPress, size: 'b32', iconSize: 16, isIconOnly: isNarrow }) : null}
+      {isNeeds && props.chat ? ActionButton(ui, { id: `chat-${item.id}`, kind: 'primary', icon: 'chat', label: props.chat.label, onPress: props.chat.onPress, size: 'b32', iconSize: 16, isIconOnly: isChatIcon }) : null}
       <Box key={`${id}-chevron`} flexDirection="row" alignItems="center" justifyContent="center" width={across(14)} flexShrink={0}>
         {Icon(ui, { id: `${id}-chevron-icon`, name: chevron, size: 14, tone: 'muted', weight: 2, alt: chevron })}
       </Box>

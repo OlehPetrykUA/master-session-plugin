@@ -156,9 +156,9 @@ test('an open archived card or workflow agent card counts as expanded, so the pa
   await ui.unmount()
 })
 
-test('long multi-line tests and activity draw as one truncated line each: the last 5 tests with +N more, nothing spills into the next item', async ($, on) => {
+test('long multi-line tests and activity draw as one truncated line each: tests dedupe into one row of chips with +N more, nothing spills into the next item', async ($, on) => {
   const script = 'cd "$HOME/.claude/worktrees/wt-x"\nL=$(mktemp)\ntsc -p . --noEmit > "$L" 2>&1\necho "tsc exit $?"\ncat "$L"\nrm "$L"'
-  const tests = ['one', 'two', 'three', 'four', 'five', 'six', script]
+  const tests = ['tsc · passed', 'persona.test · exit 0', 'persona.test · exit 0', 'plugin test · passed · 212 pass', 'one', 'two', script]
   const activity = [`Bash ${script} · 2m`, 'Read hooks/lib/band.ts · 1m']
   const path = 'hooks/lib/\nband.ts'
   await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], tests, activity, commits: [`abc1234 ${script}`], files: [path] }] })
@@ -166,10 +166,12 @@ test('long multi-line tests and activity draw as one truncated line each: the la
   await click(ui, 'hit-row-local_setup')
   const flat = script.replace(/\s+/g, ' ')
   const keys = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('test-local_setup-') ? [box.key] : []))
-  expect(keys).toEqual(['test-local_setup-0', 'test-local_setup-1', 'test-local_setup-2', 'test-local_setup-3', 'test-local_setup-4'])
   const texts = await textsOf(ui)
-  expect(texts).toEqual(expect.arrayContaining(['three', 'six', '+2 more']))
-  for (const gone of ['one', 'two']) expect(texts).not.toContain(gone)
+  const more = texts.find(text => /^\+\d+ more$/.test(text))
+  expect(keys.length + Number(more?.slice(1).split(' ')[0] ?? 0)).toBe(6)
+  expect(texts.filter(text => text === 'persona.test · exit 0').length).toBeLessThanOrEqual(1)
+  expect((await ui.find({ key: 'tests-pills-local_setup' }))?.props).toEqual(expect.objectContaining({ height: tall(24) }))
+  expect((await ui.find({ key: 'tests-pills-local_setup' }))?.props.flexWrap).toBeUndefined()
   expect(texts.some(text => text.includes('\n'))).toBe(false)
   const lines = (await ui.findAll({ type: 'Text' })).filter(one => String(one.text ?? '').includes('mktemp') && one.props.wrap !== undefined)
   expect(lines.length).toBe(3)

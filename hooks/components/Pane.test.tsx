@@ -322,7 +322,7 @@ test('one card is expanded at a time: opening a second closes the first, collaps
   await ui.unmount()
 })
 
-test('the expanded card shows long values in full: wrapped, never cut', async ($, on) => {
+test('the expanded card shows Now in full, and the row clamps a long question to two lines with an ellipsis', async ($, on) => {
   const now = `re-running the hooks suite after the settings change ${'and checking every hook line by line '.repeat(7)}`.trim()
   const needsYou = `Approve the settings.json edit ${'so the worker can carry on with the next step '.repeat(6)}`.trim()
   await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], now, needsYou }, BOARD.sessions[1]] })
@@ -330,12 +330,13 @@ test('the expanded card shows long values in full: wrapped, never cut', async ($
   await click(ui, 'hit-row-local_env')
   expect(now.length).toBeGreaterThanOrEqual(300)
   expect(needsYou.length).toBeGreaterThanOrEqual(300)
-  for (const value of [now, needsYou]) {
-    const found = await ui.findAll({ type: 'Text', text: value })
-    expect(found.length).toBeGreaterThan(0)
-    expect(found.every(one => one.props.wrap === 'wrap')).toBe(true)
-  }
-  expect((await textsOf(ui)).some(text => text.includes('…'))).toBe(false)
+  const full = await ui.findAll({ type: 'Text', text: now })
+  expect(full.length).toBeGreaterThan(0)
+  expect(full.every(one => one.props.wrap === 'wrap')).toBe(true)
+  expect(await ui.findAll({ type: 'Text', text: needsYou })).toEqual([])
+  const asked = (await textsOf(ui)).find(text => text.startsWith('Approve the settings.json edit'))
+  expect(asked?.endsWith('…')).toBe(true)
+  expect(Number(asked?.length)).toBeLessThan(needsYou.length)
   await ui.unmount()
 })
 
@@ -423,7 +424,9 @@ test('the header block stays pinned at the scroll offset over the content, with 
   const top = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const space = Number((await top.find({ key: 'header-space' }))?.props.height)
   expect(space).toBeGreaterThan(2)
-  expect((await top.find({ key: 'header-pin' }))?.props).toEqual(expect.objectContaining({ position: 'absolute', top: 0, paddingTop: 0, height: space, backgroundColor: 'composerSidebarBackground' }))
+  expect((await top.find({ key: 'header-pin' }))?.props).toEqual(expect.objectContaining({ position: 'absolute', top: 0, paddingTop: 0, height: space }))
+  expect((await top.find({ key: 'header-pin' }))?.props.backgroundColor).toBeUndefined()
+  expect((await top.find({ key: 'header-band' }))?.props).toEqual(expect.objectContaining({ height: space, backgroundColor: 'composerSidebarBackground' }))
   await top.unmount()
   const down = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, scroll: { offset: 9, bodyRows: 60 } } })
   const pin = await down.find({ key: 'header-pin' })

@@ -19,27 +19,29 @@ export function Pane(ui: Ui, data: PaneData, view = paneViewOf(data), pin = pinO
       {Summary(ui, { blocks: view.blocks, perRow: view.perRow })}
       {FilterChips(ui, { chips: view.chips, chosen: data.chosen, onFilter: data.actions.filter })}
       {List(ui, data, view)}
-      <Box key="header-pin" position="absolute" top={0} left={0} right={0} height={tall(lift) + headerRows} flexDirection="column" paddingTop={down(lift)} backgroundColor={C.panel}>
-        {Header(ui, {
-          title: TITLE,
-          isLive: !data.live.error,
-          status: view.status,
-          buttons: headerButtonsOf(data, data.actions.ask, data.actions.refresh),
-          isNarrow: view.isNarrow,
-        })}
-        {RepoChips(ui, { trees: data.trees })}
-        <Box key="header-rule" height={tall(1)} flexShrink={0} backgroundColor={C.border} />
-        {data.live.error ? (
-          <Box key="notice" flexDirection="row" alignItems="center" flexShrink={0} gap={across(8)} marginTop={down(12)} marginLeft={across(16)} marginRight={across(16)} paddingX={across(12)} paddingY={down(8)} borderStyle="round" borderColor={C.clear} backgroundColor={C.amberTint}>
-            {Icon(ui, { id: 'notice-icon', name: 'blocker', size: 16, tone: 'amber' })}
-            <Box flexShrink={1} minWidth={0}>
-              <Text size="footnote" weight="semibold" color={C.amber}>
-                {noticeOf(data.live.error)}
-              </Text>
+      <Box key="header-pin" position="absolute" top={0} left={0} right={0} height={tall(lift) + headerRows} flexDirection="column" paddingTop={down(lift)}>
+        <Box key="header-band" flexDirection="column" height={headerRows} flexShrink={0} backgroundColor={C.panel}>
+          {Header(ui, {
+            title: TITLE,
+            isLive: !data.live.error,
+            status: view.status,
+            buttons: headerButtonsOf(data, data.actions.ask, data.actions.refresh),
+            isNarrow: view.isNarrow,
+          })}
+          {RepoChips(ui, { trees: data.trees })}
+          <Box key="header-rule" height={tall(1)} flexShrink={0} backgroundColor={C.border} />
+          {data.live.error ? (
+            <Box key="notice" flexDirection="row" alignItems="center" flexShrink={0} gap={across(8)} marginTop={down(12)} marginLeft={across(16)} marginRight={across(16)} paddingX={across(12)} paddingY={down(8)} borderStyle="round" borderColor={C.clear} backgroundColor={C.amberTint}>
+              {Icon(ui, { id: 'notice-icon', name: 'blocker', size: 16, tone: 'amber' })}
+              <Box flexShrink={1} minWidth={0}>
+                <Text size="footnote" weight="semibold" color={C.amber}>
+                  {noticeOf(data.live.error)}
+                </Text>
+              </Box>
             </Box>
-          </Box>
-        ) : null}
-        <Box flexGrow={1} />
+          ) : null}
+          <Box flexGrow={1} />
+        </Box>
       </Box>
     </Box>
   )

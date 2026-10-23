@@ -7,6 +7,7 @@ import { workflowRunsOf } from './agents'
 import type { WorkflowAgent, WorkflowRun } from './agents'
 import { stepOf } from './board'
 import { compactOf } from './format'
+import { textWidth } from './layout'
 import { activityOf, elapsedOf, titleOf, whereOf } from './rows'
 import type { Row } from './rows'
 import type { RunSummary } from './totals'
@@ -93,6 +94,21 @@ export function displayNameOf(item: RowItem | { kind: 'master' }): Name {
 }
 
 export const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
+
+export function relativeOf(path: string, roots: readonly string[], home: string) {
+  const full = path.startsWith('~/') ? `${home}${path.slice(1)}` : path
+  const root = roots.filter(Boolean).sort((left, right) => right.length - left.length).find(one => full.startsWith(`${one}/`))
+  return root ? full.slice(root.length + 1) : full.startsWith(`${home}/`) ? `~${full.slice(home.length)}` : path
+}
+
+export function clampText(text: string, room: number, lines: number, size: number) {
+  const flat = oneLine(text)
+  const budget = Math.max(0, room) * lines * 0.9
+  if (textWidth(flat, size) * 1.08 <= budget) return flat
+  let cut = flat
+  while (cut && textWidth(`${cut}…`, size) * 1.08 > budget) cut = cut.slice(0, -1)
+  return `${cut.trimEnd()}…`
+}
 
 export const nameText = (name: Name) => (name.task ? `${name.persona} · ${name.task}` : name.persona)
 

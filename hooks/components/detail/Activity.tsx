@@ -22,20 +22,23 @@ export function Activity(ui: Ui, props: ActivityProps) {
       const verb = cut > 0 ? text.slice(0, cut) : text
       const rest = cut > 0 ? text.slice(cut + 1) : ''
       return (
-        <Box key={`activity-${id}-${index}`} flexDirection="row" alignItems="flex-start" gap={across(8)}>
-          <Box flexDirection="row" alignItems="center" height={tall(20)}>
+        <Box key={`activity-${id}-${index}`} flexDirection="row" alignItems="center" gap={across(8)} height={tall(20)} minWidth={0}>
+          <Box flexDirection="row" alignItems="center" height={tall(20)} flexShrink={0}>
             <Svg key={`activity-dot-${id}-${index}`} source={dot(one.isGood ? 'green' : 'faint', 6)} alt={one.isGood ? 'ok' : 'event'} width={6} height={6} />
           </Box>
-          <Box flexGrow={1} flexShrink={1} minWidth={0}>
-            <Text wrap="truncate-end">
-              <Text weight="semibold">{verb}</Text>
-              {rest ? ' ' : ''}
-              {rest ? (
-                <Text size="footnote" mono color={C.muted}>
+          <Box key={`activity-text-${id}-${index}`} flexDirection="row" alignItems="center" gap={across(4)} flexGrow={1} flexShrink={1} minWidth={0}>
+            <Box flexShrink={0}>
+              <Text weight="semibold" wrap="truncate-end">
+                {verb}
+              </Text>
+            </Box>
+            {rest ? (
+              <Box flexShrink={1} minWidth={0}>
+                <Text size="footnote" mono color={C.muted} wrap="truncate-end">
                   {rest}
                 </Text>
-              ) : null}
-            </Text>
+              </Box>
+            ) : null}
           </Box>
           <Box flexShrink={0}>
             <Text size="footnote" color={C.muted} tabular>

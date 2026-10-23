@@ -259,7 +259,7 @@ function mergeOne(id: string, row: BoardSession | undefined, boardAt: number, re
     needsYou,
     git: row?.git ?? (report?.git && gitText(report.git)),
     sha: row?.sha ?? report?.commits.at(-1)?.sha,
-    activity: report?.activity.length ? report.activity.map(one => one.text) : row?.activity,
+    activity: report?.activity.length ? report.activity.map(one => `${one.text} · ${compactOf(now - one.at)}`) : row?.activity,
     commits: report?.commits.length ? report.commits.map(one => `${one.sha} ${one.subject}`) : row?.commits,
     tests: report?.tests.length ? report.tests.map(testText) : row?.tests,
     files: row?.files?.length ? row.files : report?.files,

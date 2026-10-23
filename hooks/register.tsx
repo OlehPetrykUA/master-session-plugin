@@ -134,6 +134,8 @@ export const register: Register = on => {
     if (isArchived || isShown) await setFilter($, isArchived ? 'archived' : 'all')
     if (isShown) await setExpanded($, () => [card])
     const isPlaced = await openPane($)
+    const top = isShown ? sectionsOf(await paneData($, columns || 48))['section-expanded'] : undefined
+    void scrollToRow($, top === undefined ? 0 : scrollRowOf('section-expanded', top, pinOf(data).headerRows))
     const shown = [isArchived ? 'the Archived list' : '', isShown ? `${card} expanded${item && item.id !== card ? ` in ${item.id}` : ''}` : ''].filter(Boolean).join(' with ')
     const missing = expand && !isShown ? ` ${expand} was not found among its items${isOldOne ? '; it is archived, so pass archived: true' : ''}.` : ''
     return {

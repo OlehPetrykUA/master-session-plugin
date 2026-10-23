@@ -1,5 +1,5 @@
 import { across, tall } from '../../lib/layout'
-import { clockOf, displayNameOf, modelFamilyOf, nameText, parentsOf, sessionOfAgent, spanOf } from '../../lib/list'
+import { clampText, clockOf, displayNameOf, modelFamilyOf, nameText, parentsOf, sessionOfAgent, spanOf } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
@@ -58,7 +58,7 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
     children: [
       isNeeds && agent.asking ? Callout(ui, { id, status: 'needs', icon: 'permission', label: 'Permission', lines: [{ text: agent.asking.text, isStrong: true }, { text: [asked, waitsIn].filter(Boolean).join(' · '), isStrong: false }] }) : null,
       item.status === 'failed' ? Callout(ui, { id, status: 'failed', label: 'Failed', lines: [{ text: agent.result || 'stopped', isStrong: true }, { text: `took ${durationOf(end - agent.startedAt)}`, isStrong: false }] }) : null,
-      Block(ui, { id: `task-${id}`, icon: 'now', label: 'Task', children: [Strong(ui, { text: description, isFull: true }), prompt ? Quiet(ui, { text: prompt, isFull: true }) : null] }),
+      Block(ui, { id: `task-${id}`, icon: 'now', label: 'Task', children: [Strong(ui, { text: description, isFull: true }), prompt ? Quiet(ui, { text: clampText(prompt, props.innerWidth - 24, 4, 12), isFull: true }) : null] }),
       item.status === 'done' && (agent.result || agent.tokens)
         ? Block(ui, {
             id: `result-${id}`,

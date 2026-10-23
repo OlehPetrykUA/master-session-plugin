@@ -84,8 +84,20 @@ export const PERSONA_GLYPH: Record<string, IconName> = {
   Validator: 'validator',
 }
 
-const svg = (width: number, height: number, body: string, box = `0 0 ${width} ${height}`) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${box}"><style>svg{${LIGHT}}@media (prefers-color-scheme: dark){svg{${DARK}}}text{font-family:${FONT};font-variant-numeric:tabular-nums}${MOTION}</style>${body}</svg>`
+const usedOf = (vars: string, body: string) =>
+  vars
+    .split(';')
+    .filter(pair => body.includes(`var(${pair.slice(0, pair.indexOf(':'))})`))
+    .join(';')
+
+function svg(width: number, height: number, body: string, box = `0 0 ${width} ${height}`) {
+  const light = usedOf(LIGHT, body)
+  const theme = light ? `svg{${light}}@media (prefers-color-scheme: dark){svg{${usedOf(DARK, body)}}}` : ''
+  const text = body.includes('<text') ? `text{font-family:${FONT};font-variant-numeric:tabular-nums}` : ''
+  const motion = /class="(p|t\d)"/.test(body) ? MOTION : ''
+  const style = theme + text + motion
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${box}">${style ? `<style>${style}</style>` : ''}${body}</svg>`
+}
 
 const stroke = (path: string, tone: Tone, weight: number) =>
   `<path d="${path}" style="fill:none;stroke:var(--${tone});stroke-width:${weight};stroke-linecap:round;stroke-linejoin:round"/>`
