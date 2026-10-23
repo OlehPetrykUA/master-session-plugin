@@ -183,14 +183,14 @@ test('summary blocks read the run totals as the design words them, zeros and das
     ['Git', '0', 'clean', false],
   ])
   expect(blocksOf(totals, true, '20:04')[6]?.sub).toMatch(/^\d\d:\d\d – 20:04$/)
-  expect(blocksOf(totals, true, '20:04')[6]?.short).toBe('until 20:04')
+  expect(blocksOf(totals, true, '20:04')[6]?.shorts).toEqual(['until 20:04', '20:04'])
   expect(blocksOf({ ...totals, subagents: { total: 2, running: 0, done: 2, failed: 0, asking: 0 } }, true)[2]?.sub).toBe('all finished')
   const asking = [...agents, { id: 'ask1', type: 'master-session:reviewer', description: 'Review the diff', state: 'running' as const, startedAt: NOW, asking: { text: 'Allow Bash: npm test', since: NOW } }, { id: 'ask2', type: 'workflow-subagent', description: 'scan', state: 'running' as const, startedAt: NOW, run: { id: 'wf_x', index: 0 }, asking: { text: 'Allow Read: a', since: NOW } }, { id: 'ask3', type: 'workflow-subagent', description: 'scan 2', state: 'running' as const, startedAt: NOW, run: { id: 'wf_x', index: 1 }, asking: { text: 'Allow Read: b', since: NOW } }]
   const needs = runSummaryOf({ rows, counts: countsOf(rows, []), archived: 0, agents: asking, workflows, board, trees: [], at: NOW })
   expect(needs.needsYou).toEqual({ sessions: 1, subagents: 2 })
   expect(blocksOf(needs, true)[1]).toEqual(expect.objectContaining({ value: '3', sub: '1 session · 2 subagents', isAlert: true }))
   expect(blocksOf({ ...needs, needsYou: { sessions: 2, subagents: 0 } }, true)[1]?.sub).toBe('2 sessions')
-  expect(blocksOf({ ...needs, needsYou: { sessions: 0, subagents: 0 } }, true)[1]).toEqual(expect.objectContaining({ value: '0', sub: 'nothing waiting', short: 'none', isAlert: false }))
+  expect(blocksOf({ ...needs, needsYou: { sessions: 0, subagents: 0 } }, true)[1]).toEqual(expect.objectContaining({ value: '0', sub: 'nothing waiting', shorts: ['none'], isAlert: false }))
   expect(blocks[0]?.dots).toEqual([
     { tone: 'green', count: 1 },
     { tone: 'amber', count: 1 },

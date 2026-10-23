@@ -13,7 +13,8 @@ export function Summary(ui: Ui, props: SummaryProps) {
   const block = (one: Block) => {
     const value = numeral(one.value, 'text')
     const hasIcon = one.isAlert && textWidth(one.label, 11, { isBold: true }) + 12 + 4 <= inner
-    const sub = one.short && textWidth(one.sub, 11) > inner ? one.short : one.sub
+    const subs = [one.sub, ...(one.shorts ?? [])]
+    const sub = subs.find(text => textWidth(text, 11) <= inner) ?? subs.at(-1)
     return (
       <Box
         key={`block-${one.key}`}

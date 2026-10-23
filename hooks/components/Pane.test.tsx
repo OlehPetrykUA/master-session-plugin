@@ -160,7 +160,7 @@ test('Archived is the last group, closed with Show; open it lists two rows, Hide
 test('all done stays the one list: finished header line, every row under Done with Archive all…, no summary mode', async ($, on) => {
   const done = { ...BOARD, testsPassed: 526, testsNote: 'smoke 398 · hooks 128', sessions: BOARD.sessions.map(one => ({ ...one, state: 'done', needsYou: undefined, progress: 'step 5 of 5 — shipped', verified: 'tests 526 passed' })) }
   await started($, on, done)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 80 } })
   await dump('summary', ui)
   const texts = await textsOf(ui)
   expect(texts).toContain('finished 19:46')

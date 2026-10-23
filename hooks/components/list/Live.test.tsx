@@ -211,10 +211,36 @@ test('KPI tiles at 47 columns keep every label and sub whole: Needs you drops it
     await ui.unmount()
     return found
   }
-  expect(await tile(47)).toEqual({ needs: 'Needs you2 blockers', icon: false, tests: 'Tests2 sessions' })
+  expect(await tile(47)).toEqual({ needs: 'Needs you2 blockers', icon: false, tests: 'Tests510 passed' })
   expect(await tile(100)).toEqual({ needs: 'Needs you1 session · 1 subagent', icon: true, tests: 'Testsfrom 2 sessions’ checks' })
   const inner = (bodyWidthOf(47) - 3 * 8) / 4 - 2 - 16
-  for (const text of ['Needs you', '2 blockers', '2 sessions']) expect([text, textWidth(text, 11, { isBold: text === 'Needs you' }) <= inner]).toEqual([text, true])
+  for (const text of ['Needs you', '2 blockers', '510 passed']) expect([text, textWidth(text, 11, { isBold: text === 'Needs you' }) <= inner]).toEqual([text, true])
   expect(textWidth('Needs you', 11, { isBold: true }) + 16).toBeGreaterThan(inner)
 })
 
+
+test('KPI subs never truncate from 47 to 60 columns: each tile draws the first of its subs that fits, with 12 asking subagents, a long testsNote, and nothing reported', async ($, on) => {
+  const asking = Array.from({ length: 12 }, (_, index) => ({ id: `s${index}`, type: 'master-session:reviewer', description: `Review ${index}`, state: 'running' as const, startedAt: 3_500_000, parentSessionId: 'local_setup', asking: { text: 'Allow Bash: ls', since: 3_590_000 } }))
+  seeded(on, asking)
+  const quiet = { ...BOARD, sessions: [BOARD.sessions[1]], needsYou: [] }
+  const loud = { ...quiet, testsPassed: 52_614, testsNote: 'smoke 398 · hooks 128 · e2e 52088 across 4 workers' }
+  await started($, on, loud)
+  const subsAt = async (bodyColumns: number) => {
+    const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
+    const blocks = (await ui.findAll({ type: 'Box' })).filter(box => box.key?.startsWith('block-') && !box.key.startsWith('block-value') && !box.key.startsWith('block-dot') && !box.key.startsWith('block-icon') && !/^block-[a-z-]+-(green|amber|grey)$/.test(box.key))
+    const found = blocks.map(box => ({ key: box.key, texts: (box.children ?? []).flatMap(child => JSON.stringify(child).match(/"children":\["([^"]*)"\]/g) ?? []).map(text => text.slice(13, -2)) }))
+    await ui.unmount()
+    return found
+  }
+  for (const board of [loud, quiet]) {
+    await $.tool.call({ tool: BOARD_TOOL, ...board })
+    for (let bodyColumns = 47; bodyColumns <= 60; bodyColumns += 1) {
+      const inner = (bodyWidthOf(bodyColumns) - 3 * 8) / 4 - 2 - 16
+      const found = await subsAt(bodyColumns)
+      expect(found.map(one => one.key)).toEqual(['block-sessions', 'block-needs-you', 'block-subagents', 'block-workflows', 'block-commits', 'block-tests', 'block-duration', 'block-git'])
+      if (bodyColumns === 47) expect([found[1]?.texts, found[5]?.texts]).toEqual([['Needs you', '12 blockers'], ['Tests', board === loud ? '52614' : 'none']])
+      for (const { key, texts } of found)
+        for (const text of texts) expect([bodyColumns, key, text, textWidth(text, 11, { isBold: text === texts[0] }) <= inner]).toEqual([bodyColumns, key, text, true])
+    }
+  }
+})
