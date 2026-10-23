@@ -12,7 +12,7 @@ A persona is a fixed role the validator hands out. Each one has its own skill, `
 | Researcher | subagent | `claude --agent master-session:researcher` | `master-session:researcher` | sonnet / medium; haiku / low for one fact |
 | Spec writer | subagent | `claude --agent master-session:spec-writer` | `master-session:spec-writer` | opus / high |
 | Architect | subagent | `claude --agent master-session:architect` | `master-session:architect` | opus / high |
-| Designer | `start_session` worker, standing, one per canvas | `claude --agent master-session:designer` | `master-session:designer` | opus / high |
+| Designer | `start_session` worker for a canvas stream (rule 3), else subagent | `claude --agent master-session:designer` | `master-session:designer` | opus / high |
 | Integrator | the validator itself | | | the session's own |
 
 The read-only personas' agents deny Edit, Write and NotebookEdit. A `start_session` worker can't pick an agent, so its brief loads the skills instead. Order: Spec writer, then Architect (only for work spanning several modules or workers; skipped for fixes and single-file changes), then Designer (UI only), then Implementer, then QA verifier with Code reviewer.
