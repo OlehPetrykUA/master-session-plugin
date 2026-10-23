@@ -237,7 +237,7 @@ test('AC12 the answer is M3 and the context holds C1 alone', async ($, on) => {
   expect(run.answer.context).toEqual([C1])
 })
 
-test('AC13 a stop makes no mcp call and no process.run, in default and plan mode', async ($, on) => {
+test('AC13 a stop makes no mcp call and no process.run, in default mode', async ($, on) => {
   const plain = await master($, on)
   const calls = plain.calls.length
   const gits = plain.gits.length
@@ -289,6 +289,7 @@ test('AC17 a stopped master’s reports call denies with M5 and reads nothing', 
   const hits: string[] = []
   const watched = new Proxy({ [reportPath(HOME, 'local_env')]: '{}' } as Record<string, string>, {
     get: (target, key) => (typeof key === 'string' && key.includes('/.claude/state/') && hits.push(key), target[key as string]),
+    has: (target, key) => (typeof key === 'string' && key.includes('/.claude/state/') && hits.push(key), key in target),
     ownKeys: target => (hits.push('list'), Reflect.ownKeys(target)),
   })
   const run = await stopped($, on, BOARD, { files: watched })
@@ -528,7 +529,7 @@ test('AC23 stop then start with the same empty board writes the board file again
   await run.clock.settle()
   await $.skill.prompt(START)
   await run.clock.settle()
-  await $.command.run(typed(STOP, ''))
+  expect((await $.command.run(typed(STOP, 'force'))).text).toBe(M3)
   await run.clock.settle()
   rec.writes.length = 0
   await $.skill.prompt(START)
@@ -554,7 +555,7 @@ test('a master whose board file cannot be retired says so and still stops', WITH
   const run = await master($, on)
   failing = true
   const answer = await $.command.run(typed(STOP, ''))
-  expect(answer.text).toBe(`${M3} The board file could not be retired; workers started now may still report here.`)
+  expect(answer.text).toBe(`${M3} The board file could not be cleared; a worker started now may still take this session as its master.`)
   expect(answer.context).toEqual([C1])
   expect((await atomsOf($)).stopped).toBe(true)
   expect(run.writes).toEqual([])
@@ -564,6 +565,17 @@ test('a worker whose report file cannot be retired says so and still stops', asy
   await worker($, on)
   failing = true
   const answer = await $.command.run(typed(STOP, ''))
-  expect(answer.text).toBe(`${M4} The report file could not be retired; the master may still read this session's last report.`)
+  expect(answer.text).toBe(`${M4} The report file could not be cleared; the master may still show this session's last report.`)
   expect(answer.context).toEqual([C2])
+})
+
+test('AC23 a stopped master given the worker skill prompt rewrites its board file on the same board', async ($, on) => {
+  const run = await stopped($, on)
+  await $.skill.prompt(WORKER)
+  await run.clock.settle()
+  run.writes.length = 0
+  await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
+  await run.clock.settle()
+  const last = run.writes.filter(one => one.path === OWN).at(-1)
+  expect(JSON.parse(last?.text ?? '{}')).toMatchObject({ v: 1, kind: 'board', masterId: SELF })
 })

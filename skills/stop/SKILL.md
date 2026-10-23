@@ -5,6 +5,6 @@ disable-model-invocation: true
 argument-hint: '[force]'
 ---
 
-The master-session status mod answers this command. If you are reading this, the mod isn't running in this session. Tell the user there is nothing for the mod to stop.
+The master-session status mod answers this command. If you are reading this, the mod isn't running in this session. Tell the user the mod is not running here, and say whether you stopped a master-session heartbeat.
 
 If this session runs the master-session heartbeat (a `/loop` or `ScheduleWakeup` running master-session ticks), stop that one only: delete that `/loop` job (`CronList` lists it) or call `ScheduleWakeup` with `stop: true`. Leave any other loop alone. Run no more master-session ticks and do not call `mcp__master-session__board`. Do not stop, message or archive any worker.

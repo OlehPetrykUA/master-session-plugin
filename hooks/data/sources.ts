@@ -40,6 +40,10 @@ export function startSources(value: string) {
   ancestry.clear()
 }
 
+export const forget = () => {
+  published = ''
+}
+
 export function homeOf() {
   return home
 }
@@ -363,7 +367,6 @@ export async function refreshAll($: EngineInterface, isForced = false) {
 
 export async function markMaster($: EngineInterface) {
   await unstop($)
-  published = ''
   claim()
   const at = await $.clock.now()
   await saveBoard($, prev => prev ?? { sessions: [], needsYou: [], repos: [], source: 'tool', since: at, at })
