@@ -2,6 +2,8 @@
 
 A Claude Code plugin that turns one session into a **validator** for a team of worker sessions. The validator plans the work, briefs a worker session per piece, watches them, answers their questions, verifies every `ready <sha>` in a clean worktree and merges it fast-forward only. You get a live status board instead of a scrolling chat.
 
+<p align="center"><img src="docs/screenshots/pane-dark.png" width="380" alt="The status pane in the dark theme: run totals, filter chips, and worker sessions, subagents and a workflow run grouped into Needs you, Working, Waiting and Done"></p>
+
 ## What's inside
 
 | Part | What it does |
@@ -78,6 +80,17 @@ Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder mar
 Workers need nothing installed beyond this plugin: their brief loads the `master-session:worker` skill and their persona's skill, and they report through the status tool.
 
 The ledger, one note per run with every worker, its state and open findings, goes in your notes or memory tool, or a plain markdown file if you use none.
+
+## Screenshots
+
+| Light | Dark |
+|---|---|
+| <img src="docs/screenshots/pane-light.png" width="380" alt="The status pane in the light theme: run totals, filter chips and workers grouped by state"> | <img src="docs/screenshots/pane-dark.png" width="380" alt="The status pane in the dark theme: run totals, filter chips and workers grouped by state"> |
+| The status pane: run totals, filter chips and every worker grouped by state. | The same pane in the dark theme. |
+| <img src="docs/screenshots/session-card-light.png" width="380" alt="An expanded session card showing now and next, recent activity, worktree, git state, commits, tests, files owned, permission mode and model"> | <img src="docs/screenshots/subagent-needs-dark.png" width="380" alt="A subagent card that needs you: a permission prompt for a Bash command, its task, model and the session that started it"> |
+| A session opened in place: now and next, activity, worktree, git, commits, tests and files. | A subagent waiting on a permission prompt, with Open chat for the chat that holds it. |
+| <img src="docs/screenshots/band-needs-light.png" width="424" alt="The band above the prompt: a Designer needs you pill, the progress strip as dots and a chat button"> | <img src="docs/screenshots/pane-narrow-dark.png" width="300" alt="The status pane at 300 pixels wide, with elapsed time folded into each row's second line"> |
+| The band above the prompt names whoever needs you and opens their chat. | The pane at 300 px: the meta column folds into the second line. |
 
 ## Personas
 
