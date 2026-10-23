@@ -104,7 +104,7 @@ const remoteOf = ({ agents, workflows, at }: AgentCounts, id: string, place: Pla
   return { subs: subagentUnits(mine.filter(one => !one.run), place), runs }
 }
 
-export function bandUnitsOf(segments: Progress['segments'], current: Board | null, counts: AgentCounts, live?: Live, trees: readonly Repo[] = [], items: readonly ListItem[] = bandItemsOf(current, counts, live, trees)): Unit[] {
+export function bandUnitsOf(segments: Progress['segments'], current: Board | null, counts: AgentCounts, live: Live, trees: readonly Repo[] = [], items: readonly ListItem[] = bandItemsOf(current, counts, live, trees)): Unit[] {
   const { agents } = counts
   const own = agents.filter(one => !one.parentSessionId)
   const units: Unit[] = subagentUnits(
@@ -116,10 +116,10 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
     const row = current?.sessions.find(one => one.id === segment.id)
     const name = row?.name ?? segment.id
     const chat = { id: segment.id, name }
-    const display = sessionNameOf(live?.sessions.find(one => one.id === segment.id)?.title || row?.title || name, row?.persona)
+    const display = sessionNameOf(live.sessions.find(one => one.id === segment.id)?.title || row?.title || name, row?.persona)
     const self = { name: nameText(display), short: display.persona, glyph: PERSONA_GLYPH[display.persona] ?? ('session' as const) }
     const { subs, runs } = remoteOf(counts, segment.id, { parent: display.persona === 'Session' ? display.task : display.persona, chat })
-    const group = items.find(one => one.kind === 'session' && one.id === segment.id)?.group ?? segment.state
+    const group = items.find(one => one.kind === 'session' && one.id === segment.id)?.group
     const isAsking = group === 'needs-you'
     const child = isAsking ? [...subs, ...runs].find(one => one.asker && one.asker.reason === row?.needsYou) : undefined
     const isDone = group === 'done'
@@ -152,8 +152,8 @@ export const percentOf = (units: readonly Unit[]) => {
   return Math.min(99, Math.floor(overallOf(units) * 100 + 1e-9))
 }
 
-export const bandItemsOf = (current: Board | null, { agents, workflows, at }: AgentCounts, live?: Live, trees: readonly Repo[] = []) =>
-  itemsOf(live ? rowsOf(current, live) : [], agents, workflows, { at, trees, sessions: live ? familyOf(live) : [] })
+export const bandItemsOf = (current: Board | null, { agents, workflows, at }: AgentCounts, live: Live, trees: readonly Repo[] = []) =>
+  itemsOf(rowsOf(current, live), agents, workflows, { at, trees, sessions: familyOf(live) })
 
 export function countsOf(items: readonly ListItem[], isAllDone: boolean, total: number): CountPart[] {
   if (isAllDone) return [{ text: 'All ', isNumber: false }, { text: String(total), isNumber: true }, { text: ' done', isNumber: false }]
@@ -194,7 +194,7 @@ export function bandProgressWith(current: Board | null, live: Live, counts: Agen
   return isBusy ? IDLE_PROGRESS : undefined
 }
 
-export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live?: Live, trees: readonly Repo[] = []) {
+export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live: Live, trees: readonly Repo[] = []) {
   const width = columns * CH - 16
   const isNarrow = width < COUNTS_BELOW
   const items = bandItemsOf(current, agents, live, trees)

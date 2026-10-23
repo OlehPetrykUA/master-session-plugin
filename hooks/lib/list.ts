@@ -222,7 +222,7 @@ export const isGhostRun = (run: WorkflowRun, at: number | undefined) => at !== u
 
 export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> = {}): ListItem[] {
   const isOld = (at: number | undefined) => context.at !== undefined && at !== undefined && context.at - at >= AGENT_SHOWN_MS
-  const stale = new Set(workflowRunsOf(agents, workflows).filter(one => (one.agents.length ? one.state !== 'running' && isOld(one.endedAt) : isGhostRun(one, context.at))).map(one => one.id))
+  const stale = new Set(workflowRunsOf(agents, workflows).filter(one => isGhostRun(one, context.at) || (one.state !== 'running' && isOld(one.endedAt))).map(one => one.id))
   const shown = agents.filter(agent => (agent.run ? !stale.has(agent.run.id) : !isOld(agent.endedAt)))
   const runs = workflows.filter(one => !stale.has(one.id))
   const session = (row: Row): ListItem => {

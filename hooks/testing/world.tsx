@@ -5,8 +5,7 @@ import type { AgentSpawnInput, On } from 'claude-code'
 import type { Live } from '../../types'
 
 export const HOME = '/home/me'
-
-export const PLUGIN_ORIGIN = { kind: 'plugin', name: 'master-session' }
+const PLUGIN_ORIGIN = { kind: 'plugin', name: 'master-session' }
 export const SELF = 'local_validator'
 export const WORKTREE = `${HOME}/.claude/worktrees/wt-toolkit-setup-ui`
 export const TOOLKIT = `${HOME}/Work/toolkit`
@@ -159,6 +158,7 @@ export function world(on: On, child: Child = {}) {
   })
   on('mcp.call', (_, e) => {
     calls.push({ tool: e.tool, args: e.args })
+    if (e.tool === 'get_session' && child.isLookupDown) return { value: { content: [{ type: 'text' as const, text: 'down' }], isError: true } }
     if (e.tool === 'get_session') {
       return e.args.session_id === 'self'
         ? text(
@@ -239,6 +239,10 @@ export const liveOf = (archived: string[] = []): Live => ({
   sessions: ['a', 'b', 'c', 'd'].map(id => ({ id, name: id, title: '', cwd: '/', isRunning: true, isArchived: archived.includes(id), lastActivityAt: 0 })),
 })
 
+export async function pluginScroll($: Engine, input: { offset: number; by: number; bodyRows: number; contentRows: number }) {
+  await ($.ui as unknown as { scroll: (input: unknown) => Promise<unknown> }).scroll({ component: 'Pane', requestId: 'master-session', ...input, origin: PLUGIN_ORIGIN })
+}
+
 export const textsOf = async (ui: Ui) => (await ui.findAll({ type: 'Text' })).map(one => one.text)
 
 export const altsOf = async (ui: Ui) => (await ui.findAll({ type: 'Svg' })).map(one => one.props.alt)
@@ -251,7 +255,7 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean; isPlaced?: boolean; surfaces?: readonly ('desktop' | 'terminal')[]; archiveError?: string; unarchiveError?: string; stuck?: boolean }
+export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean; isPlaced?: boolean; surfaces?: readonly ('desktop' | 'terminal')[]; archiveError?: string; unarchiveError?: string; stuck?: boolean; isLookupDown?: boolean }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, board })

@@ -3,7 +3,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { CH, LH, across, tall } from '../lib/layout'
 import { C, KINDS } from '../theme/tokens'
-import { BOARD, HOME, PANE, PLUGIN_ORIGIN, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, click, hitsOf, started, textsOf, warmUp } from '../testing/world'
+import { BOARD, HOME, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, click, hitsOf, pluginScroll, started, textsOf, warmUp } from '../testing/world'
 
 warmUp()
 
@@ -201,7 +201,7 @@ test('the header: 56 tall, title and live dot over the status line, Ask and Refr
   }
 })
 
-test('the Sessions tile draws only non-zero dots in red, green, amber, grey order, and its dot row has flexWrap wrap in that order at 41 and 47 columns', async ($, on) => {
+test('the Sessions tile dot row is flexWrap wrap and keeps red, green, amber, grey order at 41 and 47 columns', async ($, on) => {
   const session = (id: string, state: string) => ({ id, name: id, state })
   const four = { ...BOARD, sessions: [session('n1', 'needs-you'), session('w1', 'working'), session('p1', 'waiting'), session('d1', 'done')], needsYou: [] }
   await started($, on, four)
@@ -274,8 +274,8 @@ test('polls that find nothing new write no state, so a press is never cut by a r
 test('Refresh always shows that it ran: a forced refresh stamps the time even when nothing changed', async ($, on) => {
   const { clock } = await started($, on)
   const before = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await clock.advance(5 * 60_000)
-  expect(await textsOf(before)).toContain('updated 4m ago')
+  await clock.advance(5 * 60_000 + 1_000)
+  expect(await textsOf(before)).toContain('updated 5m ago')
   await before.unmount()
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await textsOf(ui)).toContain('updated 5m ago')
@@ -446,8 +446,6 @@ test('the header block stays pinned at the scroll offset over the content, with 
   await terminal.unmount()
 })
 
-type Raise = { scroll: (input: unknown) => Promise<unknown> }
-
 function aimed(on: Parameters<typeof started>[1]) {
   const landed: number[] = []
   on('ui.scroll', ((_: unknown, e: { offset: number }) => {
@@ -459,13 +457,9 @@ function aimed(on: Parameters<typeof started>[1]) {
 
 const scrolled = (offset: number) => ({ ...PANE, surface: 'desktop' as const, props: { ...PANE.props, scroll: { offset, bodyRows: 2 } } })
 
-async function pluginScroll($: Engine) {
-  await ($.ui as unknown as Raise).scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 2, contentRows: 400, origin: PLUGIN_ORIGIN })
-}
-
 async function aimAt($: Engine, to: string) {
   const answer = (await $.tool.call({ tool: 'mcp__master-session__scroll', to })) as { result?: string; deny?: string }
-  await pluginScroll($)
+  await pluginScroll($, { offset: 0, by: 0, bodyRows: 2, contentRows: 400 })
   return Number(/\(row (\d+)\)/.exec(String(answer.result ?? answer.deny))?.[1] ?? -1)
 }
 
@@ -524,7 +518,7 @@ test('collapsing a card at a large offset clamps the pin to the new end and move
   await click(ui, 'hit-top-local_env')
   const end = await liftOn(ui)
   expect(end).toBeLessThan(39.5 * LH)
-  await pluginScroll($)
+  await pluginScroll($, { offset: 0, by: 0, bodyRows: 2, contentRows: 400 })
   expect(landed).toContain(Math.round(end / LH))
   await ui.unmount()
 })
@@ -540,7 +534,7 @@ test('a filter change while scrolled clamps the pin to the new end and moves the
   await click(ui, 'hit-chip-needs-you')
   const end = await liftOn(ui)
   expect(end).toBeLessThan(39.5 * LH)
-  await pluginScroll($)
+  await pluginScroll($, { offset: 0, by: 0, bodyRows: 2, contentRows: 400 })
   expect(landed).toContain(Math.round(end / LH))
   await ui.unmount()
 })

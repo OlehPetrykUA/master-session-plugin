@@ -8,8 +8,6 @@ import type { Ui } from '../testing/world'
 
 warmUp()
 
-declare const console: { log: (...values: unknown[]) => void }
-
 const TREES = [WORKTREE, ...Array.from({ length: 6 }, (_, index) => `${HOME}/.claude/worktrees/wt-toolkit-${index}`)]
 const MAIN = `${HOME}/Work/toolkit`
 const ALL = [MAIN, ...TREES]
@@ -68,7 +66,6 @@ test('a master with nine worktrees runs far fewer git processes a minute than th
   const from = gits.length
   await clock.advance(120_000)
   const perMinute = (gits.length - from) / 2
-  console.log(`GITS_PER_MINUTE ${perMinute}`)
   expect(perMinute).toBeLessThanOrEqual(30)
 })
 

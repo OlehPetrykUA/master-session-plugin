@@ -3,6 +3,7 @@ import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { reportPath } from './status'
+import type { Child } from '../testing/world'
 import { BAND, BOARD, BOARD_TOOL, HOME, MASTER, MASTER_TITLE, PANE, SELF, altsOf, childOf, started, textsOf, typed, warmUp, world } from '../testing/world'
 
 warmUp()
@@ -288,4 +289,44 @@ test('a plan-mode worker that reloads makes no session call', async ($, on) => {
   await $.session.start(RESTART)
   await run.clock.advance(120_000)
   expect(run.calls.length).toBe(before)
+})
+
+test('a briefed worker that reloads keeps its saved report: it is not written again, so its age is not reset', async ($, on) => {
+  const written: Record<string, string> = {}
+  on('fs.write', (_, e) => {
+    written[e.path] = e.text
+    return { value: undefined }
+  })
+  on('skill.prompt', (_, e) => ({ text: e.text }))
+  const child = childOf(3_600_000)
+  const run = world(on, child)
+  const path = reportPath(HOME, 'local_worker')
+  await $.session.start(RESTART)
+  await $.skill.prompt({ skill: 'master-session:worker', text: 'Worker.', frontmatter: {}, source: 'plugin' })
+  await run.clock.advance(3_000)
+  expect(written[path]).toBeDefined()
+  child.files = { ...child.files, [path]: written[path] ?? '' }
+  delete written[path]
+  await $.session.start(RESTART)
+  await run.clock.advance(60_000)
+  expect(written[path]).toBeUndefined()
+})
+
+test('a session saved as master that is briefed while its lookup fails is a worker after the reload, not a master again', async ($, on) => {
+  on('fs.write', () => ({ value: undefined }))
+  on('skill.prompt', (_, e) => ({ text: e.text }))
+  const child: Child = {}
+  const run = world(on, child)
+  await $.session.start(RESTART)
+  await $.command.run(typed('master-session:info', ''))
+  await $.session.start(RESTART)
+  await run.clock.advance(3_000)
+  Object.assign(child, childOf(3_600_000), { isLookupDown: true })
+  await $.skill.prompt({ skill: 'master-session:worker', text: 'Worker.', frontmatter: {}, source: 'plugin' })
+  await run.clock.advance(3_000)
+  child.isLookupDown = false
+  await $.session.start(RESTART)
+  await $.command.run(typed('master-session:info', ''))
+  await run.clock.advance(3_000)
+  expect(run.tools).toContain('report')
 })

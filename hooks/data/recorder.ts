@@ -259,13 +259,17 @@ async function adopt($: EngineInterface, next: Role) {
   outbox = reportAgentsOf(await getAgents($))
   runsOut = reportRunsOf(await getWorkflows($))
   await $.tool.register(REPORT_SPEC)
+  if (known && known.parent === next.parent && known.engineId === engineId) {
+    current = known
+    return
+  }
   await save($, { ...(known ?? freshReport(next.self, next.parent, engineId, now)), parent: next.parent, engineId }, now)
 }
 
 async function resume($: EngineInterface) {
   isPlan = await getPlan($)
   const saved = await getRole($)
-  if (await getBoard($)) isClaimed = true
+  if (await getBoard($)) claim()
   if (saved.role) {
     await adopt($, saved)
     detecting = Promise.resolve()
@@ -441,6 +445,7 @@ export async function briefed($: EngineInterface) {
   if (await getBoard($)) return
   if (role.role === 'worker') return
   role = NO_ROLE
+  await saveRole($, NO_ROLE)
   detecting = undefined
   void engage($)
 }

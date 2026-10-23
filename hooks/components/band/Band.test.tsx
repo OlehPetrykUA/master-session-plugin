@@ -283,17 +283,8 @@ test('units count the master’s own subagents and runs, each worker’s subagen
     ],
     workflows: [], at: 0,
   }
-  expect(crewValues(crew).map(one => [one.value, one.isRunning])).toEqual([
-    [0, true],
-    [0.8, false],
-    [0.6, true],
-    [0, true],
-    [0.8, true],
-    [0, true],
-    [1, false],
-    [0, true],
-    [1, false],
-  ])
+  const { view } = viewOf(WORKING, crew)
+  expect([view.percent, countsText(view.parts)]).toEqual([46, '5 working · 1 waiting · 3 subagents'])
 })
 
 test('fill tone: red when anyone needs you, else green while anything runs, else grey; green and full when all done', () => {
@@ -489,14 +480,15 @@ test('without a Client: one native Button per face, each press runs its action',
   const pressed: string[] = []
   const current = boardOf(NEEDS)
   on('ui.render', { component: 'Pane', requestId: PROBE }, ($, event) => {
-    const progress = bandProgress(current, liveOf())
+    const live = liveOf()
+    const progress = bandProgress(current, live)
     if (!progress) throw new Error('no band')
     const table = $.ui.resolve(event)
     const { Box, Button, Text } = table
     const view = bandViewOf(event.props.bodyColumns, current, progress, false, IDLE, {
       board: () => pressed.push('board'),
       chat: (id, name) => pressed.push(`chat ${id} ${name}`),
-    })
+    }, live)
     return event.surface !== 'terminal' && 'Svg' in table ? Band({ Box, Text, Button, Svg: guardSvg(table.Svg, Text) }, { view }) : TextBand({ Box, Text, Button }, { view, columns: event.props.bodyColumns })
   })
   const ui = await $.ui.mount({ plugin: 'master-session', component: 'Pane', requestId: PROBE, surface: 'vscode', props: { title: 'band', isFocused: false, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 6 }, view: {} } })
@@ -666,11 +658,13 @@ test('the needs-you pill names any kind: a session, a worker’s subagent with i
   expect([session.view.pillText, session.view.action?.label]).toEqual(['Session · env-e2e-test needs you · commit blocked', 'Open chat'])
 })
 
-test('a worker’s run keeps its phases and counts as one unit, as a unit of agents finished over agents', () => {
+test('a worker’s records-only run counts as one more unit in the percent, while the counts text never lists it', () => {
   const crew = CREW()
   const workflows: WorkflowRecord[] = [...crew.workflows, { id: 'wf_9', toolUseId: '', name: 'remote-review', phases: ['A', 'B', 'C'], startedAt: 5, parentSessionId: 'local_c' }, { id: 'wf_8', toolUseId: '', phases: ['X', 'Y'], startedAt: 6, parentSessionId: 'local_a' }]
   const { view } = viewOf(WORKING, { ...crew, workflows })
-  expect(view.units.map(one => [one.value, one.isRunning])).toEqual([[0, true], [0, true], [0.8, false], [0, true], [0.6, true], [0, true], [0, true], [0.8, true], [0, true], [1, false], [0.5, true]])
+  expect([view.percent, countsText(view.parts)]).toEqual([33, '5 working · 3 waiting · 2 subagents · 1 workflow'])
+  const without = viewOf(WORKING, { ...crew, workflows: workflows.filter(one => one.id !== 'wf_8') }).view
+  expect([without.percent, countsText(without.parts)]).toEqual([37, countsText(view.parts)])
 })
 
 test('a plain session that runs a subagent, with no board of its own and no workers, gets no band', async ($, on) => {
@@ -805,8 +799,17 @@ test('a ready session never makes "All N done": it holds the percent at 99 and t
   expect([verified.isAllDone, verified.percent]).toEqual([true, 100])
 })
 
+test('a worker’s records-only workflow older than 120 s adds no unit and leaves the percent and counts alone, while a fresh one does', () => {
+  const ghost = { id: 'wf_ghost', toolUseId: 't', name: 'ghost', phases: [], startedAt: 1, parentSessionId: 'local_b' }
+  const seen = (at: number) => viewOf(WORKING, { agents: [], workflows: [ghost], at }).view
+  const none = viewOf(WORKING, IDLE).view
+  const old = seen(121_001)
+  expect([old.percent, countsText(old.parts)]).toEqual([none.percent, countsText(none.parts)])
+  expect(seen(60_000).percent).toBeLessThan(none.percent)
+})
+
 test('a finished session counts 1 whatever its fill', () => {
-  const units = bandUnitsOf([{ id: 'local_d', state: 'done', fill: 0.4 }], boardOf([WORKING[3]!]), IDLE)
+  const units = bandUnitsOf([{ id: 'local_d', state: 'done', fill: 0.4 }], boardOf([WORKING[3]!]), IDLE, liveOf([], [WORKING[3]!]))
   expect([units[0]?.value, units[0]?.isFinished]).toEqual([1, true])
 })
 
@@ -872,11 +875,12 @@ test('terminal bar shows at least one cell once there is progress, even when not
 test('without a Client the narrow Board button is still named Open board', async ($, on) => {
   const current = boardOf(WORKING)
   on('ui.render', { component: 'Pane', requestId: PROBE }, ($, event) => {
-    const progress = bandProgress(current, liveOf([], WORKING))
+    const live = liveOf([], WORKING)
+    const progress = bandProgress(current, live)
     if (!progress) throw new Error('no band')
     const table = $.ui.resolve(event)
     const { Box, Button, Text } = table
-    const view = bandViewOf(columnsFor(500), current, progress, false, IDLE, { board: () => undefined, chat: () => undefined })
+    const view = bandViewOf(columnsFor(500), current, progress, false, IDLE, { board: () => undefined, chat: () => undefined }, live)
     return 'Svg' in table ? Band({ Box, Text, Button, Svg: guardSvg(table.Svg, Text) }, { view }) : <Text>none</Text>
   })
   const ui = await $.ui.mount({ plugin: 'master-session', component: 'Pane', requestId: PROBE, surface: 'vscode', props: { title: 'band', isFocused: false, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 6 }, view: {} } })

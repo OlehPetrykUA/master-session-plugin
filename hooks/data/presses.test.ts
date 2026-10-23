@@ -89,15 +89,18 @@ test('only the newest retry can reset the wait: an older timer firing early does
 })
 
 test('register wires ui.fault to recoverFault: one retry at 5 s, then ui.render is invalidated', async () => {
-  const handlers: Record<string, (...args: never[]) => unknown> = {}
+  const handlers: Record<string, (...args: unknown[]) => unknown> = {}
   const on = ((name: string, ...rest: unknown[]) => {
-    handlers[name] = rest[rest.length - 1] as (...args: never[]) => unknown
+    handlers[name] = rest[rest.length - 1] as (...args: unknown[]) => unknown
     return { catch: () => undefined }
   }) as never
-  register(on, {} as never)
+  register(on, {})
   const world = fakeClock()
   calm(world)
-  await (handlers['ui.fault'] as (...args: unknown[]) => unknown)(world.$, { element: 'hit-refresh' }, async () => undefined)
+  const passed: unknown[] = []
+  const event = { element: 'hit-refresh' }
+  await handlers['ui.fault']?.(world.$, event, async (e: unknown) => void passed.push(e))
+  expect(passed).toEqual([event])
   const before = world.invalidated.length
   world.advance(4_999)
   expect(world.invalidated.length).toBe(before)

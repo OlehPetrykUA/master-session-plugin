@@ -11,8 +11,6 @@ export type SummaryProps = { blocks: readonly Block[]; perRow: number; width: nu
 
 export const CAPTION = 11
 
-export { tileInnerOf }
-
 export function subOf(one: Block, inner: number) {
   const subs = [one.sub, ...(one.shorts ?? [])]
   return subs.find(text => textWidth(text, CAPTION) <= inner) ?? subs.at(-1)

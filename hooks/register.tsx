@@ -26,12 +26,11 @@ import { clearPresses, hasFaults, recoverFault, runPress } from './data/presses'
 import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
 import { skipWhileBusy } from './data/flight'
 import { briefed, claim, engage, inPlan, isActive, recordTurnEnd, recorder, startRecorder } from './data/recorder'
-import { workflowRunsOf } from './lib/agents'
 import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
-import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, TICK_MS, TICK_SLOW_MS } from './lib/constants'
+import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, TICK_MS } from './lib/constants'
 import { messageOf } from './lib/format'
-import { openIdOf } from './lib/list'
+import { elapsedOfItem, openIdOf, runAgentsOf } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
 import { getAgents, getLive, getRepos, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
@@ -41,21 +40,16 @@ let pending: { row: number; at: number } | undefined
 let shown = { offset: 0, renders: 0 }
 let isResyncing = false
 let aimedRow: number | undefined
-let lastTick = 0
+let lastLabels = ''
 
 async function tickTimes($: EngineInterface) {
   if (!isActive() || !(await isMaster($)) || !(await isPaneOpen($))) return
-  const now = await $.clock.now()
-  const agents = await getAgents($)
-  const live = await getLive($)
-  const seen = [
-    ...agents.filter(one => one.state === 'running'),
-    ...workflowRunsOf(agents, await getWorkflows($)).filter(one => one.state === 'running'),
-  ].map(one => one.startedAt)
-  const sessions = live.sessions.flatMap(one => (one.isRunning && !one.isArchived && one.createdAt !== undefined ? [one.createdAt] : []))
-  const isFresh = [...seen, ...sessions, ...(live.at ? [live.at] : [])].some(at => now - at <= TICK_SLOW_MS + TICK_MS)
-  if (!isFresh && now - lastTick < TICK_SLOW_MS) return
-  lastTick = now
+  const data = await paneData($, columns)
+  const view = paneViewOf(data)
+  const shown = view.items.flatMap(item => (item.kind === 'workflow' ? [item, ...runAgentsOf(item.run, data.agents)] : [item]))
+  const labels = [...shown.map(item => elapsedOfItem(item, data.at)), view.status.text, view.blocks.find(block => block.key === 'duration')?.value].join('|')
+  if (labels === lastLabels) return
+  lastLabels = labels
   $.ui.invalidate('ui.render')
 }
 
@@ -83,7 +77,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     startSources(String((await $.env.get('HOME')) ?? ''))
-    lastTick = 0
+    lastLabels = ''
     await startRecorder($)
     $.clock.every(
       FILE_MS,

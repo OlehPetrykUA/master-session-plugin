@@ -7,7 +7,7 @@ import type { AgentRecord, WorkflowRecord } from '../types'
 
 import { subagentsOf, workflowRunsOf } from './lib/agents'
 import type { Child } from './testing/world'
-import { BOARD, BOARD_TOOL, HOME, PANE, PLUGIN_ORIGIN, SELF, SPAWN, click, started, textsOf, typed, warmUp, world } from './testing/world'
+import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, click, pluginScroll, started, textsOf, typed, warmUp, world } from './testing/world'
 
 warmUp()
 
@@ -62,14 +62,13 @@ test('the scroll tool moves the desktop pane to every drawn section and refuses 
   }) as never)
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  const raise = $.ui as unknown as { scroll: (input: unknown) => Promise<unknown> }
   const move = async (to: string) => {
     const answer = (await $.tool.call({ tool: 'mcp__master-session__scroll', to })) as { result?: string; deny?: string }
     const text = String(answer.result ?? answer.deny)
     const row = Number(/\(row (\d+)\)/.exec(text)?.[1] ?? -1)
     expect(text).toBe(`Not scrolled (row ${row}): no implementation for ui.scroll`)
     landed.length = 0
-    await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 20, contentRows: 400, origin: PLUGIN_ORIGIN })
+    await pluginScroll($, { offset: 0, by: 0, bodyRows: 20, contentRows: 400 })
     expect(landed).toEqual([row])
     return row
   }
@@ -88,12 +87,12 @@ test('the scroll tool moves the desktop pane to every drawn section and refuses 
   expect(String(answer.deny)).toContain('section-expanded is not drawn')
   await click(ui, 'hit-row-local_env')
   expect(await move('section-expanded')).toBe(tiles)
-  await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 7, by: 7, bodyRows: 20, contentRows: 400, origin: PLUGIN_ORIGIN })
+  await pluginScroll($, { offset: 7, by: 7, bodyRows: 20, contentRows: 400 })
   expect(landed.at(-1)).toBe(7)
   const asked = await move('section-list')
   await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'section-list' })
   landed.length = 0
-  await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 20, contentRows: 22, origin: PLUGIN_ORIGIN })
+  await pluginScroll($, { offset: 0, by: 0, bodyRows: 20, contentRows: 22 })
   expect(landed).toEqual([asked])
   await ui.unmount()
 })
@@ -208,8 +207,7 @@ async function landedAfterOpen($: Engine, on: On, child: Child) {
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await $.tool.call({ tool: 'mcp__master-session__open', expand: 'local_setup' })
   await run.clock.settle()
-  const raise = $.ui as unknown as { scroll: (input: unknown) => Promise<unknown> }
-  await raise.scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 20, contentRows: 400, origin: PLUGIN_ORIGIN })
+  await pluginScroll($, { offset: 0, by: 0, bodyRows: 20, contentRows: 400 })
   await ui.unmount()
   return { landed, run }
 }
