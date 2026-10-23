@@ -59,7 +59,7 @@ export const GROUP_OF: Record<Status, SessionState> = {
 const PERSONA: Record<string, string> = {
   implementer: 'Implementer',
   refactorer: 'Refactorer',
-  reviewer: 'Reviewer',
+  reviewer: 'Code reviewer',
   'qa-verifier': 'QA verifier',
   'design-checker': 'Design checker',
   researcher: 'Researcher',

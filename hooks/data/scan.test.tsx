@@ -171,3 +171,14 @@ test('a forced refresh re-reads the repo base instead of the remembered one', { 
   await clock.settle()
   expect((await repoOfProbe($))?.base).toBeUndefined()
 })
+
+test('each tracked repo counts what landed on its base since the run start, with one capped rev-list per refresh', { plugins: [PROBE] }, async ($, on) => {
+  const { clock, gits } = await master($, on)
+  const repo = await repoOfProbe($)
+  expect((repo as unknown as { landed?: number }).landed).toBe(2)
+  const since = gits.filter(argv => argv.some(one => one.startsWith('--since=')))
+  expect(since.length).toBeGreaterThan(0)
+  const before = since.length
+  await clock.advance(60_000)
+  expect(gits.filter(argv => argv.some(one => one.startsWith('--since='))).length).toBe(before)
+})

@@ -262,7 +262,7 @@ export const register: Register = on => {
       board: () => void openPane($),
       chat: (id, name) => void openSession($, id, name),
     }, live, await getRepos($))
-    return Svg ? Band({ Box, Text, Button, Svg, Client }, { view, progress }) : TextBand({ Box, Text, Button }, { view, progress, columns: bandColumns })
+    return Svg ? Band({ Box, Text, Button, Svg, Client }, { view }) : TextBand({ Box, Text, Button }, { view, columns: bandColumns })
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

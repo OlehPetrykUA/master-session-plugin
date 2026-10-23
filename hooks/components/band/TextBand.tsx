@@ -1,10 +1,9 @@
 import type { BandView } from '../../lib/band'
-import type { Progress } from '../../lib/board'
 import { countsText } from '../../lib/band'
 import type { BarTone } from '../../theme/strip'
 import type { TextUi } from '../types'
 
-export type TextBandProps = { view: BandView; progress: Progress; columns: number }
+export type TextBandProps = { view: BandView; columns: number }
 
 const TERMINAL: Record<BarTone, string> = { red: 'error', green: 'success', grey: 'subtle' }
 
@@ -18,7 +17,7 @@ export function TextBand(ui: TextUi, props: TextBandProps) {
   const counts = showCounts ? countsText(parts) : ''
   const fixed = lead.length + counts.length + (action?.label.length ?? 0) + 12
   const cells = Math.max(CELLS.least, Math.min(CELLS.most, columns - fixed))
-  const filled = view.isAllDone ? cells : Math.min(cells - 1, Math.max(view.isRunning ? 1 : 0, Math.floor(cells * view.overall)))
+  const filled = view.isAllDone ? cells : Math.min(cells - 1, Math.max(view.isRunning || view.overall > 0 ? 1 : 0, Math.floor(cells * view.overall)))
   return (
     <Box flexDirection="row" gap={1}>
       {lead ? (

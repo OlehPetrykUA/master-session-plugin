@@ -148,7 +148,7 @@ test('subagents name their parent chain: the parent session by persona, an earli
   const nested: Context = { ...context, rows, agents: tree }
   const list = itemsOf(rows, tree, [], {})
   const line = (id: string) => lineOf(list.find(item => item.id === id)!, nested)
-  expect([list.find(item => item.id === 'p')?.status, line('p')]).toEqual(['waiting', { chain: 'Implementer ›', word: { status: 'waiting', text: 'waiting' }, text: 'on Reviewer · review a38c72e', isQuestion: false }])
+  expect([list.find(item => item.id === 'p')?.status, line('p')]).toEqual(['waiting', { chain: 'Implementer ›', word: { status: 'waiting', text: 'waiting' }, text: 'on Code reviewer · review a38c72e', isQuestion: false }])
   expect([list.find(item => item.id === 'k')?.status, line('k')]).toEqual(['needs', { chain: '… › QA verifier ›', text: 'Allow Bash: rm -rf dist?', isQuestion: true }])
 })
 
@@ -157,7 +157,7 @@ test('a run with an agent asking turns needs-you, names the asking agent with it
   if (run?.kind !== 'workflow') throw new Error('no run')
   const asking = { ...run.run, agents: run.run.agents.map(one => (one.index === 3 ? { ...one, type: 'master-session:reviewer', asking: { text: 'Allow Bash: rm -rf dist?', since: NOW } } : one)) }
   const item: RowItem = { ...run, status: runStatusOf(asking), run: asking }
-  expect(said(item)).toEqual(['needs', 'Workflow · review-changes', 'Reviewer asks: Allow Bash: rm -rf dist?'])
+  expect(said(item)).toEqual(['needs', 'Workflow · review-changes', 'Code reviewer asks: Allow Bash: rm -rf dist?'])
   expect(runAgentsOf(asking, agents).map(one => one.status)).toEqual(['done', 'failed', 'needs'])
   expect(runStatusOf({ ...run.run, counts: { ...run.run.counts, asking: 1 } as typeof run.run.counts })).toBe('needs')
 })
@@ -167,6 +167,25 @@ test('an archived session names itself from its board entry and says when it was
   const item = archivedItemOf(one, { ...board, sessions: [{ id: 'z', name: 'z', state: 'done', title: 'Implementer · Savvy removal' }] })
   expect(said(item)).toEqual(['archived', 'Implementer · Savvy removal', 'archived 2h ago · worktree removed'])
   expect(said(archivedItemOf(one))).toEqual(['archived', 'Session · old title', 'archived 2h ago · worktree removed'])
+})
+
+test('the run starts at the earliest of the board, the sessions and the subagents, so duration and since agree', () => {
+  const HOUR = 3_600_000
+  const old = [{ id: 'z1', type: 'Explore', description: 'scan', state: 'running' as const, startedAt: NOW - 2 * HOUR }]
+  const only = runSummaryOf({ rows: [], counts: countsOf([], []), archived: 0, agents: old, workflows: [], board: null, trees: [], at: NOW })
+  expect(only.duration).toEqual({ since: NOW - 2 * HOUR, ms: 2 * HOUR })
+  const fresh = { sessions: [], needsYou: [], repos: [], source: 'tool' as const, since: NOW - 60_000 }
+  const withBoard = runSummaryOf({ rows: [], counts: countsOf([], []), archived: 0, agents: old, workflows: [], board: fresh, trees: [], at: NOW })
+  expect(withBoard.duration.since).toBe(NOW - 2 * HOUR)
+  const none = runSummaryOf({ rows: [], counts: countsOf([], []), archived: 0, agents: [], workflows: [], board: fresh, trees: [], at: NOW })
+  expect(none.duration.since).toBe(NOW - 60_000)
+})
+
+test('commits count what landed on the base since the run start when that is more than the workers reported', () => {
+  const repo = { path: '/r', name: 'r', localOnly: 0, base: 'main', landed: 5, worktrees: [] }
+  const sum = (landed: number) => runSummaryOf({ rows: [], counts: countsOf([], []), archived: 0, agents: [], workflows: [], board: null, trees: [{ ...repo, landed }], at: NOW }).commits
+  expect(sum(5)).toEqual({ total: 5, repos: 1 })
+  expect(sum(0)).toEqual({ total: 0, repos: 1 })
 })
 
 test('summary blocks read the run totals as the design words them, zeros and dashes before any work', () => {
@@ -180,7 +199,7 @@ test('summary blocks read the run totals as the design words them, zeros and das
     ['Workflows', '1', '1/3 agents', false],
     ['Commits', '0', '—', false],
     ['Tests', '—', 'none reported', false],
-    ['Duration', '0m'.replace('0m', '<1m'), expect.stringMatching(/^since \d\d:\d\d$/), false],
+    ['Duration', '6m', expect.stringMatching(/^since \d\d:\d\d$/), false],
     ['Git', '0', 'clean', false],
   ])
   expect(blocksOf(totals, true, '20:04')[6]?.sub).toMatch(/^\d\d:\d\d – 20:04$/)

@@ -423,7 +423,7 @@ test('without a Client: one native Button per face, each press runs its action',
       board: () => pressed.push('board'),
       chat: (id, name) => pressed.push(`chat ${id} ${name}`),
     })
-    return event.surface !== 'terminal' && 'Svg' in table ? Band({ Box, Text, Button, Svg: guardSvg(table.Svg, Text) }, { view, progress }) : TextBand({ Box, Text, Button }, { view, progress, columns: event.props.bodyColumns })
+    return event.surface !== 'terminal' && 'Svg' in table ? Band({ Box, Text, Button, Svg: guardSvg(table.Svg, Text) }, { view }) : TextBand({ Box, Text, Button }, { view, columns: event.props.bodyColumns })
   })
   const ui = await $.ui.mount({ plugin: 'master-session', component: 'Pane', requestId: PROBE, surface: 'vscode', props: { title: 'band', isFocused: false, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 6 }, view: {} } })
   expect(await ui.findAll({ type: 'Client' })).toEqual([])
@@ -569,13 +569,13 @@ test('geometry: bar 56 with gap 12, percent 36, pill 34 with 0 12 0 8, check 18,
 test('the needs-you pill names any kind: a session, a worker’s subagent with its parent and Open chat to that worker, this chat’s subagent or workflow agent with no Open chat', () => {
   const asking = WORKING.map(one => (one.id === 'local_b' ? { ...one, state: 'needs-you' as const, needsYou: 'Allow Bash: rm -rf dist' } : one))
   const remote = viewOf(asking, CREW({ remote: true }))
-  expect([remote.view.pillText, remote.view.alt]).toEqual(['Reviewer, in QA verifier, needs you · Allow Bash: rm -rf dist', 'Master session: Reviewer, in QA verifier, needs you, Allow Bash: rm -rf dist'])
+  expect([remote.view.pillText, remote.view.alt]).toEqual(['Code reviewer, in QA verifier, needs you · Allow Bash: rm -rf dist', 'Master session: Code reviewer, in QA verifier, needs you, Allow Bash: rm -rf dist'])
   expect(remote.view.action?.label).toBe('Open chat')
   remote.view.action?.press()
   expect(remote.chats).toEqual(['local_b mod-ui'])
-  expect(viewOf(asking, CREW({ remote: true }), columnsFor(400)).view.pillText).toBe('Reviewer needs you')
+  expect(viewOf(asking, CREW({ remote: true }), columnsFor(400)).view.pillText).toBe('Code reviewer needs you')
   const own = viewOf(WORKING, CREW({ own: true }))
-  expect([own.view.pillText, own.view.action]).toEqual(['Reviewer, in QA verifier, needs you · Allow Bash: rm -rf dist', undefined])
+  expect([own.view.pillText, own.view.action]).toEqual(['Code reviewer, in QA verifier, needs you · Allow Bash: rm -rf dist', undefined])
   const flow = viewOf(WORKING, CREW({ flow: true }))
   expect([flow.view.pillText, flow.view.action, flow.view.tone]).toEqual(['scan 1, in review-changes, needs you · Allow Edit: a.ts', undefined, 'red'])
   const session = viewOf(NEEDS, CREW())
@@ -697,7 +697,7 @@ test('the pill names the unit that asked first by its since, not by position', (
     workflows: [],
   })
   expect(viewOf(WORKING, crew(1, 5)).view.pillText).toBe('Designer needs you · early')
-  expect(viewOf(WORKING, crew(5, 1)).view.pillText).toBe('Reviewer needs you · late')
+  expect(viewOf(WORKING, crew(5, 1)).view.pillText).toBe('Code reviewer needs you · late')
 })
 
 test('Open chat hides when the prompt is already in this chat, and opens the asker’s own chat otherwise', () => {
@@ -741,6 +741,14 @@ test('terminal bar follows the bar: at least one cell while running, never full 
   await nearly.unmount()
 })
 
+test('terminal bar shows at least one cell once there is progress, even when nothing runs', async ($, on) => {
+  await band($, on, [{ ...WORKING[1]!, state: 'waiting', progress: 'step 1 of 50 — x' }])
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  const bar = (await textsOf(ui)).find(one => /^[█░]+$/.test(one)) ?? ''
+  expect(bar.startsWith('█')).toBe(true)
+  await ui.unmount()
+})
+
 test('without a Client the narrow Board button is still named Open board', async ($, on) => {
   const current = boardOf(WORKING)
   on('ui.render', { component: 'Pane', requestId: PROBE }, ($, event) => {
@@ -749,7 +757,7 @@ test('without a Client the narrow Board button is still named Open board', async
     const table = $.ui.resolve(event)
     const { Box, Button, Text } = table
     const view = bandViewOf(columnsFor(500), current, progress, false, IDLE, { board: () => undefined, chat: () => undefined })
-    return 'Svg' in table ? Band({ Box, Text, Button, Svg: guardSvg(table.Svg, Text) }, { view, progress }) : <Text>none</Text>
+    return 'Svg' in table ? Band({ Box, Text, Button, Svg: guardSvg(table.Svg, Text) }, { view }) : <Text>none</Text>
   })
   const ui = await $.ui.mount({ plugin: 'master-session', component: 'Pane', requestId: PROBE, surface: 'vscode', props: { title: 'band', isFocused: false, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 6 }, view: {} } })
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])

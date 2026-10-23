@@ -38,16 +38,19 @@ export function testsOf(rows: readonly Row[], board: Board | null) {
   return { value: '—', sub: 'none reported' }
 }
 
+export const runStartOf = (rows: readonly Row[], agents: readonly AgentRecord[], board: Board | null, at: number) =>
+  Math.min(...rows.flatMap(row => (row.live?.createdAt !== undefined ? [row.live.createdAt] : [])), ...agents.map(one => one.startedAt), board?.since ?? at)
+
 export function runSummaryOf({ rows, counts, archived, agents, workflows, board, trees, at }: RunSummaryInput) {
   const runs = workflowRunsOf(agents, workflows)
   const asking = agents.filter(one => one.state === 'running' && one.asking)
-  const since = Math.min(...rows.flatMap(row => (row.live?.createdAt !== undefined ? [row.live.createdAt] : [])), board?.since ?? at)
+  const since = runStartOf(rows, agents, board, at)
   return {
     sessions: { total: rows.length, 'needs-you': counts['needs-you'], waiting: counts.waiting, working: counts.working, done: counts.done, archived },
     needsYou: { sessions: counts['needs-you'], subagents: asking.filter(one => !one.run).length + new Set(asking.flatMap(one => (one.run ? [one.run.id] : []))).size },
     subagents: stateCountsOf(subagentsOf(agents)),
     workflows: { ...stateCountsOf(runs), agents: runs.reduce((sum, run) => sum + run.agents.length, 0), agentsDone: runs.reduce((sum, run) => sum + run.counts.done, 0) },
-    commits: { total: rows.reduce((sum, row) => sum + (row.board?.commits?.length ?? 0), 0), repos: trees.length },
+    commits: { total: Math.max(rows.reduce((sum, row) => sum + (row.board?.commits?.length ?? 0), 0), trees.reduce((sum, repo) => sum + (repo.landed ?? 0), 0)), repos: trees.length },
     tests: testsOf(rows, board),
     duration: { since, ms: at - since },
     git: { dirty: trees.reduce((sum, repo) => sum + repo.worktrees.reduce((count, tree) => count + tree.dirty, 0), 0) },

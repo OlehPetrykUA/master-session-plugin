@@ -79,6 +79,7 @@ export const PERSONA_GLYPH: Record<string, IconName> = {
   Implementer: 'implementer',
   Refactorer: 'refactorer',
   Reviewer: 'reviewer',
+  'Code reviewer': 'reviewer',
   'QA verifier': 'verifier',
   'Design checker': 'designChecker',
   Researcher: 'researcher',

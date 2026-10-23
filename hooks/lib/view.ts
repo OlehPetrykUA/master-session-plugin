@@ -57,9 +57,11 @@ export function paneViewOf(data: PaneData) {
 export type PaneView = ReturnType<typeof paneViewOf>
 
 export function headerButtonsOf(data: PaneData, onAsk: () => void, onRefresh: () => void): HeaderButton[] {
-  const ask: HeaderButton[] = data.asked
-    ? [{ id: 'ask', icon: 'check', label: 'Asked', onPress: onAsk, isQuiet: true }]
-    : [{ id: 'ask', icon: 'chat', label: data.columns * COLUMN >= ASK_WIDE_PX ? ASK_WIDE : 'Ask', onPress: onAsk }]
+  const ask: HeaderButton[] = !data.rows.length
+    ? []
+    : data.asked
+      ? [{ id: 'ask', icon: 'check', label: 'Asked', onPress: onAsk, isQuiet: true }]
+      : [{ id: 'ask', icon: 'chat', label: data.columns * COLUMN >= ASK_WIDE_PX ? ASK_WIDE : 'Ask', onPress: onAsk }]
   return [...ask, { id: 'refresh', icon: 'refresh', label: 'Refresh', onPress: onRefresh, isPressed: data.isRefreshing }]
 }
 

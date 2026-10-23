@@ -43,7 +43,7 @@ export const bandAction = (element: string) => {
 
 export const agentCountsOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]): AgentCounts => ({ agents, workflows })
 
-const counted = (count: number, word: string) => `${word}${count === 1 ? '' : 's'}`
+const wordFor = (count: number, word: string) => `${word}${count === 1 ? '' : 's'}`
 
 const clamp = (value: number) => Math.min(1, Math.max(0, value))
 
@@ -115,6 +115,7 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
     {},
   )
   const known = new Set(segments.map(one => one.id))
+  const rows = live ? rowsOf(current, live) : []
   for (const segment of segments) {
     const row = current?.sessions.find(one => one.id === segment.id)
     const name = row?.name ?? segment.id
@@ -122,7 +123,7 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
     const display = sessionNameOf(live?.sessions.find(one => one.id === segment.id)?.title || row?.title || name, row?.persona)
     const self = { name: nameText(display), short: display.persona, glyph: PERSONA_GLYPH[display.persona] ?? ('session' as const) }
     const { subs, runs } = remoteOf(agents, workflows, segment.id, { parent: display.persona === 'Session' ? display.task : display.persona, chat })
-    const found: Row = (live && rowsOf(current, live).find(one => one.id === segment.id)) || { id: segment.id, name, title: row?.title ?? '', state: segment.state, board: row }
+    const found: Row = rows.find(one => one.id === segment.id) || { id: segment.id, name, title: row?.title ?? '', state: segment.state, board: row }
     const group = GROUP_OF[sessionStatusOf(found, trees, live?.sessions ?? [])]
     const isAsking = group === 'needs-you'
     const child = isAsking ? [...subs, ...runs].find(one => one.asker && one.asker.reason === row?.needsYou) : undefined
@@ -166,8 +167,8 @@ export function countsOf(units: readonly Unit[], isAllDone: boolean): CountPart[
   const subagents = running('subagent')
   const workflows = running('workflow')
   const entries: [number, string][] = [[sessions('working'), 'working'], [sessions('waiting'), 'waiting']]
-  if (subagents) entries.push([subagents, counted(subagents, 'subagent')])
-  if (workflows) entries.push([workflows, counted(workflows, 'workflow')])
+  if (subagents) entries.push([subagents, wordFor(subagents, 'subagent')])
+  if (workflows) entries.push([workflows, wordFor(workflows, 'workflow')])
   return entries.flatMap(([count, word], index): CountPart[] => [...(index ? [{ text: SEPARATOR, isNumber: false }] : []), { text: String(count), isNumber: true }, { text: ` ${word}`, isNumber: false }])
 }
 

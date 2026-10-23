@@ -10,6 +10,7 @@ import { ARCHIVE_LIMIT, BOARD_TOOL, GIT_CAP, LIVE_LIMIT, PANE, TITLE, TREE_STALE
 import { messageOf } from '../lib/format'
 import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
+import { runStartOf } from '../lib/totals'
 import { familyOf, rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
 import { getAgents, getBoard, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
@@ -25,7 +26,7 @@ let publishedAt = 0
 let flight: Promise<void> | undefined
 let isQueued = false
 const seenTrees = new Map<string, { key: string; at: number; tree: Worktree }>()
-const seenRepos = new Map<string, { key: string; at: number; base: string | undefined; localOnly: number }>()
+const seenRepos = new Map<string, { key: string; at: number; base: string | undefined; localOnly: number; landed: number }>()
 const gitDirs = new Map<string, string>()
 
 export function startSources(value: string) {
@@ -244,22 +245,21 @@ async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees
   return scanned
 }
 
-export async function repoOf($: EngineInterface, path: string, tick: Tick): Promise<Repo | undefined> {
+async function factsOf($: EngineInterface, path: string, tick: Tick, key: string, at: number, start: number) {
+  const base = await baseOf($, path, tick)
+  const localOnly = (await git($, path, ['for-each-ref', 'refs/heads', '--format=x%(upstream:short)'], tick).catch(soft(''))).split('\n').filter(line => line === 'x').length
+  const landed = base ? Number((await git($, path, ['rev-list', '--count', `--since=${new Date(start).toISOString()}`, `refs/heads/${base}`], tick).catch(soft('0'))).trim()) || 0 : 0
+  return { key, at, base, localOnly, landed }
+}
+
+export async function repoOf($: EngineInterface, path: string, tick: Tick, start: number): Promise<Repo | undefined> {
   const listing = await git($, path, ['worktree', 'list', '--porcelain'], tick)
   const trees = parseWorktrees(listing)
   const main = trees.find(tree => tree.isMain) ?? trees[0]
   if (!main) return undefined
   const now = await $.clock.now()
   const seen = seenRepos.get(main.path)
-  const facts =
-    !tick.isForced && seen?.key === listing && now - seen.at < TREE_STALE_MS
-      ? seen
-      : {
-          key: listing,
-          at: now,
-          base: await baseOf($, path, tick),
-          localOnly: (await git($, path, ['for-each-ref', 'refs/heads', '--format=x%(upstream:short)'], tick).catch(soft(''))).split('\n').filter(line => line === 'x').length,
-        }
+  const facts = !tick.isForced && seen && seen.key === listing && now - seen.at < TREE_STALE_MS ? seen : await factsOf($, path, tick, listing, now, start)
   seenRepos.set(main.path, facts)
   const worktrees: Worktree[] = []
   for (const tree of trees) worktrees.push(await treeOf($, tree, facts.base, tick, now))
@@ -268,6 +268,7 @@ export async function repoOf($: EngineInterface, path: string, tick: Tick): Prom
     name: home && main.path.startsWith(`${home}/`) ? `~${main.path.slice(home.length)}` : main.path,
     localOnly: facts.localOnly,
     base: facts.base,
+    landed: facts.landed,
     worktrees,
   }
 }
@@ -308,6 +309,7 @@ async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[
   const { board: current } = await boardOf($)
   const live = await getLive($)
   const rows = rowsOf(current, live)
+  const start = runStartOf(rows, await getAgents($), current, await $.clock.now())
   const paths = [
     ...rows.flatMap(row => [row.board?.cwd ?? '', row.live?.cwd ?? ''].filter(Boolean)),
     ...rows.flatMap(row => sideOf(row, sessions ?? familyOf(live), [])).map(one => one.cwd),
@@ -319,7 +321,7 @@ async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[
   for (const path of new Set(paths)) {
     if ([...found.values()].some(repo => repo.worktrees.some(tree => tree.path === path))) continue
     try {
-      const repo = await repoOf($, path, tick)
+      const repo = await repoOf($, path, tick, start)
       if (repo) found.set(repo.path, repo)
       else failed.push(path)
     } catch (error) {

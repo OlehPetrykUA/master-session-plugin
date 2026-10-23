@@ -99,6 +99,7 @@ export type Repo = {
   localOnly: number
   base?: string
   onBase?: string[]
+  landed?: number
   worktrees: Worktree[]
 }
 

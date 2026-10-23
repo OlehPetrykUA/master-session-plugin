@@ -1,5 +1,4 @@
 import type { BandView } from '../../lib/band'
-import type { Progress } from '../../lib/board'
 import { across, tall } from '../../lib/layout'
 import { BAR, BUTTON, CHECK, PERCENT, PILL } from '../../theme/band'
 import { glyph } from '../../theme/icons'
@@ -10,7 +9,7 @@ import type { Tone } from '../../theme/tokens'
 import type { Ui } from '../types'
 import { BandButton } from './BandButton'
 
-export type BandProps = { view: BandView; progress: Progress }
+export type BandProps = { view: BandView }
 
 export function Band(ui: Ui, props: BandProps) {
   const { Box, Text, Svg } = ui
