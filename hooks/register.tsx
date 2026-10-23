@@ -11,7 +11,6 @@ import {
   boardOf,
   isMaster,
   isPaneOpen,
-  tracePane,
   openAsking,
   markMaster,
   openPane,
@@ -27,9 +26,10 @@ import { clearPresses, hasFaults, recoverFault, runPress } from './data/presses'
 import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
 import { skipWhileBusy } from './data/flight'
 import { briefed, claim, engage, inPlan, isActive, recordTurnEnd, recorder, startRecorder } from './data/recorder'
+import { workflowRunsOf } from './lib/agents'
 import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
-import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL } from './lib/constants'
+import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, TICK_MS, TICK_SLOW_MS } from './lib/constants'
 import { messageOf } from './lib/format'
 import { openIdOf } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
@@ -41,6 +41,23 @@ let pending: { row: number; at: number } | undefined
 let shown = { offset: 0, renders: 0 }
 let isResyncing = false
 let aimedRow: number | undefined
+let lastTick = 0
+
+async function tickTimes($: EngineInterface) {
+  if (!isActive() || !(await isMaster($)) || !(await isPaneOpen($))) return
+  const now = await $.clock.now()
+  const agents = await getAgents($)
+  const live = await getLive($)
+  const seen = [
+    ...agents.filter(one => one.state === 'running'),
+    ...workflowRunsOf(agents, await getWorkflows($)).filter(one => one.state === 'running'),
+  ].map(one => one.startedAt)
+  const sessions = live.sessions.flatMap(one => (one.isRunning && !one.isArchived && one.createdAt !== undefined ? [one.createdAt] : []))
+  const isFresh = [...seen, ...sessions, ...(live.at ? [live.at] : [])].some(at => now - at <= TICK_SLOW_MS + TICK_MS)
+  if (!isFresh && now - lastTick < TICK_SLOW_MS) return
+  lastTick = now
+  $.ui.invalidate('ui.render')
+}
 
 function lastShown() {
   return shown
@@ -49,7 +66,6 @@ function lastShown() {
 async function scrollToRow($: EngineInterface, row: number) {
   pending = { row, at: await $.clock.now() }
   if (!(await isPaneOpen($))) return void (pending = undefined)
-  await tracePane($, `scroll row=${row}`)
   await $.ui.scroll({ in: PANE, to: 'start', block: 'start' }).catch(() => undefined)
 }
 
@@ -67,6 +83,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     startSources(String((await $.env.get('HOME')) ?? ''))
+    lastTick = 0
     await startRecorder($)
     $.clock.every(
       FILE_MS,
@@ -75,6 +92,7 @@ export const register: Register = on => {
       }),
     )
     $.clock.every(FILE_MS, skipWhileBusy(async () => (isActive() ? refreshAgents($) : undefined)))
+    $.clock.every(TICK_MS, skipWhileBusy(() => tickTimes($)))
     $.clock.every(LIVE_MS, () => void refreshAll($).catch(() => undefined))
     await $.tool.register({
       name: 'open',
@@ -120,7 +138,7 @@ export const register: Register = on => {
     const note = await workerNote($)
     if (note) return { text: note }
     if (e.args.trim() === 'ask') return { text: await askAll($) }
-    await openPane($, 'info')
+    await openPane($)
     return { text: OPENED }
   }).catch(($, e, next) => next(e))
 
@@ -130,7 +148,7 @@ export const register: Register = on => {
       const note = await workerNote($)
       if (note) return { text: note }
       await markMaster($)
-      await openPane($, 'start')
+      await openPane($)
       return { text: OPENED }
     }
     return next(e)
@@ -161,7 +179,7 @@ export const register: Register = on => {
     const isShown = !!expand && !!card
     if (isArchived || isShown) await setFilter($, isArchived ? 'archived' : 'all')
     if (isShown) await setExpanded($, () => [card])
-    const isPlaced = await openPane($, 'open-tool')
+    const isPlaced = await openPane($)
     const top = isShown ? sectionsOf(await paneData($, columns || 48))['section-expanded'] : undefined
     void scrollToRow($, top === undefined ? 0 : scrollRowOf('section-expanded', top, pinOf(data).headerRows))
     const shown = [isArchived ? 'the Archived list' : '', isShown ? `${card} expanded${item && item.id !== card ? ` in ${item.id}` : ''}` : ''].filter(Boolean).join(' with ')
@@ -237,14 +255,12 @@ export const register: Register = on => {
   })
 
   on('ui.open', { id: PANE }, async ($, event, next) => {
-    await tracePane($, 'ui.open')
     const opened = await next(event)
     $.ui.invalidate('ui.render')
     return opened
   })
 
   on('ui.close', { id: PANE }, async ($, event, next) => {
-    await tracePane($, `ui.close origin=${event.origin.kind}`)
     const closed = await next(event)
     $.ui.invalidate('ui.render')
     return closed
@@ -253,7 +269,7 @@ export const register: Register = on => {
   on('ui.message', { element: /^band-hit-/ }, async ($, event, next) => {
     const action = bandAction(event.element)
     if (!action || typeof (event.data as { press?: unknown } | undefined)?.press !== 'string') return next(event)
-    await (action === 'board' ? openPane($, 'band') : openAsking($))
+    await (action === 'board' ? openPane($) : openAsking($))
     return {}
   })
 
@@ -271,7 +287,7 @@ export const register: Register = on => {
     const Svg = event.surface !== 'terminal' && 'Svg' in table ? guardSvg(table.Svg, Text) : undefined
     const Client = event.surface === 'desktop' && 'Client' in table && !hasFaults() ? table.Client : undefined
     const view = bandViewOf(bandColumns, current, progress, isOpen, agents, {
-      board: () => void openPane($, 'band'),
+      board: () => void openPane($),
       chat: (id, name) => void openSession($, id, name),
     }, live, await getRepos($))
     return Svg ? Band({ Box, Text, Button, Svg, Client }, { view }) : TextBand({ Box, Text, Button }, { view, columns: bandColumns })

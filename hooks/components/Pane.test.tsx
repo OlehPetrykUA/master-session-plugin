@@ -275,7 +275,7 @@ test('Refresh always shows that it ran: a forced refresh stamps the time even wh
   const { clock } = await started($, on)
   const before = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await clock.advance(5 * 60_000)
-  expect(await textsOf(before)).toContain('updated just now')
+  expect(await textsOf(before)).toContain('updated 4m ago')
   await before.unmount()
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await textsOf(ui)).toContain('updated 5m ago')

@@ -15,7 +15,6 @@ import { familyOf, rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
 import { getAgents, getBoard, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
-import { keptAgents } from './agents'
 import { claim, detected, inPlan, isActive, roleOf, sessionFacts } from './recorder'
 import { askForUpdates, readReports, writeBoard } from './status'
 
@@ -93,10 +92,8 @@ export async function refreshReports($: EngineInterface) {
   const onBoard = new Set((await getBoard($))?.sessions.map(one => one.id))
   const mine = liveReportsOf((await readReports($, home)).filter(one => one.parent === self || onBoard.has(one.session)), await getLive($))
   await saveReports($, () => mine)
-  const now = await $.clock.now()
   await saveWorkflows($, workflows => withReportedRuns(workflows, mine))
-  const workflows = await getWorkflows($)
-  await saveAgents($, agents => keptAgents(withReported(agents, mine), workflows, now))
+  await saveAgents($, agents => withReported(agents, mine))
   await republishBoard($)
 }
 
@@ -323,15 +320,6 @@ export async function isPaneOpen($: EngineInterface) {
   return (await $.ui.panes()).some(pane => pane.id === PANE && pane.isShown && pane.isPlaced)
 }
 
-let traced: string[] = []
-
-export async function tracePane($: EngineInterface, what: string) {
-  if (!home || (await $.env.get('MASTER_SESSION_TRACE_PANE').catch(() => undefined)) !== '1') return
-  const panes = JSON.stringify(await $.ui.panes().catch(() => []))
-  traced = [...traced, `${await $.clock.now()} ${what} panes=${panes}`].slice(-300)
-  await $.fs.write(`${home}/.claude/state/master-session/pane-trace.log`, traced.join('\n')).catch(() => undefined)
-}
-
 export async function isMaster($: EngineInterface) {
   return !!(await getBoard($))
 }
@@ -387,9 +375,8 @@ export async function workerNote($: EngineInterface) {
   return `This is a worker session of ${title ? `"${title}" (${parent})` : parent}: the master session pane is only in that session.`
 }
 
-export async function openPane($: EngineInterface, caller = '') {
+export async function openPane($: EngineInterface) {
   if (await isWorker($)) return false
-  await tracePane($, `openPane caller=${caller}`)
   const opened = await $.ui.open({ id: PANE, title: TITLE, focus: true })
   void refreshAll($, true).catch(() => undefined)
   return opened.isPlaced

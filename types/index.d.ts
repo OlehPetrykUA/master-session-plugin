@@ -4,6 +4,8 @@ export type Filter = 'all' | SessionState | 'archived'
 
 export type ArchiveView = 'closed' | 'open' | 'all'
 
+export type Role = { role: 'worker' | 'master' | ''; self: string; parent: string }
+
 export type Asked = { at: number; count: number }
 
 export type Undone = { ids: string[]; name: string; skipped: number; group: SessionState; index: number; at: number }
@@ -207,6 +209,8 @@ declare module 'claude-code' {
       reports: Report[]
       agents: AgentRecord[]
       workflows: WorkflowRecord[]
+      role: Role
+      isPlan: boolean
     }
   }
 }

@@ -20,6 +20,7 @@ const OUTPUT: Record<string, string> = {
   'git commit -m "broken"': '[main 9f9f9f9] broken',
   'pytest -q tests FAIL': '1 failed, 3 passed in 0.2s',
   'tsc -p . --noEmit': '',
+  'git commit -m "feat: y"': '[main 2b3c4d5] feat: y',
 }
 
 type Hook = ($: unknown, e: unknown, next: (e: unknown) => Promise<unknown>) => unknown
@@ -534,4 +535,25 @@ test('a successful check clears the rejection, so a later return to the place ch
   expect(run.reportNow()?.git?.path).toBe('/home/me/q')
   await run.bash('cd ~/p && tsc -p . --noEmit')
   expect(run.reportNow()?.git?.path).toBe('/home/me/p')
+})
+
+test('any successful check clears the rejection, so a rejected place is checked again after a commit elsewhere', async () => {
+  const run = world()
+  await run.start()
+  run.breakGit('/home/me/new')
+  await run.bash('cd ~/new && tsc -p . --noEmit')
+  const gits = () => run.ran.filter(argv => argv.includes('-C') && argv[argv.indexOf('-C') + 1] === '/home/me/new').length
+  await run.bash('git commit -m "feat: y"')
+  await run.bash('cd ~/new && tsc -p . --noEmit')
+  expect(gits()).toBe(2)
+})
+
+test('a path segment named git is not a git command: the rejected place is not checked again within 30 s', async () => {
+  const run = world()
+  await run.start()
+  run.breakGit('/home/me/git/scratch')
+  const gits = () => run.ran.filter(argv => argv.includes('-C') && argv[argv.indexOf('-C') + 1] === '/home/me/git/scratch').length
+  await run.bash('cd ~/git/scratch && tsc -p . --noEmit')
+  await run.bash('cd ~/git/scratch && tsc -p . --noEmit')
+  expect(gits()).toBe(1)
 })

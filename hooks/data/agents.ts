@@ -116,8 +116,6 @@ export function launched(workflows: WorkflowRecord[], toolUseId: string, result:
   return known ? workflows.map(one => (one.id === id ? record : one)) : [...workflows, record]
 }
 
-export const keptAgents = (agents: AgentRecord[], _workflows: readonly WorkflowRecord[], _now: number) => agents
-
 export async function recordSpawn($: EngineInterface, e: AgentSpawnInput, out: AgentSpawnResult) {
   const now = await $.clock.now()
   await saveAgents($, agents => spawned(agents, e, out, now))

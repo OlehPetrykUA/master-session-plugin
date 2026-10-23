@@ -2,17 +2,15 @@ import type { EngineInterface, On, ToolCallInput, TurnCompleteInput } from 'clau
 
 import { asked, reportAgentsOf, reportRunsOf } from '../lib/agents'
 import { expandHome, parseStatus } from '../lib/git'
-import { getAgents, getBoard, getLive, getWorkflows, saveAgents, saveLive } from '../state/atoms'
+import { getAgents, getBoard, getLive, getPlan, getRole, getWorkflows, saveAgents, saveLive, savePlan, saveRole } from '../state/atoms'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
-import type { ReportAgent, ReportRun, SessionState } from '../../types'
+import type { ReportAgent, ReportRun, Role, SessionState } from '../../types'
 import { boardPath, parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
 type Held = { text: string; tool: string; state: SessionState; needsYou?: string; by?: string }
 
 const MAIN = ''
-
-export type Role = { role: 'worker' | 'master' | ''; self: string; parent: string }
 
 const NO_ROLE: Role = { role: '', self: '', parent: '' }
 const COMMIT_LINE = /^\[[^\]\s]+(?: \([^)]*\))? ([0-9a-f]{7,40})\] (.+)$/m
@@ -244,19 +242,34 @@ async function detect($: EngineInterface) {
   const asked = isChild ? String(me.parentSessionId) : ''
   const isMasterParent = !!asked && (await $.fs.stat(boardPath(home, asked)).then(stat => stat.kind === 'file', () => false))
   const parent = isChild ? (isMasterParent ? asked : '') : await parentFromBoards($, home, self)
-  const engineId = await $.session.id()
-  role = { role: parent ? 'worker' : 'master', self, parent }
-  if (!parent) {
+  await adopt($, { role: parent ? 'worker' : 'master', self, parent })
+  return true
+}
+
+async function adopt($: EngineInterface, next: Role) {
+  role = next
+  await saveRole($, next)
+  if (!next.parent) {
     await $.tool.register(REPORTS_SPEC)
-    return true
+    return
   }
+  const engineId = await $.session.id()
   const now = await $.clock.now()
-  const known = await readReport($, home, self)
+  const known = await readReport($, home, next.self)
   outbox = reportAgentsOf(await getAgents($))
   runsOut = reportRunsOf(await getWorkflows($))
   await $.tool.register(REPORT_SPEC)
-  await save($, { ...(known ?? freshReport(self, parent, engineId, now)), parent, engineId }, now)
-  return true
+  await save($, { ...(known ?? freshReport(next.self, next.parent, engineId, now)), parent: next.parent, engineId }, now)
+}
+
+async function resume($: EngineInterface) {
+  isPlan = await getPlan($)
+  const saved = await getRole($)
+  if (await getBoard($)) isClaimed = true
+  if (saved.role) {
+    await adopt($, saved)
+    detecting = Promise.resolve()
+  }
 }
 
 export function engage($: EngineInterface) {
@@ -292,10 +305,11 @@ async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?:
   const isTest = tests.length > 0
   const place = repoOf(e.command, home)
   const now = await $.clock.now()
-  const isSkipped = !!place && place === rejected?.place && !/\bgit\b/.test(e.command) && now - rejected.at < REJECT_MS
+  const isSkipped = !!place && place === rejected?.place && !segmentsOf(e.command).some(one => /^git\b/.test(one)) && now - rejected.at < REJECT_MS
   const isMoved = !!place && place !== gitCwd && !isSkipped
   if (!commit && !isTest && !isMoved) return
   const git = commit || isMoved ? await gitOf($, now, isMoved ? place : gitCwd) : undefined
+  if (git) rejected = undefined
   if (isMoved) {
     gitCwd = git ? place : gitCwd
     rejected = git || out.isError ? undefined : { place, at: now }
@@ -420,6 +434,7 @@ export async function startRecorder($: EngineInterface) {
   outbox = []
   runsOut = []
   syncing = Promise.resolve()
+  await resume($).catch(() => undefined)
 }
 
 export async function briefed($: EngineInterface) {
@@ -436,8 +451,14 @@ export async function recordTurnEnd($: EngineInterface, e: TurnCompleteInput) {
   await turnEnded($, e).catch(() => undefined)
 }
 
-const modeSeen = (e: { permission_mode?: string; agent_id?: string }) => {
-  if (e.agent_id === undefined && e.permission_mode !== undefined) isPlan = e.permission_mode === 'plan'
+async function setPlan($: EngineInterface, value: boolean) {
+  if (isPlan === value) return
+  isPlan = value
+  await savePlan($, value).catch(() => undefined)
+}
+
+const modeSeen = async ($: EngineInterface, e: { permission_mode?: string; agent_id?: string }) => {
+  if (e.agent_id === undefined && e.permission_mode !== undefined) await setPlan($, e.permission_mode === 'plan')
 }
 
 export function recorder(on: On) {
@@ -446,7 +467,7 @@ export function recorder(on: On) {
     if (String(e.tool) === REPORTS_TOOL) return listed($)
     if (String(e.tool) === QUESTION_TOOL) await promptOpened($, promptTextOf(QUESTION_TOOL, e), QUESTION_TOOL, e.agentId).catch(() => undefined)
     const out = await next(e)
-    if (String(e.tool) === 'ExitPlanMode' && e.agentId === undefined && !out.isError && out.deny === undefined) isPlan = false
+    if (String(e.tool) === 'ExitPlanMode' && e.agentId === undefined && !out.isError && out.deny === undefined) await setPlan($, false)
     await promptClosed($, String(e.tool), e.agentId).catch(() => undefined)
     if (current && out.deny === undefined) await recordTool($, e, out).catch(() => undefined)
     return out
@@ -456,29 +477,29 @@ export function recorder(on: On) {
   })
 
   on('classic.PermissionRequest', async ($, e, next) => {
-    modeSeen(e)
+    await modeSeen($, e)
     await promptOpened($, promptTextOf(e.tool_name, e.tool_input), e.tool_name, e.agent_id).catch(() => undefined)
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('classic.UserPromptSubmit', async ($, e, next) => {
-    modeSeen(e)
+    await modeSeen($, e)
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('classic.Stop', async ($, e, next) => {
-    modeSeen(e)
+    await modeSeen($, e)
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('prompt.attachment', async ($, e, next) => {
-    if (e.agentId === undefined && (e.type === 'plan_mode' || e.type === 'plan_mode_reentry')) isPlan = true
-    if (e.agentId === undefined && e.type === 'plan_mode_exit') isPlan = false
+    if (e.agentId === undefined && (e.type === 'plan_mode' || e.type === 'plan_mode_reentry')) await setPlan($, true)
+    if (e.agentId === undefined && e.type === 'plan_mode_exit') await setPlan($, false)
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('classic.Notification', async ($, e, next) => {
-    modeSeen(e)
+    await modeSeen($, e)
     if (ASKING.has(e.notification_type) && !held.has(await keyOf($, e.agent_id))) await promptOpened($, e.message || e.title || 'Claude needs your input', '', e.agent_id).catch(() => undefined)
     if (ANSWERED.has(e.notification_type)) await promptClosed($, undefined, e.agent_id).catch(() => undefined)
     return next(e)

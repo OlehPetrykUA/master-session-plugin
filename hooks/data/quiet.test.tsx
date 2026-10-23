@@ -149,3 +149,63 @@ test('/master-session:start writes the master’s board file at once, so a worke
   await run.clock.settle()
   expect(writes).toContain(`${HOME}/.claude/state/master-session/boards/${SELF}.json`)
 })
+
+test('a plan-mode master that reloads makes no session call and stays out of the app until plan mode ends', async ($, on) => {
+  counted(on)
+  const run = await started($, on)
+  await $.classic.UserPromptSubmit(PROMPT('plan'))
+  await run.clock.advance(15_000)
+  const before = run.calls.length
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.advance(120_000)
+  expect(run.calls.length).toBe(before)
+})
+
+test('a plain session that reloads stays as quiet as before: no call, scan, poll or git', async ($, on) => {
+  const scans = counted(on)
+  const run = world(on)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.settle()
+  await turns($)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.settle()
+  await run.clock.advance(120_000)
+  expect([run.calls.length, run.scans.messages, scans.agents, run.gits.length]).toEqual([0, 0, 0, 0])
+})
+
+const selfLookups = (run: { calls: { tool: string; args: Record<string, unknown> }[] }) => run.calls.filter(one => one.tool === 'get_session' && one.args.session_id === 'self').length
+
+test('an unclaimed master that reloads in plan mode makes no role lookup when the pane is opened', async ($, on) => {
+  counted(on)
+  const run = world(on)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.settle()
+  await $.command.run(typed('master-session:info', ''))
+  await run.clock.settle()
+  await $.classic.UserPromptSubmit(PROMPT('plan'))
+  const before = selfLookups(run)
+  expect(before).toBe(1)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await $.command.run(typed('master-session:info', ''))
+  await run.clock.settle()
+  expect(selfLookups(run)).toBe(before)
+})
+
+test('a child of a plain chat that reloads stays quiet: no write, scan, poll or git, and no master session for its reports', async ($, on) => {
+  const scans = counted(on)
+  const writes: string[] = []
+  on('fs.write', (_, e) => {
+    writes.push(e.path)
+    return { value: undefined }
+  })
+  const run = world(on, { parent: 'local_plain', isPaneOpen: true })
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await $.skill.prompt({ skill: 'master-session:worker', text: 'Worker.', frontmatter: {}, source: 'plugin' })
+  await run.clock.settle()
+  const before = run.calls.length
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.advance(120_000)
+  const answer = (await $.tool.call({ tool: 'mcp__master-session__report', state: 'working' })) as { deny?: string }
+  expect(String(answer.deny)).toContain('no master session')
+  expect([run.calls.length, writes, run.scans.messages, scans.agents, run.gits.length]).toEqual([before, [], 0, 0, 0])
+})

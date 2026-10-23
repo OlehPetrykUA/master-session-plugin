@@ -233,3 +233,59 @@ test('a worker skill preloaded after the start does not turn the validator into 
   await run.clock.advance(1_000)
   expect(String(((await $.tool.call({ tool: REPORT_TOOL, state: 'working' })) as { deny?: string }).deny)).toContain('no master session')
 })
+
+const RESTART = { cwd: HOME, surface: 'desktop', isInteractive: true } as const
+
+test('a master that reloads keeps reading its workers: a report written afterwards reaches the pane and the board file is published again', async ($, on) => {
+  const writes: string[] = []
+  on('fs.write', (_, e) => {
+    writes.push(e.path)
+    return { value: undefined }
+  })
+  const files: Record<string, string> = {}
+  const run = await started($, on, BOARD, { files })
+  await $.session.start(RESTART)
+  await run.clock.settle()
+  writes.length = 0
+  const report = { v: 1, kind: 'status', session: 'local_setup', engineId: 'engine-setup', parent: SELF, seq: 5, at: 3_590_000, run: { isRunning: true }, modelAt: 3_590_000, state: 'needs-you', needsYou: 'Allow Bash: rm -rf build', waits: { since: 3_590_000, on: 'you' }, activity: [], commits: [], tests: [], files: [] }
+  files[reportPath(HOME, 'local_setup')] = JSON.stringify(report)
+  await run.clock.advance(15_000)
+  expect(writes).toContain(`${HOME}/.claude/state/master-session/boards/${SELF}.json`)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await textsOf(ui)).toContain('Allow Bash: rm -rf build')
+  await ui.unmount()
+})
+
+test('a briefed worker that reloads still records its next commit with no report call', async ($, on) => {
+  const written: Record<string, string> = {}
+  on('fs.write', (_, e) => {
+    written[e.path] = e.text
+    return { value: undefined }
+  })
+  on('tool.call', { tool: 'Bash' }, () => ({ result: 'ok', text: '[main 1a2b3c4] feat: x\n 1 file changed' }))
+  on('skill.prompt', (_, e) => ({ text: e.text }))
+  const run = world(on, childOf(3_600_000))
+  await $.session.start(RESTART)
+  await $.skill.prompt({ skill: 'master-session:worker', text: 'Worker.', frontmatter: {}, source: 'plugin' })
+  await run.clock.advance(3_000)
+  await $.session.start(RESTART)
+  await run.clock.advance(3_000)
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "feat: x"' })
+  const saved = JSON.parse(written[reportPath(HOME, 'local_worker')] ?? '{}') as { commits?: { sha: string }[] }
+  expect(saved.commits?.map(one => one.sha)).toEqual(['1a2b3c4'])
+})
+
+test('a plan-mode worker that reloads makes no session call', async ($, on) => {
+  on('fs.write', () => ({ value: undefined }))
+  on('skill.prompt', (_, e) => ({ text: e.text }))
+  on('classic.UserPromptSubmit', () => ({}))
+  const run = world(on, childOf(3_600_000))
+  await $.session.start(RESTART)
+  await $.skill.prompt({ skill: 'master-session:worker', text: 'Worker.', frontmatter: {}, source: 'plugin' })
+  await $.classic.UserPromptSubmit({ prompt: 'go', permission_mode: 'plan' } as never)
+  await run.clock.advance(3_000)
+  const before = run.calls.length
+  await $.session.start(RESTART)
+  await run.clock.advance(120_000)
+  expect(run.calls.length).toBe(before)
+})

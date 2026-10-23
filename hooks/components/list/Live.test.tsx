@@ -9,7 +9,7 @@ import { blocksOf } from '../../lib/list'
 import type { RunSummary } from '../../lib/totals'
 import { subOf, tileInnerOf } from './Summary'
 import { C } from '../../theme/tokens'
-import { BOARD, BOARD_TOOL, HOME, PANE, PLUGIN_ORIGIN, SELF, WORKTREE, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
+import { BOARD, BOARD_TOOL, HOME, PANE, PLUGIN_ORIGIN, SELF, WORKTREE, childOf, click, hitsOf, started, textsOf, warmUp, world } from '../../testing/world'
 
 const BASH = `Allow Bash: P=/Users/opetryk/Work/master-session-plugin; W="$HOME/.claude/worktrees/wt-master-session-plugin-band-v3"; git -C $P merge-base --is-ancestor 9bd146ce23c7d6485d main && git -C "$W" log --oneline -5 && git -C "$W" status --porcelain=v2 --branch --untracked-files=all`
 
@@ -257,7 +257,7 @@ test('KPI subs drawn at 47 and 60 columns never truncate: each tile draws the fi
   await started($, on, loud)
   const subsAt = async (bodyColumns: number) => {
     const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
-    const blocks = (await ui.findAll({ type: 'Box' })).filter(box => box.key?.startsWith('block-') && !box.key.startsWith('block-value') && !box.key.startsWith('block-dot') && !box.key.startsWith('block-icon') && !/^block-[a-z-]+-(green|amber|grey)$/.test(box.key))
+    const blocks = (await ui.findAll({ type: 'Box' })).filter(box => box.key?.startsWith('block-') && !box.key.startsWith('block-value') && !box.key.startsWith('block-dot') && !box.key.startsWith('block-icon'))
     const found = blocks.map(box => ({ key: box.key, texts: (box.children ?? []).flatMap(child => JSON.stringify(child).match(/"children":\["([^"]*)"\]/g) ?? []).map(text => text.slice(13, -2)) }))
     await ui.unmount()
     return found
@@ -317,4 +317,113 @@ test('each tile draws the FIRST of [sub, ...shorts] whose width fits, and it fit
   }
   const needs = blocksOf({ ...base, needsYou: { sessions: 1, subagents: 1000 } }, true)[1]
   expect(needs && subOf(needs, tileInnerOf(bodyWidthOf(47), 4))).toBe('1001')
+})
+
+const SECONDS = /^\d+s$/
+
+const OLD_AGENT = { id: 'q1', type: 'master-session:qa-verifier', description: 'Live check', prompt: 'go', state: 'running', startedAt: 3_500_000 }
+
+const STALE_LIVE = { self: SELF, title: '', sessions: [], error: '', at: 1 }
+
+function seededRuns(on: On, values: Record<string, unknown> = {}) {
+  const all: Record<string, unknown> = {
+    agents: [{ ...OLD_AGENT, startedAt: 3_599_000 }],
+    workflows: [{ id: 'w1', toolUseId: 'toolu_w', name: 'audit', phases: [], startedAt: 3_599_000 }],
+    ...values,
+  }
+  on('state.get', async (_, e, next) => {
+    const real = (await next(e)) as { value: { value: unknown; version: number } }
+    return (e.key in all ? { value: { ...real.value, value: all[e.key] } } : real) as never
+  })
+  return all
+}
+
+const invalidations = (on: On) => {
+  const drawn = { count: 0 }
+  on('ui.invalidate', () => {
+    drawn.count += 1
+    return { value: undefined } as never
+  })
+  return drawn
+}
+
+test('a running workflow row and a subagent row read 1s at mount and 3s after two quiet seconds', async ($, on) => {
+  seededRuns(on)
+  const run = await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const secondsOf = async () => (await textsOf(ui)).filter(text => SECONDS.test(text))
+  expect(await secondsOf()).toEqual(['1s', '1s'])
+  await run.clock.advance(2_000)
+  expect(await secondsOf()).toEqual(['3s', '3s'])
+  await ui.unmount()
+})
+
+test('a closed pane is never redrawn by the time tick', async ($, on) => {
+  seededRuns(on)
+  const drawn = invalidations(on)
+  const run = await started($, on, BOARD, { isPaneOpen: false })
+  const before = drawn.count
+  await run.clock.advance(5_000)
+  expect(drawn.count).toBe(before)
+})
+
+test('a session that is not a claimed master is never redrawn by the time tick, even when a board shows up', async ($, on) => {
+  const seeded = seededRuns(on)
+  const drawn = invalidations(on)
+  const run = world(on)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.settle()
+  seeded.board = { sessions: [], needsYou: [], repos: [], source: 'tool', since: 0, at: 0 }
+  await run.clock.advance(5_000)
+  expect(drawn.count).toBe(0)
+})
+
+test('a worker with an open pane and a running subagent is never redrawn by the time tick', async ($, on) => {
+  seededRuns(on)
+  on('fs.write', () => ({ value: undefined }))
+  on('skill.prompt', (_, e) => ({ text: e.text }))
+  const drawn = invalidations(on)
+  const run = world(on, childOf(3_600_000))
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await $.skill.prompt({ skill: 'master-session:worker', text: 'Worker.', frontmatter: {}, source: 'plugin' })
+  await run.clock.advance(5_000)
+  expect(drawn.count).toBe(0)
+})
+
+test('a running session row with no agents reads <1m, then 1m, then 2m as its age passes each minute', async ($, on) => {
+  const session = { id: 'local_env', name: 'env-e2e-test', title: '', cwd: HOME, isRunning: true, isArchived: false, lastActivityAt: 0, createdAt: 3_542_000 }
+  seededRuns(on, { agents: [], workflows: [], live: { ...STALE_LIVE, sessions: [session] } })
+  const run = await started($, on, { ...BOARD, sessions: [{ id: 'local_env', name: 'env-e2e-test', state: 'working', progress: 'step 1 of 2 — fix' }], needsYou: [] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const minutesOf = async () => (await textsOf(ui)).filter(text => /^(<1|\d)m$/.test(text))
+  expect(await minutesOf()).toEqual(['<1m'])
+  await run.clock.advance(3_000)
+  expect(await minutesOf()).toEqual(['1m'])
+  await run.clock.advance(61_000)
+  expect(await minutesOf()).toEqual(['2m'])
+  await ui.unmount()
+})
+
+test('with nothing fresh the pane is redrawn once a minute: one redraw over 59 s, two over 61 s', async ($, on) => {
+  seededRuns(on, { agents: [OLD_AGENT], workflows: [], live: STALE_LIVE })
+  const drawn = invalidations(on)
+  const run = await started($, on)
+  const before = drawn.count
+  await run.clock.advance(59_000)
+  expect(drawn.count - before).toBe(1)
+  await run.clock.advance(2_000)
+  expect(drawn.count - before).toBe(2)
+})
+
+test('the header age moves past a minute with nothing running', async ($, on) => {
+  seededRuns(on, { agents: [], workflows: [], live: { ...STALE_LIVE, at: 3_590_000 } })
+  const run = await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const updated = async () => (await textsOf(ui)).filter(text => text.startsWith('updated'))
+  expect(await updated()).toEqual(['updated 10s ago'])
+  await run.clock.advance(20_000)
+  expect(await updated()).toEqual(['updated 30s ago'])
+  await run.clock.advance(41_000)
+  expect(await updated()).toEqual(['updated 1m ago'])
+  await ui.unmount()
 })
