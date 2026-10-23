@@ -188,3 +188,20 @@ test('the master republishes a merged board with its reports and repos when a wo
   expect(row.state).toBe('done')
   expect(row.commits).toEqual(['abc1234 fix'])
 })
+
+test('a hidden pane stays hidden: nothing scrolls and ticks never reopen it', async ($, on) => {
+  const landed: number[] = []
+  on('ui.scroll', ((_: unknown, e: { offset: number }) => {
+    landed.push(e.offset)
+    return { value: {} }
+  }) as never)
+  const { opened, clock } = await started($, on, BOARD, { isPaneHidden: true })
+  const scrolled = (await $.tool.call({ tool: 'mcp__master-session__scroll', to: 'start' })) as { deny?: string }
+  expect(String(scrolled.deny)).toContain('the pane is hidden')
+  await clock.advance(60_000)
+  await clock.settle()
+  expect([landed, opened]).toEqual([[], []])
+  await $.tool.call({ tool: 'mcp__master-session__open' })
+  await clock.settle()
+  expect([landed, opened]).toEqual([[], ['master-session']])
+})

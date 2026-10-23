@@ -340,7 +340,16 @@ async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[
 }
 
 export async function isPaneOpen($: EngineInterface) {
-  return (await $.ui.panes()).some(pane => pane.id === PANE)
+  return (await $.ui.panes()).some(pane => pane.id === PANE && pane.isShown && pane.isPlaced)
+}
+
+let traced: string[] = []
+
+export async function tracePane($: EngineInterface, what: string) {
+  if (!home || (await $.env.get('MASTER_SESSION_TRACE_PANE').catch(() => undefined)) !== '1') return
+  const panes = JSON.stringify(await $.ui.panes().catch(() => []))
+  traced = [...traced, `${await $.clock.now()} ${what} panes=${panes}`].slice(-300)
+  await $.fs.write(`${home}/.claude/state/master-session/pane-trace.log`, traced.join('\n')).catch(() => undefined)
 }
 
 export async function isMaster($: EngineInterface) {
@@ -397,8 +406,9 @@ export async function workerNote($: EngineInterface) {
   return `This is a worker session of ${title ? `"${title}" (${parent})` : parent}: the master session pane is only in that session.`
 }
 
-export async function openPane($: EngineInterface) {
+export async function openPane($: EngineInterface, caller = '') {
   if (await isWorker($)) return false
+  await tracePane($, `openPane caller=${caller}`)
   const opened = await $.ui.open({ id: PANE, title: TITLE, focus: true })
   void refreshAll($, true).catch(() => undefined)
   return opened.isPlaced

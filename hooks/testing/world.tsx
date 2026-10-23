@@ -113,7 +113,7 @@ export function world(on: On, child: Child = {}) {
     opened.push(e.id)
     return { value: { isPlaced: true } }
   })
-  on('ui.panes', () => ({ value: child.isPaneOpen ? [{ id: 'master-session', title: 'Master session', isShown: true, isFocused: false, isPlaced: true }] : [] }))
+  on('ui.panes', () => ({ value: child.isPaneOpen === false ? [] : [{ id: 'master-session', title: 'Master session', isShown: !child.isPaneHidden, isFocused: false, isPlaced: true }] }))
   on('ui.toast', (_, e) => {
     toasts.push(e.text)
     return { value: undefined }
@@ -247,7 +247,7 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean }
+export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, board })

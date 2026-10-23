@@ -11,6 +11,7 @@ import {
   boardOf,
   isMaster,
   isPaneOpen,
+  tracePane,
   openAsking,
   markMaster,
   openPane,
@@ -49,6 +50,8 @@ function lastShown() {
 
 async function scrollToRow($: EngineInterface, row: number) {
   pending = { row, at: await $.clock.now() }
+  if (!(await isPaneOpen($))) return void (pending = undefined)
+  await tracePane($, `scroll row=${row}`)
   await $.ui.scroll({ in: PANE, to: 'start', block: 'start' }).catch(() => undefined)
 }
 
@@ -117,7 +120,7 @@ export const register: Register = on => {
     const note = await workerNote($)
     if (note) return { text: note }
     if (e.args.trim() === 'ask') return { text: await askAll($) }
-    await openPane($)
+    await openPane($, 'info')
     return { text: OPENED }
   }).catch(($, e, next) => next(e))
 
@@ -126,7 +129,7 @@ export const register: Register = on => {
       const note = await workerNote($)
       if (note) return { text: note }
       await markMaster($)
-      await openPane($)
+      await openPane($, 'start')
       return { text: OPENED }
     }
     return next(e)
@@ -155,7 +158,7 @@ export const register: Register = on => {
     const isShown = !!expand && !!card
     if (isArchived || isShown) await setFilter($, isArchived ? 'archived' : 'all')
     if (isShown) await setExpanded($, () => [card])
-    const isPlaced = await openPane($)
+    const isPlaced = await openPane($, 'open-tool')
     const top = isShown ? sectionsOf(await paneData($, columns || 48))['section-expanded'] : undefined
     void scrollToRow($, top === undefined ? 0 : scrollRowOf('section-expanded', top, pinOf(data).headerRows))
     const shown = [isArchived ? 'the Archived list' : '', isShown ? `${card} expanded${item && item.id !== card ? ` in ${item.id}` : ''}` : ''].filter(Boolean).join(' with ')
@@ -192,6 +195,7 @@ export const register: Register = on => {
     const row = section === undefined || found === undefined ? undefined : scrollRowOf(section, found, pinOf(data).headerRows)
     if (to !== 'start' && to !== 'end' && row === undefined) return { deny: `Not scrolled: ${to} is not drawn in the pane now. Drawn: ${Object.keys(sections).join(', ')}.` }
     const target = row === undefined ? '' : ` (row ${row})`
+    if (!(await isPaneOpen($))) return { deny: `Not scrolled${target}: the pane is hidden; open it first.` }
     pending = row === undefined ? undefined : { row, at: await $.clock.now() }
     const before = lastShown().renders
     try {
@@ -227,12 +231,14 @@ export const register: Register = on => {
   })
 
   on('ui.open', { id: PANE }, async ($, event, next) => {
+    await tracePane($, 'ui.open')
     const opened = await next(event)
     $.ui.invalidate('ui.render')
     return opened
   })
 
   on('ui.close', { id: PANE }, async ($, event, next) => {
+    await tracePane($, `ui.close origin=${event.origin.kind}`)
     const closed = await next(event)
     $.ui.invalidate('ui.render')
     return closed
@@ -241,7 +247,7 @@ export const register: Register = on => {
   on('ui.message', { element: /^band-hit-/ }, async ($, event, next) => {
     const action = bandAction(event.element)
     if (!action || typeof (event.data as { press?: unknown } | undefined)?.press !== 'string') return next(event)
-    await (action === 'board' ? openPane($) : openAsking($))
+    await (action === 'board' ? openPane($, 'band') : openAsking($))
     return {}
   })
 
@@ -259,7 +265,7 @@ export const register: Register = on => {
     const Svg = event.surface !== 'terminal' && 'Svg' in table ? guardSvg(table.Svg, Text) : undefined
     const Client = event.surface === 'desktop' && 'Client' in table && !hasFaults() ? table.Client : undefined
     const view = bandViewOf(bandColumns, current, progress, isOpen, agents, {
-      board: () => void openPane($),
+      board: () => void openPane($, 'band'),
       chat: (id, name) => void openSession($, id, name),
     }, live, await getRepos($))
     return Svg ? Band({ Box, Text, Button, Svg, Client }, { view }) : TextBand({ Box, Text, Button }, { view, columns: bandColumns })

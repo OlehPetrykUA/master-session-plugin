@@ -47,7 +47,8 @@ type McpHook = (context: unknown, event: { tool: string }) => unknown
 
 async function band($: Engine, on: On, sessions: BoardSession[], isPaneOpen = false, linked: Linked[] = []) {
   let isOpen = isPaneOpen
-  on('ui.panes', () => ({ value: isOpen ? [{ id: 'master-session', title: 'Master session', isShown: true, isFocused: false, isPlaced: true }] : [] }))
+  let isHidden = false
+  on('ui.panes', () => ({ value: isOpen ? [{ id: 'master-session', title: 'Master session', isShown: !isHidden, isFocused: false, isPlaced: true }] : [] }))
   const register = on as unknown as (event: string, ...rest: unknown[]) => unknown
   const scoped = (event: string, ...rest: unknown[]) => {
     if (event === 'ui.panes') return undefined
@@ -56,7 +57,7 @@ async function band($: Engine, on: On, sessions: BoardSession[], isPaneOpen = fa
     return register(event, (context: unknown, call: { tool: string }) => (call.tool === 'list_sessions' ? text(linked) : inner(context, call)))
   }
   const run = await started($, scoped as unknown as On, publish(sessions))
-  return { ...run, open: (value: boolean) => (isOpen = value) }
+  return { ...run, open: (value: boolean) => (isOpen = value), hide: () => (isHidden = true) }
 }
 
 const mount = ($: Engine, bodyColumns = 100) => $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns } })
@@ -409,6 +410,17 @@ test('exactly one Open board while the pane is closed, restyled in place on hove
   expect(await hitsOf(ui)).toEqual([])
   expect((await textsOf(ui)).filter(one => one === 'Open board')).toHaveLength(0)
   await ui.unmount()
+})
+
+test('a listed pane that the person hid is not open: Open board shows again', async ($, on) => {
+  const run = await band($, on, WORKING, true)
+  const ui = await mount($)
+  expect((await textsOf(ui)).filter(one => one === 'Open board')).toHaveLength(0)
+  await ui.unmount()
+  run.hide()
+  const hidden = await mount($)
+  expect((await textsOf(hidden)).filter(one => one === 'Open board')).toHaveLength(1)
+  await hidden.unmount()
 })
 
 test('without a Client: one native Button per face, each press runs its action', async ($, on) => {
