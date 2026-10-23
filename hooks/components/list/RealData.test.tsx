@@ -9,7 +9,7 @@ import { rowsOf as sessionRowsOf } from '../../lib/rows'
 import { isFailed, testsOf } from '../../lib/totals'
 import { pillOf, testsShownOf } from '../detail/Tests'
 import { C } from '../../theme/tokens'
-import { ASKS, ELLIPSIS, WIDE_ASKS } from '../../testing/widths'
+import { ASKS, ELLIPSIS, ROCKET_PX, WIDE_ASKS } from '../../testing/widths'
 import { BOARD, HOME, PANE, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 
 const COMMAND = `cd ${HOME}/.claude/worktrees/wt-master-session-plugin-rows-v3 && npm run build -- --filter hooks && node --test hooks/lib/list.test.ts hooks/lib/band.test.ts hooks/components/detail/Detail.test.tsx 2>&1 | tee /private/tmp/claude-501/rows-v3-gate.log && git status --porcelain && git log --oneline -3`
@@ -32,9 +32,12 @@ test('rows: split by width, at most n, the last ends in "…"; emoji count by co
   for (const row of rows) expect(textWidth(row, 13)).toBeLessThanOrEqual(280)
   for (const row of rowsOf('Archive can lose work until this lands: 2 commits exist only on archive-guard. '.repeat(4), 200, 13, 3, { isBold: true })) expect(textWidth(row, 13, { isBold: true })).toBeLessThanOrEqual(200)
   for (const row of rowsOf(COMMAND, 200, 12, 6, { isMono: true })) expect(textWidth(row, 12, { isMono: true })).toBeLessThanOrEqual(200)
+  const realRocketsOf = (row: string) => Array.from(row.replace(/…$/, '')).length * (ROCKET_PX[12] ?? Infinity) + (row.endsWith('…') ? ELLIPSIS : 0)
   const rockets = rowsOf('🚀'.repeat(96), 300, 12, 4)
-  expect(rockets.join('').endsWith('…')).toBe(false)
-  expect(Array.from(rockets.join('')).length).toBe(96)
+  expect(rockets.at(-1)?.endsWith('…')).toBe(true)
+  for (const row of rockets) expect([row, realRocketsOf(row) <= 300]).toEqual([row, true])
+  const fitting = rowsOf('🚀'.repeat(76), 300, 12, 4)
+  expect([fitting.join('').endsWith('…'), Array.from(fitting.join('')).length, fitting.every(row => realRocketsOf(row) <= 300)]).toEqual([false, 76, true])
   const cut = rowsOf('🚀'.repeat(400), 300, 12, 2)
   expect(cut.at(-1)?.endsWith('…')).toBe(true)
   expect(/[\uD800-\uDBFF]…$/.test(cut.at(-1) ?? '')).toBe(false)
@@ -325,7 +328,7 @@ test('tabular digits: the elapsed time is measured at 0.64 em per digit as it re
   }
 })
 
-test('wide glyphs by real width: Æ Œ, Cyrillic, arrows and box drawing, ✓ ★ — every row of each repro, measured in Chrome, fits its room at any width', () => {
+test('wide glyphs by real width: Æ Œ, Cyrillic, arrows and box drawing, ✓ ★, emoji lines at 12 and 13 px, 400 and 600 — every row, measured in Chrome, fits its room at any width', () => {
   for (const ask of WIDE_ASKS)
     for (let room = 100; room <= 330; room += 5)
       for (const { row, real } of rowsByRealWidth(ask, room, ask.size, ask.isBold)) expect([ask.size, room, row, real <= room]).toEqual([ask.size, room, row, true])
@@ -338,6 +341,8 @@ test('wide glyphs by real width: Æ Œ, Cyrillic, arrows and box drawing, ✓ �
   expect(textWidth('Å', 12, { isBold: true })).toBe(textWidth('A', 12, { isBold: true }))
   expect(textWidth('Ж', 13, { isBold: true })).toBeGreaterThanOrEqual(1.1 * 13)
   expect(Math.round(textWidth('漢', 12) * 1000)).toBe(Math.round(1.02 * 12 * 1.02 * 1000))
+  expect(Math.round(textWidth('🚀', 12) * 1000)).toBe(Math.round(1.25 * 12 * 1.02 * 1000))
+  expect(textWidth('🚀', 13, { isBold: true })).toBeGreaterThanOrEqual(ROCKET_PX[13] ?? Infinity)
 })
 
 test('tabular digits count 0.64 em each, whatever the proportional digit width; other characters keep their own widths', () => {
