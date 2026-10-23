@@ -94,14 +94,14 @@ The ledger, one note per run with every worker, its state and open findings, goe
 
 ## Personas
 
-Each persona is a skill, `master-session:<persona>`, and an agent of the same name that keeps the model, effort and tool limits listed in [personas.md](skills/start/personas.md). The reviewer, QA verifier, design checker and researcher can't edit files.
+Each persona is a skill, `master-session:<persona>`, and an agent of the same name that keeps the model, effort and tool limits listed in [personas.md](skills/start/personas.md). The code reviewer, QA verifier, design checker and researcher can't edit files.
 
 | Persona | What it does |
 |---|---|
 | `implementer` | Builds one deliverable from a brief in its own worktree and reports `ready <sha>`. |
 | `refactorer` | Moves, renames or splits code without changing behaviour. |
-| `reviewer` | Judges a `ready <sha>` against its brief and rules, ending in PASS or FAIL. |
-| `qa-verifier` | Owns the verification of a ready sha: gate in a clean detached worktree, Reviewer and (UI) Design checker as its own subagents, live screenshot when given a window id; returns one PASS or FAIL with bundled findings. |
+| `reviewer` | The Code reviewer, a peer of the QA verifier: reads a `ready <sha>` against its brief, the spec, the user's words and code quality, ending in PASS or FAIL. |
+| `qa-verifier` | Owns the verification of a ready sha: gate, tests, mutations and live checks in a clean detached worktree, (UI) Design checker as its own subagent, live screenshot when given a window id; returns one PASS or FAIL with bundled findings. |
 | `design-checker` | Compares the built UI with the approved design. |
 | `researcher` | Answers one question from published docs, citing each claim. |
 | `spec-writer` | Writes the feature's spec in the project's Claude Doc, one tab per feature, with testable acceptance criteria, before design and build. |
