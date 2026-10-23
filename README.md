@@ -11,7 +11,7 @@ A Claude Code plugin that turns one session into a **validator** for a team of w
 | Skill `start` | `/master-session:start`, the validator protocol: roles, briefs, the tick loop, verification, permissions, the ledger. Ships `personas.md` (the persona index) and `board.md` (the chat board when the pane isn't available). |
 | Skills `subchat`, `subagent`, `workflow` | `/master-session:subchat`, `/master-session:subagent` and `/master-session:workflow`: start a worker session, a persona subagent or a workflow of persona agents from the validator. |
 | Skill `worker` | The protocol every worker session follows: its own worktree, the report tool, talking to the validator, the `ready <sha>` gate. |
-| Status mod | `/master-session:info` opens it: a pane beside the chat with one tile per worker (state, progress, git, tests, commits), a band above the prompt, archive and unarchive, and **Ask for updates**. Workers report through the `mcp__master-session__report` tool; the mod also records their commits, test runs, edits and waits by itself. |
+| Status mod | `/master-session:info` opens it: a pane beside the chat with one row per worker (state, progress, git, tests, commits) under run-total tiles, a band above the prompt, archive and unarchive, and **Ask for updates** (shown once workers are listed). Workers report through the `mcp__master-session__report` tool; the mod also records their commits, test runs, edits and waits by itself. |
 | Personas | Nine roles, each a skill plus an agent of the same name: `implementer`, `refactorer`, `reviewer`, `qa-verifier`, `design-checker`, `researcher`, `spec-writer`, `architect` and `designer`. |
 
 ## Install
@@ -89,8 +89,8 @@ The ledger, one note per run with every worker, its state and open findings, goe
 | The status pane: run totals, filter chips and every worker grouped by state. | The same pane in the dark theme. |
 | <img src="docs/screenshots/session-card-light.png" width="380" alt="An expanded session card showing now and next, recent activity, worktree, git state, commits, tests, files owned, permission mode and model"> | <img src="docs/screenshots/subagent-needs-dark.png" width="380" alt="A subagent card that needs you: a permission prompt for a Bash command, its task, model and the session that started it"> |
 | A session opened in place: now and next, activity, worktree, git, commits, tests and files. | A subagent waiting on a permission prompt, with Open chat for the chat that holds it. |
-| <img src="docs/screenshots/band-needs-light.png" width="424" alt="The band above the prompt: a Designer needs you pill, the progress strip as dots and a chat button"> | <img src="docs/screenshots/pane-narrow-dark.png" width="300" alt="The status pane at 300 pixels wide, with elapsed time folded into each row's second line"> |
-| The band above the prompt names whoever needs you and opens their chat. | The pane at 300 px: the meta column folds into the second line. |
+| <img src="docs/screenshots/band-needs-light.png" width="424" alt="Status band asking for attention: a red &quot;Designer needs you&quot; pill, a red progress bar about half full, and an Open chat button"> | <img src="docs/screenshots/pane-narrow-dark.png" width="300" alt="The status pane at 300 pixels wide, with elapsed time folded into each row's second line"> |
+| The band above the prompt names whoever needs you, shows one progress bar and opens their chat. | The pane at 300 px: the meta column folds into the second line. |
 
 ## Personas
 
@@ -122,7 +122,7 @@ The validator also spawns each one as a subagent, `master-session:<persona>`, wh
 - The Claude desktop app's **Code** tab. The skill starts and messages worker sessions through the app's session tools, and the pane draws there. In a terminal the mod falls back to a text pane and band.
 - git. Workers work in their own worktrees and the validator merges with `--ff-only`.
 
-The mod keeps worker reports and the shared board under `~/.claude/state/master-session/`.
+The mod keeps worker reports under `~/.claude/state/master-session/`.
 
 ## Development
 
