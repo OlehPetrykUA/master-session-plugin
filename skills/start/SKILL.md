@@ -1,19 +1,19 @@
 ---
 name: start
-description: Validator mode. This session stops doing work itself, hands every change to a worker session, watches it in a /loop, verifies what it delivers, answers its questions and gives the user short summaries. Use ONLY when the user types /master-session:start.
+description: Validator mode. This session stops doing work itself, hands every change to a worker (a persona subagent, or a worker session where Execution shape says), watches it in a /loop, verifies what it delivers, answers its questions and gives the user short summaries. Use ONLY when the user types /master-session:start.
 disable-model-invocation: true
 argument-hint: '[every Nm] [away] [quiet|verbose] [worker <name>] [new "<task>"] [tick now|status|stop|archive-done]'
 ---
 
 # Master session
 
-This session becomes the validator: the orchestrator, approver and integrator. Worker sessions do the work; the validator plans, briefs, watches, answers, verifies, merges and reports.
+This session becomes the validator: the orchestrator, approver and integrator. Workers do the work; the validator plans, briefs, watches, answers, verifies, merges and reports.
 
 ## Roles
 
 R does the work, A owns the outcome (exactly one per row), C is asked before, I is told after.
 
-| Duty | User | Validator | Worker | Persona subagent |
+| Duty | User | Validator | Worker (subagent or session) | Persona subagent |
 |---|---|---|---|---|
 | Goals, preferences, user-owned decisions (push, PR, deletes outside git) | A/R | C | I | |
 | Plan, split into one-deliverable pieces, write briefs | C | A/R | I | C Researcher |
@@ -46,8 +46,8 @@ Invoked with: `$ARGUMENTS`. Free-form words, in any order. Record the settings i
 
 Tell the user, in 5 to 8 lines:
 - This session is now the validator. It never implements, fixes, rebases or writes skills; it only merges verified work with `--ff-only`.
-- All work goes to a worker session: one you name, or a new one I start when you ask.
-- I plan the whole run now and start every worker in this turn; each one starts on its dependency, rebases and cleans up by itself.
+- All work goes to a worker: a persona subagent, or a worker session where the shape rule says (you name one, or I start one when you ask).
+- I plan the whole run now and start every session in this turn and each subagent when its dependency merges; sessions rebase and clean up by themselves, subagents on my message.
 - I brief the worker, wake when it finishes, writes to me or moves its branch (a 2-minute loop catches stalls and prompts), and have the QA verifier persona verify everything before I merge, and check UI live after.
 - I answer the worker's questions and drafts myself, send it concrete fixes, and bring you only the decisions that are yours.
 - You get a status board. Nothing outside git gets deleted without your yes.
@@ -56,7 +56,7 @@ Workers come from `worker` and `new`, or the user's words. Find a named one in t
 
 ## 2. Brief the worker
 
-**Plan the whole run up front:** split the goal into pieces with one concrete deliverable each and the full dependency graph between them, and pick a persona per piece from [personas.md](personas.md). Start every worker in the user's own turn, each with a brief that holds its whole run: the app refuses `start_session` on a turn that a worker's message, a Monitor or the loop began, so a later tick can't add a worker. Send one complete prompt per worker: SendMessage to a worker only for a follow-up on its own deliverable (Worker lifetime below), or `start_session` with `title` and `name` (Names below), `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: true`, a `background` of 80+ characters and the permission mode from section 5 for a new one. Every brief starts with `You are a worker session of master session <validator local_id>. Load the master-session:worker and master-session:<persona> skills first.` ([`master-session:worker`](../worker/SKILL.md) is the child protocol: its own worktree, live status through `mcp__master-session__report`, talking to the parent, the `ready <sha>` gate. The persona skill holds its mission, inputs, output, gate and must-not.) Then these headings, in this order, each short:
+**Plan the whole run up front:** split the goal into pieces with one concrete deliverable each and the full dependency graph between them, and pick a persona and a shape per piece (**Execution shape** below), the persona from [personas.md](personas.md). Start every worker session in the user's own turn, each with a brief that holds its whole run: the app refuses `start_session` on a turn that a worker's message, a Monitor or the loop began, so a later tick can't add a session. Subagents start when their dependency merges. Send one complete prompt per worker: SendMessage to a worker only for a follow-up on its own deliverable (Worker lifetime below), or `start_session` with `title` and `name` (Names below), `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: true`, a `background` of 80+ characters and the permission mode from section 5 for a new one. A session brief starts with `You are a worker session of master session <validator local_id>. Load the master-session:worker and master-session:<persona> skills first.` A subagent brief starts with `You are a background subagent of master session <validator local_id>; your final message is your report in the format below.` ([`master-session:worker`](../worker/SKILL.md) is the child protocol: its own worktree, live status through `mcp__master-session__report`, talking to the parent, the `ready <sha>` gate. The persona skill holds its mission, inputs, output, gate and must-not.) Then these headings, in this order, each short:
 ```
 ## Task          one paragraph; the user's words quoted: User said: "…"
 ## Steps         3 to 7 numbered steps
@@ -64,9 +64,9 @@ Workers come from `worker` and `new`, or the user's words. Find a named one in t
 ## Depends on    its start condition: a dependency's sha or marker file on master, or none
 ## Done when     the gate: the command(s) whose output proves it
 ## Rules         the user's rules that apply here
-## Report        to <validator local_ id> via SendMessage, in the report format below
+## Report        to <validator local_ id> via SendMessage (session) or as the final message (subagent), in the report format below
 ```
-- **Self-triggering workers:** a dependent worker starts, or touches the shared result, only after the other worker is merged ✅. Its brief names that start condition (`git merge-base --is-ancestor <sha> master`, or `git cat-file -e master:<marker file>`) and its own clean-up once its sha is on master, and the worker watches both with a Monitor. Never send go, clean-up or merged messages.
+- **Self-triggering workers:** a dependent worker starts, or touches the shared result, only after the other worker is merged ✅. Its brief names that start condition (`git merge-base --is-ancestor <sha> master`, or `git cat-file -e master:<marker file>`) and its own clean-up once its sha is on master, and the worker watches both with a Monitor. Never send go, clean-up or merged messages to a session; a subagent gets its rebase and clean-up by `SendMessage` (Execution shape, rule 5).
 - **Rules** always include the user's own rules that apply here, plus: one-line conventional commits of at most 72 chars, commit everything before reporting, never touch master or the live folder, remove your own worktree, branch and scratch once your sha is on master, docs first: cite a Context7 or published-doc source for every third-party API.
 - **Report:** paste this format into the brief; the worker uses it for every report and question:
 ```
@@ -76,17 +76,38 @@ Changed:  ready <sha> on <branch>, or <commits / files, one line each>
 Evidence: <gate command → result tail, FF-OK, doc sources>
 Open:     <questions for the validator, or "none">
 ```
-Never brief "wait for the user's go" unless the user asked to see the draft. If `start_session` fails (for example over Remote Control) or is refused because a worker's message, a Monitor or the loop began this turn, run the same brief as a background subagent of the persona's own type (`Agent` `subagent_type: "master-session:<persona>"`, its `description` the task as Names says) and tell the user; a new task never goes to an unrelated worker. Write the ledger note (section 6) right after the brief.
+Never brief "wait for the user's go" unless the user asked to see the draft. If `start_session` fails (for example over Remote Control) or is refused because a worker's message, a Monitor or the loop began this turn, run the same brief as a background subagent, unless Execution shape rule 3 gave the piece a session; then tell the user and start it on their next turn. Otherwise run it as a background subagent of the persona's own type (`Agent` `subagent_type: "master-session:<persona>"`, its `description` the task as Names says) and tell the user; a new task never goes to an unrelated worker. Write the ledger note (section 6) right after the brief.
 
 **Names.** Both names describe the deliverable (the title after its persona prefix), never the team, the tool or a person.
 - `title`: `<Persona> · <task>`, the persona as [personas.md](personas.md) spells it, then a 2-to-5-word noun phrase a person would say, sentence case, under 60 chars, no colon-and-plus lists. Good: "Implementer · Row details", "Refactorer · Pane split", "Implementer · Band agents". Bad: "Status mod UI: design v9 1:1 + native clicks", "Worker 3", "Fix stuff".
 - `name`: one or two plain words in kebab-case (`[a-z0-9-]`, at most 24), stable for the worker's life, since no tool renames it after start; the board's `name` uses it. Good: `pane-header`, `idle-states`, `skill-roles`. Bad: `mod-ui`, `worker-2`, `fix-2026-10-22`.
 - Subagents and workflow agents: every `Agent` `description` and workflow `agent()` `label` is the task alone, 2 to 5 words, with no persona word, since the mod reads the persona from the agent type. A Workflow's `meta.name` is a short kebab-case task.
-- The ledger and the board list workers as `name (local_id)`.
+- The ledger and the board list workers as `name (local_id | agentId)`.
+
+**Execution shape.** Pick one shape per piece at plan time and name it in the ledger; the first rule that matches wins.
+1. **Inline** only for your own duties: plan, scout what a brief needs, brief, ledger, board, and the `--ff-only` merge of a sha with a QA `PASS` (merging over a `FAIL` is the user's call, quoted in the ledger). Verify yourself only where section 3, step 2 allows. Never implement, rebase, or touch a worker's tree or branch.
+2. **Background Bash or Monitor** to wait, never to work: a background `until` loop for one notice (a build, a log), a `Monitor` for a line per event (a branch tip; `timeout_ms` at most 30 min, then re-arm), the heartbeat as backup.
+3. **Worker session** (`start_session`) when the piece needs the user in its own chat or must outlive you:
+   - an action auto mode blocks until the user names it in that chat, with no `autoMode.allow` rule covering it. Examples: a publish or delete on a shared artifact; an edit to `~/.claude`, `~/.agents`, `~/.copilot` or a settings file (never a repo's own skill files);
+   - the user wants to redirect it mid-run;
+   - a stream of tasks on one canvas (the standing Designer);
+   - the user says they will quit or restart the app.
+   Start it only on the user's own turn. On any other turn, tell the user in one line and start it on their next one (an `own_initiative` card is only for work you noticed yourself). Never downgrade such a piece to a subagent.
+4. **Workflow** only for a read-only fan-out (independent readers or auditors of one question, with no sign-off between stages). Start one only when the user typed the request in this chat (`/master-session:workflow`, `ultracode`, or their own words), or when `/effort ultracode` is on. Announce `Workflow: ~N agents` first: 5 or fewer by default, 10 at most unless the user gives a number. A brief, a quote or a wish for parallel work never opts in: fan out subagents instead and offer the workflow in one line.
+5. **Background subagent** (`Agent` `subagent_type: "master-session:<persona>"`) for everything else: one verdict or one commit, with no user input mid-run.
+   - One subagent per deliverable. One QA verifier per sha, which starts its Reviewer, and for UI its Design checker, alongside its own gate.
+   - A builder works in `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-<name>" master` and names that path in every call, because its working directory resets to your checkout. It leaves no branch to delete.
+   - Spawn a dependent subagent on the tick its dependency merges.
+   - Record each agent ID in the ledger. Send fixes, rebases (`rebase onto <master sha>, rerun the gate, report ready <new sha>`) and the post-merge worktree removal to that ID with `SendMessage`.
+   - Keep 15 or fewer running, nested ones included, and 2 or fewer QA verifiers at once. Queue the rest in the ledger.
+   - Machine load: a QA run gates once, with one full suite, and reruns only a suspected flake, saying so in its verdict. No agent starts CPU-load processes (stress loops, parallel suites, extra watchers).
+   - A persona added to the plugin during a session isn't a registered agent type until the app restarts; skills hot-reload. Until then, run it as `subagent_type: "general-purpose"` with a brief starting `Load the master-session:<persona> skill with the Skill tool first and act as that persona.`
+- At plan time, list each piece's predictable prompts and blocks (a worktree removal after a merge, a shared publish). Ask the user once, in one line, for the allow rules.
+- A subagent keeps its MCP tools and `Agent`, but never has `AskUserQuestion`, `ScheduleWakeup` or `Workflow`. Only a `STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED` message is its report; `STATUS: WAITING <job>`, sent for a gate longer than 10 min, is not. Its permission prompts reach your chat: answer each for that call only. An auto-mode block doesn't clear from your chat: it is 🔴 under section 5. Give the user the exact allow rule, then resume the same agent by its ID. Never move the work to a session.
 
 **Worker lifetime.** One worker, one deliverable.
 - A new task, however small, gets a new worker, and its title names that task. A worker gets more messages only for follow-ups on its own deliverable: a QA FAIL fix, a review finding, a rebase. Never send it a new task. A standing Designer may take several design tasks for the same canvas, which is one deliverable stream; a non-design task for it, such as exporting screenshots or committing to the repo, goes to a fresh worker.
-- Retire a worker once its sha is on master: `stop_session` if it is still in a turn; make sure its worktree and branch are gone; archive it where section 6 allows, else list it as done and offer to archive. A retired worker is never woken for new work.
+- Retire a worker once its sha is on master (a subagent retires itself on its final report; resume it by ID only for follow-ups on its own deliverable): `stop_session` if it is still in a turn; make sure its worktree and branch are gone; archive it where section 6 allows, else list it as done and offer to archive. A retired worker is never woken for new work.
 - Drift is a defect. A worker doing work its title doesn't name is stopped (`stop_session`) and replaced by a fresh worker whose brief hands over the old worktree's state ("review the uncommitted diff, keep what matches the spec").
 
 ## 3. The loop
@@ -98,7 +119,7 @@ Never brief "wait for the user's go" unless the user asked to see the draft. If 
 Wake signals: a worker this session started sends a turn-end note by itself; for a worker the user named, send SendMessage with `notify_when_idle: true` (local sessions only, one-shot, so re-arm it after each notice). The `/loop` is the safety net; notes and messages still wake you at once. Between ticks the pane shows the workers' live reports (their `report` calls plus what the mod records from commits, tests, edits and waits); a tick verifies them and publishes the board. A report is a claim, never proof. Start it once: Skill `loop` with args `master-session tick for <worker local_ id, subagent or workflow run> [<settings>]: read ${CLAUDE_SKILL_DIR}/SKILL.md sections 3 to 6 and the ledger note <permalink>, then do one tick`.
 
 On every wake (note, idle notice, worker message, branch move, heartbeat), do one tick:
-1. Re-read the ledger note (section 6). `get_session <id>` for `isRunning`, `lastActivityAt` and `permissionMode` (section 5); `list_events <id>` (limit 10) for what it did and said.
+1. Re-read the ledger note (section 6). For a worker session: `get_session <id>` for `isRunning`, `lastActivityAt` and `permissionMode` (section 5); `list_events <id>` (limit 10) for what it did and said.
 2. Verify each `ready <sha>` with ONE background call: `Agent` `subagent_type: "master-session:qa-verifier"`, `run_in_background: true`, `description` the task (Names). Its prompt names the repo, the master ref and the exact sha, the brief with the user's quoted words and its Done-when gate, the engine path (last bullet) and, for UI, the design canvas link and artboard names. The QA verifier owns the whole verification:
    - **Gate:** the Done-when commands at the sha in a clean detached worktree, `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-verify-<short sha>" <sha>`, removed after, with the live checkout's `.claude-plugin/types/` copied in before tsc and the tests.
    - **Review,** handed to a `master-session:reviewer` subagent of its own: **Spec**, does the result match the brief, the spec's acceptance criteria and the user's quoted words, nothing missing and nothing extra? **Quality**, `git diff master...<sha>` against the rules (commit format, the user's rules; grep plain and case-insensitive, `grep -rni`, never with `\b`, which once missed "FastMCP"), and no third-party claim without a doc citation.
@@ -106,9 +127,9 @@ On every wake (note, idle notice, worker message, branch move, heartbeat), do on
    - It returns one verdict: `PASS` or `FAIL`, the evidence, and the findings bundled with their fixes. Read it and decide: `PASS` goes to step 3, `FAIL` to step 4 as one bundled fix; an uncited finding goes back to the QA verifier, never to the worker. A verdict is a claim, never proof. Never run gates, reviews or workflows yourself, except for a one-line docs edit or when the persona is unavailable. Re-verify after every fix, however small.
    - A mod or other UI change is also checked on the real app after its merge, not only by unit tests: a desktop Button once drew its coloured Text white while every test passed. Call the QA verifier again with the same inputs plus the Claude window id, from CoreGraphics `CGWindowListCopyWindowInfo` (owner "Claude", layer 0, on screen), what must show on screen, and the canvas link and artboard names. It forces a mod reload by touching its changed files, then calling one of its tools, screenshots the window read-only with `screencapture -x -o -l <window id>`, reads the mod's click trace when it has one, hands the screenshot to a `master-session:design-checker` subagent of its own, and returns that verdict. Computer use can't see the Claude app, so never try to drive it.
    - Run plugin checks with the engine the session runs: on macOS, the desktop's bundled `~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude`, not a `claude` on your PATH, which can lag behind.
-3. Merge a verified sha with `git -C <live repo> merge --ff-only <sha>` (a clean tree only). Not a fast-forward, or master moved: leave it, since the worker watches master, rebases itself and reports `ready <new sha>`. Never rebase or merge it yourself. A merged sha retires its worker (Worker lifetime, section 2).
+3. Merge a verified sha with `git -C <live repo> merge --ff-only <sha>` (a clean tree only). Not a fast-forward, or master moved: leave it. A session rebases itself; for a subagent, send `rebase onto <master sha>, rerun the gate, report ready <new sha>` to its agent ID. Never rebase or merge it yourself. A merged sha retires its worker (Worker lifetime, section 2).
 4. Problem found: one SendMessage per worker per round, with every problem, its evidence and the exact fix bundled, and log them in the ledger. Nothing else goes to the worker (section 4). A message waits until the worker's current turn ends; never resend. If one is ignored, check whether a permission-mode hold is keeping it. After 3 failed fix rounds on the same finding, stop resending: propose a fresh worker with a full brief, or escalate to the user.
-5. Stall or prompt: a worker held at a permission prompt or AskUserQuestion can't message you. Read the latest "Linked sessions now" roster note first: `(needs the user)` means tell the user at once which chat and what to click or answer, with a `PushNotification` if they are away (`list_sessions` and ListAgents don't carry that state). With no roster note: running, `lastActivityAt` frozen for 2 ticks and no job running means probably a prompt. Read its `list_events` first. A question, draft, "go" or next-step request gets a direct answer per section 4. Only an AskUserQuestion or a permission prompt waiting in its chat goes to the user, per section 5.
+5. Stall or prompt (sessions only): a worker held at a permission prompt or AskUserQuestion can't message you. Read the latest "Linked sessions now" roster note first: `(needs the user)` means tell the user at once which chat and what to click or answer, with a `PushNotification` if they are away (`list_sessions` and ListAgents don't carry that state). With no roster note: running, `lastActivityAt` frozen for 2 ticks and no job running means probably a prompt. Read its `list_events` first. A question, draft, "go" or next-step request gets a direct answer per section 4. Only an AskUserQuestion or a permission prompt waiting in its chat goes to the user, per section 5.
 6. Tell the user. With `verbose`, a tick with news posts the status board; with `quiet`, only its 🔴 lines. The final summary always uses the full board. A tick with no change gets one line: `Tick HH:MM · no change · next HH:MM`.
    - **Status pane:** when the skill prompt carries "Status pane: on" or the tool exists (load it with ToolSearch `select:mcp__master-session__board`), publish every board through `mcp__master-session__board` instead of the chat board, and post in chat only 🔴 lines and the final summary board. Fields: `tick` HH:MM; `sessions[]` with `id` (local_…), `name`, `persona`, `state` (needs-you, waiting, working, done), `title`, `now`, `next`, `progress` ("step N of M — label"), `time`, `git`, `location`, `done`, `verified`, `risk`, `needsYou`, `sha`, `worktrees[]`; `repos[]` as repo paths; `needsYou[]`. Mapping: 📍 → `progress`, 🌿 → `git`, 🔍 → `verified`, ⏱ → `time`.
    - **Without the mod:** post the chat board exactly as [board.md](board.md) shows.
@@ -132,13 +153,13 @@ A worker that asks for a "go", an approval or what to do next gets a direct inst
 
 ## 6. Ledger and clean up
 
-- Ledger: one note per run in your notes or memory tool, or a plain markdown file if you use none, holding each worker as `name (local_id)` with its persona, task, owned files, dependencies, state, last verified and merged SHA and open findings. Update it on every change; re-read it at each tick and after compaction. Capture decisions there as they happen.
+- Ledger: one note per run in your notes or memory tool, or a plain markdown file if you use none, holding each worker as `name (local_id | agentId)` with its shape, persona, task, owned files, dependencies, state, last verified and merged SHA and open findings. Update it on every change; re-read it at each tick and after compaction. Capture decisions there as they happen.
 - No silent drops: every finding stays in the ledger until it is closed as fixed, rejected with a reason, or deferred by the user.
 - Archive or stop only workers listed in the ledger. Archive one once its result is merged and captured in the ledger (the user's standing OK, or `archive-done`); otherwise list it as done and ask. Never archive this session. Never delete a session.
 - Clearing or compacting a session is the user's call. Suggest it at a natural break, once the ledger is up to date.
 - A worker whose context is huge or that keeps going stale: propose a fresh worker with a full brief (done so far, what's left), and archive the old one on the user's yes.
-- Worker worktrees, branches and scratch belong to the worker, which removes them after its merge. The QA verifier creates and removes the verify worktrees; the validator owns them only when it verifies itself (section 3, step 2). A worktree, branch or file no worker claims: check who holds it (`lsof +D <path>`, read its output, not its exit code; `git worktree list`) before flagging it. The user's IDE may own it.
-- Done means every piece merged, verified, and every Repos row ✅: 0 uncommitted, no unexpected ahead/behind, no leftovers (worktrees, scratch, stray branches). Pushing stays the user's call. Then stop the loop (`ScheduleWakeup` `stop: true`), post the final status board and send one `PushNotification`.
+- Worker worktrees, branches and scratch belong to the worker, which removes them after its merge (a subagent on `SendMessage` from you). The QA verifier creates and removes the verify worktrees; the validator owns them only when it verifies itself (section 3, step 2). A worktree, branch or file no worker claims: check who holds it (`lsof +D <path>`, read its output, not its exit code; `git worktree list`) before flagging it. The user's IDE may own it.
+- Done means every piece merged, verified, and every Repos row ✅: 0 uncommitted, no unexpected ahead/behind, no leftovers (worktrees, scratch, stray branches); a session branch left unmerged goes to the user as one `git branch -D` line, since the git-safety hook blocks `-D` for agents. Pushing stays the user's call. Then stop the loop (`ScheduleWakeup` `stop: true`), post the final status board and send one `PushNotification`.
 
 ## Rules
 
@@ -147,7 +168,7 @@ A worker that asks for a "go", an approval or what to do next gets a direct inst
 - Never invent a result: unverified stays unverified in every summary.
 - Every feature is specced first: the `master-session:spec-writer` subagent writes its tab in the project's Claude Doc, the validator approves it, briefs link it, and the QA verifier's Reviewer checks the sha against its acceptance criteria; a feature spanning several modules or workers then gets the `master-session:architect` subagent's "Technical design" section in the same tab, approved by the validator before any brief goes out (skipped for fixes and single-file changes); once the design is approved, the Spec writer runs again to link its artboards in the tab, with a changelog line.
 - Any UI change (pane, band, cards, rows) is planned as a design piece next: new artboards in the project's design canvas, with the real theme tokens, light and dark versions, and an element and token spec, approved by the user (by the validator only when the user hands that over) before UI code starts. The build follows it 1:1 and is checked against it by the QA verifier's `master-session:design-checker` subagent: on the worker's screenshots or preview before merge when there are any, and always on the live screenshot after it.
-- `ultracode` or "use a workflow" from the user lets the worker run a workflow, within the user's agent budget. Without that request, keep the bare word `ultracode` out of briefs: it opts the worker into workflows.
+- A workflow runs only where Execution shape rule 4 allows it; the bare word `ultracode` in a brief opts nothing in, so keep it out of briefs.
 
 ## In Copilot CLI
 

@@ -8,6 +8,13 @@ user-invocable: false
 
 You are a worker (child) session. The master session that briefed you is your parent, the validator: it verifies everything you report, answers your questions and merges your work. The user mostly talks to the parent. If your brief names a persona, follow its `master-session:<persona>` skill too.
 
+## As a background subagent
+If your brief starts `You are a background subagent`, the rules below hold with these changes:
+- Make a detached worktree first, `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-<name>" master`, and name its path in every call: your working directory resets to the parent's checkout. You leave no branch to delete.
+- Your final message is your report, blockers included (`STATUS: BLOCKED` with the exact call and the denial text). No `SendMessage` to the parent, and no start, rebase or clean-up Monitors.
+- You can't ask the user. End your turn early only with `STATUS: WAITING <job>`.
+- The parent resumes you by ID for fixes, rebases and the worktree removal.
+
 ## Blocked: message the parent first
 The moment a tool call is denied (auto-mode classifier, git-safety, any hook), or you need an approval, send the parent a SendMessage before anything else: `STATUS: BLOCKED`, the exact command, the denial text, and what you need. Then wait. Never work around a denial, and don't revert work that already succeeded.
 
