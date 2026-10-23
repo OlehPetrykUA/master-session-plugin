@@ -4,7 +4,7 @@ import type { Board, LiveSession, Repo, SessionState, Worktree } from '../../typ
 
 import { lossesOf, sideOf } from '../components/detail/losses'
 import { withReported, withReportedRuns } from '../lib/agents'
-import { bandProgress } from '../lib/band'
+import { agentCountsOf, askingChatOf } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
 import { ARCHIVE_LIMIT, BOARD_TOOL, LIVE_LIMIT, PANE, TITLE, UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
@@ -341,9 +341,9 @@ export async function openSummary($: EngineInterface) {
 
 export async function openAsking($: EngineInterface) {
   const { board: current } = await boardOf($)
-  const id = bandProgress(current, await getLive($))?.segments.find(one => one.state === 'needs-you')?.id
-  const asking = current?.sessions.find(one => one.id === id)
-  if (asking) await openSession($, asking.id, asking.name)
+  const agents = agentCountsOf(await sharedAgentsOf($), await sharedWorkflowsOf($))
+  const chat = askingChatOf(current, await getLive($), agents, await getRepos($))
+  if (chat) await openSession($, chat.id, chat.name)
 }
 
 async function archiveOne($: EngineInterface, id: string, name: string) {

@@ -1,38 +1,40 @@
-import type { AgentRecord, Board, Live, SessionState, WorkflowRecord } from '../../types'
+import type { AgentRecord, Board, Live, Repo, SessionState, WorkflowRecord } from '../../types'
 
-import { BAR, BUTTON, CHECK, COUNTS, PERCENT, PILL } from '../theme/band'
+import { BAR, BUTTON, CHECK, PERCENT, PILL } from '../theme/band'
 import { PERSONA_GLYPH } from '../theme/icons'
 import type { IconName } from '../theme/icons'
-import { barsWidth, dotsWidth, flexCount } from '../theme/strip'
-import type { StripItem, StripTone } from '../theme/strip'
+import type { BarTone } from '../theme/strip'
 import { workflowRunsOf } from './agents'
 import type { WorkflowRun } from './agents'
 import { progressOf } from './board'
 import type { Progress } from './board'
 import { COLUMN, fit, textWidth, widthOf } from './layout'
-import { nameText, personaOfType, sessionNameOf } from './list'
+import { GROUP_OF, nameText, personaOfType, sessionNameOf, sessionStatusOf } from './list'
 import { rowsOf } from './rows'
+import type { Row } from './rows'
 
 const DIGIT = 0.64
 export const HIT = 'band-hit-'
-const MAX_BARS = 8
+export const BAR_MIN = 48
+const COUNTS_BELOW = 600
+const PERCENT_BELOW = 340
 const PILL_WIDTH = 2 + PILL.left + PILL.icon + PILL.gap + PILL.right
 const NEEDS = ' needs you'
+const SEPARATOR = ' · '
 
 export type BandAction = 'board' | 'chat'
 
-export type BandActions = { board: () => void; chat: (id: string, name: string) => void }
+type BandActions = { board: () => void; chat: (id: string, name: string) => void }
 
 export type AgentCounts = { agents: readonly AgentRecord[]; workflows: readonly WorkflowRecord[] }
 
-export type Asker = { name: string; short: string; glyph: IconName; parent?: string; reason?: string; chat?: { id: string; name: string } }
+type Asker = { name: string; short: string; glyph: IconName; parent?: string; reason?: string; since?: number; chat?: { id: string; name: string } }
 
-export type BandItem = StripItem & { id: string; isRunning: boolean; asker?: Asker }
+type UnitKind = 'session' | 'subagent' | 'workflow'
 
-export const slotWidth = (text: string, size: number) => {
-  const padded = text.replace(/\d+/g, digits => '0'.repeat(Math.max(2, digits.length)))
-  return textWidth(padded.replace(/0/g, ''), size, { isBold: true }) + DIGIT * size * (padded.match(/0/g)?.length ?? 0)
-}
+type Unit = { id: string; kind: UnitKind; value: number; isRunning: boolean; isFinished: boolean; group?: SessionState; asker?: Asker }
+
+type CountPart = { text: string; isNumber: boolean }
 
 export const bandAction = (element: string) => {
   const name = element.startsWith(HIT) ? element.slice(HIT.length) : ''
@@ -41,17 +43,9 @@ export const bandAction = (element: string) => {
 
 export const agentCountsOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]): AgentCounts => ({ agents, workflows })
 
-const counted = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
+const counted = (count: number, word: string) => `${word}${count === 1 ? '' : 's'}`
 
-export const extrasOf = ({ subagents, workflows }: { subagents: number; workflows: number }) =>
-  [subagents ? counted(subagents, 'subagent') : '', workflows ? counted(workflows, 'workflow') : ''].filter(Boolean)
-
-const SESSION_TONE: Record<SessionState, StripTone> = { 'needs-you': 'red', waiting: 'amber', working: 'green', done: 'grey' }
-
-const agentTone = (agent: { state: string; asking?: unknown }): StripTone =>
-  agent.state === 'running' ? (agent.asking ? 'red' : 'green') : agent.state === 'failed' ? 'failed' : 'grey'
-
-const runTone = (run: WorkflowRun): StripTone => (run.counts.asking ? 'red' : run.state === 'running' ? 'green' : run.state === 'failed' ? 'failed' : 'grey')
+const clamp = (value: number) => Math.min(1, Math.max(0, value))
 
 const agentAskerOf = (type: string, label: string) => {
   const persona = personaOfType(type)
@@ -72,103 +66,114 @@ function treeOf(agents: readonly AgentRecord[]) {
   return order
 }
 
-function subagentItems(agents: readonly AgentRecord[], place: Place): BandItem[] {
-  return treeOf(agents).map(({ agent, parent }) => ({
-    id: agent.id,
-    kind: 'subagent',
-    tone: agentTone(agent),
-    fill: 1,
-    isChild: true,
-    isRunning: agent.state === 'running',
-    asker: agent.state === 'running' && agent.asking ? { ...agentAskerOf(agent.type, agent.name || agent.description), parent: parent ? agentAskerOf(parent.type, parent.name || parent.description).name : place.parent, reason: agent.asking.text, chat: place.chat } : undefined,
-  }))
-}
-
-function runItems(runs: readonly WorkflowRun[], place: Place): BandItem[] {
-  return runs.map(run => {
-    const asking = run.agents.find(one => one.state === 'running' && one.asking)
-    const finished = run.counts.done + run.counts.failed
+function subagentUnits(agents: readonly AgentRecord[], place: Place): Unit[] {
+  return treeOf(agents).map(({ agent, parent }) => {
+    const isRunning = agent.state === 'running'
     return {
-      id: run.id,
-      kind: 'workflow',
-      tone: runTone(run),
-      fill: run.state === 'running' ? (run.counts.total ? finished / run.counts.total : 0) : 1,
-      pieces: Math.max(1, run.phases.length),
-      isRunning: run.state === 'running',
-      asker: asking?.asking ? { ...agentAskerOf(asking.type, asking.label), parent: run.name, reason: asking.asking.text, chat: place.chat } : undefined,
+      id: agent.id,
+      kind: 'subagent',
+      value: isRunning ? 0 : 1,
+      isRunning,
+      isFinished: !isRunning,
+      asker: isRunning && agent.asking ? { ...agentAskerOf(agent.type, agent.name || agent.description), parent: parent ? agentAskerOf(parent.type, parent.name || parent.description).name : place.parent, reason: agent.asking.text, since: agent.asking.since, chat: place.chat } : undefined,
     }
   })
 }
 
-export function bandItemsOf(segments: Progress['segments'], current: Board | null, { agents, workflows }: AgentCounts, live?: Live): BandItem[] {
+function runUnits(runs: readonly WorkflowRun[], place: Place): Unit[] {
+  return runs.map(run => {
+    const asking = run.agents.find(one => one.state === 'running' && one.asking)
+    const isRunning = run.state === 'running'
+    const finished = run.counts.done + run.counts.failed
+    return {
+      id: run.id,
+      kind: 'workflow',
+      value: isRunning ? (run.counts.total ? finished / run.counts.total : 0) : 1,
+      isRunning,
+      isFinished: !isRunning,
+      asker: asking?.asking ? { ...agentAskerOf(asking.type, asking.label), parent: run.name, reason: asking.asking.text, since: asking.asking.since, chat: place.chat } : undefined,
+    }
+  })
+}
+
+const remoteOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], id: string, place: Place) => {
+  const mine = agents.filter(one => one.parentSessionId === id)
+  const runs = runUnits(
+    workflowRunsOf(
+      mine.map(({ parentSessionId, ...one }) => one),
+      workflows.filter(one => one.parentSessionId === id).map(({ parentSessionId, ...one }) => one),
+    ),
+    { chat: place.chat },
+  )
+  return { subs: subagentUnits(mine.filter(one => !one.run), place), runs }
+}
+
+export function bandUnitsOf(segments: Progress['segments'], current: Board | null, { agents, workflows }: AgentCounts, live?: Live, trees: readonly Repo[] = []): Unit[] {
   const own = agents.filter(one => !one.parentSessionId)
-  const items: BandItem[] = subagentItems(
+  const units: Unit[] = subagentUnits(
     own.filter(one => !one.run),
     {},
   )
+  const known = new Set(segments.map(one => one.id))
   for (const segment of segments) {
     const row = current?.sessions.find(one => one.id === segment.id)
     const name = row?.name ?? segment.id
     const chat = { id: segment.id, name }
     const display = sessionNameOf(live?.sessions.find(one => one.id === segment.id)?.title || row?.title || name, row?.persona)
     const self = { name: nameText(display), short: display.persona, glyph: PERSONA_GLYPH[display.persona] ?? ('session' as const) }
-    const remote = agents.filter(one => one.parentSessionId === segment.id)
-    const subs = subagentItems(
-      remote.filter(one => !one.run),
-      { parent: display.persona === 'Session' ? display.task : display.persona, chat },
-    )
-    const runs = runItems(
-      workflowRunsOf(
-        remote.map(({ parentSessionId, ...one }) => one),
-        workflows.filter(one => one.parentSessionId === segment.id).map(({ parentSessionId, ...one }) => one),
-      ),
-      { chat },
-    )
-    const isAsking = segment.state === 'needs-you'
+    const { subs, runs } = remoteOf(agents, workflows, segment.id, { parent: display.persona === 'Session' ? display.task : display.persona, chat })
+    const found: Row = (live && rowsOf(current, live).find(one => one.id === segment.id)) || { id: segment.id, name, title: row?.title ?? '', state: segment.state, board: row }
+    const group = GROUP_OF[sessionStatusOf(found, trees, live?.sessions ?? [])]
+    const isAsking = group === 'needs-you'
     const child = isAsking ? [...subs, ...runs].find(one => one.asker && one.asker.reason === row?.needsYou) : undefined
-    items.push({
+    const isDone = group === 'done'
+    units.push({
       id: segment.id,
       kind: 'session',
-      tone: SESSION_TONE[segment.state],
-      fill: segment.fill,
-      isWorking: segment.state === 'working',
-      isRunning: segment.state !== 'done',
+      value: isDone ? 1 : clamp(segment.fill),
+      isRunning: group === 'working',
+      isFinished: isDone,
+      group,
       asker: isAsking ? (child?.asker ?? { ...self, reason: row?.needsYou, chat }) : undefined,
     })
-    items.push(...subs, ...runs)
+    units.push(...subs, ...runs)
   }
-  items.push(...runItems(workflowRunsOf(agents, workflows), {}))
-  return items
+  const gone = [...new Set(agents.flatMap(one => (one.parentSessionId && !known.has(one.parentSessionId) ? [one.parentSessionId] : [])))]
+  gone.forEach(id => {
+    const { subs, runs } = remoteOf(agents, workflows, id, {})
+    units.push(...subs, ...runs)
+  })
+  units.push(...runUnits(workflowRunsOf(agents, workflows), {}))
+  return units
 }
+
+const firstAskerOf = (units: readonly Unit[]) => units.reduce<Asker | undefined>((first, one) => (one.asker && (!first || (one.asker.since ?? Infinity) < (first.since ?? Infinity)) ? one.asker : first), undefined)
 
 const headOf = (asker: Asker) => (asker.parent ? `${asker.name}, in ${asker.parent},${NEEDS}` : `${asker.name}${NEEDS}`)
 
-const countsWidthOf = (text: string) => COUNTS.left + COUNTS.icon + COUNTS.gap + slotWidth(text, 13) + COUNTS.right
+export const overallOf = (units: readonly Unit[]) => (units.length ? units.reduce((sum, one) => sum + one.value, 0) / units.length : 0)
 
-export type FitInput = { room: number; gap: number; items: readonly StripItem[]; counts: number; full?: string; short?: string }
-
-export function fitBand({ room, gap, items, counts, full, short }: FitInput) {
-  const dots = dotsWidth(items)
-  const bars = barsWidth(items)
-  const isForced = flexCount(items) > MAX_BARS
-  if (full === undefined) {
-    const least = isForced ? dots : bars
-    const showCounts = room - counts - gap >= least
-    const left = showCounts ? room - counts - gap : room
-    const isDots = isForced || left < bars
-    return { pill: '', showCounts, isDots, strip: Math.round(isDots ? dots : left), isHidden: false }
-  }
-  const brief = short ?? full
-  const tries = isForced
-    ? [{ text: full, isDots: true }, { text: brief, isDots: true }]
-    : [{ text: full, isDots: false }, { text: brief, isDots: false }, { text: brief, isDots: true }]
-  for (const { text, isDots } of tries) {
-    const left = room - PILL_WIDTH - widthOf(text, { isBold: true })
-    if (left >= (isDots ? dots : bars)) return { pill: text, showCounts: false, isDots, strip: Math.round(isDots ? dots : left), isHidden: false }
-  }
-  if (room - PILL_WIDTH - widthOf(brief, { isBold: true }) >= 0) return { pill: brief, showCounts: false, isDots: true, strip: 0, isHidden: true }
-  return { pill: fit(brief, room - PILL_WIDTH, { isBold: true }), showCounts: false, isDots: true, strip: 0, isHidden: true }
+export const percentOf = (units: readonly Unit[]) => {
+  if (!units.length) return 0
+  if (units.every(one => one.isFinished)) return 100
+  return Math.min(99, Math.floor(overallOf(units) * 100 + 1e-9))
 }
+
+export function countsOf(units: readonly Unit[], isAllDone: boolean): CountPart[] {
+  if (isAllDone) return [{ text: 'All ', isNumber: false }, { text: String(units.length), isNumber: true }, { text: ' done', isNumber: false }]
+  const sessions = (group: SessionState) => units.filter(one => one.kind === 'session' && one.group === group).length
+  const running = (kind: UnitKind) => units.filter(one => one.kind === kind && one.isRunning).length
+  const subagents = running('subagent')
+  const workflows = running('workflow')
+  const entries: [number, string][] = [[sessions('working'), 'working'], [sessions('waiting'), 'waiting']]
+  if (subagents) entries.push([subagents, counted(subagents, 'subagent')])
+  if (workflows) entries.push([workflows, counted(workflows, 'workflow')])
+  return entries.flatMap(([count, word], index): CountPart[] => [...(index ? [{ text: SEPARATOR, isNumber: false }] : []), { text: String(count), isNumber: true }, { text: ` ${word}`, isNumber: false }])
+}
+
+export const countsText = (parts: readonly CountPart[]) => parts.map(one => one.text).join('')
+
+const countsWidthOf = (parts: readonly CountPart[]) => parts.reduce((sum, one) => sum + (one.isNumber ? DIGIT * 13 * one.text.length : textWidth(one.text, 13)), 0)
 
 export function bandProgress(current: Board | null, live: Live) {
   const sessions = rowsOf(current, live)
@@ -176,6 +181,11 @@ export function bandProgress(current: Board | null, live: Live) {
     .map(row => ({ ...row.board, id: row.id, name: row.name, state: row.state }))
   const progress = progressOf({ sessions, needsYou: [], repos: [], source: 'tool' }, live)
   return progress.total ? progress : undefined
+}
+
+export function askingChatOf(current: Board | null, live: Live, agents: AgentCounts, trees: readonly Repo[]) {
+  const chat = firstAskerOf(bandUnitsOf(bandProgress(current, live)?.segments ?? [], current, agents, live, trees))?.chat
+  return chat && chat.id !== live.self ? chat : undefined
 }
 
 const IDLE_PROGRESS: Progress = { segments: [], percent: 0, done: 0, total: 0 }
@@ -187,48 +197,54 @@ export function bandProgressWith(current: Board | null, live: Live, { agents, wo
   return isBusy ? IDLE_PROGRESS : undefined
 }
 
-export function bandViewOf(columns: number, current: Board | null, progress: Progress, from: string, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live?: Live) {
+export function bandViewOf(columns: number, current: Board | null, progress: Progress, from: string, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live?: Live, trees: readonly Repo[] = []) {
   const width = columns * COLUMN - 16
-  const isNarrow = width < 600
-  const items = bandItemsOf(progress.segments, current, agents, live)
-  const count = (state: SessionState) => progress.segments.filter(one => one.state === state).length
-  const asker = items.find(one => one.asker)?.asker
-  const isAllDone = !asker && progress.total > 0 && progress.done === progress.total
-  const hasLead = !asker && progress.total > 0
-  const percent = progress.percent
-  const digits = String(progress.total).length
-  const number = (value: number) => String(value).padStart(digits, ' ')
-  const counts = isAllDone ? `${number(progress.total)} done · ${number(0)} open` : progress.total ? `${number(count('working'))} working · ${number(count('waiting'))} waiting` : ''
-  const running = (kind: StripItem['kind']) => items.filter(one => one.kind === kind && one.isRunning).length
-  const parts = isAllDone || asker ? [] : extrasOf({ subagents: running('subagent'), workflows: running('workflow') })
+  const isNarrow = width < COUNTS_BELOW
+  const units = bandUnitsOf(progress.segments, current, agents, live, trees)
+  const asker = firstAskerOf(units)
+  const isAllDone = !asker && units.length > 0 && units.every(one => one.isFinished)
+  const isRunning = units.some(one => one.isRunning)
+  const overall = overallOf(units)
+  const percent = percentOf(units)
+  const tone: BarTone = asker ? 'red' : isAllDone || isRunning ? 'green' : 'grey'
+  const hasPercent = !asker && !isAllDone && width >= PERCENT_BELOW
+  const parts = asker ? [] : countsOf(units, isAllDone)
   const via = from ? `, from ${from}` : ''
-  const full = asker ? `${headOf(asker)}${asker.reason ? ` · ${asker.reason}` : ''}` : undefined
+  const full = asker ? `${headOf(asker)}${asker.reason ? ` · ${asker.reason}` : ''}` : ''
+  const short = asker ? `${asker.short}${NEEDS}` : ''
   const alt = asker
     ? `Master session: ${headOf(asker)}${asker.reason ? `, ${asker.reason}` : ''}${via}`
     : isAllDone
-      ? `Master session: all ${progress.total} done${via}`
-      : `Master session: ${[...(progress.total ? [`${percent} percent`, `${count('working')} working`, `${count('waiting')} waiting`] : []), ...parts].join(', ')}${via}`
-  const chat = asker?.chat
+      ? `Master session: all ${units.length} done${via}`
+      : `Master session: ${[`${percent} percent`, ...countsText(parts).split(SEPARATOR)].join(', ')}${via}`
+  const chat = asker?.chat && asker.chat.id !== live?.self ? asker.chat : undefined
   const action = asker
     ? chat
-      ? { name: 'chat' as const, label: 'Open chat', icon: 'chat' as const, isIconOnly: isNarrow, press: () => act.chat(chat.id, chat.name) }
+      ? { name: 'chat' as const, label: 'Open chat', accessibleName: 'Open chat', icon: 'chat' as const, isIconOnly: isNarrow, press: () => act.chat(chat.id, chat.name) }
       : undefined
     : isPaneOpen
       ? undefined
-      : { name: 'board' as const, label: isNarrow ? 'Board' : 'Open board', icon: 'panel' as const, isIconOnly: false, press: act.board }
+      : { name: 'board' as const, label: isNarrow ? 'Board' : 'Open board', accessibleName: 'Open board', icon: 'panel' as const, isIconOnly: false, press: act.board }
   const actionWidth = action ? (action.isIconOnly ? BUTTON.height : 2 + BUTTON.left + BUTTON.icon + BUTTON.gap + widthOf(action.label, { isBold: true }) + BUTTON.right) : 0
   const padLeft = asker ? 8 : isNarrow ? 12 : 16
-  const padRight = isNarrow ? 6 : 8
+  const padRight = action ? (isNarrow ? 6 : 8) : isNarrow ? 12 : 16
   const gap = BAR.gap
-  const leadWidth = isAllDone ? CHECK : hasLead ? PERCENT : 0
-  const room = width - padLeft - padRight - 2 - (asker || isAllDone || hasLead ? leadWidth + gap : 0) - (action ? actionWidth + gap : 0)
-  const fitOf = (text: string) => fitBand({ room, gap, items, counts: countsWidthOf(text), full, short: asker ? `${asker.short}${NEEDS}` : undefined })
-  const extras = parts.join(' · ')
-  const wide = fitOf([counts, extras].filter(Boolean).join(' · '))
-  const fitted = wide.showCounts || !extras || !counts ? wide : fitOf(counts)
-  const { showCounts } = fitted
-  const pillText = fitted.pill
-  return { items, asker, isAllDone, hasLead, percent, counts, extras: fitted === wide ? extras : '', alt, action, actionWidth, padLeft, padRight, gap, fitted, showCounts, pillText }
+  const inner = width - padLeft - padRight - 2
+  const around = (lead: number, counts: number) => {
+    const sides = [lead, counts, actionWidth].filter(Boolean)
+    return inner - sides.reduce((sum, one) => sum + one, 0) - sides.length * gap
+  }
+  let pillText = ''
+  let leadWidth = isAllDone ? CHECK : hasPercent ? PERCENT : 0
+  if (asker) {
+    const avail = around(0, 0) - BAR_MIN - PILL_WIDTH
+    pillText = !isNarrow && widthOf(full, { isBold: true }) <= avail ? full : widthOf(short, { isBold: true }) <= avail ? short : fit(short, Math.max(0, avail), { isBold: true })
+    leadWidth = PILL_WIDTH + widthOf(pillText, { isBold: true })
+  }
+  const countsWidth = countsWidthOf(parts)
+  const showCounts = !isNarrow && parts.length > 0 && around(leadWidth, countsWidth) >= BAR_MIN
+  const barWidth = Math.max(BAR_MIN, Math.round(around(leadWidth, showCounts ? countsWidth : 0)))
+  return { units, asker, isAllDone, isRunning, hasPercent, overall, percent, tone, parts, showCounts, alt, action, actionWidth, padLeft, padRight, gap, barWidth, pillText }
 }
 
 export type BandView = ReturnType<typeof bandViewOf>

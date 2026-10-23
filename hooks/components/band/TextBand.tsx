@@ -1,23 +1,24 @@
 import type { BandView } from '../../lib/band'
 import type { Progress } from '../../lib/board'
-import type { StripTone } from '../../theme/strip'
+import { countsText } from '../../lib/band'
+import type { BarTone } from '../../theme/strip'
 import type { TextUi } from '../types'
 
 export type TextBandProps = { view: BandView; progress: Progress; columns: number }
 
-const TERMINAL: Record<StripTone, string> = { red: 'error', failed: 'error', amber: 'warning', green: 'success', grey: 'subtle' }
+const TERMINAL: Record<BarTone, string> = { red: 'error', green: 'success', grey: 'subtle' }
+
+const CELLS = { least: 6, most: 24 }
 
 export function TextBand(ui: TextUi, props: TextBandProps) {
   const { Box, Text, Button } = ui
   const { view, columns } = props
-  const { items, asker, isAllDone, percent, counts, extras, action, showCounts, pillText } = view
-  const lead = asker ? `● ${pillText}` : isAllDone ? '✓' : view.hasLead ? `${percent}%`.padStart(4) : ''
-  const more = showCounts && extras ? (counts ? `· ${extras}` : extras) : ''
-  const marks = items.reduce((sum, one) => sum + (one.kind === 'subagent' ? 2 : one.kind === 'workflow' ? (one.pieces ?? 1) + 1 : 0), 0)
-  const sessions = Math.max(1, items.filter(one => one.kind === 'session').length)
-  const fixed = lead.length + (showCounts ? counts.length : 0) + (more ? more.length + 1 : 0) + (action?.label.length ?? 0) + marks + 12
-  const cells = Math.max(1, Math.min(8, Math.floor((columns - fixed) / sessions) - 1))
-  const toneOf = (tone: StripTone) => (isAllDone ? 'success' : TERMINAL[tone])
+  const { asker, isAllDone, percent, parts, action, showCounts, pillText } = view
+  const lead = asker ? `● ${pillText}` : isAllDone ? '✓' : view.hasPercent ? `${percent}%`.padStart(4) : ''
+  const counts = showCounts ? countsText(parts) : ''
+  const fixed = lead.length + counts.length + (action?.label.length ?? 0) + 12
+  const cells = Math.max(CELLS.least, Math.min(CELLS.most, columns - fixed))
+  const filled = view.isAllDone ? cells : Math.min(cells - 1, Math.max(view.isRunning ? 1 : 0, Math.floor(cells * view.overall)))
   return (
     <Box flexDirection="row" gap={1}>
       {lead ? (
@@ -25,22 +26,20 @@ export function TextBand(ui: TextUi, props: TextBandProps) {
           {lead}
         </Text>
       ) : null}
-      {items.map(one => {
-        if (one.kind === 'subagent') return <Text color={toneOf(one.tone)} dimColor={!!asker || undefined}>•</Text>
-        if (one.kind === 'workflow') {
-          const pieces = one.pieces ?? 1
-          const filled = Math.round(pieces * Math.min(1, one.fill))
-          return <Text color={toneOf(one.tone)} dimColor={!!asker || undefined}>{'■'.repeat(filled) + '□'.repeat(pieces - filled)}</Text>
-        }
-        const filled = Math.max(1, Math.round(cells * Math.min(1, one.fill)))
-        return (
-          <Text color={toneOf(one.tone)} dimColor={!!asker || undefined}>
-            {'█'.repeat(filled) + '░'.repeat(cells - filled)}
-          </Text>
-        )
-      })}
-      {showCounts && counts ? <Text dimColor>{counts}</Text> : null}
-      {more ? <Text weight="semibold">{more}</Text> : null}
+      <Text color={TERMINAL[view.tone]}>{'█'.repeat(filled) + '░'.repeat(cells - filled)}</Text>
+      {counts ? (
+        <Text dimColor>
+          {parts.map((part, index) =>
+            part.isNumber ? (
+              <Text key={`c${index}`} weight="semibold" dimColor={false}>
+                {part.text}
+              </Text>
+            ) : (
+              part.text
+            ),
+          )}
+        </Text>
+      ) : null}
       {action ? <Button key={`band-${action.name}`} variant="primary" label={action.label} onPress={action.press} /> : null}
     </Box>
   )

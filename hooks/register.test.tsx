@@ -219,6 +219,6 @@ test('a worker band redraws when the master rewrites its board, and counts the m
   const files = child.files ?? {}
   files[path] = JSON.stringify({ v: 1, kind: 'board', at: 3_650_000, masterId: 'local_master', masterTitle: 'M', board: next, agents: [agent] })
   await run.clock.advance(6_000)
-  expect((await altsOf(band)).join()).toContain('all 2 done')
+  expect((await altsOf(band)).join()).toContain('66 percent, 0 working, 0 waiting, 1 subagent')
   await band.unmount()
 })

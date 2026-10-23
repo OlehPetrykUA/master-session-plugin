@@ -34,7 +34,7 @@ import { messageOf } from './lib/format'
 import { openIdOf } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
-import { getAgents, getBoard, getLive, getReports, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
+import { getAgents, getBoard, getLive, getReports, getRepos, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
 
 let columns = 0
 let pending: { row: number; at: number } | undefined
@@ -242,7 +242,7 @@ export const register: Register = on => {
     const view = bandViewOf(bandColumns, current, progress, from, isOpen, agents, {
       board: () => void openPane($),
       chat: (id, name) => void openSession($, id, name),
-    }, live)
+    }, live, await getRepos($))
     return Svg ? Band({ Box, Text, Button, Svg, Client }, { view, progress }) : TextBand({ Box, Text, Button }, { view, progress, columns: bandColumns })
   })
 
