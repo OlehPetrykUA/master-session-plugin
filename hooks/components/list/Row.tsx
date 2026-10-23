@@ -49,7 +49,7 @@ export function Row(ui: Ui, props: RowProps) {
   )
   const isChat = isNeeds && !!props.chat
   const isMeta = !isChat && !isNarrow
-  const metaWidth = isMeta ? Math.max(elapsed ? 16 + textWidth(elapsed, 12, { isTabular: true }) : 0, item.kind === 'session' && !isNeeds ? (git?.width ?? 0) + 4 + 14 : 0) : 0
+  const metaWidth = isMeta ? Math.max(elapsed ? 16 + textWidth(elapsed, 12) : 0, item.kind === 'session' && !isNeeds ? (git?.width ?? 0) + 4 + 14 : 0) : 0
   const base = props.width - 2 - 12 - 8 - 28 - 12 - 14 - 12 - (metaWidth ? metaWidth + 12 : 0) - (steps && !isChat ? 34 + 12 : 0)
   const chatWidth = (isIcon: boolean) => (isChat ? (isIcon ? 32 : faceWidth(props.chat?.label ?? '', 'b32') + 1) + 12 : 0)
   const personaWidth = textWidth(name.persona, 14, { isBold: true }) + (name.task ? 8 + textWidth('·', 14) : 0)

@@ -8,6 +8,7 @@ import { foldPath, relativeOf, rowsOf } from '../../lib/list'
 import { rowsOf as sessionRowsOf } from '../../lib/rows'
 import { isFailed, testsOf } from '../../lib/totals'
 import { pillOf, testsShownOf } from '../detail/Tests'
+import { CAPTION } from './Summary'
 import { C } from '../../theme/tokens'
 import { ASKS, ELLIPSIS, ROCKET_PX, WIDE_ASKS } from '../../testing/widths'
 import { BOARD, HOME, PANE, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
@@ -255,9 +256,9 @@ test('textWidth follows anthropic-sans at opsz 16 as Chrome renders it at 12–1
     ['Designer', 14, true, 60.93],
     ['Open chat', 13, true, 65.4],
     ['Allow Read outside the project: ~/.agents/RULES.md?', 12, true, 309.1],
-    ['(1) [2] {3}: a.b, c; d! e? f.', 12, false, 126.82],
-    ['(1) [2] {3}: a.b, c; d! e? f.', 12, true, 130.92],
-    ['Allow Bash: ls -1 ./a/ | wc -l; ls -1 ./b/ | wc -l; ls -1 ./c/ | wc -l?', 12, true, 320.48],
+    ['(1) [2] {3}: a.b, c; d! e? f.', 12, false, 131.77],
+    ['(1) [2] {3}: a.b, c; d! e? f.', 12, true, 135.06],
+    ['Allow Bash: ls -1 ./a/ | wc -l; ls -1 ./b/ | wc -l; ls -1 ./c/ | wc -l?', 12, true, 328.98],
     ['Allow Bash: rm -f ./a.js ./b.js ./c.js ./d.js ./e.js ./f.js ./g.js?', 12, true, 307.28],
   ]
   for (const [text, size, isBold, real] of measured) {
@@ -307,7 +308,7 @@ test('rows break at spaces first, then after a slash in a path; never after a hy
 })
 
 test('tabular digits: the elapsed time is measured at 0.64 em per digit as it renders, so the ask beside it stays inside its real column', async ($, on) => {
-  expect(textWidth('11m', 12, { isTabular: true })).toBeGreaterThanOrEqual(25.81)
+  expect(textWidth('11m', 12)).toBeGreaterThanOrEqual(25.81)
   seeded(on, [
     { id: 't1', name: 'band diff', type: 'master-session:reviewer', description: 'Review', state: 'running', startedAt: 2_940_000, asking: { text: 'Allow Bash: bun install && bun run build && bun test?', since: 3_590_000 } },
     { id: 't2', name: 'canvas v3 check', type: 'master-session:reviewer', description: 'Check', state: 'running', startedAt: 3_589_000, asking: { text: 'Allow Read outside the project: ~/.agents/RULES.md?', since: 3_590_000 } },
@@ -345,10 +346,33 @@ test('wide glyphs by real width: Æ Œ, Cyrillic, arrows and box drawing, ✓ �
   expect(textWidth('🚀', 13, { isBold: true })).toBeGreaterThanOrEqual(ROCKET_PX[13] ?? Infinity)
 })
 
-test('tabular digits count 0.64 em each, whatever the proportional digit width; other characters keep their own widths', () => {
+test('digits count 0.64 em each, the tabular advance the desktop draws for every Text, at both weights; other characters keep their own widths', () => {
   const px = (value: number) => Math.round(value * 1000) / 1000
-  expect(px(textWidth('1111', 12, { isTabular: true }))).toBe(px(4 * 0.64 * 12 * 1.02))
-  expect(textWidth('1111', 12)).toBeLessThan(textWidth('1111', 12, { isTabular: true }))
-  expect(px(textWidth('11m', 12, { isTabular: true }) - textWidth('m', 12))).toBe(px(2 * 0.64 * 12 * 1.02))
-  expect(px(textWidth('0', 12, { isTabular: true, isBold: true }))).toBe(px(0.64 * 12 * 1.02))
+  expect(px(textWidth('1111', 12))).toBe(px(4 * 0.64 * 12 * 1.02))
+  expect(px(textWidth('1', 12))).toBe(px(textWidth('8', 12)))
+  expect(px(textWidth('11m', 12) - textWidth('m', 12))).toBe(px(2 * 0.64 * 12 * 1.02))
+  expect(px(textWidth('0', 12, { isBold: true }))).toBe(px(0.64 * 12 * 1.02))
+})
+
+test('KPI tile text matches the live desktop pane: 14 tile labels and subs read from a retina screenshot (1 css px = 2.315 px, set by the 16.2 px tabular digit pitch), ink plus the font’s side bearings, all within −3 % / +9 % of textWidth at the caption size', () => {
+  const live: [string, boolean, number][] = [
+    ['Sessions', true, 47.49],
+    ['Needs you', true, 56.06],
+    ['Subagents', true, 56.57],
+    ['Workflows', true, 55.68],
+    ['Commits', true, 47.63],
+    ['Tests', true, 27.94],
+    ['Duration', true, 45.7],
+    ['Git', true, 15.59],
+    ['1 session', false, 49.27],
+    ['none', false, 26.3],
+    ['2 repos', false, 40.57],
+    ['475 passed', false, 63.04],
+    ['since 12:29', false, 61.67],
+    ['clean', false, 28.85],
+  ]
+  for (const [text, isBold, real] of live) {
+    const ratio = textWidth(text, CAPTION, { isBold }) / real
+    expect([text, Math.round(ratio * 1000) / 1000, ratio >= 0.97 && ratio <= 1.09]).toEqual([text, Math.round(ratio * 1000) / 1000, true])
+  }
 })

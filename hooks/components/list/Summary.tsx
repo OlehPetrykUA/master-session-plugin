@@ -7,11 +7,13 @@ import type { Ui } from '../types'
 
 export type SummaryProps = { blocks: readonly Block[]; perRow: number; width: number }
 
+export const CAPTION = 11
+
 export const tileInnerOf = (width: number, perRow: number) => (width - (perRow - 1) * 8) / perRow - 2 - 16
 
 export function subOf(one: Block, inner: number) {
   const subs = [one.sub, ...(one.shorts ?? [])]
-  return subs.find(text => textWidth(text, 11) <= inner) ?? subs.at(-1)
+  return subs.find(text => textWidth(text, CAPTION) <= inner) ?? subs.at(-1)
 }
 
 export function Summary(ui: Ui, props: SummaryProps) {
@@ -19,7 +21,7 @@ export function Summary(ui: Ui, props: SummaryProps) {
   const inner = tileInnerOf(props.width, props.perRow)
   const block = (one: Block) => {
     const value = numeral(one.value, 'text')
-    const hasIcon = one.isAlert && textWidth(one.label, 11, { isBold: true }) + 12 + 4 <= inner
+    const hasIcon = one.isAlert && textWidth(one.label, CAPTION, { isBold: true }) + 12 + 4 <= inner
     const sub = subOf(one, inner)
     return (
       <Box

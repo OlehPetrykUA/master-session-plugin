@@ -28,12 +28,12 @@ const WIDE = /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F
 const EMOJI = /\p{Extended_Pictographic}/u
 const CODES = RUNS.flatMap(([first, count]) => Array.from({ length: count }, (_, index) => first + index))
 
-export type Face = { isMono?: boolean; isBold?: boolean; isTabular?: boolean }
+export type Face = { isMono?: boolean; isBold?: boolean }
 
 const emsOf = (table: readonly number[]) => new Map(CODES.map((code, index) => [code, (table[index] ?? MISSING_EM * 1000) / 1000]))
 const EMS = { regular: emsOf(REGULAR), semibold: emsOf(SEMIBOLD) }
 const emOf = (ch: string, face: Face) =>
-  face.isTabular && /\d/.test(ch) ? TABULAR : (EMS[face.isBold ? 'semibold' : 'regular'].get(ch.codePointAt(0) ?? 0) ?? (EMOJI.test(ch) ? EMOJI_EM : WIDE.test(ch) ? WIDE_EM : MISSING_EM))
+  /\d/.test(ch) ? TABULAR : (EMS[face.isBold ? 'semibold' : 'regular'].get(ch.codePointAt(0) ?? 0) ?? (EMOJI.test(ch) ? EMOJI_EM : WIDE.test(ch) ? WIDE_EM : MISSING_EM))
 
 export const textWidth = (text: string, size: number, face: Face = {}) =>
   face.isMono ? [...text].length * 0.6 * size : [...text].reduce((width, ch) => width + emOf(ch, face), 0) * size * SAFE
@@ -65,5 +65,5 @@ export const bodyWidthOf = (columns: number) => columns * COLUMN - 32
 
 export function faceWidth(label: string, size: Size = 's') {
   const [, left, right, gap] = SIZES[size]
-  return 2 + left + 15 + gap + widthOf(label, { isBold: true, isTabular: true }) + right
+  return 2 + left + 15 + gap + widthOf(label, { isBold: true }) + right
 }
