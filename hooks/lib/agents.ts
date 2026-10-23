@@ -98,7 +98,7 @@ export const reportAgentsOf = (agents: readonly AgentRecord[]): ReportAgent[] =>
 export const withReported = (agents: AgentRecord[], reports: readonly Report[]): AgentRecord[] => [
   ...agents.filter(one => !one.parentSessionId),
   ...reports.flatMap(report =>
-    (report.agents ?? []).map(({ runId, runIndex, ...one }): AgentRecord => ({ ...one, parentSessionId: report.session, run: runId ? { id: runId, index: runIndex ?? 0 } : undefined })),
+    (report.agents ?? []).map(({ runId, runIndex, running, ...one }): AgentRecord => ({ ...one, parentSessionId: report.session, run: runId ? { id: runId, index: runIndex ?? 0 } : undefined })),
   ),
 ]
 

@@ -49,7 +49,7 @@ export function Row(ui: Ui, props: RowProps) {
     </Box>
   )
   const chevron = props.isInCard ? 'collapse' : 'expand'
-  const narrowElapsed = isNarrow && elapsed && !(isNeeds && props.chat)
+  const narrowElapsed = isNarrow && elapsed && !(isNeeds && props.chat) && !line.cmdElapsed
   const second = (
     <Box key={`${id}-line`} flexDirection="row" alignItems={isNeeds ? 'flex-start' : 'center'} gap={across(4)} minWidth={0} overflow="hidden">
       {glyph(`${id}-kind`, KIND_ICON[item.kind], 'muted', KIND_WORD[item.kind])}
@@ -68,6 +68,14 @@ export function Row(ui: Ui, props: RowProps) {
         <Box key={`${id}-text`} flexShrink={1} minWidth={0}>
           <Text size="footnote" color={C.muted} wrap="truncate-end">
             {oneLine(line.text)}
+          </Text>
+        </Box>
+      ) : null}
+      {line.cmdElapsed ? muted('·', `${id}-cmd-dot`) : null}
+      {line.cmdElapsed ? (
+        <Box key={`${id}-cmd-elapsed`} flexShrink={0}>
+          <Text size="footnote" color={C.muted} tabular>
+            {line.cmdElapsed}
           </Text>
         </Box>
       ) : null}

@@ -7,11 +7,10 @@ import { getAgents, getBoard, getLive, getPlan, getRole, getStopped, getWorkflow
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
 import type { ReportAgent, ReportRun, Role, SessionState } from '../../types'
+import { MAIN, beginCall, capOf, dropLoop, endCall, hostOf, isShown, isSlow, resetRunning, runOf, runningOf } from './running'
 import { hasBoardFile, parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
 type Held = { text: string; tool: string; state: SessionState; needsYou?: string; by?: string }
-
-const MAIN = ''
 
 const NO_ROLE: Role = { role: '', self: '', parent: '' }
 const COMMIT_LINE = /^\[[^\]\s]+(?: \([^)]*\))? ([0-9a-f]{7,40})\] (.+)$/m
@@ -40,6 +39,7 @@ let held = new Map<string, Held>()
 let outbox: ReportAgent[] = []
 let runsOut: ReportRun[] = []
 let syncing: Promise<void> = Promise.resolve()
+let written = ''
 
 export const roleOf = () => role
 
@@ -164,8 +164,9 @@ export function promptTextOf(tool: string, input: unknown) {
     const questions = typeof input === 'object' && input ? (input as { questions?: unknown }).questions : undefined
     return fieldOf(Array.isArray(questions) ? questions[0] : undefined, 'question') ?? 'Answer the question in the chat'
   }
-  const detail = ['command', 'file_path', 'url', 'pattern', 'description'].map(key => fieldOf(input, key)).find(Boolean)
-  return `Allow ${tool}${detail ? `: ${detail.slice(0, 160)}` : ''}`
+  const url = fieldOf(input, 'url')
+  const detail = fieldOf(input, 'file_path') ?? (url && hostOf(url))
+  return `Allow ${tool}${detail ? `: ${capOf(detail)}` : ''}`
 }
 
 export const repoOf = (command: string, base: string) => {
@@ -195,9 +196,23 @@ export async function sessionFacts($: EngineInterface, id: string) {
   }
 }
 
+const withRunning = (agents: ReportAgent[]) =>
+  agents.map(one => {
+    const running = runningOf(one.id)
+    return running ? { ...one, running } : one
+  })
+
+const runsOf = () => JSON.stringify([runningOf(MAIN), outbox.map(one => runningOf(one.id))])
+
 async function save($: EngineInterface, next: Report, now: number) {
-  current = stamped({ ...next, agents: outbox, runs: runsOut }, now)
+  const sign = runsOf()
+  current = stamped({ ...next, agents: withRunning(outbox), runs: runsOut, running: runningOf(MAIN) }, now)
   await writeReport($, home, current)
+  written = sign
+}
+
+async function flushRunning($: EngineInterface) {
+  if (current && role.role === 'worker' && runsOf() !== written) await save($, current, await $.clock.now())
 }
 
 export function syncAgents($: EngineInterface) {
@@ -210,7 +225,7 @@ async function syncOnce($: EngineInterface) {
   const agents = reportAgentsOf(await getAgents($))
   const runs = reportRunsOf(await getWorkflows($))
   const now = await $.clock.now()
-  if (!current || (JSON.stringify(agents) === JSON.stringify(current.agents ?? []) && JSON.stringify(runs) === JSON.stringify(current.runs ?? []))) return
+  if (!current || (JSON.stringify(withRunning(agents)) === JSON.stringify(current.agents ?? []) && JSON.stringify(runs) === JSON.stringify(current.runs ?? []))) return
   outbox = agents
   runsOut = runs
   await save($, current, now)
@@ -265,6 +280,7 @@ async function adopt($: EngineInterface, next: Role) {
   await $.tool.register(REPORT_SPEC)
   if (known && known.parent === next.parent && known.engineId === engineId) {
     current = known
+    written = JSON.stringify([known.running, outbox.map(one => known.agents?.find(agent => agent.id === one.id)?.running)])
     return
   }
   await save($, { ...(known ?? freshReport(next.self, next.parent, engineId, now)), parent: next.parent, engineId }, now)
@@ -339,6 +355,17 @@ async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?:
     },
     now,
   )
+}
+
+async function runStarted($: EngineInterface, e: ToolCallInput) {
+  const tool = String(e.tool)
+  const isWorker = role.role === 'worker'
+  if (!isActive() || !isShown(tool) || (isWorker && !isSlow(tool)) || (!isWorker && e.agentId === undefined)) return undefined
+  const loop = isWorker && e.agentId !== undefined ? await keyOf($, e.agentId) : (e.agentId ?? MAIN)
+  if (isWorker && loop === MAIN && e.agentId !== undefined) return undefined
+  beginCall(loop, e.tool_use_id, runOf(e, home, await $.clock.now()))
+  await flushRunning($).catch(() => undefined)
+  return loop
 }
 
 async function promptOpened($: EngineInterface, text: string, tool: string, agentId?: string) {
@@ -449,6 +476,8 @@ export async function startRecorder($: EngineInterface) {
   outbox = []
   runsOut = []
   syncing = Promise.resolve()
+  written = ''
+  resetRunning()
   await resume($).catch(() => undefined)
 }
 
@@ -480,6 +509,7 @@ export async function briefed($: EngineInterface) {
 }
 
 export async function recordTurnEnd($: EngineInterface, e: TurnCompleteInput) {
+  dropLoop(e.agentId ?? MAIN)
   if (e.agentId !== undefined) return agentCleared($, e.agentId).catch(() => undefined)
   await promptClosed($, undefined, undefined, false).catch(() => undefined)
   await turnEnded($, e).catch(() => undefined)
@@ -500,10 +530,19 @@ export function recorder(on: On) {
     if (String(e.tool) === REPORT_TOOL) return reported($, e)
     if (String(e.tool) === REPORTS_TOOL) return listed($)
     if (String(e.tool) === QUESTION_TOOL) await promptOpened($, promptTextOf(QUESTION_TOOL, e), QUESTION_TOOL, e.agentId).catch(() => undefined)
-    const out = await next(e)
+    const loop = await runStarted($, e).catch(() => undefined)
+    const out = await next(e).catch(async (error: unknown) => {
+      if (loop !== undefined) {
+        endCall(loop, e.tool_use_id)
+        await flushRunning($).catch(() => undefined)
+      }
+      throw error
+    })
+    if (loop !== undefined) endCall(loop, e.tool_use_id)
     if (String(e.tool) === 'ExitPlanMode' && e.agentId === undefined && !out.isError && out.deny === undefined) await setPlan($, false)
     await promptClosed($, String(e.tool), e.agentId).catch(() => undefined)
     if (current && out.deny === undefined) await recordTool($, e, out).catch(() => undefined)
+    await flushRunning($).catch(() => undefined)
     return out
   }).catch(($, e, next) => {
     const failed = FAILED[String(e.tool)]

@@ -250,7 +250,8 @@ test('commits, test runs and edits are recorded from tool calls; failures and ot
   await run.bash('tsc -p . --noEmit')
   const seq = run.reportNow()?.seq
   await run.bash('ls')
-  expect(run.reportNow()?.seq).toBe(seq)
+  expect(run.reportNow()?.seq).toBe((seq ?? 0) + 2)
+  expect(run.reportNow()).not.toHaveProperty('running')
   const tested = run.reportNow()
   expect(tested?.commits.map(one => one.sha)).toEqual(['1a2b3c4'])
   expect(tested?.tests.map(one => [one.cmd, one.ok])).toEqual([
@@ -308,7 +309,7 @@ test('an agent sync that began before the answer never writes the old ask back o
   run.seed('agents', [{ id: 'a2', type: 'Explore', description: 'Check one caller', state: 'running', startedAt: NOW }])
   await run.start()
   await run.fire('classic.PermissionRequest', { tool_name: 'Bash', tool_input: { command: 'rm -rf build' }, agent_id: 'a2' })
-  expect(run.reportNow()?.agents?.[0]?.asking?.text).toBe('Allow Bash: rm -rf build')
+  expect(run.reportNow()?.agents?.[0]?.asking?.text).toBe('Allow Bash')
   run.hold('now')
   const background = run.sync()
   await settle()
@@ -369,7 +370,7 @@ test('a gate script run through Bash stores the labels; a non-test call with "te
   const seq = run.reportNow()?.seq
   await run.bash('cat hooks/data/agent-prompts.test.tsx')
   await run.bash('sed -n 1,20p hooks/persona.test.sh')
-  expect(run.reportNow()?.seq).toBe(seq)
+  expect(run.reportNow()?.seq).toBe((seq ?? 0) + 4)
   expect(run.reportNow()?.tests).toHaveLength(4)
 })
 

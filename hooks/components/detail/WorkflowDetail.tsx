@@ -14,7 +14,7 @@ import { Strong } from '../Strong'
 import type { Ui } from '../types'
 import { Block } from './Block'
 import { Callout } from './Callout'
-import { durationOf, tokensOf } from './format'
+import { durationOf, runningTimeOf, tokensOf } from './format'
 import { Pair } from './Pair'
 
 export type WorkflowDetailProps = { item: Extract<ListItem, { kind: 'workflow' }>; context: Context; rowProps: RowProps; innerWidth: number; agentOf: (item: RowItem) => RenderChildren }
@@ -80,7 +80,7 @@ export function WorkflowDetail(ui: Ui, props: WorkflowDetailProps) {
           'elapsed',
           'Time',
           run.state === 'running'
-            ? [Strong(ui, { text: `running ${durationOf(at - run.startedAt)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(run.startedAt)}`, isFull: true })]
+            ? [Strong(ui, { text: `running ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(run.startedAt)}`, isFull: true })]
             : [Strong(ui, { text: `took ${durationOf(end - run.startedAt)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(run.startedAt)}`, isFull: true })],
         ),
         right: half('usage', 'usage', 'Usage', [Strong(ui, { text: plural(counts.total, 'agent'), isFull: true }), run.tokens ? Quiet(ui, { text: tokensOf(run.tokens), isFull: true }) : null]),

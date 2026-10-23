@@ -1,6 +1,6 @@
 import { modelFamilyOf } from '../../lib/format'
 import { across, tall } from '../../lib/layout'
-import { askOf, clockOf, displayNameOf, nameText, parentsOf, rowsOf, sessionOfAgent, spanOf, tildeOf } from '../../lib/list'
+import { askOf, clockOf, displayNameOf, nameText, parentsOf, rowsOf, runningOfItem, sessionOfAgent, spanOf, tildeOf } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
@@ -13,9 +13,10 @@ import { Strong } from '../Strong'
 import type { Actions, Ui } from '../types'
 import { Block } from './Block'
 import { Callout } from './Callout'
-import { durationOf, tokensOf } from './format'
+import { durationOf, runningTimeOf, tokensOf } from './format'
 import { ModelValue } from './Model'
 import { Pair } from './Pair'
+import { RunningBlock } from './RunningBlock'
 
 export type SubagentDetailProps = { item: Extract<RowItem, { kind: 'subagent' | 'agent' }>; context: Context; rowProps: RowProps; innerWidth: number; actions: Actions }
 
@@ -56,9 +57,9 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
     </Text>
   )
   const time = isNeeds && agent.asking
-    ? [Strong(ui, { text: `waiting ${durationOf(at - agent.asking.since)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
+    ? [Strong(ui, { text: `waiting ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
     : isRunning
-      ? [Strong(ui, { text: `running ${durationOf(at - agent.startedAt)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
+      ? [Strong(ui, { text: `running ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
       : [Strong(ui, { text: `took ${durationOf(end - agent.startedAt)}`, isFull: true }), Quiet(ui, { text: `${clockOf(agent.startedAt)} – ${clockOf(end)}`, isFull: true })]
   const modelBlock = half('model', 'modelChip', 'Model', [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), type ? Quiet(ui, { text: type, isMono: true, isFull: true }) : null], 8)
   return Card(ui, {
@@ -78,6 +79,7 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
           })
         : null,
       item.status === 'failed' ? Callout(ui, { id, status: 'failed', label: 'Failed', lines: [{ text: agent.result || 'stopped', isStrong: true }, { text: `took ${durationOf(end - agent.startedAt)}`, isStrong: false }] }) : null,
+      RunningBlock(ui, { id, run: runningOfItem(item, context), at }),
       Block(ui, {
         id: `task-${id}`,
         icon: 'now',

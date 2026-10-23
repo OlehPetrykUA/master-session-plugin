@@ -106,6 +106,8 @@ export type EndReason = 'answer' | 'aborted' | 'refusal' | 'error'
 
 export type Step = { step: number; of: number; label: string }
 
+export type Running = { tool: string; text?: string; since: number }
+
 export type Report = {
   v: 1
   kind: 'status'
@@ -129,6 +131,7 @@ export type Report = {
   files: string[]
   waits?: { since: number; on: string }
   git?: { branch: string; dirty: number; ahead: number; at: number; path?: string }
+  running?: Running
   agents?: ReportAgent[]
   runs?: ReportRun[]
 }
@@ -160,7 +163,7 @@ export type AgentRecord = {
   parentSessionId?: string
 }
 
-export type ReportAgent = Pick<AgentRecord, 'id' | 'type' | 'description' | 'state' | 'startedAt' | 'name' | 'endedAt' | 'asking' | 'parentAgentId'> & { runId?: string; runIndex?: number }
+export type ReportAgent = Pick<AgentRecord, 'id' | 'type' | 'description' | 'state' | 'startedAt' | 'name' | 'endedAt' | 'asking' | 'parentAgentId'> & { runId?: string; runIndex?: number; running?: Running }
 
 export type WorkflowRecord = {
   id: string

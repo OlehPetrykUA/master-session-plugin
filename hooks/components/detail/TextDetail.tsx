@@ -1,22 +1,22 @@
 import type { RenderChildren } from 'claude-code'
 
 import { compactOf, modelFamilyOf, modelOf } from '../../lib/format'
-import { clockOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, parentsOf, plural, runAgentsOf, shortNameOf } from '../../lib/list'
+import { clockOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, parentsOf, plural, runAgentsOf, runningOfItem, runningTextOf, shortNameOf } from '../../lib/list'
 import type { Context, ListItem, RowItem } from '../../lib/list'
 import { headOf, syncOf, whereOf } from '../../lib/rows'
 import { CARD_BORDER, TERMINAL_COLOR } from '../../theme/tokens'
 import type { Actions, TextUi } from '../types'
 import { LOST } from './ArchiveBox'
-import { durationOf, tokensOf } from './format'
+import { durationOf, runningTimeOf, tokensOf } from './format'
 import { lossesOf } from './losses'
 import { pillsOf } from './Tests'
 
-type Line = { text: string; color?: string }
+type Line = { text: string; color?: string; key?: string }
 
 type TextCardProps = { id: string; title: string; head: Line; lines: readonly (Line | string)[]; body?: RenderChildren; tail?: readonly (Line | string)[]; isNeeds?: boolean; onCollapse: () => void; actions?: RenderChildren }
 
-const textLines = ({ Text }: TextUi, lines: readonly (Line | string)[]) =>
-  lines.map(line => (typeof line === 'string' ? { text: line } : line)).map(line => (line.color ? <Text color={line.color}>{line.text}</Text> : <Text dimColor>{line.text}</Text>))
+const textLines = ({ Box, Text }: TextUi, lines: readonly (Line | string)[]) =>
+  lines.map(line => (typeof line === 'string' ? { text: line } : line)).map(line => (line.color ? <Text color={line.color}>{line.text}</Text> : line.key ? <Box key={line.key}><Text dimColor>{line.text}</Text></Box> : <Text dimColor>{line.text}</Text>))
 
 function TextCard(ui: TextUi, props: TextCardProps) {
   const { Box, Text, Button } = ui
@@ -40,6 +40,11 @@ export const colorOf = (item: RowItem) => (item.status === 'archived' ? 'subtle'
 
 const headOfItem = (item: RowItem, context: Context): Line => ({ text: [lineTextOf(lineOf(item, context)), elapsedOfItem(item, context.at)].filter(Boolean).join(' · '), color: colorOf(item) })
 
+const runningLineOf = (item: RowItem, context: Context): Line | string => {
+  const run = runningOfItem(item, context)
+  return run ? { key: `running-${item.id}`, text: `Running · ${runningTextOf(run)} · since ${clockOf(run.since)}` } : ''
+}
+
 export type TextSessionProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; asking: string; actions: Actions }
 
 export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
@@ -61,6 +66,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
     isNeeds: item.status === 'needs',
     head: headOfItem(item, context),
     lines: [
+      runningLineOf(item, context),
       facts?.now ? `Now: ${facts.now}` : '',
       facts?.next ? `Next: ${facts.next}` : '',
       ...(facts?.activity ?? []).slice(0, 3).map(line => `• ${line}`),
@@ -127,7 +133,7 @@ export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
       ),
     ),
     tail: [
-      run.state === 'running' ? `Time: running ${durationOf(at - run.startedAt)} · started ${clockOf(run.startedAt)}` : `Time: took ${durationOf(end - run.startedAt)} · ${clockOf(run.startedAt)} – ${clockOf(end)}`,
+      run.state === 'running' ? `Time: running ${runningTimeOf(item, at)} · started ${clockOf(run.startedAt)}` : `Time: took ${durationOf(end - run.startedAt)} · ${clockOf(run.startedAt)} – ${clockOf(end)}`,
       `Usage: ${plural(counts.total, 'agent')}${run.tokens ? ` · ${tokensOf(run.tokens)}` : ''}`,
     ],
     onCollapse: props.onCollapse,
@@ -150,12 +156,13 @@ export function TextSubagentDetail(ui: TextUi, props: TextSubagentProps) {
     isNeeds: item.status === 'needs',
     head: headOfItem(item, context),
     lines: [
+      runningLineOf(item, context),
       ...(item.status === 'needs' && agent.asking ? [{ text: `Permission: ${agent.asking.text}`, color: 'error' }] : []),
       `Task: ${item.kind === 'subagent' ? item.agent.description : item.agent.label}`,
       item.kind === 'subagent' ? (item.agent.prompt ?? '') : '',
       `Model: ${model || '—'} · ${agent.type}`,
       `Started by: ${parentsOf(item, context).map(nameText).join(' › ')} · ${how}`,
-      isRunning ? `Time: running ${durationOf(at - agent.startedAt)} · started ${clockOf(agent.startedAt)}` : `Time: took ${durationOf(end - agent.startedAt)} · ${clockOf(agent.startedAt)} – ${clockOf(end)}`,
+      isRunning ? `Time: ${item.status === 'needs' && agent.asking ? 'waiting' : 'running'} ${runningTimeOf(item, at)} · started ${clockOf(agent.startedAt)}` : `Time: took ${durationOf(end - agent.startedAt)} · ${clockOf(agent.startedAt)} – ${clockOf(end)}`,
       !isRunning && agent.result ? `${agent.state === 'failed' ? 'Error' : 'Result'}: ${agent.result}` : '',
       !isRunning && agent.tokens ? tokensOf(agent.tokens) : '',
     ].filter(Boolean),

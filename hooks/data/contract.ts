@@ -1,7 +1,8 @@
-import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, ReportRun, Step } from '../../types'
+import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, ReportRun, Running, Step } from '../../types'
 
 import { ORDER, stateOf } from '../lib/board'
 import { compactOf } from '../lib/format'
+import { capOf } from './running'
 
 export const REPORT_TOOL = 'mcp__master-session__report'
 export const REPORTS_TOOL = 'mcp__master-session__reports'
@@ -73,6 +74,12 @@ export function parseStep(text: string): Step | undefined {
   const step = Number(match[1])
   const of = Number(match[2])
   return of > 0 && step <= of ? { step, of, label: (match[3] ?? '').trim() } : undefined
+}
+
+export function parseRunning(value: unknown): Running | undefined {
+  const data = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  if (typeof data.tool !== 'string' || !data.tool || !Number.isFinite(data.since)) return undefined
+  return data.tool !== 'Bash' && typeof data.text === 'string' && data.text ? { tool: data.tool, text: capOf(data.text), since: Number(data.since) } : { tool: data.tool, since: Number(data.since) }
 }
 
 const AGENT_STATES = new Set(['running', 'done', 'failed'])
@@ -187,7 +194,8 @@ export function parseReport(raw: unknown): Report | undefined {
     files: textsOf(data.files),
     waits: listOf<NonNullable<Report['waits']>>([data.waits], item => Number.isFinite(item.since))[0],
     git: listOf<NonNullable<Report['git']>>([data.git], item => typeof item.branch === 'string' && Number.isFinite(item.dirty))[0],
-    agents: listOf<ReportAgent>(data.agents, isReportAgent),
+    running: parseRunning(data.running),
+    agents: listOf<ReportAgent>(data.agents, isReportAgent).map(one => ({ ...one, running: parseRunning(one.running) })),
     runs: listOf<ReportRun>(data.runs, item => typeof item.id === 'string' && Number.isFinite(item.startedAt)),
   }
 }

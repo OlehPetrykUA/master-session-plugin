@@ -1,6 +1,6 @@
 import { compactOf, modelOf } from '../../lib/format'
 import { across, tall } from '../../lib/layout'
-import { ageOf, askOf, clockOf, foldPath, oneLine, relativeOf, shortNameOf, tildeOf } from '../../lib/list'
+import { ageOf, askOf, clockOf, foldPath, oneLine, relativeOf, runningOfItem, shortNameOf, tildeOf } from '../../lib/list'
 import type { Context, ListItem } from '../../lib/list'
 import { activityOf, headOf, othersOf, syncOf, whereOf } from '../../lib/rows'
 import type { Row } from '../../lib/rows'
@@ -20,6 +20,7 @@ import { Commits } from './Commits'
 import { lossesOf } from './losses'
 import { ModelValue } from './Model'
 import { Pair } from './Pair'
+import { RunningBlock } from './RunningBlock'
 import { Tests } from './Tests'
 
 export type SessionDetailProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; rowProps: RowProps; home: string; asking: string; innerWidth: number; actions: Actions }
@@ -101,6 +102,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
     children: [
       permission,
       callout,
+      RunningBlock(ui, { id: row.id, run: runningOfItem(item, context), at }),
       Pair(ui, {
         id: `pair-now-${row.id}`,
         left: half('Now', 'now', Strong(ui, { text: facts?.now || '—', isFull: true }), 'now'),

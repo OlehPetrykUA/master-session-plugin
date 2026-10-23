@@ -30,13 +30,24 @@ const start = async ($: Engine, run: ReturnType<typeof worker>) => {
 
 warmUp()
 
-test('the needs-you text names the tool and its command or path, or the first question asked', () => {
-  expect(promptTextOf('Bash', { command: 'rm -rf build', description: 'Remove build' })).toBe('Allow Bash: rm -rf build')
+test('the needs-you text names the tool and its path or host, never a command, or the first question asked', () => {
+  expect(promptTextOf('Bash', { command: 'rm -rf build', description: 'Remove build' })).toBe('Allow Bash')
   expect(promptTextOf('Edit', { file_path: '/repo/a.ts' })).toBe('Allow Edit: /repo/a.ts')
   expect(promptTextOf('mcp__x__y', {})).toBe('Allow mcp__x__y')
   expect(promptTextOf('AskUserQuestion', { questions: [{ question: 'Which branch?' }, { question: 'Second?' }] })).toBe('Which branch?')
   expect(promptTextOf('AskUserQuestion', {})).toBe('Answer the question in the chat')
-  expect(promptTextOf('Bash', { command: 'x'.repeat(300) }).length).toBe('Allow Bash: '.length + 160)
+  expect(promptTextOf('Bash', { command: 'x=$(mysql -p hunter2)' })).toBe('Allow Bash')
+  expect(promptTextOf('WebFetch', { url: 'https://api.x.dev/v1?token=t9' })).toBe('Allow WebFetch: api.x.dev')
+  expect(promptTextOf('Grep', { pattern: 'p9', description: 'd9' })).toBe('Allow Grep')
+})
+
+test('a permission request for a command shows and writes the tool name only, never a command', async ($, on) => {
+  const run = worker(on)
+  on('classic.PermissionRequest', () => ({}))
+  await start($, run)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'mysql -p hunter2' } })
+  expect(run.last()?.needsYou).toBe('Allow Bash')
+  expect(JSON.stringify(run.written).includes('hunter2')).toBe(false)
 })
 
 test('a permission request turns the worker report needs-you with the tool and command; the tool running turns it back to working', async ($, on) => {
@@ -49,7 +60,7 @@ test('a permission request turns the worker report needs-you with the tool and c
   })
   await start($, run)
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -rf build' } })
-  expect([run.last()?.state, run.last()?.needsYou, run.last()?.waits?.on]).toEqual(['needs-you', 'Allow Bash: rm -rf build', 'you'])
+  expect([run.last()?.state, run.last()?.needsYou, run.last()?.waits?.on]).toEqual(['needs-you', 'Allow Bash', 'you'])
   const askedAt = run.last()?.modelAt ?? 0
   expect(askedAt).toBeGreaterThan(0)
   await $.tool.call({ tool: 'Bash', command: 'rm -rf build' })
@@ -85,7 +96,7 @@ test("a waiting prompt's notification marks needs-you when nothing else did, its
   expect(run.last()?.state).toBe('working')
   await $.tool.call({ tool: 'mcp__master-session__report', state: 'needs-you', needsYou: 'Pick the design' })
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' } })
-  expect(run.last()?.needsYou).toBe('Allow Bash: ls')
+  expect(run.last()?.needsYou).toBe('Allow Bash')
   await $.tool.call({ tool: 'Bash', command: 'ls' })
   expect([run.last()?.state, run.last()?.needsYou]).toEqual(['needs-you', 'Pick the design'])
 })
@@ -113,15 +124,15 @@ async function reachesMaster($: Engine, on: On, child: Child) {
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const heads = async () => (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
   expect(await heads()).toEqual(['group-head-working', 'group-head-waiting', 'group-head-archived'])
-  files[reportPath(HOME, 'local_setup')] = JSON.stringify({ ...report, seq: 6, at: 3_601_000, modelAt: 3_601_000, state: 'needs-you', needsYou: 'Allow Bash: rm -rf build', waits: { since: 3_601_000, on: 'you' } })
+  files[reportPath(HOME, 'local_setup')] = JSON.stringify({ ...report, seq: 6, at: 3_601_000, modelAt: 3_601_000, state: 'needs-you', needsYou: 'Allow Bash', waits: { since: 3_601_000, on: 'you' } })
   await run.clock.advance(3_000)
   expect((await heads())[0]).toBe('group-head-needs-you')
-  expect(await textsOf(ui)).toContain('Allow Bash: rm -rf build')
+  expect(await textsOf(ui)).toContain('Allow Bash')
   expect((await ui.find({ key: 'row-local_setup' }))?.props.borderColor).toBe('error')
   expect(await hitsOf(ui)).toContain('hit-chat-local_setup')
   await ui.unmount()
   const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await altsOf(band)).some(alt => String(alt).includes('Session · Redo toolkit setup UI needs you, Allow Bash: rm -rf build'))).toBe(true)
+  expect((await altsOf(band)).some(alt => String(alt).includes('Session · Redo toolkit setup UI needs you, Allow Bash'))).toBe(true)
   await band.unmount()
   files[reportPath(HOME, 'local_setup')] = JSON.stringify({ ...report, seq: 7, at: 3_604_000, modelAt: 3_604_000, state: 'working' })
   await run.clock.advance(3_000)

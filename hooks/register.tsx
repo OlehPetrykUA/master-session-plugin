@@ -31,7 +31,9 @@ import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/b
 import { boardFromJson } from './lib/board'
 import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, NOT_MASTER, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, STOP, TICK_MS } from './lib/constants'
 import { messageOf } from './lib/format'
-import { elapsedOfItem, openIdOf, runAgentsOf } from './lib/list'
+import { runningTimeOf } from './components/detail/format'
+import { elapsedOfItem, lineOf, openIdOf, runAgentsOf } from './lib/list'
+import type { RowItem } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
 import { getAgents, getLive, getRepos, getWorkflows, saveBoard, setExpanded, setFilter, setNarrativeOpen } from './state/atoms'
@@ -45,10 +47,14 @@ let lastLabels = ''
 
 async function tickTimes($: EngineInterface) {
   if (!isActive() || !(await isMaster($)) || !(await isPaneOpen($))) return
-  const data = await paneData($, columns)
+  const data = await paneData($, columns || 48)
   const view = paneViewOf(data)
-  const shown = view.items.flatMap(item => (item.kind === 'workflow' ? [item, ...runAgentsOf(item.run, data.agents)] : [item]))
-  const labels = [...shown.map(item => elapsedOfItem(item, data.at)), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age].join('|')
+  const shown = view.groups.flatMap(group => group.items).flatMap(item => (item.kind === 'workflow' && openIdOf(item, data.open) ? [item, ...runAgentsOf(item.run, data.agents)] : [item]))
+  const labelOf = (item: RowItem) => {
+    const line = lineOf(item, view.context)
+    return [elapsedOfItem(item, data.at), line.cmdElapsed ? `${line.text}~${line.cmdElapsed}` : '', openIdOf(item, data.open) ? runningTimeOf(item, data.at) : ''].join('~')
+  }
+  const labels = [...shown.map(labelOf), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age].join('|')
   if (labels === lastLabels) return
   lastLabels = labels
   $.ui.invalidate('ui.render')
