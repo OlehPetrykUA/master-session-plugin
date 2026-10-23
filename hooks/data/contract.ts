@@ -192,7 +192,10 @@ export function parseReport(raw: unknown): Report | undefined {
   }
 }
 
+export const isTombstone = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as { kind?: unknown }).kind === 'stopped'
+
 export function accept(previous: Report | undefined, raw: unknown) {
+  if (isTombstone(raw)) return undefined
   const next = parseReport(raw)
   if (!next) return previous
   return previous && previous.session === next.session && next.seq < previous.seq ? previous : next

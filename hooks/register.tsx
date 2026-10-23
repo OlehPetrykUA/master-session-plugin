@@ -25,10 +25,11 @@ import {
 import { clearPresses, hasFaults, recoverFault, runPress } from './data/presses'
 import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
 import { skipWhileBusy } from './data/flight'
-import { briefed, claim, engage, inPlan, isActive, recordTurnEnd, recorder, startRecorder } from './data/recorder'
+import { briefed, claim, engage, inPlan, isActive, isOff, recordTurnEnd, recorder, startRecorder, unstop } from './data/recorder'
+import { stopMode } from './data/stop'
 import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/band'
 import { boardFromJson } from './lib/board'
-import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, TICK_MS } from './lib/constants'
+import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, NOT_MASTER, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, STOP, TICK_MS } from './lib/constants'
 import { messageOf } from './lib/format'
 import { elapsedOfItem, openIdOf, runAgentsOf } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
@@ -127,7 +128,10 @@ export const register: Register = on => {
     return out
   }).catch(($, e, next) => next(e))
 
+  on('command.run', { command: STOP }, ($, e) => stopMode($, e.args.trim() === 'force')).catch(($, e, next) => next(e))
+
   on('command.run', { command: INFO }, async ($, e) => {
+    if (isOff()) return { text: NOT_MASTER }
     await wake($)
     const note = await workerNote($)
     if (note) return { text: note }
@@ -138,6 +142,7 @@ export const register: Register = on => {
 
   on('command.run', { command: SKILL }, async ($, e, next) => {
     if (e.args.trim() === 'status') {
+      await unstop($)
       await wake($)
       const note = await workerNote($)
       if (note) return { text: note }
@@ -161,6 +166,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('tool.call', { tool: 'mcp__master-session__open' }, async ($, e) => {
+    if (isOff()) return { deny: NOT_MASTER }
     await engage($)
     const note = await workerNote($)
     if (note) return { result: note }
@@ -186,6 +192,7 @@ export const register: Register = on => {
   }).catch(() => ({ deny: 'The master session pane could not be opened: post the board in chat.' }))
 
   on('tool.call', { tool: 'mcp__master-session__board' }, async ($, e) => {
+    if (isOff()) return { deny: NOT_MASTER }
     const next = boardFromJson(e, 'tool')
     const sent = Array.isArray(e.sessions) ? e.sessions.length : 0
     if (!next || next.sessions.length < sent) return { deny: 'The board needs a sessions array whose items carry id and state.' }
@@ -290,6 +297,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const table = $.ui.resolve(e)
     const { Box, Button, Text } = table
+    if (isOff()) return <Text>{NOT_MASTER}</Text>
     const note = await workerNote($)
     if (note) return <Text>{note}</Text>
     const Svg = e.surface !== 'terminal' && 'Svg' in table ? guardSvg(table.Svg, Text) : undefined

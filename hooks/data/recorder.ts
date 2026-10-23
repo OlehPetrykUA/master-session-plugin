@@ -1,12 +1,13 @@
 import type { EngineInterface, On, ToolCallInput, TurnCompleteInput } from 'claude-code'
 
+import { NOT_MASTER } from '../lib/constants'
 import { asked, reportAgentsOf, reportRunsOf } from '../lib/agents'
 import { expandHome, parseStatus } from '../lib/git'
-import { getAgents, getBoard, getLive, getPlan, getRole, getWorkflows, saveAgents, saveLive, savePlan, saveRole } from '../state/atoms'
+import { getAgents, getBoard, getLive, getPlan, getRole, getStopped, getWorkflows, saveAgents, saveLive, savePlan, saveRole, saveStopped } from '../state/atoms'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
 import type { ReportAgent, ReportRun, Role, SessionState } from '../../types'
-import { boardPath, parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
+import { hasBoardFile, parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
 type Held = { text: string; tool: string; state: SessionState; needsYou?: string; by?: string }
 
@@ -29,6 +30,7 @@ let role = NO_ROLE
 let current: Report | undefined
 let detecting: Promise<void> | undefined
 let isClaimed = false
+let isStopped = false
 let isPlan = false
 let facts = new Map<string, Record<string, unknown>>()
 let failures = new Map<string, { error: Error; at: number }>()
@@ -42,6 +44,8 @@ let syncing: Promise<void> = Promise.resolve()
 export const roleOf = () => role
 
 export const isActive = () => isClaimed || role.role === 'worker'
+
+export const isOff = () => isStopped
 
 export const claim = () => {
   isClaimed = true
@@ -240,7 +244,7 @@ async function detect($: EngineInterface) {
   await saveLive($, prev => ({ ...prev, self, title: String(me.title ?? '') }))
   const isChild = typeof me.parentSessionId === 'string' && !!me.parentSessionId && me.detached !== true
   const asked = isChild ? String(me.parentSessionId) : ''
-  const isMasterParent = !!asked && (await $.fs.stat(boardPath(home, asked)).then(stat => stat.kind === 'file', () => false))
+  const isMasterParent = !!asked && (await hasBoardFile($, home, asked))
   const parent = isChild ? (isMasterParent ? asked : '') : await parentFromBoards($, home, self)
   await adopt($, { role: parent ? 'worker' : 'master', self, parent })
   return true
@@ -268,6 +272,11 @@ async function adopt($: EngineInterface, next: Role) {
 
 async function resume($: EngineInterface) {
   isPlan = await getPlan($)
+  isStopped = await getStopped($)
+  if (isStopped) {
+    detecting = Promise.resolve()
+    return
+  }
   const saved = await getRole($)
   if (await getBoard($)) claim()
   if (saved.role) {
@@ -416,6 +425,7 @@ async function reported($: EngineInterface, input: unknown) {
 }
 
 async function listed($: EngineInterface) {
+  if (isStopped) return { deny: NOT_MASTER }
   await engage($)
   const now = await $.clock.now()
   const shared = role.self ? await readBoard($, home, role.self, now) : undefined
@@ -429,6 +439,7 @@ export async function startRecorder($: EngineInterface) {
   current = undefined
   detecting = undefined
   isClaimed = false
+  isStopped = false
   isPlan = false
   facts = new Map()
   failures = new Map()
@@ -441,7 +452,25 @@ export async function startRecorder($: EngineInterface) {
   await resume($).catch(() => undefined)
 }
 
+export async function halt($: EngineInterface) {
+  role = NO_ROLE
+  current = undefined
+  isClaimed = false
+  isStopped = true
+  detecting = Promise.resolve()
+  await saveRole($, NO_ROLE)
+  await saveStopped($, true)
+}
+
+export async function unstop($: EngineInterface) {
+  if (!isStopped) return
+  isStopped = false
+  detecting = undefined
+  await saveStopped($, false)
+}
+
 export async function briefed($: EngineInterface) {
+  await unstop($)
   if (await getBoard($)) return
   if (role.role === 'worker') return
   role = NO_ROLE

@@ -20,6 +20,7 @@ const agents = atom({ plugin: 'master-session', key: 'agents' } as const, [])
 const workflows = atom({ plugin: 'master-session', key: 'workflows' } as const, [])
 const role = atom({ plugin: 'master-session', key: 'role' } as const, { role: '', self: '', parent: '' })
 const isPlan = atom({ plugin: 'master-session', key: 'isPlan' } as const, false)
+const stopped = atom({ plugin: 'master-session', key: 'stopped' } as const, false)
 
 const isSame = (one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other)
 
@@ -168,4 +169,12 @@ export function getPlan($: EngineInterface) {
 
 export function savePlan($: EngineInterface, value: boolean) {
   return update($, isPlan, () => value)
+}
+
+export function getStopped($: EngineInterface) {
+  return read($, stopped)
+}
+
+export function saveStopped($: EngineInterface, value: boolean) {
+  return update($, stopped, () => value)
 }

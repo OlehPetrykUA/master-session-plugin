@@ -213,6 +213,7 @@ declare module 'claude-code' {
       workflows: WorkflowRecord[]
       role: Role
       isPlan: boolean
+      stopped: boolean
     }
   }
 }

@@ -15,7 +15,7 @@ import { familyOf, rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
 import { getAgents, getBoard, getCleared, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setCleared, setClearing, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
-import { claim, detected, inPlan, isActive, roleOf, sessionFacts } from './recorder'
+import { claim, detected, inPlan, isActive, roleOf, sessionFacts, unstop } from './recorder'
 import { askForUpdates, readReports, writeBoard } from './status'
 
 let home = ''
@@ -362,6 +362,8 @@ export async function refreshAll($: EngineInterface, isForced = false) {
 }
 
 export async function markMaster($: EngineInterface) {
+  await unstop($)
+  published = ''
   claim()
   const at = await $.clock.now()
   await saveBoard($, prev => prev ?? { sessions: [], needsYou: [], repos: [], source: 'tool', since: at, at })

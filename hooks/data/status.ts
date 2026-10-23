@@ -2,7 +2,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { Shared } from '../../types'
 import { boardFromJson } from '../lib/board'
-import { BOARD_MAX_AGE_MS, REPORT_CAP, accept, askText, capped } from './contract'
+import { BOARD_MAX_AGE_MS, REPORT_CAP, accept, askText, capped, isTombstone } from './contract'
 import type { Report } from './contract'
 
 type Io = Pick<EngineInterface, 'fs'>
@@ -68,6 +68,16 @@ export async function readReports($: Io, home: string) {
   return [...seenReports].flatMap(([path, one]) => (path.startsWith(`${dir}/`) && one.report ? [one.report] : []))
 }
 
+export function writeTombstone($: Io, path: string, session: string, at: number) {
+  return $.fs.write(path, JSON.stringify({ v: 1, kind: 'stopped', session, at }))
+}
+
+export async function hasBoardFile($: Io, home: string, masterId: string) {
+  const path = boardPath(home, masterId)
+  if (!(await $.fs.stat(path).then(stat => stat.kind === 'file', () => false))) return false
+  return !isTombstone(await jsonOf($, path))
+}
+
 export function writeBoard($: Io, home: string, shared: Shared) {
   return $.fs.write(boardPath(home, shared.masterId), JSON.stringify({ v: 1, kind: 'board', ...shared, board: { ...shared.board, source: undefined } }))
 }
@@ -86,7 +96,8 @@ export async function readBoard($: Io, home: string, masterId: string, now: numb
   if (!stat || stat.kind !== 'file') return undefined
   const before = seenBoards.get(path)
   if (before?.mtimeMs !== stat.mtimeMs) {
-    const shared = sharedOf(await jsonOf($, path)) ?? before?.shared
+    const raw = await jsonOf($, path)
+    const shared = isTombstone(raw) ? undefined : (sharedOf(raw) ?? before?.shared)
     seenBoards.set(path, { mtimeMs: shared === before?.shared ? -1 : stat.mtimeMs, shared })
   }
   const shared = seenBoards.get(path)?.shared

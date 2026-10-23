@@ -1,0 +1,10 @@
+---
+name: stop
+description: Turns this session back into a plain one: it stops being a master session (or a worker) and the status pane and band go. Use ONLY when the user types /master-session:stop.
+disable-model-invocation: true
+argument-hint: '[force]'
+---
+
+The master-session status mod answers this command. If you are reading this, the mod isn't running in this session. Tell the user there is nothing for the mod to stop.
+
+If this session runs the master-session heartbeat (a `/loop` or `ScheduleWakeup` running master-session ticks), stop that one only: delete that `/loop` job (`CronList` lists it) or call `ScheduleWakeup` with `stop: true`. Leave any other loop alone. Run no more master-session ticks and do not call `mcp__master-session__board`. Do not stop, message or archive any worker.
