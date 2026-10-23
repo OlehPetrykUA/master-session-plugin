@@ -128,7 +128,8 @@ export async function republishBoard($: EngineInterface) {
   const masterId = me.self || roleOf().self
   if (!own || !masterId) return
   const at = await $.clock.now()
-  const agents = (await getAgents($)).slice(-SHARED_AGENTS)
+  const everyone = await getAgents($)
+  const agents = [...everyone.filter(one => one.state === 'running'), ...everyone.filter(one => one.state !== 'running')].slice(0, SHARED_AGENTS)
   const workflows = await getWorkflows($)
   const merged = merge(own, await getReports($), me, at)
   const repos = [...new Set([...merged.repos, ...(await getRepos($)).map(one => one.path)])]
@@ -139,19 +140,23 @@ export async function republishBoard($: EngineInterface) {
   await writeBoard($, home, { at, masterId, masterTitle: me.title || TITLE, board: { ...merged, repos }, agents, workflows })
 }
 
+async function copyOf($: EngineInterface) {
+  return (await getBoard($)) ? null : await getShared($)
+}
+
 export async function sharedAgentsOf($: EngineInterface) {
-  const copy = await getShared($)
+  const copy = await copyOf($)
   const own = await getAgents($)
   const mine = new Set(own.map(one => one.id))
-  const theirs = (copy?.agents ?? []).filter(one => !mine.has(one.id)).map(one => ({ ...one, parentSessionId: one.parentSessionId ?? copy?.masterId }))
+  const theirs = (copy?.agents ?? []).filter(one => !mine.has(one.id))
   return [...own, ...theirs]
 }
 
 export async function sharedWorkflowsOf($: EngineInterface) {
-  const copy = await getShared($)
+  const copy = await copyOf($)
   const own = await getWorkflows($)
   const mine = new Set(own.map(one => one.id))
-  return [...own, ...(copy?.workflows ?? []).filter(one => !mine.has(one.id)).map(one => ({ ...one, parentSessionId: one.parentSessionId ?? copy?.masterId }))]
+  return [...own, ...(copy?.workflows ?? []).filter(one => !mine.has(one.id))]
 }
 
 export async function askAll($: EngineInterface) {
