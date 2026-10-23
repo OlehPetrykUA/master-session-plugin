@@ -227,7 +227,8 @@ export const register: Register = on => {
     const { board: current, from } = await boardOf($)
     const agents = agentCountsOf(await getAgents($), await getWorkflows($))
     const isMaster = !!(await getBoard($)) || (await getReports($)).length > 0
-    const progress = bandProgressWith(current, await getLive($), agents, isMaster)
+    const live = await getLive($)
+    const progress = bandProgressWith(current, live, agents, isMaster)
     if (event.props.hasSurvey || !progress) return next(event)
     const table = $.ui.resolve(event)
     const bandColumns = event.props.bodyColumns || 100
@@ -238,7 +239,7 @@ export const register: Register = on => {
     const view = bandViewOf(bandColumns, current, progress, from, isOpen, agents, {
       board: () => void openPane($),
       chat: (id, name) => void openSession($, id, name),
-    })
+    }, live)
     return Svg ? Band({ Box, Text, Button, Svg, Client }, { view, progress }) : TextBand({ Box, Text, Button }, { view, progress, columns: bandColumns })
   })
 

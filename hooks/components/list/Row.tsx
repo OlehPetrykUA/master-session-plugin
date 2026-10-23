@@ -48,11 +48,13 @@ export function Row(ui: Ui, props: RowProps) {
     </Box>
   )
   const isChat = isNeeds && !!props.chat
-  const isChatIcon = isNarrow
   const isMeta = !isChat && !isNarrow
   const metaWidth = isMeta ? Math.max(elapsed ? 16 + textWidth(elapsed, 12) * 1.08 : 0, item.kind === 'session' && !isNeeds ? (git?.width ?? 0) + 4 + 14 : 0) : 0
-  const right = (metaWidth ? metaWidth + 12 : 0) + (steps && !isChat ? 34 + 12 : 0) + (isChat ? (isChatIcon ? 32 : faceWidth(props.chat?.label ?? '', 'b32') + 1) + 12 : 0)
-  const column = props.width - 2 - 12 - 8 - 28 - 12 - 14 - 12 - right
+  const base = props.width - 2 - 12 - 8 - 28 - 12 - 14 - 12 - (metaWidth ? metaWidth + 12 : 0) - (steps && !isChat ? 34 + 12 : 0)
+  const chatWidth = (isIcon: boolean) => (isChat ? (isIcon ? 32 : faceWidth(props.chat?.label ?? '', 'b32') + 1) + 12 : 0)
+  const [shown = ''] = isChat && name.task ? rowsOf(name.task, base - chatWidth(false) - textWidth(name.persona, 14) * 1.08 - 16, 14, 1) : []
+  const isChatIcon = isNarrow || (shown !== oneLine(name.task) && Array.from(shown).length - 1 < 12)
+  const column = base - chatWidth(isChatIcon)
   const isPersonaCut = textWidth(name.persona, 14) * 1.08 + (name.task ? 16 : 0) > column
   const question = (
     <Box key={`${id}-ask`} flexDirection="row" alignItems="flex-start" gap={across(4)} minWidth={0} flexShrink={1}>

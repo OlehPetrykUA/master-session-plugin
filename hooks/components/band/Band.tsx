@@ -22,7 +22,7 @@ export function Band(ui: Ui, props: BandProps) {
   const look = asker ? 'dim' : isAllDone ? 'done' : 'live'
   const lead = asker ? (
     <Box flexDirection="row" alignItems="center" flexShrink={1} minWidth={0} gap={across(PILL.gap)} height={tall(PILL.height)} paddingLeft={across(PILL.left)} paddingRight={across(PILL.right)} paddingY={0} borderStyle="round" borderColor={C.red} backgroundColor={C.redTint}>
-      {icon('needs', PILL.icon, 'red', 2)}
+      {icon(asker.glyph, PILL.icon, 'red', 2)}
       <Text weight="semibold" color={C.text} wrap="truncate-end">
         {pillText}
       </Text>

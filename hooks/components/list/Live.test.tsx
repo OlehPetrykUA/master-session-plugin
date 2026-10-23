@@ -3,10 +3,10 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord } from '../../../types'
 
-import { across, tall, textWidth } from '../../lib/layout'
+import { across, bodyWidthOf, faceWidth, tall, textWidth } from '../../lib/layout'
 import { rowsOf } from '../../lib/list'
 import { C } from '../../theme/tokens'
-import { BOARD, HOME, PANE, SELF, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
+import { BOARD, BOARD_TOOL, HOME, PANE, SELF, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 
 const BASH = `Allow Bash: P=/Users/opetryk/Work/master-session-plugin; W="$HOME/.claude/worktrees/wt-master-session-plugin-band-v3"; git -C $P merge-base --is-ancestor 9bd146ce23c7d6485d main && git -C "$W" log --oneline -5 && git -C "$W" status --porcelain=v2 --branch --untracked-files=all`
 
@@ -41,26 +41,43 @@ function seeded(on: On, agents: AgentRecord[]) {
   })
 }
 
-test('a needs-you row with a long Bash prompt clamps the question to two lines; Open chat keeps its label and the title truncates, icon-only only below 340 px', async ($, on) => {
-  await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], title: 'Implementer · Prompt hardening for the worker skills', needsYou: BASH }, BOARD.sessions[1]] })
+const linked = (sessionId: string, name: string, title: string) => ({ sessionId, name, title, cwd: WORKTREE, isRunning: true, isArchived: false, lastActivityAt: '1970-01-01T00:59:00.000Z', startedBy: SELF })
+
+const asking = (id: string, name: string, needsYou: string) => ({ ...BOARD, sessions: [{ id, name, state: 'needs-you', progress: 'step 1 of 2 — fix', needsYou }, BOARD.sessions[1]] })
+
+test('a needs-you row at the real pane width: the question takes two rows, the second ending in "…", with home as ~; Open chat goes icon-only because the task would show fewer than 12 characters beside its label', async ($, on) => {
+  await started($, on, asking('local_impl', 'verify-personas', BASH.replaceAll('/Users/opetryk', HOME)), { sessions: [linked('local_impl', 'verify-personas', 'Implementer · Prompt status data')] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
   const rows = await ui.findAll({ type: 'Text' })
   const asked = rows.filter(one => one.props.color === C.red && one.props.wrap === 'truncate-end').map(one => String(one.text))
   expect(asked.length).toBe(2)
-  expect(asked.join(' ').startsWith('Allow Bash:')).toBe(true)
+  expect(asked[0]?.startsWith('Allow Bash: P=~/Work/')).toBe(true)
   expect(asked[1]?.endsWith('…')).toBe(true)
-  expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).not.toBe(across(32))
+  expect(asked.join(' ')).not.toContain(HOME)
+  expect((await ui.find({ key: 'face-chat-local_impl' }))?.props.width).toBe(across(32))
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Implementer', 'Prompt status data']))
   await ui.unmount()
-  const narrow = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 36 } })
-  expect((await narrow.find({ key: 'face-chat-local_env' }))?.props.width).toBe(across(32))
-  await narrow.unmount()
 })
 
-test('a short needs title keeps the Open chat label at 46 columns', async ($, on) => {
-  await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], title: 'Designer · Pane v2', needsYou: BASH }, BOARD.sessions[1]] })
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
-  expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).not.toBe(across(32))
-  await ui.unmount()
+test('Open chat keeps its label when the task fits whole beside it, or when at least 12 of its characters still show; below that it is icon-only, and always below 340 px', async ($, on) => {
+  await started($, on, BOARD, { sessions: [linked('local_pane', 'pane-v2', 'Designer · Pane v2'), linked('local_long', 'prompt-data', 'Implementer · Prompt status data and more')] })
+  const face = async (id: string, bodyColumns: number) => {
+    await $.tool.call({ tool: BOARD_TOOL, ...asking(id, id, BASH) })
+    const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
+    const width = (await ui.find({ key: `face-chat-${id}` }))?.props.width
+    await ui.unmount()
+    return width === across(32) ? 'icon' : 'label'
+  }
+  const room = (bodyColumns: number) => bodyWidthOf(bodyColumns) - 88 - faceWidth('Open chat', 'b32') - 1 - 12
+  const shown = (persona: string, task: string, bodyColumns: number) => rowsOf(task, room(bodyColumns) - textWidth(persona, 14) * 1.08 - 16, 14, 1)[0] ?? ''
+  expect(shown('Designer', 'Pane v2', 52)).toBe('Pane v2')
+  expect(await face('local_pane', 52)).toBe('label')
+  const cut = shown('Implementer', 'Prompt status data and more', 60)
+  expect([cut.endsWith('…'), Array.from(cut).length - 1 >= 12]).toEqual([true, true])
+  expect(await face('local_long', 60)).toBe('label')
+  expect(Array.from(shown('Implementer', 'Prompt status data and more', 52)).length - 1).toBeLessThan(12)
+  expect(await face('local_long', 52)).toBe('icon')
+  expect(await face('local_pane', 40)).toBe('icon')
 })
 
 test('splitting a 20,000-character prompt into 4 rows takes under 10 ms, and every row fits', () => {

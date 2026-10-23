@@ -355,10 +355,10 @@ test('needs you: red pill with the reason, dimmed segments filling the rest, Ope
   const ui = await mount($)
   await dump('band-needs-you', ui)
   const strip = await stripOf(ui)
-  expect(strip?.props.alt).toBe('Master session: env-e2e-test needs you, commit blocked')
+  expect(strip?.props.alt).toBe('Master session: Session · env-e2e-test needs you, commit blocked')
   expect(String(strip?.props.source)).toContain('<g opacity=".35">')
   expect(pills(pathOf(String(strip?.props.source), 'track'))).toBe(5)
-  expect(await textsOf(ui)).toEqual(['env-e2e-test needs you · commit blocked', 'Open chat'])
+  expect(await textsOf(ui)).toEqual(['Session · env-e2e-test needs you · commit blocked', 'Open chat'])
   expect((await hitsOf(ui)).map(one => one[0])).toEqual(['band-hit-chat'])
   expect(await scopesOf(ui)).toEqual(['face-band-chat'])
   await click(ui, 'band-hit-chat', 1, 0)
@@ -387,10 +387,10 @@ test('all done: check, full green fills, counts, and Open board with the board i
 })
 
 const BREAKPOINTS = [
-  { px: 760, working: ['80%', '2 working · 1 waiting', 'Open board'], pill: /^env-e2e-test needs you · commit blocked$/, done: ['4 done · 0 open', 'Open board'], needsStrip: 'bars' },
-  { px: 560, working: ['80%', '2 working · 1 waiting', 'Board'], pill: /^env-e2e-test needs you · commit blocked$/, done: ['4 done · 0 open', 'Board'], needsStrip: 'bars' },
-  { px: 390, working: ['80%', 'Board'], pill: /^env-e2e-test needs you$/, done: ['Board'], needsStrip: 'dots' },
-  { px: 300, working: ['80%', 'Board'], pill: /^env-e2e-test needs you$/, done: ['Board'], needsStrip: 'none' },
+  { px: 760, working: ['80%', '2 working · 1 waiting', 'Open board'], pill: /^Session · env-e2e-test needs you · commit blocked$/, done: ['4 done · 0 open', 'Open board'], needsStrip: 'bars' },
+  { px: 560, working: ['80%', '2 working · 1 waiting', 'Board'], pill: /^Session needs you$/, done: ['4 done · 0 open', 'Board'], needsStrip: 'bars' },
+  { px: 390, working: ['80%', 'Board'], pill: /^Session needs you$/, done: ['Board'], needsStrip: 'bars' },
+  { px: 300, working: ['80%', 'Board'], pill: /^Session needs you$/, done: ['Board'], needsStrip: 'dots' },
 ] as const
 
 for (const point of BREAKPOINTS) {
@@ -412,7 +412,7 @@ for (const point of BREAKPOINTS) {
     const needs = await parts(NEEDS, 'needs-you')
     expect(needs.texts[0]).toMatch(point.pill)
     expect(needs.texts.slice(1)).toEqual(['Open chat'])
-    expect(needs.icons).toEqual(['needs', 'chat'])
+    expect(needs.icons).toEqual(['session', 'chat'])
     const strip = Number.isNaN(needs.width) ? 'none' : needs.width === dotsWidth(sessionsOf(5)) ? 'dots' : 'bars'
     expect([point.px, strip]).toEqual([point.px, point.needsStrip])
     strip === 'bars' && expect(needs.width).toBeGreaterThanOrEqual(5 * 24 + 4 * 4)
@@ -549,7 +549,7 @@ test('v2-11 geometry: bar 56 with gap 12, percent 34, pill 34 with 0 12 0 8, but
     expect(pill).toEqual(expect.objectContaining({ height: tall(34), gap: across(6), paddingLeft: across(8), paddingRight: across(12), borderStyle: 'round', borderColor: 'error' }))
     expect((await ui.find({ key: 'face-band-chat' }))?.props).toEqual(expect.objectContaining({ height: tall(32) }))
     px < 600 && expect((await ui.find({ key: 'face-band-chat' }))?.props.width).toBe(across(32))
-    expect(await sizes(ui)).toEqual([['needs', 15]])
+    expect(await sizes(ui)).toEqual([['session', 15]])
     const chat = await faceOf(ui, 'chat')
     expect(chat).toMatch(/--accentBtn:#B85335.*--onAccent:#FFFFFF.*prefers-color-scheme: dark.*fill:var\(--accentBtn\)/)
     expect(chat).toContain('stroke:var(--onAccent)')
@@ -643,7 +643,30 @@ test('the needs-you pill names any kind: a session, a worker’s subagent with i
   expect([flow.view.pillText, flow.view.action]).toEqual(['scan 1, in review-changes, needs you · Allow Edit: a.ts', undefined])
   expect(flow.view.items.find(one => one.id === 'wf_1')?.tone).toBe('red')
   const session = viewOf(NEEDS, CREW())
-  expect([session.view.pillText, session.view.action?.label]).toEqual(['env-e2e-test needs you · commit blocked', 'Open chat'])
+  expect([session.view.pillText, session.view.action?.label]).toEqual(['Session · env-e2e-test needs you · commit blocked', 'Open chat'])
+})
+
+test('the needs-you pill names the asker as the pane does: its persona glyph at 15 px, stroke 2, in red; "<Persona> · <task> needs you" wide and "<Persona> needs you" narrow; the kind glyph without a persona, never the alert glyph', async ($, on) => {
+  const sessions: BoardSession[] = [{ id: 'local_v', name: 'verify-personas', persona: 'Implementer', state: 'needs-you', progress: 'step 1 of 2 — fix', needsYou: 'Allow Bash: npm test' }, ...WORKING]
+  const current = boardOf(sessions)
+  const plain = liveOf([], sessions)
+  const live = { ...plain, sessions: plain.sessions.map(one => (one.id === 'local_v' ? { ...one, title: 'Implementer · Prompt status data' } : one)) }
+  const progress = bandProgress(current, live)
+  if (!progress) throw new Error('no band')
+  const act = { board: () => undefined, chat: () => undefined }
+  const wide = bandViewOf(100, current, progress, '', false, IDLE, act, live)
+  expect([wide.pillText, wide.asker?.glyph]).toEqual(['Implementer · Prompt status data needs you · Allow Bash: npm test', 'implementer'])
+  expect(bandViewOf(Math.round((390 + 16) / COLUMN), current, progress, '', false, IDLE, act, live).pillText).toBe('Implementer needs you')
+  expect(bandViewOf(100, current, progress, '', false, IDLE, act).pillText).toBe('Implementer · verify-personas needs you · Allow Bash: npm test')
+  const remote = viewOf(WORKING.map(one => (one.id === 'local_b' ? { ...one, state: 'needs-you' as const, needsYou: 'Allow Bash: rm -rf dist' } : one)), CREW({ remote: true })).view
+  expect([remote.asker?.glyph, viewOf(WORKING, CREW({ flow: true })).view.asker?.glyph, viewOf(NEEDS, CREW()).view.asker?.glyph]).toEqual(['reviewer', 'agent', 'session'])
+  await band($, on, sessions)
+  const ui = await mount($)
+  const pill = (await ui.findAll({ type: 'Svg' }))[0]
+  expect([pill?.props.alt, pill?.props.width]).toEqual(['implementer', 15])
+  expect(String(pill?.props.source)).toContain(`d="${I.implementer}" style="fill:none;stroke:var(--red);stroke-width:2;`)
+  expect(String(pill?.props.source)).not.toContain(I.needs)
+  await ui.unmount()
 })
 
 test('the needs-you pill: C.text words on the red tint, red border and glyph', async ($, on) => {
@@ -723,7 +746,7 @@ test('a plain session that runs a subagent, with no board of its own and no work
 })
 
 test('with the strip hidden, the short pill gets the whole room: it fits whole at room = pill chrome + text and truncates only below', () => {
-  const short = 'env-e2e-test needs you'
+  const short = 'Session needs you'
   const exact = 2 + 8 + 15 + 6 + 12 + widthOf(short)
   const input = { gap: 12, items: sessionsOf(5), counts: 0, full: `${short} · commit blocked`, short }
   expect(fitBand({ ...input, room: exact })).toEqual({ pill: short, showCounts: false, isDots: true, strip: 0, isHidden: true })
@@ -733,7 +756,7 @@ test('with the strip hidden, the short pill gets the whole room: it fits whole a
 test('lane 7 at 300 px: a session asker hides the strip with an icon-only Open chat; a workflow agent asker has no Open chat, so the dots fit', () => {
   const columns = Math.round((300 + 16) / COLUMN)
   const session = viewOf(NEEDS, CREW(), columns).view
-  expect([session.fitted.isHidden, session.action?.isIconOnly, session.actionWidth, session.pillText]).toEqual([true, true, 32, 'env-e2e-test needs you'])
+  expect([session.fitted.isHidden, session.action?.isIconOnly, session.actionWidth, session.pillText]).toEqual([true, true, 32, 'Session needs you'])
   const flow = viewOf(WORKING, CREW({ flow: true }), columns).view
-  expect([flow.fitted.isHidden, flow.fitted.isDots, flow.action, flow.pillText]).toEqual([false, true, undefined, 'scan 1 needs you'])
+  expect([flow.fitted.isHidden, flow.fitted.isDots, flow.action, flow.pillText]).toEqual([false, true, undefined, 'Agent needs you'])
 })

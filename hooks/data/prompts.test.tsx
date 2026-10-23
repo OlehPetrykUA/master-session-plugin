@@ -119,7 +119,7 @@ async function reachesMaster($: Engine, on: On, child: Child) {
   expect(await hitsOf(ui)).toContain('hit-chat-local_setup')
   await ui.unmount()
   const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await altsOf(band)).some(alt => String(alt).includes('setup-ui-redo needs you, Allow Bash: rm -rf build'))).toBe(true)
+  expect((await altsOf(band)).some(alt => String(alt).includes('Session · Redo toolkit setup UI needs you, Allow Bash: rm -rf build'))).toBe(true)
   await band.unmount()
   files[reportPath(HOME, 'local_setup')] = JSON.stringify({ ...report, seq: 7, at: 3_604_000, modelAt: 3_604_000, state: 'working' })
   await run.clock.advance(3_000)

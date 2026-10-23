@@ -1,6 +1,8 @@
 import type { AgentRecord, Board, Live, SessionState, WorkflowRecord } from '../../types'
 
 import { BAR, BUTTON, CHECK, COUNTS, PERCENT, PILL } from '../theme/band'
+import { PERSONA_GLYPH } from '../theme/icons'
+import type { IconName } from '../theme/icons'
 import { barsWidth, dotsWidth, flexCount } from '../theme/strip'
 import type { StripItem, StripTone } from '../theme/strip'
 import { workflowRunsOf } from './agents'
@@ -8,6 +10,7 @@ import type { WorkflowRun } from './agents'
 import { progressOf } from './board'
 import type { Progress } from './board'
 import { COLUMN, fit, textWidth, widthOf } from './layout'
+import { nameText, personaOfType, sessionNameOf } from './list'
 import { rowsOf } from './rows'
 
 const DIGIT = 0.62
@@ -22,7 +25,7 @@ export type BandActions = { board: () => void; chat: (id: string, name: string) 
 
 export type AgentCounts = { agents: readonly AgentRecord[]; workflows: readonly WorkflowRecord[] }
 
-export type Asker = { name: string; short: string; parent?: string; reason?: string; chat?: { id: string; name: string } }
+export type Asker = { name: string; short: string; glyph: IconName; parent?: string; reason?: string; chat?: { id: string; name: string } }
 
 export type BandItem = StripItem & { id: string; isRunning: boolean; asker?: Asker }
 
@@ -50,7 +53,11 @@ const agentTone = (agent: { state: string; asking?: unknown }): StripTone =>
 
 const runTone = (run: WorkflowRun): StripTone => (run.counts.asking ? 'red' : run.state === 'running' ? 'green' : run.state === 'failed' ? 'failed' : 'grey')
 
-const nameOf = (agent: Pick<AgentRecord, 'name' | 'description'>) => agent.name || agent.description
+const agentAskerOf = (type: string, label: string) => {
+  const persona = personaOfType(type)
+  const glyph = PERSONA_GLYPH[persona]
+  return { name: glyph ? persona : label, short: persona, glyph: glyph ?? ('agent' as const) }
+}
 
 type Place = { parent?: string; chat?: { id: string; name: string } }
 
@@ -73,7 +80,7 @@ function subagentItems(agents: readonly AgentRecord[], place: Place): BandItem[]
     fill: 1,
     isChild: true,
     isRunning: agent.state === 'running',
-    asker: agent.state === 'running' && agent.asking ? { name: nameOf(agent), short: nameOf(agent), parent: parent ? nameOf(parent) : place.parent, reason: agent.asking.text, chat: place.chat } : undefined,
+    asker: agent.state === 'running' && agent.asking ? { ...agentAskerOf(agent.type, agent.name || agent.description), parent: parent ? agentAskerOf(parent.type, parent.name || parent.description).name : place.parent, reason: agent.asking.text, chat: place.chat } : undefined,
   }))
 }
 
@@ -88,12 +95,12 @@ function runItems(runs: readonly WorkflowRun[], place: Place): BandItem[] {
       fill: run.state === 'running' ? (run.counts.total ? finished / run.counts.total : 0) : 1,
       pieces: Math.max(1, run.phases.length),
       isRunning: run.state === 'running',
-      asker: asking?.asking ? { name: asking.label, short: asking.label, parent: run.name, reason: asking.asking.text, chat: place.chat } : undefined,
+      asker: asking?.asking ? { ...agentAskerOf(asking.type, asking.label), parent: run.name, reason: asking.asking.text, chat: place.chat } : undefined,
     }
   })
 }
 
-export function bandItemsOf(segments: Progress['segments'], current: Board | null, { agents, workflows }: AgentCounts): BandItem[] {
+export function bandItemsOf(segments: Progress['segments'], current: Board | null, { agents, workflows }: AgentCounts, live?: Live): BandItem[] {
   const own = agents.filter(one => !one.parentSessionId)
   const items: BandItem[] = subagentItems(
     own.filter(one => !one.run),
@@ -103,10 +110,12 @@ export function bandItemsOf(segments: Progress['segments'], current: Board | nul
     const row = current?.sessions.find(one => one.id === segment.id)
     const name = row?.name ?? segment.id
     const chat = { id: segment.id, name }
+    const display = sessionNameOf(live?.sessions.find(one => one.id === segment.id)?.title || row?.title || name, row?.persona)
+    const self = { name: nameText(display), short: display.persona, glyph: PERSONA_GLYPH[display.persona] ?? ('session' as const) }
     const remote = agents.filter(one => one.parentSessionId === segment.id)
     const subs = subagentItems(
       remote.filter(one => !one.run),
-      { parent: name, chat },
+      { parent: display.persona === 'Session' ? display.task : display.persona, chat },
     )
     const runs = runItems(
       workflowRunsOf(
@@ -124,7 +133,7 @@ export function bandItemsOf(segments: Progress['segments'], current: Board | nul
       fill: segment.fill,
       isWorking: segment.state === 'working',
       isRunning: segment.state !== 'done',
-      asker: isAsking ? (child?.asker ?? { name, short: name, reason: row?.needsYou, chat }) : undefined,
+      asker: isAsking ? (child?.asker ?? { ...self, reason: row?.needsYou, chat }) : undefined,
     })
     items.push(...subs, ...runs)
   }
@@ -178,10 +187,10 @@ export function bandProgressWith(current: Board | null, live: Live, { agents, wo
   return isBusy ? IDLE_PROGRESS : undefined
 }
 
-export function bandViewOf(columns: number, current: Board | null, progress: Progress, from: string, isPaneOpen: boolean, agents: AgentCounts, act: BandActions) {
+export function bandViewOf(columns: number, current: Board | null, progress: Progress, from: string, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live?: Live) {
   const width = columns * COLUMN - 16
   const isNarrow = width < 600
-  const items = bandItemsOf(progress.segments, current, agents)
+  const items = bandItemsOf(progress.segments, current, agents, live)
   const count = (state: SessionState) => progress.segments.filter(one => one.state === state).length
   const asker = items.find(one => one.asker)?.asker
   const isAllDone = !asker && progress.total > 0 && progress.done === progress.total

@@ -78,7 +78,7 @@ export const modelFamilyOf = (model: string | undefined) => (model ? (model.repl
 
 const firstLine = (text: string | undefined) => (text ?? '').split('\n').find(line => line.trim())?.trim() ?? ''
 
-function sessionNameOf(title: string, persona: string | undefined): Name {
+export function sessionNameOf(title: string, persona: string | undefined): Name {
   const cut = title.indexOf(' · ')
   const prefix = cut > 0 ? title.slice(0, cut) : ''
   return { persona: persona || prefix || 'Session', task: cut > 0 ? title.slice(cut + 3) : title }
@@ -90,7 +90,7 @@ export function displayNameOf(item: RowItem | { kind: 'master' }): Name {
   if (item.kind === 'archived') return sessionNameOf(item.board?.title || item.one.title || item.one.name, item.board?.persona)
   if (item.kind === 'workflow') return { persona: 'Workflow', task: item.run.name }
   if (item.kind === 'agent') return { persona: personaOfType(item.agent.type), task: item.agent.label }
-  return { persona: personaOfType(item.agent.type), task: item.agent.description }
+  return { persona: personaOfType(item.agent.type), task: item.agent.name || item.agent.description }
 }
 
 export const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
@@ -135,7 +135,8 @@ function headOf(text: string, limit: number) {
   }
 }
 
-export function rowsOf(text: string, room: number, size: number, count: number, isMono = false): string[] {
+export function rowsOf(text: string, box: number, size: number, count: number, isMono = false): string[] {
+  const room = isMono ? box : box / 1.08
   const all = Array.from(headOf(text, Math.ceil((Math.max(0, room) / (0.28 * size)) * count) + 2))
   const rows: string[] = []
   let start = 0
@@ -395,10 +396,10 @@ export type Block = { key: string; label: string; value: string; sub: string; do
 
 export function blocksOf(totals: RunSummary, hasWork: boolean, end?: string): Block[] {
   const { sessions, subagents, workflows, commits, tests, duration, git } = totals
-  const needs = totals.needsYou
+  const needs = totals.needsYou.sessions + totals.needsYou.subagents
   return [
     { key: 'sessions', label: 'Sessions', value: String(sessions.total), sub: '', dots: [{ tone: 'green', count: sessions.working }, { tone: 'amber', count: sessions.waiting }, { tone: 'grey', count: sessions.done }], isAlert: false },
-    { key: 'needs-you', label: 'Needs you', value: String(needs), sub: needs ? plural(needs, 'blocker') : 'nothing waiting', isAlert: needs > 0 },
+    { key: 'needs-you', label: 'Needs you', value: String(needs), sub: needs ? [totals.needsYou.sessions ? plural(totals.needsYou.sessions, 'session') : '', totals.needsYou.subagents ? plural(totals.needsYou.subagents, 'subagent') : ''].filter(Boolean).join(' · ') : 'nothing waiting', isAlert: needs > 0 },
     { key: 'subagents', label: 'Subagents', value: String(subagents.total), sub: subagents.running ? `${subagents.running} running` : subagents.total ? 'all finished' : 'none', isAlert: false },
     { key: 'workflows', label: 'Workflows', value: String(workflows.total), sub: workflows.total ? `${workflows.agentsDone}/${workflows.agents} agents` : 'none', isAlert: false },
     { key: 'commits', label: 'Commits', value: String(commits.total), sub: commits.total ? plural(commits.repos, 'repo') : '—', isAlert: false },

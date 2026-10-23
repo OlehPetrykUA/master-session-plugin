@@ -93,7 +93,7 @@ test('every kind names itself persona · task and says its state word and curren
     ['done', 'Session · done', 'unmerged · git state unknown'],
     ['working', 'Workflow · review-changes', 'verify:atoms.ts'],
     ['working', 'Explore · Review auth flow', 'Validator › running'],
-    ['done', 'Researcher · Find token usages', 'Validator › done'],
+    ['done', 'Researcher · token-finder', 'Validator › done'],
   ])
   expect(lineOf(of('a'), context).isQuestion).toBe(true)
   const run = items.find(item => item.kind === 'workflow')
@@ -174,7 +174,7 @@ test('summary blocks read the run totals as the design words them, zeros and das
   const blocks = blocksOf(totals, true)
   expect(blocks.map(block => [block.label, block.value, block.sub, block.isAlert])).toEqual([
     ['Sessions', '4', '', false],
-    ['Needs you', '1', '1 blocker', true],
+    ['Needs you', '1', '1 session', true],
     ['Subagents', '2', '1 running', false],
     ['Workflows', '1', '1/3 agents', false],
     ['Commits', '0', '—', false],
@@ -184,6 +184,12 @@ test('summary blocks read the run totals as the design words them, zeros and das
   ])
   expect(blocksOf(totals, true, '20:04')[6]?.sub).toMatch(/^\d\d:\d\d – 20:04$/)
   expect(blocksOf({ ...totals, subagents: { total: 2, running: 0, done: 2, failed: 0, asking: 0 } }, true)[2]?.sub).toBe('all finished')
+  const asking = [...agents, { id: 'ask1', type: 'master-session:reviewer', description: 'Review the diff', state: 'running' as const, startedAt: NOW, asking: { text: 'Allow Bash: npm test', since: NOW } }, { id: 'ask2', type: 'workflow-subagent', description: 'scan', state: 'running' as const, startedAt: NOW, run: { id: 'wf_x', index: 0 }, asking: { text: 'Allow Read: a', since: NOW } }]
+  const needs = runSummaryOf({ rows, counts: countsOf(rows, []), archived: 0, agents: asking, workflows, board, trees: [], at: NOW })
+  expect(needs.needsYou).toEqual({ sessions: 1, subagents: 1 })
+  expect(blocksOf(needs, true)[1]).toEqual(expect.objectContaining({ value: '2', sub: '1 session · 1 subagent', isAlert: true }))
+  expect(blocksOf({ ...needs, needsYou: { sessions: 2, subagents: 0 } }, true)[1]?.sub).toBe('2 sessions')
+  expect(blocksOf({ ...needs, needsYou: { sessions: 0, subagents: 0 } }, true)[1]).toEqual(expect.objectContaining({ value: '0', sub: 'nothing waiting', isAlert: false }))
   expect(blocks[0]?.dots).toEqual([
     { tone: 'green', count: 1 },
     { tone: 'amber', count: 1 },

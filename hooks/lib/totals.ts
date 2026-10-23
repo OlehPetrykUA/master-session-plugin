@@ -16,9 +16,9 @@ export type RunSummaryInput = {
 
 export type RunSummary = ReturnType<typeof runSummaryOf>
 
-const countOf = (label: string) => /(\d+)\s+(?:tests?\s+)?pass(?:ed|es)?\b/i.exec(label)?.[1]
+export const countOf = (label: string) => /(\d+)\s+(?:tests?\s+)?pass(?:ed|es)?\b/i.exec(label)?.[1]
 
-const isFailed = (label: string) => /\bfail(?:ed|s)?\b|exit [1-9]/i.test(label)
+export const isFailed = (label: string) => /\b[1-9]\d* (?:fail(?:ed|s)?|errors?)\b|· failed\b|exit [1-9]/i.test(label)
 
 export function testsOf(rows: readonly Row[], board: Board | null) {
   if (board?.testsPassed !== undefined) return { value: String(board.testsPassed), sub: board.testsNote || 'passed' }
@@ -36,7 +36,7 @@ export function runSummaryOf({ rows, counts, archived, agents, workflows, board,
   const since = Math.min(...rows.flatMap(row => (row.live?.createdAt !== undefined ? [row.live.createdAt] : [])), board?.since ?? at)
   return {
     sessions: { total: rows.length, 'needs-you': counts['needs-you'], waiting: counts.waiting, working: counts.working, done: counts.done, archived },
-    needsYou: counts['needs-you'],
+    needsYou: { sessions: counts['needs-you'], subagents: agents.filter(one => !one.run && one.state === 'running' && one.asking).length },
     subagents: stateCountsOf(subagentsOf(agents)),
     workflows: { ...stateCountsOf(runs), agents: runs.reduce((sum, run) => sum + run.agents.length, 0), agentsDone: runs.reduce((sum, run) => sum + run.counts.done, 0) },
     commits: { total: rows.reduce((sum, row) => sum + (row.board?.commits?.length ?? 0), 0), repos: trees.length },

@@ -33,7 +33,7 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
     expect(at).toBeGreaterThan(from)
     from = at
   }
-  for (const word of ['1 blocker', 'none', '—', 'Session', 'Approve the settings.json edit', 'Redo toolkit setup UI', 'waiting', 'waiting for the go', '50m']) expect(texts).toContain(word)
+  for (const word of ['1 session', 'none', '—', 'Session', 'Approve the settings.json edit', 'Redo toolkit setup UI', 'waiting', 'waiting for the go', '50m']) expect(texts).toContain(word)
   expect(texts.some(text => /^since \d\d:\d\d$/.test(text))).toBe(true)
   expect((await ui.find({ key: 'block-needs-you' }))?.props).toEqual(expect.objectContaining({ backgroundColor: C.redTint, borderColor: C.red, borderStyle: 'round' }))
   expect((await ui.find({ key: 'row-local_env' }))?.props).toEqual(expect.objectContaining({ borderColor: C.red, minHeight: tall(56), paddingLeft: across(12), paddingRight: across(8), gap: across(12) }))
@@ -60,7 +60,7 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
       await dump('main-terminal', other)
       const lines = await textsOf(other)
       expect(lines).toEqual(expect.arrayContaining(['Needs you 1', 'Waiting 1', 'Archived 1', 'Approve the settings.json edit', 'waiting · waiting for the go · 50m · 2/5']))
-      expect(lines.some(line => line.startsWith('Sessions 2 (0 / 1 / 0) · Needs you 1 1 blocker'))).toBe(true)
+      expect(lines.some(line => line.startsWith('Sessions 2 (0 / 1 / 0) · Needs you 1 1 session'))).toBe(true)
       expect((await other.find({ key: 'row-open-local_env' }))?.text).toBe('Session · Test and validate local agent environment')
     }
     await other.unmount()
@@ -116,7 +116,7 @@ test('subagents and workflows are rows with their kind and the same groups: runn
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await dump('agents-desktop', ui)
   const texts = await textsOf(ui)
-  for (const word of ['Workflow', 'review-changes', 'verify:band.ts', 'Explore', 'Review auth flow', 'Researcher', 'Find token usages', 'Validator ›', 'running', 'done']) expect(texts).toContain(word)
+  for (const word of ['Workflow', 'review-changes', 'verify:band.ts', 'Explore', 'Review auth flow', 'Researcher', 'token-finder', 'Validator ›', 'running', 'done']) expect(texts).toContain(word)
   for (const word of ['review:bugs', 'workflow-subagent', 'master-session:researcher', 'haiku', 'sonnet']) expect(texts).not.toContain(word)
   const heads = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
   expect(heads).toEqual(['group-head-needs-you', 'group-head-working', 'group-head-waiting', 'group-head-done', 'group-head-archived'])

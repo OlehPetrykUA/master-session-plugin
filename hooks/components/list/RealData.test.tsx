@@ -3,10 +3,11 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord, Board } from '../../../types'
 
-import { textWidth } from '../../lib/layout'
+import { across, textWidth } from '../../lib/layout'
 import { foldPath, relativeOf, rowsOf } from '../../lib/list'
 import { rowsOf as sessionRowsOf } from '../../lib/rows'
 import { testsOf } from '../../lib/totals'
+import { testsShownOf } from '../detail/Tests'
 import { C } from '../../theme/tokens'
 import { BOARD, HOME, PANE, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 
@@ -27,7 +28,9 @@ test('rows: split by width, at most n, the last ends in "…"; emoji count by co
   const rows = rowsOf('Archive can lose work until this lands: 2 commits exist only on archive-guard, and Archive all would remove its worktree. '.repeat(3), 280, 13, 3)
   expect(rows.length).toBe(3)
   expect(rows.at(-1)?.endsWith('…')).toBe(true)
-  for (const row of rows) expect(textWidth(row, 13)).toBeLessThanOrEqual(280)
+  for (const row of rows) expect(textWidth(row, 13) * 1.08).toBeLessThanOrEqual(280)
+  for (const row of rowsOf('Archive can lose work until this lands: 2 commits exist only on archive-guard. '.repeat(4), 200, 13, 3)) expect(textWidth(row, 13) * 1.08).toBeLessThanOrEqual(200)
+  for (const row of rowsOf(COMMAND, 200, 12, 6, true)) expect(textWidth(row, 12, true)).toBeLessThanOrEqual(200)
   const rockets = rowsOf('🚀'.repeat(148), 300, 12, 4)
   expect(rockets.join('').endsWith('…')).toBe(false)
   expect(Array.from(rockets.join('')).length).toBe(148)
@@ -100,18 +103,22 @@ test('a subagent asking for Bash: Permission callout, a Now block, the descripti
   await ui.unmount()
 })
 
-test('a narrow pane that still shows the Open chat label cuts the persona last, after the task is gone', async ($, on) => {
+test('a needs row whose task cannot show 12 characters beside the Open chat label draws it icon-only; the persona is cut last, after the task is gone', async ($, on) => {
   seeded(on, [{ id: 'd1', type: 'master-session:design-checker', description: 'Compare the live pane with every lane', state: 'running', startedAt: 3_540_000, parentSessionId: 'local_setup', asking: { text: 'Allow Read: /etc/hosts', since: 3_590_000 } }])
   await started($, on)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 41 } })
-  expect(await hitsOf(ui)).toContain('hit-chat-d1')
-  const persona = await ui.find({ key: 'row-d1-persona' })
-  expect(persona?.props).toEqual(expect.objectContaining({ flexShrink: 1, minWidth: 0 }))
-  expect(textsIn((await ui.find({ key: 'row-d1' }))?.children)).not.toContain('Compare the live pane with every lane')
-  await ui.unmount()
-  const wide = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 60 } })
-  expect((await wide.find({ key: 'row-d1-persona' }))?.props.flexShrink).toBe(0)
-  await wide.unmount()
+  const at = async (bodyColumns: number) => {
+    const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
+    const found = {
+      chat: (await ui.find({ key: 'face-chat-d1' }))?.props.width === across(32) ? 'icon' : 'label',
+      shrink: (await ui.find({ key: 'row-d1-persona' }))?.props.flexShrink,
+      hasTask: textsIn((await ui.find({ key: 'row-d1' }))?.children).includes('Compare the live pane with every lane'),
+    }
+    await ui.unmount()
+    return found
+  }
+  expect(await at(70)).toEqual({ chat: 'label', shrink: 0, hasTask: true })
+  expect(await at(41)).toEqual({ chat: 'icon', shrink: 0, hasTask: true })
+  expect(await at(30)).toEqual({ chat: 'icon', shrink: 1, hasTask: false })
 })
 
 test('tests: one row, newest first, each label at most 140 px, then "+N more" in 12/600 muted', async ($, on) => {
@@ -154,6 +161,40 @@ test('the Tests tile takes the first source that applies: testsPassed, then summ
   const checks = board([{ id: 'c', name: 'c', state: 'working', tests: ['tsc · exit 0', 'persona.test · exit 0', 'lint · passed', 'smoke · failed', 'plugin validate · exit 0', 'build · exit 0', 'e2e · exit 0'] }])
   expect(testsOf(rows(checks), checks)).toEqual({ value: '6 checks', sub: 'passed · no counts' })
   expect(testsOf([], null)).toEqual({ value: '—', sub: 'none reported' })
+  const reruns = board([{ id: 'd', name: 'd', state: 'working', tests: ['bun test · 120 pass · 8 fail', 'bun test · 128 pass · 0 fail', 'tsc · 3 errors'] }])
+  expect(testsOf(rows(reruns), reruns)).toEqual({ value: '128', sub: 'from 1 session’s checks' })
+  const broken = board([{ id: 'e', name: 'e', state: 'working', tests: ['bun test · 128 pass · 0 fail', 'bun test · 120 pass · 8 fail', 'tsc · 3 errors'] }])
+  expect(testsOf(rows(broken), broken)).toEqual({ value: '—', sub: 'none reported' })
+})
+
+test('tests pills: a failed run is a red pill with the failed glyph and “· failed”, never green; only the newest label per command shows', async ($, on) => {
+  expect(testsShownOf(['bun test · 120 pass · 8 fail', 'tsc · 3 errors', 'bun test · 128 pass · 0 fail', 'tsc -p . --noEmit · exit 2'], 600).pills).toEqual([
+    { name: 'tsc', isFailed: true, label: 'tsc · failed' },
+    { name: 'bun test', isFailed: false, label: 'bun test · 128 pass' },
+  ])
+  expect(testsShownOf(['bun test · 128 pass · 0 fail', 'bun test · 120 pass · 8 fail'], 600).pills).toEqual([{ name: 'bun test', isFailed: true, label: 'bun test · failed' }])
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], tests: ['plugin test · passed · 228 pass', 'bun test · 120 pass · 8 fail'] }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 80 } })
+  await click(ui, 'hit-row-local_setup')
+  const [failed, passed] = [await ui.find({ key: 'test-local_setup-0' }), await ui.find({ key: 'test-local_setup-1' })]
+  expect([failed?.props.backgroundColor, failed?.text, JSON.stringify(failed?.children).includes('"alt":"failed"')]).toEqual([C.redTint, 'bun test · failed', true])
+  expect([passed?.props.backgroundColor, passed?.text]).toEqual([C.greenTint, 'plugin test · 228 pass'])
+  await ui.unmount()
+})
+
+test('a subagent with a name shows it as its task in its row and in the chain of the agents it started; its Task block keeps the description', async ($, on) => {
+  seeded(on, [
+    { id: 'q1', name: 'rows-v3 48187ca', type: 'master-session:qa-verifier', description: 'Verify rows-v3 at 48187ca in a clean detached worktree', state: 'running', startedAt: 3_540_000, parentSessionId: 'local_setup' },
+    { id: 'r1', type: 'master-session:reviewer', description: 'Review the diff', state: 'running', startedAt: 3_550_000, parentSessionId: 'local_setup', parentAgentId: 'q1' },
+  ])
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 80 } })
+  expect(textsIn((await ui.find({ key: 'row-q1' }))?.children)).toContain('rows-v3 48187ca')
+  await click(ui, 'hit-row-r1')
+  expect((await textsOf(ui)).some(text => text.includes('QA verifier · rows-v3 48187ca'))).toBe(true)
+  await click(ui, 'hit-row-q1')
+  expect(textsIn((await ui.find({ key: 'task-title-q1' }))?.children).join(' ')).toContain('Verify rows-v3 at 48187ca')
+  await ui.unmount()
 })
 
 test('the header wraps a long status line and grows; offline shows I.offline muted on line 2 and the notice in C.text with an amber glyph', async ($, on) => {

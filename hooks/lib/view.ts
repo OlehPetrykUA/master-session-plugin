@@ -72,6 +72,8 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
     repos: data.trees.map(repo => shortOf(repo.name)),
     isNarrow: view.isNarrow,
     notice: data.live.error ? noticeOf(data.live.error) : '',
+    status: view.status.text,
+    buttons: headerButtonsOf(data, () => undefined, () => undefined).map(button => button.label),
     blockRows: Math.ceil(view.blocks.length / view.perRow),
     chips: view.chips.map(chip => ({ label: chip.label, count: chip.count, hasMark: !!markWidthOf(chip), markWidth: markWidthOf(chip) })),
     groups: view.groups

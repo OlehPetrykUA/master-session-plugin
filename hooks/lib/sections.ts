@@ -1,4 +1,5 @@
-import { LH, bodyWidthOf, textWidth, widthOf } from './layout'
+import { COLUMN, LH, bodyWidthOf, faceWidth, textWidth, widthOf } from './layout'
+import { rowsOf } from './list'
 
 export type SectionKey = 'section-header' | 'section-summary' | 'section-chips' | 'section-list' | 'section-expanded' | 'section-archived'
 
@@ -11,6 +12,8 @@ export type SectionInput = {
   repos: readonly string[]
   isNarrow: boolean
   notice: string
+  status: string
+  buttons: readonly string[]
   blockRows: number
   chips: readonly ChipSize[]
   groups: readonly GroupSize[]
@@ -48,14 +51,23 @@ export function scrollMessage(to: string, asked: number | undefined, landed: num
 
 export const noticePxOf = (notice: string, columns: number) => (notice ? 12 + 16 + Math.max(1, Math.ceil((textWidth(notice, 12) * 1.08) / (bodyWidthOf(columns) - 24 - 16 - 8))) * 16 : 0)
 
-export function headerPxOf(input: Pick<SectionInput, 'columns' | 'repos' | 'isNarrow' | 'notice'>) {
-  const header = input.isNarrow ? 12 + 20 + 2 + 16 + 8 + 32 + 8 : 56
+type HeaderInput = Pick<SectionInput, 'columns' | 'repos' | 'isNarrow' | 'notice' | 'status' | 'buttons'>
+
+export function statusLinesOf(input: HeaderInput) {
+  const width = input.columns * COLUMN - 16 - 8
+  const room = input.isNarrow ? width : width - 8 * (input.buttons.length + 1) - input.buttons.reduce((sum, label) => sum + faceWidth(label, 'b32'), 0)
+  return Math.max(1, rowsOf(input.status, room - 12 - 4, 12, 20).length)
+}
+
+export function headerPxOf(input: HeaderInput) {
+  const lines = statusLinesOf(input)
+  const header = input.isNarrow ? 12 + 20 + 2 + 16 * lines + 8 + 32 + 8 : Math.max(56, 20 + 2 + 16 * lines)
   const repoLines = input.repos.length ? linesOf([4 + 12 + 4 + textWidth('Repos', 12), ...input.repos.map(repoWidthOf)], bodyWidthOf(input.columns), 4) : 0
   const repos = repoLines ? repoLines * 24 + (repoLines - 1) * 4 + 12 : 0
   return header + repos + 1 + noticePxOf(input.notice, input.columns)
 }
 
-export const headerRowsOf = (input: Pick<SectionInput, 'columns' | 'repos' | 'isNarrow' | 'notice'>) => Math.ceil(headerPxOf(input) / LH)
+export const headerRowsOf = (input: HeaderInput) => Math.ceil(headerPxOf(input) / LH)
 
 const groupPxOf = (group: GroupSize) => 32 + (group.rows ? 4 + group.rows * ROW + (group.rows - 1) * 4 : 0)
 

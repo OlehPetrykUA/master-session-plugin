@@ -68,7 +68,7 @@ test('the run summary counts sessions by state, needs you, subagents, workflows,
   const rows = rowsOf(board, { ...live, sessions: live.sessions.map(one => (one.id === 'a' ? { ...one, createdAt: NOW - 3_600_000 } : one)) })
   expect(runSummaryOf({ rows, counts: countsOf(rows, []), archived: 1, agents: AGENTS, workflows: RUNS, board, trees: [], at: NOW })).toEqual({
     sessions: { total: 3, 'needs-you': 1, waiting: 0, working: 1, done: 1, archived: 1 },
-    needsYou: 1,
+    needsYou: { sessions: 1, subagents: 0 },
     subagents: { total: 2, running: 1, done: 1, failed: 0, asking: 0 },
     workflows: { total: 3, running: 2, done: 1, failed: 0, asking: 0, agents: 3, agentsDone: 1 },
     commits: { total: 3, repos: 0 },

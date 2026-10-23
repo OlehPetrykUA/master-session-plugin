@@ -125,7 +125,7 @@ test('every row ends in a chevron: expand while closed, collapse on the card top
   expect(needs?.props).toEqual(expect.objectContaining({ borderColor: C.red, backgroundColor: C.redTint }))
   expect(await inside('block-needs-you')).toContain('"alt":"needs"')
   expect(await inside('block-needs-you')).toContain('stroke:var(--red);stroke-width:2.2;')
-  for (const text of ['Needs you', '1 blocker']) expect((await ui.findAll({ type: 'Text', text })).every(one => one.props.color !== C.red)).toBe(true)
+  for (const text of ['Needs you', '1 session']) expect((await ui.findAll({ type: 'Text', text })).every(one => one.props.color !== C.red)).toBe(true)
   expect(String((await ui.findAll({ type: 'Svg' })).find(one => one.props.alt === 'Needs you 1')?.props.source)).not.toContain('var(--red)')
   await click(ui, 'hit-row-local_setup')
   expect(await inside('top-local_setup-chevron')).toContain('"alt":"collapse"')

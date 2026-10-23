@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { LH, down, liftOf, tall } from './layout'
-import { BLOCK, ROW, chipWidthOf, contentHeightOf, headerPxOf, headerRowsOf, linesOf, noticePxOf, scrollMessage, scrollRowOf, sectionTopsOf } from './sections'
+import { BLOCK, ROW, chipWidthOf, contentHeightOf, headerPxOf, headerRowsOf, linesOf, noticePxOf, scrollMessage, scrollRowOf, sectionTopsOf, statusLinesOf } from './sections'
 import type { SectionInput } from './sections'
 
 const chips = ['All', 'Needs you', 'Waiting', 'Working', 'Done', 'Archived'].map((label, index) => ({ label, count: index, hasMark: true, markWidth: index % 5 ? 8 : 14 }))
@@ -11,6 +11,8 @@ const input: SectionInput = {
   repos: ['~/dotfiles', 'toolkit'],
   isNarrow: false,
   notice: '',
+  status: 'updated just now',
+  buttons: ['Ask', 'Refresh'],
   blockRows: 2,
   chips,
   groups: [
@@ -74,4 +76,17 @@ test('content height is known only where every row has a fixed height: closed de
   expect(contentHeightOf({ ...input, hasExpanded: true })).toBeUndefined()
   expect(contentHeightOf({ ...input, isEmpty: true })).toBeUndefined()
   expect(contentHeightOf({ ...input, groups: [] })).toBeUndefined()
+})
+
+test('a header status that wraps adds its extra lines to the header and moves every section below it', () => {
+  const status = 'Asked the validator for a board update at 10:58 · it answers on its next tick and the pane refreshes by itself'
+  const wide = { ...input, columns: 46, status }
+  const lines = statusLinesOf(wide)
+  expect(lines).toBeGreaterThan(2)
+  expect(statusLinesOf({ ...wide, status: 'updated just now' })).toBe(1)
+  expect(headerPxOf(wide) - headerPxOf({ ...wide, status: 'updated just now' })).toBe(20 + 2 + 16 * lines - 56)
+  const narrow = { ...wide, isNarrow: true }
+  expect(headerPxOf(narrow) - headerPxOf({ ...narrow, status: 'updated just now' })).toBe(16 * (statusLinesOf(narrow) - 1))
+  expect((sectionTopsOf(wide)['section-summary'] ?? 0) - (sectionTopsOf({ ...wide, status: 'updated just now' })['section-summary'] ?? 0)).toBe((headerRowsOf(wide) - headerRowsOf({ ...wide, status: 'updated just now' })) * LH)
+  expect(headerRowsOf(wide)).toBeGreaterThan(headerRowsOf({ ...wide, status: 'updated just now' }))
 })
