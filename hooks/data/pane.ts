@@ -4,8 +4,8 @@ import type { PaneData } from '../components/types'
 import { archivedOf, countsOf, rowsOf } from '../lib/rows'
 import { runSummaryOf } from '../lib/totals'
 import { UNDO_MS } from '../lib/constants'
-import { getAgents, getArchiveView, getAsked, getConfirming, getExpanded, getFilter, getLive, getRefreshing, getReports, getRepos, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter } from '../state/atoms'
-import { archive, askAll, boardOf, homeOf, openSession, refreshAll, stopSession, unarchive, undoArchive } from './sources'
+import { getArchiveView, getAsked, getConfirming, getExpanded, getFilter, getLive, getRefreshing, getReports, getRepos, getUndone, setArchiveView, setConfirming, setExpanded, setFilter } from '../state/atoms'
+import { archive, askAll, boardOf, homeOf, openSession, refreshAll, sharedAgentsOf, sharedWorkflowsOf, stopSession, unarchive, undoArchive } from './sources'
 
 export async function paneData($: EngineInterface, columns: number, offset = 0, bodyRows = 0, isAligned = false): Promise<PaneData> {
   const { board: current, from } = await boardOf($)
@@ -14,8 +14,8 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
   const rows = rowsOf(current, live)
   const counts = countsOf(rows, trees)
   const archived = archivedOf(live)
-  const agents = await getAgents($)
-  const workflows = await getWorkflows($)
+  const agents = await sharedAgentsOf($)
+  const workflows = await sharedWorkflowsOf($)
   const at = await $.clock.now()
   const asked = await getAsked($)
   const isAnswered = !!asked && (await getReports($)).some(one => one.modelAt > asked.at)

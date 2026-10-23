@@ -5,7 +5,7 @@ import type { On } from 'claude-code'
 import type { AgentRecord, WorkflowRecord } from '../types'
 
 import { subagentsOf, workflowRunsOf } from './lib/agents'
-import { BAND, HOME, PANE, SPAWN, altsOf, childOf, click, started, textsOf, typed, warmUp, world } from './testing/world'
+import { BAND, BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, altsOf, childOf, click, started, textsOf, typed, warmUp, world } from './testing/world'
 
 warmUp()
 
@@ -180,4 +180,45 @@ test('the open tool can expand one card and open the Archived list, so a check c
   const plain = (await $.tool.call({ tool: 'mcp__master-session__open' })) as { result?: string }
   expect(plain.result).toBe('The master session pane is open beside the chat.')
   expect(opened.length).toBeGreaterThanOrEqual(3)
+})
+
+test('the master republishes a merged board with its reports, agents and repos when a worker reports, and a worker band and pane follow it', async ($, on) => {
+  const writes = new Map<string, string>()
+  on('fs.write', (_, e) => {
+    writes.set(e.path, e.text)
+    return { value: undefined }
+  })
+  const files: Record<string, string> = {}
+  const run = world(on, { files })
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.settle()
+  await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
+  await run.clock.settle()
+  const path = `${HOME}/.claude/state/master-session/boards/${SELF}.json`
+  const first = JSON.parse(writes.get(path) ?? '{}')
+  expect(first.board.sessions.find((one: { id: string }) => one.id === 'local_setup').state).toBe('waiting')
+  const report = JSON.stringify({ v: 1, kind: 'status', session: 'local_setup', parent: SELF, seq: 1, at: 3_700_000, modelAt: 3_700_000, state: 'done', commits: [{ sha: 'abc1234', subject: 'fix' }], run: { isRunning: false } })
+  files[`${HOME}/.claude/state/master-session/sessions/local_setup.json`] = report
+  await run.clock.advance(9_000)
+  const second = JSON.parse(writes.get(path) ?? '{}')
+  const row = second.board.sessions.find((one: { id: string }) => one.id === 'local_setup')
+  expect(row.state).toBe('done')
+  expect(row.commits).toEqual(['abc1234 fix'])
+})
+
+test('a worker band redraws when the master rewrites its board, and counts the master’s subagents', async ($, on) => {
+  const child = childOf(3_600_000)
+  const path = Object.keys(child.files ?? {})[0] ?? ''
+  const run = world(on, child)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.advance(3_000)
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect((await altsOf(band)).join()).toContain('needs you')
+  const next = { ...BOARD, sessions: BOARD.sessions.map(one => ({ ...one, state: 'done' as const })), needsYou: [] }
+  const agent = { id: 'ag1', name: 'Band strip order', type: 'x', description: 'd', state: 'running', startedAt: 1 }
+  const files = child.files ?? {}
+  files[path] = JSON.stringify({ v: 1, kind: 'board', at: 3_650_000, masterId: 'local_master', masterTitle: 'M', board: next, agents: [agent] })
+  await run.clock.advance(6_000)
+  expect((await altsOf(band)).join()).toContain('all 2 done')
+  await band.unmount()
 })

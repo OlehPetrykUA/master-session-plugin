@@ -13,12 +13,14 @@ import {
   openAsking,
   openPane,
   openSession,
-  publishBoard,
   refreshAll,
   refreshBoard,
   refreshFile,
   refreshReports,
   refreshShared,
+  republishBoard,
+  sharedAgentsOf,
+  sharedWorkflowsOf,
   startSources,
   whoAmI,
 } from './data/sources'
@@ -151,7 +153,7 @@ export const register: Register = on => {
     if (!next) return { deny: 'The board needs a sessions array whose items carry id and state.' }
     const at = await $.clock.now()
     await saveBoard($, prev => ({ ...next, since: prev?.since ?? at, at }))
-    await publishBoard($, next, at).catch(() => undefined)
+    await republishBoard($).catch(() => undefined)
     void refreshAll($, true).catch(() => undefined)
     const surfaces = await $.session.surfaces()
     return {
@@ -226,7 +228,7 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, event, next) => {
     const { board: current, from } = await boardOf($)
-    const agents = agentCountsOf(await getAgents($), await getWorkflows($))
+    const agents = agentCountsOf(await sharedAgentsOf($), await sharedWorkflowsOf($))
     const isMaster = !!(await getBoard($)) || (await getReports($)).length > 0
     const live = await getLive($)
     const progress = bandProgressWith(current, live, agents, isMaster)

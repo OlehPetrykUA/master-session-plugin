@@ -12,7 +12,7 @@ import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
 import { familyOf, rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
-import { getAgents, getBoard, getLive, getReports, getShared, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
+import { getAgents, getBoard, getLive, getReports, getRepos, getShared, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, saveShared, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
 import { keptAgents } from './agents'
 import { roleOf } from './recorder'
@@ -20,10 +20,14 @@ import { askForUpdates, readBoard, readReports, writeBoard } from './status'
 
 let home = ''
 let fileStamp = -1
+let published = ''
+let publishedAt = 0
 
 export function startSources(value: string) {
   home = value
   fileStamp = -1
+  published = ''
+  publishedAt = 0
 }
 
 export function homeOf() {
@@ -113,12 +117,41 @@ export async function refreshReports($: EngineInterface) {
   await saveWorkflows($, workflows => withReportedRuns(workflows, mine))
   const workflows = await getWorkflows($)
   await saveAgents($, agents => keptAgents(withReported(agents, mine), workflows, now))
+  await republishBoard($)
 }
 
-export async function publishBoard($: EngineInterface, board: Board, at: number) {
+const SHARED_AGENTS = 40
+
+export async function republishBoard($: EngineInterface) {
+  const own = await getBoard($)
   const me = await getLive($)
   const masterId = me.self || roleOf().self
-  if (masterId) await writeBoard($, home, { at, masterId, masterTitle: me.title || TITLE, board })
+  if (!own || !masterId) return
+  const at = await $.clock.now()
+  const agents = (await getAgents($)).slice(-SHARED_AGENTS)
+  const workflows = await getWorkflows($)
+  const merged = merge(own, await getReports($), me, at)
+  const repos = [...new Set([...merged.repos, ...(await getRepos($)).map(one => one.path)])]
+  const sign = JSON.stringify([merged.sessions.map(one => [one.id, one.name, one.state, one.progress, one.now, one.next, one.needsYou, one.commits?.length, one.tests?.length]), merged.needsYou, repos, agents.map(one => [one.id, one.state, one.parentSessionId, one.asking?.text]), workflows.map(one => [one.id, one.parentSessionId])])
+  if (sign === published && at - publishedAt < BOARD_MAX_AGE_MS / 3) return
+  published = sign
+  publishedAt = at
+  await writeBoard($, home, { at, masterId, masterTitle: me.title || TITLE, board: { ...merged, repos }, agents, workflows })
+}
+
+export async function sharedAgentsOf($: EngineInterface) {
+  const copy = await getShared($)
+  const own = await getAgents($)
+  const mine = new Set(own.map(one => one.id))
+  const theirs = (copy?.agents ?? []).filter(one => !mine.has(one.id)).map(one => ({ ...one, parentSessionId: one.parentSessionId ?? copy?.masterId }))
+  return [...own, ...theirs]
+}
+
+export async function sharedWorkflowsOf($: EngineInterface) {
+  const copy = await getShared($)
+  const own = await getWorkflows($)
+  const mine = new Set(own.map(one => one.id))
+  return [...own, ...(copy?.workflows ?? []).filter(one => !mine.has(one.id)).map(one => ({ ...one, parentSessionId: one.parentSessionId ?? copy?.masterId }))]
 }
 
 export async function askAll($: EngineInterface) {
@@ -247,6 +280,7 @@ export async function refreshAll($: EngineInterface, isForced = false) {
   try {
     await refreshLive($, isForced)
     await refreshRepos($)
+    await republishBoard($)
   } finally {
     isForced && (await setRefreshing($, false))
   }

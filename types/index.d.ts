@@ -79,6 +79,8 @@ export type Shared = {
   masterId: string
   masterTitle: string
   board: Board
+  agents?: AgentRecord[]
+  workflows?: WorkflowRecord[]
 }
 
 export type Worktree = {
