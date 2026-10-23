@@ -10,7 +10,7 @@ import { AGENT_SHOWN_MS } from './constants'
 import { compactOf } from './format'
 import { textWidth } from './layout'
 import type { Face } from './layout'
-import { activityOf, elapsedOf, titleOf, whereOf } from './rows'
+import { activityOf, elapsedOf, titleOf } from './rows'
 import type { Row } from './rows'
 import type { RunSummary } from './totals'
 
@@ -332,7 +332,7 @@ function sessionLineOf(row: Row, status: Status, context: Context): Line {
   if (status === 'waiting') return worded('waiting', board?.now ?? '')
   if (status === 'ready') return worded('ready', board?.done || board?.now || board?.sha || '')
   if (status === 'verified') return worded('verified', board?.verified ?? '')
-  if (status === 'merged') return worded('merged', board?.sha ?? whereOf(row, context.trees)?.tree.sha ?? '', mergedLineOf(row, context.trees))
+  if (status === 'merged') return worded('merged', board?.sha ?? '', mergedLineOf(row, context.trees))
   return worded('done', board?.done || 'unverified')
 }
 

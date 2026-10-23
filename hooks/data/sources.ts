@@ -25,8 +25,9 @@ let publishedAt = 0
 let flight: Promise<void> | undefined
 let isQueued = false
 const seenTrees = new Map<string, { key: string; at: number; tree: Worktree }>()
-const seenRepos = new Map<string, { key: string; at: number; base: string | undefined; localOnly: number; landed: number }>()
+const seenRepos = new Map<string, { key: string; at: number; base: string | undefined; baseSha: string; localOnly: number; landed: number }>()
 const gitDirs = new Map<string, string>()
+const NO_STATUS = { dirty: 0, paths: [] as string[], upstream: '', ahead: 0, behind: 0 }
 
 export function startSources(value: string) {
   home = value
@@ -37,6 +38,7 @@ export function startSources(value: string) {
   seenTrees.clear()
   seenRepos.clear()
   gitDirs.clear()
+  ancestry.clear()
 }
 
 export function homeOf() {
@@ -159,7 +161,7 @@ async function refreshLive($: EngineInterface, isForced = false) {
   try {
     const me = await whoAmI($)
     const sessions = await listSessions($, me.sessions, { include_archived: true, limit: LIVE_LIMIT })
-    await saveLive($, prev => (!isForced && !prev.error && JSON.stringify(prev.sessions) === JSON.stringify(sessions) ? prev : { ...prev, sessions, error: '', at }))
+    await saveLive($, prev => (!isForced && !prev.error && JSON.stringify(prev.sessions) === JSON.stringify(sessions) ? prev : { ...prev, sessions, family: undefined, error: '', at }))
   } catch (error) {
     await saveLive($, prev => (prev.error === messageOf(error) ? prev : { ...prev, error: messageOf(error), at }))
   }
@@ -189,7 +191,8 @@ export async function git($: EngineInterface, cwd: string, args: readonly string
 async function baseOf($: EngineInterface, path: string, tick: Tick) {
   const remote = (await git($, path, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], tick).catch(soft(''))).trim()
   for (const name of [remote.replace(/^origin\//, ''), 'main', 'master'].filter(Boolean)) {
-    if ((await git($, path, ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`], tick).catch(soft(''))).trim()) return name
+    const sha = (await git($, path, ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`], tick).catch(soft(''))).trim()
+    if (sha) return { name, sha }
   }
   return undefined
 }
@@ -203,29 +206,30 @@ async function gitDirOf($: EngineInterface, path: string) {
   return dir
 }
 
-async function keyOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined) {
+async function keyOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined, head: string) {
   const index = await $.fs.stat(`${await gitDirOf($, tree.path)}/index`).catch(() => undefined)
-  return index ? `${tree.sha}|${tree.branch}|${base ?? ''}|${index.mtimeMs}|${index.size}` : ''
+  return index ? `${tree.sha}|${tree.branch}|${base ?? ''}@${head}|${index.mtimeMs}|${index.size}` : ''
 }
 
-async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined, tick: Tick, now: number): Promise<Worktree> {
-  const key = await keyOf($, tree, base)
+async function treeOf($: EngineInterface, tree: ReturnType<typeof parseWorktrees>[number], base: string | undefined, head: string, tick: Tick, now: number): Promise<Worktree> {
+  const key = await keyOf($, tree, base, head)
   const before = seenTrees.get(tree.path)
   if (!tick.isForced && key && before?.key === key && now - before.at < TREE_STALE_MS) return before.tree
-  if (!tick.isForced && tick.spent + (tree.isMain ? 1 : 2) > GIT_CAP) return before?.tree ?? { path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }
+  if (!tick.isForced && tick.spent + (tree.isMain ? 1 : 2) > GIT_CAP) return before?.tree ?? { path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...NO_STATUS }
   const status = await git($, tree.path, ['status', '--porcelain=v2', '--branch', '--untracked-files=all', '--ignore-submodules=none'], tick).catch(soft(undefined))
   const count = !status ? '' : tree.isMain ? '0' : base ? (await git($, tree.path, ['rev-list', '--count', `refs/heads/${base}..HEAD`], tick).catch(soft(''))).trim() : ''
-  const known = status ? parseStatus(status) : { dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }
-  const scanned = { path: tree.path, branch: tree.branch, sha: tree.sha, isMain: tree.isMain, ...known, unmerged: /^\d+$/.test(count) ? Number(count) : undefined }
+  const known = status ? parseStatus(status) : NO_STATUS
+  const scanned = { path: tree.path, sha: tree.sha, isMain: tree.isMain, ...known, branch: tree.branch, unmerged: /^\d+$/.test(count) ? Number(count) : undefined }
   if (status !== undefined) seenTrees.set(tree.path, { key, at: now, tree: scanned })
   return scanned
 }
 
 async function factsOf($: EngineInterface, path: string, tick: Tick, key: string, at: number, start: number) {
-  const base = await baseOf($, path, tick)
+  const found = await baseOf($, path, tick)
+  const base = found?.name
   const localOnly = (await git($, path, ['for-each-ref', 'refs/heads', '--format=x%(upstream:short)'], tick).catch(soft(''))).split('\n').filter(line => line === 'x').length
   const landed = base ? Number((await git($, path, ['rev-list', '--count', `--since=${new Date(start).toISOString()}`, `refs/heads/${base}`], tick).catch(soft('0'))).trim()) || 0 : 0
-  return { key, at, base, localOnly, landed }
+  return { key, at, base, baseSha: found?.sha ?? '', localOnly, landed }
 }
 
 export async function repoOf($: EngineInterface, path: string, tick: Tick, start: number): Promise<Repo | undefined> {
@@ -238,7 +242,7 @@ export async function repoOf($: EngineInterface, path: string, tick: Tick, start
   const facts = !tick.isForced && seen && seen.key === listing && now - seen.at < TREE_STALE_MS ? seen : await factsOf($, path, tick, listing, now, start)
   seenRepos.set(main.path, facts)
   const worktrees: Worktree[] = []
-  for (const tree of trees) worktrees.push(await treeOf($, tree, facts.base, tick, now))
+  for (const tree of trees) worktrees.push(await treeOf($, tree, facts.base, facts.baseSha, tick, now))
   return {
     path: main.path,
     name: home && main.path.startsWith(`${home}/`) ? `~${main.path.slice(home.length)}` : main.path,
@@ -259,7 +263,7 @@ async function provenOf($: EngineInterface, repos: Repo[], rows: readonly Row[],
     const sha = row.board?.sha ?? ''
     const cwd = row.live?.cwd ?? row.board?.cwd
     const found = cwd ? locate(cwd, repos) : undefined
-    if (!found?.repo.base || !found.tree.isMain || !/^[0-9a-f]{7,40}$/i.test(sha)) continue
+    if (!found?.repo.base || !/^[0-9a-f]{7,40}$/i.test(sha)) continue
     const { path, base } = found.repo
     const key = `${path}\0${base}\0${sha}`
     if (seen.has(key)) continue
@@ -308,7 +312,7 @@ async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[
   }
   for (const path of failed) {
     const outer = locate(path, [...found.values()])
-    if (outer && outer.tree.path !== path) found.set(outer.repo.path, { ...outer.repo, worktrees: [...outer.repo.worktrees, { path, branch: '', sha: '', isMain: false, dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0 }] })
+    if (outer && outer.tree.path !== path) found.set(outer.repo.path, { ...outer.repo, worktrees: [...outer.repo.worktrees, { path, branch: '', sha: '', isMain: false, ...NO_STATUS }] })
   }
   const repos = await provenOf($, [...found.values()], rows, tick)
   await saveRepos($, () => repos)
@@ -354,11 +358,14 @@ export async function refreshAll($: EngineInterface, isForced = false) {
     return flight
   }
   flight = (async () => {
-    await scan($, isForced)
+    const errors: unknown[] = []
+    const attempt = (isNow: boolean) => scan($, isNow).catch((error: unknown) => void errors.push(error))
+    await attempt(isForced)
     while (isQueued) {
       isQueued = false
-      await scan($, true)
+      await attempt(true)
     }
+    if (errors.length) throw errors[0]
   })().finally(() => {
     flight = undefined
     isQueued = false
@@ -407,7 +414,8 @@ async function archiveOne($: EngineInterface, id: string, name: string) {
   await call($, 'ccd_session_mgmt', 'archive_session', { session_id: id, reason: 'Archived from the master session pane' })
   await refreshLive($)
   const after = (await getLive($)).sessions.find(one => one.id === id)
-  if (after && !after.isArchived) throw new Error(`${name} is still active. The app may be waiting for your approval.`)
+  if (!after) throw new Error(`${name} is not in the session list, so the archive can't be confirmed.`)
+  if (!after.isArchived) throw new Error(`${name} is still active. The app may be waiting for your approval.`)
 }
 
 export async function archive($: EngineInterface, rows: readonly Row[], all?: { group: SessionState; skipped: number }, confirmed: readonly string[] = []) {
@@ -430,7 +438,9 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
   const busyOf = (row: Row) => sideOf(row, sessions, trees).find(one => one.isRunning || fresh.some(each => each.id === one.id && each.state === 'needs-you'))
   const able = targets.filter(row => isArchivable(row.board ?? { state: row.state }, row.live))
   const allowed = able.filter(row => !busyOf(row))
-  const refused = rows.filter(row => !able.some(one => one.id === row.id)).map(row => row.name)
+  const missing = rows.filter(row => !targets.some(one => one.id === row.id)).map(row => row.name)
+  const refused = targets.filter(row => !able.some(one => one.id === row.id)).map(row => row.name)
+  if (missing.length) $.ui.toast(`Not archived: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} no longer on the board.`)
   if (refused.length) $.ui.toast(`Not archived: ${refused.join(', ')} ${refused.length === 1 ? 'is' : 'are'} still working or waiting for your answer.`)
   for (const busy of able.flatMap(row => busyOf(row) ?? [])) $.ui.toast(`Not archived: ${busy.name || busy.title} is still working`)
   const first = allowed[0]
@@ -459,16 +469,31 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
   const at = await $.clock.now()
   const index = all || !archived[0] ? 0 : Math.max(0, items.filter(item => item.group === group).findIndex(item => item.id === archived[0]?.id))
   await setUndone($, () => ({ ids: archived.map(row => row.id), name: !all && archived[0] ? archived[0].name : '', skipped, group, index, at }))
+  expireUndo($, at)
+}
+
+function expireUndo($: EngineInterface, at: number) {
   $.clock.after(UNDO_MS, () => void setUndone($, value => (value?.at === at ? null : value)))
 }
 
 export async function undoArchive($: EngineInterface) {
   const undone = await getUndone($)
   await setUndone($, () => null)
-  try {
-    for (const id of undone?.ids ?? []) await call($, 'ccd_session_mgmt', 'unarchive_session', { session_id: id })
-  } catch (error) {
-    $.ui.toast(`Not unarchived: ${messageOf(error)}`)
+  const failed: string[] = []
+  let reason = ''
+  for (const id of undone?.ids ?? []) {
+    try {
+      await call($, 'ccd_session_mgmt', 'unarchive_session', { session_id: id })
+    } catch (error) {
+      failed.push(id)
+      reason ||= messageOf(error)
+    }
+  }
+  if (failed.length && undone) {
+    $.ui.toast(`Not unarchived: ${reason}`)
+    const at = await $.clock.now()
+    await setUndone($, () => ({ ...undone, ids: failed, at }))
+    expireUndo($, at)
   }
   await refreshLive($).catch(() => undefined)
 }

@@ -55,7 +55,7 @@ test('Archive all without a failure archives every clean session', async ($, on)
   await ui.unmount()
 })
 
-test('an Undo whose unarchive fails toasts the reason and drops the Undo bar', async ($, on) => {
+test('an Undo whose unarchive fails toasts the reason and keeps the failed session in the Undo bar', async ($, on) => {
   const { calls, toasts } = await started($, on, DONE, withSessions({ unarchiveError: 'cannot restore' }))
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_a')
@@ -64,6 +64,6 @@ test('an Undo whose unarchive fails toasts the reason and drops the Undo bar', a
   await click(ui, 'hit-undo-done')
   expect(calls.filter(one => one.tool === 'unarchive_session').map(one => one.args.session_id)).toEqual(['local_a'])
   expect(toasts).toEqual(['Not unarchived: cannot restore'])
-  expect(await ui.find({ key: 'undo-bar-done' })).toBeUndefined()
+  expect(await ui.find({ key: 'undo-bar-done' })).toBeDefined()
   await ui.unmount()
 })

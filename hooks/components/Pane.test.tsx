@@ -387,14 +387,14 @@ function legacyExpanded(on: Parameters<typeof started>[1], saved: unknown = 'loc
   return written
 }
 
-test('a legacy single-id expanded value still shows that card and collapses to an empty list', async ($, on) => {
+test('a legacy single-id expanded value still shows that card and collapses to empty', async ($, on) => {
   const written = legacyExpanded(on)
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ key: 'detail-local_env' })).toBeDefined()
   expect(await ui.find({ key: 'detail-local_setup' })).toBeUndefined()
   await click(ui, 'hit-top-local_env')
-  expect(written.at(-1)).toEqual([])
+  expect(written.at(-1)).toEqual('')
   expect(await ui.find({ key: 'detail-local_env' })).toBeUndefined()
   await ui.unmount()
 })
@@ -406,7 +406,7 @@ test('a saved list from multi-expand loads as one card: only the last id stays o
   expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
   expect(await ui.find({ key: 'detail-local_env' })).toBeUndefined()
   await click(ui, 'hit-row-local_env')
-  expect(written.at(-1)).toEqual(['local_env'])
+  expect(written.at(-1)).toEqual('local_env')
   await ui.unmount()
 })
 
@@ -415,7 +415,7 @@ test('a legacy single-id expanded value gives way when another card is pressed',
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_setup')
-  expect(written.at(-1)).toEqual(['local_setup'])
+  expect(written.at(-1)).toEqual('local_setup')
   expect(await ui.find({ key: 'detail-local_env' })).toBeUndefined()
   expect(await ui.find({ key: 'detail-local_setup' })).toBeDefined()
   await ui.unmount()

@@ -4,6 +4,7 @@ import type { On } from 'claude-code'
 
 import { GIT_CAP } from '../lib/constants'
 import { BOARD, BOARD_TOOL, HOME, PANE, WORKTREE, click, started, warmUp } from '../testing/world'
+import type { Ui } from '../testing/world'
 
 warmUp()
 
@@ -48,19 +49,18 @@ const PROBE = {
   },
 }
 
-async function repoOfProbe($: Engine) {
+type Probed = { base?: string; landed?: number; worktrees: { path: string; dirty: number; unmerged?: number }[] }
+
+async function reposOfProbe($: Engine) {
   const ui = await $.ui.mount({ ...PANE, plugin: 'state-probe', requestId: 'state-probe', surface: 'terminal' })
-  const repos = JSON.parse(String((await ui.find({ type: 'Text' }))?.text)) as { base?: string; worktrees: { path: string }[] }[]
+  const repos = JSON.parse(String((await ui.find({ type: 'Text' }))?.text)) as Probed[]
   await ui.unmount()
-  return repos.find(one => one.worktrees.some(tree => tree.path === WORKTREE))
+  return repos
 }
 
-async function dirtyOf($: Engine, path: string) {
-  const ui = await $.ui.mount({ ...PANE, plugin: 'state-probe', requestId: 'state-probe', surface: 'terminal' })
-  const repos = JSON.parse(String((await ui.find({ type: 'Text' }))?.text)) as { worktrees: { path: string; dirty: number }[] }[]
-  await ui.unmount()
-  return repos.flatMap(one => one.worktrees).find(one => one.path === path)?.dirty
-}
+const repoOfProbe = async ($: Engine) => (await reposOfProbe($)).find(one => one.worktrees.some(tree => tree.path === WORKTREE))
+
+const treeOfProbe = async ($: Engine, path: string) => (await reposOfProbe($)).flatMap(one => one.worktrees).find(one => one.path === path)
 
 test('a master with nine worktrees runs far fewer git processes a minute than the 100 it ran before', async ($, on) => {
   const { clock, gits } = await master($, on)
@@ -101,16 +101,16 @@ test('a tick never runs more git processes than the cap, and the rest follow on 
   expect(ALL.every(path => seen.has(path))).toBe(true)
 })
 
-test('an edit that leaves the index alone shows on the next forced refresh, never stale', { plugins: [PROBE] }, async ($, on) => {
+test('an edit that leaves the index alone shows on the next forced refresh, not before', { plugins: [PROBE] }, async ($, on) => {
   const { clock, git } = await master($, on)
   const path = TREES[2] ?? ''
-  expect(await dirtyOf($, path)).toBe(0)
+  expect((await treeOfProbe($, path))?.dirty).toBe(0)
   git[`${path} status`] = DIRTY
   await clock.advance(15_000)
-  expect(await dirtyOf($, path)).toBe(0)
+  expect((await treeOfProbe($, path))?.dirty).toBe(0)
   await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
   await clock.settle()
-  expect(await dirtyOf($, path)).toBe(1)
+  expect((await treeOfProbe($, path))?.dirty).toBe(1)
 })
 
 async function archiveClick($: Engine, on: On, status: string | undefined) {
@@ -127,6 +127,24 @@ async function archiveClick($: Engine, on: On, status: string | undefined) {
 
 test('control: a clean worktree archives', async ($, on) => {
   expect(await archiveClick($, on, undefined)).toBe(1)
+})
+
+const FAMILY = {
+  name: 'family-probe',
+  register(on: On) {
+    on('ui.render', { component: 'Pane', requestId: 'family-probe' }, async ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      const live = await $.state.get({ plugin: 'master-session', key: 'live' })
+      return <Text>{JSON.stringify((live.value as { family?: unknown } | undefined)?.family ?? null)}</Text>
+    })
+  },
+}
+
+test('the archive list kept for the confirm is dropped once a refresh replaces the sessions', { plugins: [FAMILY] }, async ($, on) => {
+  await archiveClick($, on, undefined)
+  const ui = await $.ui.mount({ ...PANE, plugin: 'family-probe', requestId: 'family-probe', surface: 'terminal' })
+  expect((await ui.find({ type: 'Text' }))?.text).toBe('null')
+  await ui.unmount()
 })
 
 test('archive sees an unstaged edit made after the last scan and asks instead of archiving', async ($, on) => {
@@ -158,7 +176,7 @@ test('a failed git status is not remembered: the next tick reads it again withou
   git[`${path} status`] = DIRTY
   await run.clock.advance(15_000)
   expect(good).not.toBe('')
-  expect(await dirtyOf($, path)).toBe(1)
+  expect((await treeOfProbe($, path))?.dirty).toBe(1)
 })
 
 test('a forced refresh re-reads the repo base instead of the remembered one', { plugins: [PROBE] }, async ($, on) => {
@@ -175,10 +193,79 @@ test('a forced refresh re-reads the repo base instead of the remembered one', { 
 test('each tracked repo counts what landed on its base since the run start, with one capped rev-list per refresh', { plugins: [PROBE] }, async ($, on) => {
   const { clock, gits } = await master($, on)
   const repo = await repoOfProbe($)
-  expect((repo as unknown as { landed?: number }).landed).toBe(2)
+  expect(repo?.landed).toBe(2)
   const since = gits.filter(argv => argv.some(one => one.startsWith('--since=')))
   expect(since.length).toBeGreaterThan(0)
   const before = since.length
   await clock.advance(60_000)
   expect(gits.filter(argv => argv.some(one => one.startsWith('--since='))).length).toBe(before)
+})
+
+test('a base move seen in the worktree listing rescans the unmerged count of a worktree whose index did not change', { plugins: [PROBE] }, async ($, on) => {
+  const { clock, git } = await master($, on)
+  const path = TREES[2] ?? ''
+  expect((await treeOfProbe($, path))?.unmerged).toBe(2)
+  git[`${WORKTREE} rev-parse`] = 'def5678\n'
+  git[`${WORKTREE} worktree`] = (git[`${WORKTREE} worktree`] ?? '').replace(`HEAD ${'0'.repeat(40)}`, `HEAD ${'9'.repeat(40)}`)
+  git[`${path} rev-list`] = '5\n'
+  for (let tick = 0; tick < 6; tick += 1) await clock.advance(15_000)
+  expect((await treeOfProbe($, path))?.unmerged).toBe(5)
+})
+
+const MCP = {
+  name: 'mcp-probe',
+  register(on: On) {
+    const hidden: string[] = []
+    on('mcp.call', async (_, e, next) => {
+      if (e.tool === 'archive_session') hidden.push(String(e.args.session_id))
+      if (e.tool === 'unarchive_session' && e.args.session_id === 'local_b') return { value: { content: [{ type: 'text' as const, text: 'cannot unarchive' }], isError: true } } as never
+      const done = (await next(e)) as { value: { content: { type: 'text'; text: string }[] } }
+      if (e.tool !== 'list_sessions' || !hidden.length) return done as never
+      const list = JSON.parse(done.value.content[0]?.text ?? '[]') as { sessionId: string }[]
+      return { value: { content: [{ type: 'text' as const, text: JSON.stringify(list.filter(one => !hidden.includes(one.sessionId))) }], isError: false } } as never
+    })
+  },
+}
+
+const barOf = async (ui: Ui) => (await ui.findAll({ type: 'Box' })).map(box => box.key ?? '').filter(key => key.startsWith('undo-bar'))
+
+test('an archive that succeeds but leaves the session out of the refreshed list is reported, not counted', { plugins: [MCP] }, async ($, on) => {
+  const { clock, toasts } = await master($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_setup')
+  await click(ui, 'hit-archive-local_setup')
+  await click(ui, 'hit-archive-yes-local_setup')
+  await clock.settle()
+  expect(toasts.some(toast => toast.startsWith('Not archived:') && toast.includes('session list'))).toBe(true)
+  expect(await barOf(ui)).toEqual([])
+  await ui.unmount()
+})
+
+test('undo unarchives each id: one that fails stays in the bar for a fresh 10 s and is toasted once', { plugins: [MCP] }, async ($, on) => {
+  const written: unknown[] = []
+  let isSeeded = true
+  on('state.get', async (_, e, next) => {
+    const real = (await next(e)) as { value: { value: unknown; version: number } }
+    return (isSeeded && e.key === 'undone' ? { value: { ...real.value, value: { ids: ['local_a', 'local_b'], name: '', skipped: 0, group: 'waiting', index: 0, at: Number.MAX_SAFE_INTEGER } } } : real) as never
+  })
+  on('state.set', async (_, e, next) => {
+    const done = await next(e)
+    if (e.key === 'undone') {
+      isSeeded = false
+      written.push(e.value)
+    }
+    return done
+  })
+  const { clock, toasts } = await master($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-undo-waiting')
+  await clock.settle()
+  expect(toasts.filter(toast => toast.startsWith('Not unarchived'))).toHaveLength(1)
+  expect((written.at(-1) as { ids: string[] }).ids).toEqual(['local_b'])
+  expect((written.at(-1) as { at: number }).at).toBeLessThan(Number.MAX_SAFE_INTEGER)
+  await clock.advance(9_000)
+  expect((written.at(-1) as { ids: string[] } | null)?.ids).toEqual(['local_b'])
+  await clock.advance(2_000)
+  expect(written.at(-1)).toBeNull()
+  await ui.unmount()
 })

@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import { REPORTS_TOOL, REPORT_TOOL, askText } from './contract'
 import type { Report } from './contract'
-import { commitOf, engage, isTestCommand, recordTurnEnd, recorder, repoOf, roleOf, sessionFacts, startRecorder, summaryOf, syncAgents, testsOf } from './recorder'
+import { commitOf, engage, recordTurnEnd, recorder, repoOf, roleOf, sessionFacts, startRecorder, syncAgents, testsOf } from './recorder'
 import { boardPath, reportPath } from './status'
 
 const HOME = '/home/me'
@@ -46,9 +46,11 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
   const registered: { name: string; isDeferred?: unknown }[] = []
   const ran: string[][] = []
   const atoms: Record<string, { value: unknown; version: number }> = {}
+  let at = NOW
   const holding = { now: 0, get: 0, mcp: 0 }
   const asked: string[] = []
   let failing = ''
+  let brokenGit = ''
   const waiting: (() => void)[] = []
   const gated = <T>(kind: 'now' | 'get' | 'mcp', value: () => T): Promise<T> => {
     if (!holding[kind]) return Promise.resolve(value())
@@ -58,7 +60,7 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
   const $ = {
     env: { get: async (name: string) => (name === 'HOME' ? HOME : undefined) },
     session: { id: async () => ENGINE, cwd: async () => HOME },
-    clock: { now: () => gated('now', () => NOW) },
+    clock: { now: () => gated('now', () => at) },
     mcp: {
       call: (_server: string, tool: string, args: Record<string, unknown>) =>
         gated('mcp', () => {
@@ -79,7 +81,7 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
     process: {
       run: async (argv: readonly string[]) => {
         ran.push([...argv])
-        return { exitCode: 0, stdout: STATUS, stderr: '', isStdoutTruncated: false, isStderrTruncated: false }
+        return { exitCode: brokenGit && argv[argv.indexOf('-C') + 1] === brokenGit ? 128 : 0, stdout: STATUS, stderr: '', isStdoutTruncated: false, isStderrTruncated: false }
       },
     },
     fs: {
@@ -141,6 +143,12 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
   const fail = (id: string) => {
     failing = id
   }
+  const later = (ms: number) => {
+    at += ms
+  }
+  const breakGit = (path: string) => {
+    brokenGit = path
+  }
   const hold = (kind: 'now' | 'get' | 'mcp') => {
     holding[kind] += 1
   }
@@ -149,8 +157,10 @@ function world(parent = MASTER, files: Record<string, string> = {}) {
     atoms[key] = { value, version: 1 }
   }
   const sync = () => syncAgents($ as never)
-  return { $, fire, begin, start, end, registered, ran, asked, reportNow, bash, report, receive, hold, release, seed, sync, fail }
+  return { $, fire, begin, start, end, registered, ran, asked, reportNow, bash, report, receive, hold, release, seed, sync, fail, breakGit, later }
 }
+
+const recordsTests = (command: string) => testsOf(command, '', true).length > 0
 
 const ended = (turnId: string, patch: Event = {}) => ({ answer: '', durationMs: 1, isAborted: false, turnId, reason: 'answer', ...patch })
 
@@ -159,11 +169,12 @@ test('the helpers read a commit line, test runners, the last output line and the
   expect(commitOf('git commit -m "x"', '[main (root-commit) 0abcdef] initial')).toEqual({ sha: '0abcdef', subject: 'initial' })
   expect(commitOf('git log --oneline', '[main 1a2b3c4] feat: x')).toBeUndefined()
   expect(commitOf('git commit --amend', 'nothing to commit')).toBeUndefined()
-  for (const command of ['pytest -q', 'npm test', 'pnpm run test', 'claude plugin test ~/mod', '/opt/homebrew/bin/tsc -p . --noEmit', 'python3 tests/test_hooks.py']) expect(isTestCommand(command)).toBe(true)
-  for (const command of ['ls', 'git status', 'cat test.txt', 'cat hooks/data/agent-prompts.test.tsx', 'sed -n 1,20p hooks/persona.test.sh', 'ls tests/', 'grep -n tsc tsconfig.json', 'echo "plugin test exit $?"', "python3 - <<'EOF'\nimport pytest\nEOF"]) expect(isTestCommand(command)).toBe(false)
-  expect(summaryOf('a\n\n  13 passed  \n\n')).toBe('13 passed')
+  for (const command of ['pytest -q', 'npm test', 'pnpm run test', 'claude plugin test ~/mod', '/opt/homebrew/bin/tsc -p . --noEmit', 'python3 tests/test_hooks.py']) expect(recordsTests(command)).toBe(true)
+  for (const command of ['ls', 'git status', 'cat test.txt', 'cat hooks/data/agent-prompts.test.tsx', 'sed -n 1,20p hooks/persona.test.sh', 'ls tests/', 'grep -n tsc tsconfig.json', 'echo "plugin test exit $?"', "python3 - <<'EOF'\nimport pytest\nEOF"]) expect(recordsTests(command)).toBe(false)
   expect(repoOf('cd ~/dotfiles && git commit -m x', HOME)).toBe(`${HOME}/dotfiles`)
   expect(repoOf('git -C "/repo/one" commit -m x', HOME)).toBe('/repo/one')
+  expect(repoOf('git -C "$HOME/x" commit -m x', HOME)).toBe(`${HOME}/x`)
+  expect(repoOf('cd ${HOME}/x && git commit -m x', HOME)).toBe(`${HOME}/x`)
   expect(repoOf('git commit -m x', HOME)).toBe('')
 })
 
@@ -171,7 +182,7 @@ test('a worker started by a master registers report in front and writes its firs
   const run = world()
   await run.start()
   expect(run.registered).toEqual([{ name: 'report', isDeferred: false }])
-  expect(roleOf()).toEqual({ role: 'worker', self: SELF, parent: MASTER, engineId: ENGINE })
+  expect(roleOf()).toEqual({ role: 'worker', self: SELF, parent: MASTER })
   expect(run.reportNow()).toEqual(expect.objectContaining({ v: 1, kind: 'status', session: SELF, parent: MASTER, engineId: ENGINE, seq: 1, state: 'working' }))
 })
 
@@ -210,7 +221,7 @@ test('a worker without parentSessionId finds its master in the board files', asy
   const board = { v: 1, kind: 'board', at: 1, masterId: MASTER, masterTitle: 'Validator', board: { sessions: [{ id: SELF, state: 'working' }] } }
   const run = world('', { [boardPath(HOME, MASTER)]: JSON.stringify(board) })
   await run.start()
-  expect(roleOf()).toEqual({ role: 'worker', self: SELF, parent: MASTER, engineId: ENGINE })
+  expect(roleOf()).toEqual({ role: 'worker', self: SELF, parent: MASTER })
   expect(run.reportNow()?.parent).toBe(MASTER)
 })
 
@@ -241,9 +252,9 @@ test('commits, test runs and edits are recorded from tool calls; failures and ot
   expect(run.reportNow()?.seq).toBe(seq)
   const tested = run.reportNow()
   expect(tested?.commits.map(one => one.sha)).toEqual(['1a2b3c4'])
-  expect(tested?.tests.map(one => [one.cmd, one.ok, one.summary])).toEqual([
-    ['pytest · 3 passed · 1 failed', false, ''],
-    ['tsc · exit 0', true, ''],
+  expect(tested?.tests.map(one => [one.cmd, one.ok])).toEqual([
+    ['pytest · 3 passed · 1 failed', false],
+    ['tsc · exit 0', true],
   ])
   await run.fire('tool.call', { tool: 'Edit', tool_use_id: 'e1', file_path: '/repo/a.ts', old_string: 'a', new_string: 'b' })
   const edited = run.reportNow()?.seq ?? 0
@@ -336,17 +347,17 @@ OUTPUT[GATE] = GATE_OUT
 test('a multi-line gate script records one short "<tool> · <result>" label per check it runs, in order, never the raw script', () => {
   const tests = testsOf(GATE, GATE_OUT, false)
   expect(tests).toEqual([
-    { cmd: 'validate · passed', ok: true, summary: '' },
-    { cmd: 'plugin test · 186 pass', ok: true, summary: '' },
-    { cmd: 'tsc · exit 0', ok: true, summary: '' },
-    { cmd: 'persona.test · exit 0', ok: true, summary: '' },
+    { cmd: 'validate · passed', ok: true },
+    { cmd: 'plugin test · 186 pass', ok: true },
+    { cmd: 'tsc · exit 0', ok: true },
+    { cmd: 'persona.test · exit 0', ok: true },
   ])
   expect(tests.every(one => !/[\n/]|\$|cd /.test(one.cmd) && one.cmd.length <= 60)).toBe(true)
-  expect(testsOf('"$E" plugin test .', ' 184 pass\n 2 fail', true)).toEqual([{ cmd: 'plugin test · 184 pass · 2 fail', ok: false, summary: '' }])
-  expect(testsOf('tsc -p . --noEmit', 'a.ts(1,1): error TS2322: x\nb.ts(2,2): error TS7006: y', true)).toEqual([{ cmd: 'tsc · 2 errors', ok: false, summary: '' }])
-  expect(testsOf('sh hooks/persona.test.sh', 'ok   a\nok   b\nFAIL c (exit 1)', true)).toEqual([{ cmd: 'persona.test · 2 ok · 1 fail', ok: false, summary: '' }])
-  expect(testsOf('go test ./...', 'Exit code 2\nFAIL', true)).toEqual([{ cmd: 'go test · exit 2', ok: false, summary: '' }])
-  expect(testsOf('python3 tests/test_hooks.py', '123 passed', false)).toEqual([{ cmd: 'test_hooks.py · 123 passed', ok: true, summary: '' }])
+  expect(testsOf('"$E" plugin test .', ' 184 pass\n 2 fail', true)).toEqual([{ cmd: 'plugin test · 184 pass · 2 fail', ok: false }])
+  expect(testsOf('tsc -p . --noEmit', 'a.ts(1,1): error TS2322: x\nb.ts(2,2): error TS7006: y', true)).toEqual([{ cmd: 'tsc · 2 errors', ok: false }])
+  expect(testsOf('sh hooks/persona.test.sh', 'ok   a\nok   b\nFAIL c (exit 1)', true)).toEqual([{ cmd: 'persona.test · 2 ok · 1 fail', ok: false }])
+  expect(testsOf('go test ./...', 'Exit code 2\nFAIL', true)).toEqual([{ cmd: 'go test · exit 2', ok: false }])
+  expect(testsOf('python3 tests/test_hooks.py', '123 passed', false)).toEqual([{ cmd: 'test_hooks.py · 123 passed', ok: true }])
 })
 
 test('a gate script run through Bash stores the labels; a non-test call with "test" in a path stores nothing', async () => {
@@ -377,16 +388,16 @@ test('a parsed pass count still fails when the check’s exit status is not 0', 
 
 test('reading, copying, diffing or staging a test file is no run; neither is a test word after echo, grep or ls', () => {
   for (const command of ['sed -n 1,5p ./hooks/persona.test.sh', 'git diff hooks/persona.test.sh', 'cp tests/test_x.sh /tmp/', 'chmod +x ./test_x.sh', 'cat ./test_x.sh', 'git add tests/test_hooks.py', 'echo npm test', 'grep plugin test x', 'ls go test.txt'])
-    expect([command, isTestCommand(command)]).toEqual([command, false])
+    expect([command, recordsTests(command)]).toEqual([command, false])
   for (const command of ['"$E" plugin test .', '~/bin/claude plugin validate --strict .', 'sh hooks/persona.test.sh', './hooks/persona.test.sh', 'bash scripts/test_hooks.sh', 'go test ./...'])
-    expect([command, isTestCommand(command)]).toEqual([command, true])
+    expect([command, recordsTests(command)]).toEqual([command, true])
 })
 
 test('launchers and env prefixes still count; tsc version and help flags do not; a heredoc keeps the rest of its opening line; bun test parses pass and fail', () => {
   for (const command of ['bunx tsc', 'pnpm exec tsc', 'FOO=1 tsc', 'uv run pytest', 'poetry run pytest -q', 'npx --yes tsc -p .', 'time pytest', 'bun x vitest run', 'python3 -m pytest'])
-    expect([command, isTestCommand(command)]).toEqual([command, true])
-  for (const command of ['tsc --version', 'tsc -v', 'tsc -h', 'tsc --help']) expect([command, isTestCommand(command)]).toEqual([command, false])
-  expect(isTestCommand('cat <<EOF > x && pytest\nbody\nEOF')).toBe(true)
+    expect([command, recordsTests(command)]).toEqual([command, true])
+  for (const command of ['tsc --version', 'tsc -v', 'tsc -h', 'tsc --help']) expect([command, recordsTests(command)]).toEqual([command, false])
+  expect(recordsTests('cat <<EOF > x && pytest\nbody\nEOF')).toBe(true)
   expect(labels('bun test', ' 12 pass\n 1 fail', true)).toEqual([['bun test · 12 pass · 1 fail', false]])
 })
 
@@ -453,4 +464,74 @@ test('a body without a model is asked again, one with a model is cached', async 
   await sessionFacts(run.$ as never, 'local_nomodel')
   await sessionFacts(run.$ as never, 'local_nomodel')
   expect(run.asked).toEqual(['get_session local_nomodel', 'get_session local_nomodel'])
+})
+
+test('a relative or non-repo cd never becomes the git directory', async () => {
+  const run = world()
+  await run.start()
+  await run.bash('cd ~/dotfiles && git commit -m "feat(mods): x"')
+  const dotfiles = `${HOME}/dotfiles`
+  await run.bash('cd hooks && git commit -m "broken"')
+  await run.bash('tsc -p . --noEmit')
+  expect(run.reportNow()?.git).toEqual({ branch: 'main', dirty: 1, ahead: 2, at: NOW, path: dotfiles })
+  run.breakGit('/tmp')
+  await run.bash('cd /tmp && tsc -p . --noEmit')
+  await run.end(ended('t1'))
+  expect(run.ran.at(-1)).toEqual(['git', '--no-optional-locks', '-C', dotfiles, 'status', '--porcelain=v2', '--branch'])
+  expect(run.reportNow()?.git?.path).toBe(dotfiles)
+  const calls = run.ran.length
+  await run.bash('cd /tmp && tsc -p . --noEmit')
+  expect(run.ran.length).toBe(calls)
+})
+
+test('a rejected place is checked again when git is named, but not again within 30 s', async () => {
+  const run = world()
+  await run.start()
+  run.breakGit('/home/me/new')
+  await run.bash('cd ~/new && tsc -p . --noEmit')
+  const gits = () => run.ran.filter(argv => argv.includes('-C') && argv[argv.indexOf('-C') + 1] === '/home/me/new').length
+  expect(gits()).toBe(1)
+  await run.bash('cd ~/new && tsc -p . --noEmit')
+  expect(gits()).toBe(1)
+  run.breakGit('')
+  await run.bash('cd ~/new && git commit -m "broken"')
+  expect(gits()).toBe(2)
+  expect(run.reportNow()?.git?.path).toBe('/home/me/new')
+})
+
+test('a rejected place is checked once more after 30 s even without git in the command', async () => {
+  const run = world()
+  await run.start()
+  run.breakGit('/home/me/new')
+  await run.bash('cd ~/new && tsc -p . --noEmit')
+  const gits = () => run.ran.filter(argv => argv.includes('-C') && argv[argv.indexOf('-C') + 1] === '/home/me/new').length
+  const before = gits()
+  run.later(31_000)
+  run.breakGit('')
+  await run.bash('cd ~/new && tsc -p . --noEmit')
+  expect(gits()).toBe(before + 1)
+  expect(run.reportNow()?.git?.path).toBe('/home/me/new')
+})
+
+test('a failed command does not reject its place, so the next one checks it again', async () => {
+  const run = world()
+  await run.start()
+  run.breakGit('/home/me/new')
+  await run.bash('cd ~/new && ls FAIL')
+  run.breakGit('')
+  await run.bash('cd ~/new && npm test')
+  expect(run.reportNow()?.git?.path).toBe('/home/me/new')
+})
+
+test('a successful check clears the rejection, so a later return to the place checks again', async () => {
+  const run = world()
+  await run.start()
+  run.breakGit('/home/me/p')
+  await run.bash('cd ~/p && tsc -p . --noEmit')
+  run.breakGit('')
+  await run.bash('cd ~/p && git status')
+  await run.bash('cd ~/q && git status')
+  expect(run.reportNow()?.git?.path).toBe('/home/me/q')
+  await run.bash('cd ~/p && tsc -p . --noEmit')
+  expect(run.reportNow()?.git?.path).toBe('/home/me/p')
 })

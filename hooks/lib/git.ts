@@ -39,6 +39,7 @@ export function parseStatus(porcelain: string) {
   const ab = header('ab').match(/^\+(\d+) -(\d+)$/)
   const paths = lines.filter(line => !line.startsWith('#')).map(pathOf)
   return {
+    branch: header('head'),
     dirty: paths.length,
     paths,
     upstream: header('upstream'),
@@ -60,4 +61,4 @@ export function locate(path: string, repos: readonly Repo[]) {
 
 export const isRepoClean = (repo: Repo) => repo.worktrees.every(tree => !tree.dirty && !tree.ahead && !tree.behind)
 
-export const expandHome = (path: string, home: string) => (path === '~' ? home : path.replace(/^~\//, `${home}/`))
+export const expandHome = (path: string, home: string) => path.replace(/^(?:~|\$HOME|\$\{HOME\})(?=\/|$)/, home)

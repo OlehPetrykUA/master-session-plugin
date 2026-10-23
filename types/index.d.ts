@@ -30,11 +30,7 @@ export type BoardSession = {
   commits?: string[]
   tests?: string[]
   files?: string[]
-  note?: string
-  isQuiet?: boolean
-  isVerified?: boolean
   reportAt?: number
-  ageMinutes?: number
   cwd?: string
 }
 
@@ -126,7 +122,7 @@ export type Report = {
   risk?: string
   activity: { at: number; text: string }[]
   commits: { sha: string; subject: string; at: number }[]
-  tests: { cmd: string; ok: boolean; summary: string; at: number }[]
+  tests: { cmd: string; ok: boolean; summary?: string; at: number }[]
   files: string[]
   waits?: { since: number; on: string }
   git?: { branch: string; dirty: number; ahead: number; at: number; path?: string }
@@ -201,7 +197,7 @@ declare module 'claude-code' {
       board: Board | null
       live: Live
       repos: Repo[]
-      expanded: string[]
+      expanded: string
       confirming: string
       filter: Filter
       archiveView: ArchiveView

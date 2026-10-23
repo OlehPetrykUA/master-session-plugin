@@ -20,7 +20,7 @@ test('the helpers read a chat board, steps and git porcelain', async () => {
     [true, 'main', 'd575596'],
     [false, '', '0a4621c'],
   ])
-  expect(parseStatus(GIT[`${TOOLKIT} status`] as string)).toEqual({ dirty: 0, paths: [], upstream: 'origin/main', ahead: 0, behind: 0 })
+  expect(parseStatus(GIT[`${TOOLKIT} status`] as string)).toEqual({ branch: 'main', dirty: 0, paths: [], upstream: 'origin/main', ahead: 0, behind: 0 })
   const tree = { path: `${HOME}/dotfiles`, dirty: 3, paths: ['hooks.py', 'mods/master-session-status/hooks/register.tsx', 'mods/other/x.ts'] }
   expect(dirtyOf(tree, [], HOME)).toBe(3)
   expect(dirtyOf(tree, ['mods/master-session-status/'], HOME)).toBe(1)

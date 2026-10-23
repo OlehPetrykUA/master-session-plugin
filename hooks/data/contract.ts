@@ -1,4 +1,4 @@
-import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, ReportRun, SessionState, Step } from '../../types'
+import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, ReportRun, Step } from '../../types'
 
 import { ORDER, stateOf } from '../lib/board'
 import { compactOf } from '../lib/format'
@@ -6,9 +6,7 @@ import { compactOf } from '../lib/format'
 export const REPORT_TOOL = 'mcp__master-session__report'
 export const REPORTS_TOOL = 'mcp__master-session__reports'
 export const ASK_MARK = '[master-session:ask]'
-export const QUIET_MS = 10 * 60_000
 export const FRESH_MS = 10 * 60_000
-export const ANSWER_MS = 2 * 60_000
 export const BOARD_MAX_AGE_MS = 30 * 60_000
 export const REPORT_CAP = 16_384
 export const SVG_CAP = 131_072
@@ -23,11 +21,9 @@ export type { EndReason, Report, Step }
 
 export type Intent = Partial<Pick<Report, 'state' | 'persona' | 'progress' | 'now' | 'next' | 'needsYou' | 'risk'>> & { activity: string[]; files: string[] }
 
-export type Merged = BoardSession & { reportAt?: number; ageMinutes?: number; isVerified: boolean; isQuiet: boolean; note?: string }
+export type Merged = BoardSession & { reportAt?: number }
 
 export type MergedBoard = Omit<Board, 'sessions'> & { sessions: Merged[] }
-
-export type Published = Board & { at?: number }
 
 export type Ask = { from: string; at: number }
 
@@ -216,13 +212,6 @@ const gitText = (git: NonNullable<Report['git']>) =>
 
 const testText = (test: Report['tests'][number]) => (test.cmd.includes(' · ') ? test.cmd : [test.cmd, test.ok ? 'passed' : 'failed', test.summary].filter(Boolean).join(' · '))
 
-function noteOf(state: SessionState, isVerified: boolean, isIdle: boolean, isRunning: boolean, age: number | undefined) {
-  if (state === 'done' && !isVerified) return 'done · unverified'
-  if (isIdle) return age === undefined ? 'idle' : `idle · report ${compactOf(age)} ago`
-  if (isRunning && age !== undefined && age >= QUIET_MS) return `last report ${compactOf(age)} ago`
-  return undefined
-}
-
 function isStoppedOf(report: Report | undefined, live: LiveSession | undefined) {
   if (live) return !live.isRunning
   return report ? !report.run.isRunning : false
@@ -242,9 +231,6 @@ function mergeOne(id: string, row: BoardSession | undefined, boardAt: number, re
   const isIdle = reported === 'working' && isStoppedOf(report, live)
   const state = isIdle ? 'waiting' : reported
   const needsYou = isAsking ? ((report?.state === 'needs-you' ? report.needsYou : agentAsk?.text) ?? row?.needsYou) : state === 'needs-you' ? pick(report?.needsYou, row?.needsYou) : undefined
-  const isVerified = !!row?.verified
-  const age = report ? Math.max(0, now - report.at) : undefined
-  const isQuiet = !!live?.isRunning && age !== undefined && age >= QUIET_MS
   const merged: Merged = {
     ...row,
     id,
@@ -265,15 +251,11 @@ function mergeOne(id: string, row: BoardSession | undefined, boardAt: number, re
     files: row?.files?.length ? row.files : report?.files,
     reportAt: report?.at,
     cwd: report?.git?.path || undefined,
-    ageMinutes: age === undefined ? undefined : Math.floor(age / 60_000),
-    isVerified,
-    isQuiet,
-    note: noteOf(state, isVerified, isIdle, !!live?.isRunning, age),
   }
   return Object.fromEntries(Object.entries(merged).filter(([, value]) => value !== undefined)) as Merged
 }
 
-export function merge(board: Published | null, reports: readonly Report[], live: Live, now: number): MergedBoard {
+export function merge(board: Board | null, reports: readonly Report[], live: Live, now: number): MergedBoard {
   const latest = latestOf(reports)
   const rows = new Map((board?.sessions ?? []).map(row => [row.id, row]))
   const own = [...latest.values()].filter(report => live.self && report.parent === live.self && !rows.has(report.session)).map(report => report.session)
@@ -343,11 +325,6 @@ export function askOf(text: string): Ask | undefined {
     }
   })()
   return data?.kind === 'ask' && typeof data.from === 'string' && Number.isFinite(data.at) ? { from: data.from, at: Number(data.at) } : undefined
-}
-
-export function answerOf(askedAt: number, report: Report | undefined, now: number) {
-  if (report && report.at >= askedAt) return 'answered'
-  return now - askedAt >= ANSWER_MS ? 'no answer' : 'asking'
 }
 
 export const isArchivable = (row: Pick<BoardSession, 'state'>, live: LiveSession | undefined) => row.state !== 'needs-you' && !!live && !live.isRunning && !live.isArchived

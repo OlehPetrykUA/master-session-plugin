@@ -327,6 +327,8 @@ test('archiving the last row of a group keeps the group heading for the 10 s Und
 
 const CLEAN_GIT = () => ({ ...BASE, [`${WORKTREE} worktree`]: TREES('branch refs/heads/main'), [`${CLEAN} status`]: '# branch.oid 1111111\n# branch.head feat/clean\n', [`${CLEAN} rev-list`]: '0\n' })
 
+const PROVEN_GIT = () => ({ ...CLEAN_GIT(), [`${TOOLKIT} merge-base --is-ancestor 1111111 refs/heads/main`]: 'ok' })
+
 test('losses follow the live cwd: a worker whose board cwd is the main checkout still asks before removing its dirty, unmerged worktree', async ($, on) => {
   const report = { v: 1, kind: 'status', session: 'local_setup', engineId: 'engine-setup', parent: SELF, seq: 1, at: 3_500_000, run: { isRunning: false }, modelAt: 0, state: 'done', activity: [], commits: [], tests: [], files: [], git: { branch: 'main', dirty: 0, ahead: 0, at: 3_500_000, path: TOOLKIT } }
   const files = { [`${HOME}/.claude/state/master-session/sessions/local_setup.json`]: JSON.stringify(report) }
@@ -356,7 +358,7 @@ test('a listed worktree whose git status fails stays listed as unknown instead o
 })
 
 test('a clean merged done row says merged to main as its state word, with the sha muted after it', async ($, on) => {
-  await started($, on, doneOf('local_clean'), { git: CLEAN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN)] })
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], state: 'done' }, { ...finished('local_clean'), sha: '1111111' }] }, { git: PROVEN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const word = await ui.find({ type: 'Text', text: 'merged to main' })
   expect(word?.props).toEqual(expect.objectContaining({ color: C.text, weight: 'semibold' }))
@@ -760,7 +762,7 @@ test('a done session with a reported sha reads ready for verify in Waiting, and 
 })
 
 test('a merged worktree with a reported sha sits in Done, which needs its git state, and archiving it puts the Undo bar in Done, not Waiting', async ($, on) => {
-  const { calls } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...finished('local_clean'), sha: '1111111' }] }, { git: CLEAN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN)] })
+  const { calls } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...finished('local_clean'), sha: '1111111' }] }, { git: PROVEN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const before = await keysOf(ui)
   expect(before.indexOf('group-head-done')).toBeLessThan(before.indexOf('row-local_clean'))

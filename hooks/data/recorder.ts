@@ -12,9 +12,9 @@ type Held = { text: string; tool: string; state: SessionState; needsYou?: string
 
 const MAIN = ''
 
-export type Role = { role: 'worker' | 'master' | ''; self: string; parent: string; engineId: string }
+export type Role = { role: 'worker' | 'master' | ''; self: string; parent: string }
 
-const NO_ROLE: Role = { role: '', self: '', parent: '', engineId: '' }
+const NO_ROLE: Role = { role: '', self: '', parent: '' }
 const COMMIT_LINE = /^\[[^\]\s]+(?: \([^)]*\))? ([0-9a-f]{7,40})\] (.+)$/m
 const REPO = /(?:^|&&|;)\s*cd\s+("[^"]+"|'[^']+'|[^\s;&|]+)|\bgit\s+-C\s+("[^"]+"|'[^']+'|[^\s;&|]+)/
 const NUDGE = `Status check from your master session: call ${REPORT_TOOL} at your next step boundary. No chat reply.`
@@ -35,6 +35,7 @@ let isPlan = false
 let facts = new Map<string, Record<string, unknown>>()
 let failures = new Map<string, { error: Error; at: number }>()
 let gitCwd = ''
+let rejected: { place: string; at: number } | undefined
 let held = new Map<string, Held>()
 let outbox: ReportAgent[] = []
 let runsOut: ReportRun[] = []
@@ -51,6 +52,7 @@ export const claim = () => {
 export const inPlan = () => isPlan
 
 const FACTS_RETRY_MS = 60_000
+const REJECT_MS = 30_000
 
 export const commitOf = (command: string, output: string) => {
   const match = /\bgit\b/.test(command) && /\bcommit\b/.test(command) ? output.match(COMMIT_LINE) : null
@@ -146,11 +148,9 @@ export function testsOf(command: string, output: string, isError: boolean) {
     if (!parsed && status === undefined) return []
     const ok = parsed ? !parsed.bad && (status === undefined || status === 0) : status === 0
     const text = parsed ? (!ok && !parsed.bad && status ? `${parsed.text} · exit ${status}` : parsed.text) : `exit ${status}`
-    return [{ cmd: `${tool} · ${text}`.slice(0, LABEL_CAP), ok, summary: '' }]
+    return [{ cmd: `${tool} · ${text}`.slice(0, LABEL_CAP), ok }]
   })
 }
-
-export const isTestCommand = (command: string) => checksOf(command).length > 0
 
 const fieldOf = (input: unknown, key: string) => {
   const value = typeof input === 'object' && input ? (input as Record<string, unknown>)[key] : undefined
@@ -166,19 +166,11 @@ export function promptTextOf(tool: string, input: unknown) {
   return `Allow ${tool}${detail ? `: ${detail.slice(0, 160)}` : ''}`
 }
 
-export const summaryOf = (output: string) =>
-  (
-    output
-      .split('\n')
-      .map(line => line.trim())
-      .filter(Boolean)
-      .at(-1) ?? ''
-  ).slice(0, 160)
-
 export const repoOf = (command: string, base: string) => {
   const match = command.match(REPO)
   const path = (match?.[1] ?? match?.[2] ?? '').replace(/^["']|["']$/g, '')
-  return path ? expandHome(path, base) : ''
+  const place = path ? expandHome(path, base) : ''
+  return place.startsWith('/') ? place : ''
 }
 
 export async function sessionFacts($: EngineInterface, id: string) {
@@ -253,7 +245,7 @@ async function detect($: EngineInterface) {
   const isMasterParent = !!asked && (await $.fs.stat(boardPath(home, asked)).then(stat => stat.kind === 'file', () => false))
   const parent = isChild ? (isMasterParent ? asked : '') : await parentFromBoards($, home, self)
   const engineId = await $.session.id()
-  role = { role: parent ? 'worker' : 'master', self, parent, engineId }
+  role = { role: parent ? 'worker' : 'master', self, parent }
   if (!parent) {
     await $.tool.register(REPORTS_SPEC)
     return true
@@ -278,13 +270,13 @@ export function engage($: EngineInterface) {
 
 export const detected = () => detecting ?? Promise.resolve()
 
-async function gitOf($: EngineInterface, now: number) {
-  const where = gitCwd ? ['-C', gitCwd] : []
+async function gitOf($: EngineInterface, now: number, cwd = gitCwd) {
+  const where = cwd ? ['-C', cwd] : []
   const ran = await $.process.run(['git', '--no-optional-locks', ...where, 'status', '--porcelain=v2', '--branch'], { timeoutMs: 10_000 }).catch(() => undefined)
   if (!ran || ran.exitCode !== 0) return undefined
   const status = parseStatus(ran.stdout)
-  const path = gitCwd || (await $.session.cwd().catch(() => ''))
-  return { branch: ran.stdout.match(/^# branch\.head (.+)$/m)?.[1] ?? '', dirty: status.dirty, ahead: status.ahead, at: now, path }
+  const path = cwd || (await $.session.cwd().catch(() => ''))
+  return { branch: status.branch, dirty: status.dirty, ahead: status.ahead, at: now, path }
 }
 
 async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?: boolean; text?: string }) {
@@ -299,11 +291,15 @@ async function recordTool($: EngineInterface, e: ToolCallInput, out: { isError?:
   const tests = testsOf(e.command, output, !!out.isError)
   const isTest = tests.length > 0
   const place = repoOf(e.command, home)
-  const isMoved = !!place && place !== gitCwd
-  if (!commit && !isTest && !isMoved) return
   const now = await $.clock.now()
-  gitCwd = place || gitCwd
-  const git = commit || isMoved ? await gitOf($, now) : undefined
+  const isSkipped = !!place && place === rejected?.place && !/\bgit\b/.test(e.command) && now - rejected.at < REJECT_MS
+  const isMoved = !!place && place !== gitCwd && !isSkipped
+  if (!commit && !isTest && !isMoved) return
+  const git = commit || isMoved ? await gitOf($, now, isMoved ? place : gitCwd) : undefined
+  if (isMoved) {
+    gitCwd = git ? place : gitCwd
+    rejected = git || out.isError ? undefined : { place, at: now }
+  }
   const before = current
   await save(
     $,
@@ -419,6 +415,7 @@ export async function startRecorder($: EngineInterface) {
   facts = new Map()
   failures = new Map()
   gitCwd = ''
+  rejected = undefined
   held = new Map()
   outbox = []
   runsOut = []

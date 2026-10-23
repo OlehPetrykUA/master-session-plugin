@@ -119,27 +119,28 @@ test('every kind names itself persona · task and says its state word and curren
 test('a session reads idle, ready, verified or merged from its live state, board and worktree; a persona on the board or the title names it', () => {
   const live = { id: 's', name: 's', title: 'Implementer · Savvy removal', cwd: '/r/wt', isRunning: false, isArchived: false, lastActivityAt: 0 }
   const row = (state: Row['state'], board: Partial<NonNullable<Row['board']>> = {}): Row => ({ id: 's', name: 's', title: '', state, board: { id: 's', name: 's', state, ...board }, live })
-  const tree = (unmerged: number, dirty = 0): Repo[] => [{ path: '/r', name: 'r', localOnly: 0, base: 'main', worktrees: [{ path: '/r/wt', branch: 'b', sha: 'abc', isMain: false, dirty, paths: [], upstream: '', ahead: 0, behind: 0, unmerged }] }]
+  const tree = (unmerged: number, dirty = 0, onBase: string[] = []): Repo[] => [{ path: '/r', name: 'r', localOnly: 0, base: 'main', onBase, worktrees: [{ path: '/r/wt', branch: 'b', sha: 'abc', isMain: false, dirty, paths: [], upstream: '', ahead: 0, behind: 0, unmerged }] }]
   expect([
     sessionStatusOf(row('working')),
     sessionStatusOf(row('waiting', { now: 'idle since 11:02' })),
     sessionStatusOf(row('waiting', { now: 'waiting on review' })),
     sessionStatusOf(row('done', { sha: 'abc' })),
     sessionStatusOf(row('done', { sha: 'abc', verified: 'PASS' })),
-    sessionStatusOf(row('done', { sha: 'abc' }), tree(0)),
+    sessionStatusOf(row('done', { sha: 'abc' }), tree(0, 0, ['abc'])),
     sessionStatusOf(row('done', { sha: 'abc' }), tree(2)),
-    sessionStatusOf(row('done', { sha: 'abc' }), tree(0, 1)),
+    sessionStatusOf(row('done', { sha: 'abc' }), tree(0, 1, ['abc'])),
+    sessionStatusOf(row('done', { sha: 'abc' }), tree(0)),
     sessionStatusOf(row('done')),
-  ]).toEqual(['idle', 'idle', 'waiting', 'ready', 'verified', 'merged', 'ready', 'ready', 'done'])
+  ]).toEqual(['idle', 'idle', 'waiting', 'ready', 'verified', 'merged', 'ready', 'ready', 'ready', 'done'])
   const main = (branch: string, dirty = 0): Repo[] => [{ path: '/r/wt', name: 'r', localOnly: 0, base: 'main', onBase: ['abc'], worktrees: [{ path: '/r/wt', branch, sha: 'abc', isMain: true, dirty, paths: [], upstream: '', ahead: 0, behind: 0, unmerged: 0 }] }]
   expect([
     sessionStatusOf(row('done', { sha: 'abc' }), main('main')),
     sessionStatusOf(row('done'), main('main')),
     sessionStatusOf(row('done', { sha: 'abc' }), main('feature')),
     sessionStatusOf(row('done', { sha: 'abc' }), main('main', 1)),
-  ]).toEqual(['merged', 'done', 'ready', 'ready'])
+  ]).toEqual(['merged', 'done', 'merged', 'ready'])
   const item = (one: Row, trees: Repo[] = []): RowItem => ({ kind: 'session', id: 's', group: one.state, status: sessionStatusOf(one, trees), row: one })
-  expect(said(item(row('done', { sha: 'abc' }), tree(0)), { ...context, trees: tree(0) })).toEqual(['merged', 'Implementer · Savvy removal', 'merged to main · abc'])
+  expect(said(item(row('done', { sha: 'abc' }), tree(0, 0, ['abc'])), { ...context, trees: tree(0, 0, ['abc']) })).toEqual(['merged', 'Implementer · Savvy removal', 'merged to main · abc'])
   expect(displayNameOf(item({ ...row('working', { persona: 'Designer' } as object), live: { ...live, title: 'canvas v3' } }))).toEqual({ persona: 'Designer', task: 'canvas v3' })
   expect(displayNameOf({ kind: 'master' })).toEqual({ persona: 'Validator', task: '' })
 })

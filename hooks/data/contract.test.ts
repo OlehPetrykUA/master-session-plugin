@@ -1,11 +1,10 @@
 import { expect, test } from 'claude-code/testing'
 
-import type { BoardSession, Live, LiveSession } from '../../types'
+import type { Board, BoardSession, Live, LiveSession } from '../../types'
 
 import { boardFromJson } from '../lib/board'
 import {
   accept,
-  answerOf,
   askSummary,
   applyIntent,
   askOf,
@@ -22,7 +21,7 @@ import {
   reportsView,
   stamped,
 } from './contract'
-import type { Published, Report } from './contract'
+import type { Report } from './contract'
 
 const MASTER = 'local_master'
 const MIN = 60_000
@@ -43,7 +42,7 @@ const liveOne = (id: string, isRunning: boolean, patch: Partial<LiveSession> = {
 
 const liveOf = (...sessions: LiveSession[]): Live => ({ self: MASTER, title: 'Master', sessions, error: '', at: 0 })
 
-const boardOf = (at: number, ...sessions: BoardSession[]): Published => ({ at, sessions, needsYou: [], repos: [], source: 'tool' })
+const boardOf = (at: number, ...sessions: BoardSession[]): Board => ({ at, sessions, needsYou: [], repos: [], source: 'tool' })
 
 const row = (patch: Partial<BoardSession> = {}): BoardSession => ({ id: 'local_a', name: 'alpha', state: 'working', ...patch })
 
@@ -104,14 +103,6 @@ test('merge: a needs-you report wins at once, even against a newer board', () =>
   expect([resolved.sessions[0]?.state, resolved.sessions[0]?.needsYou]).toEqual(['working', undefined])
 })
 
-test('merge: a reported done shows unverified until the board marks it verified', () => {
-  const live = liveOf(liveOne('local_a', false))
-  const done = merge(boardOf(80 * MIN, row()), [report({ state: 'done' })], live, NOW).sessions[0]
-  expect([done?.state, done?.isVerified, done?.note]).toEqual(['done', false, 'done · unverified'])
-  const verified = merge(boardOf(95 * MIN, row({ state: 'done', verified: 'tests 13/13, screenshot' })), [report({ state: 'done' })], live, NOW).sessions[0]
-  expect([verified?.isVerified, verified?.note]).toEqual([true, undefined])
-})
-
 test('merge: a turn that started after the board shows working with the report, a stopped one keeps the board', () => {
   const board = boardOf(80 * MIN, row({ state: 'done', now: 'shipped', progress: 'step 5 of 5 — shipped' }))
   const turn = report({ state: 'done', modelAt: 70 * MIN, now: 'fixing the pin', progress: { step: 2, of: 4, label: 'pin' }, run: { isRunning: true, since: 81 * MIN } })
@@ -128,15 +119,6 @@ test('merge: a turn that started after the board shows working with the report, 
 test('merge: a lower seq for the same session is ignored', () => {
   const merged = merge(null, [report({ seq: 7, now: 'seven' }), report({ seq: 3, now: 'three', at: 99 * MIN })], liveOf(liveOne('local_a', true)), NOW)
   expect(merged.sessions.map(one => one.now)).toEqual(['seven'])
-})
-
-test('merge: idle-but-working shows the report age; a running worker quiet for 10 min shows a dim last-report note', () => {
-  const idle = merge(boardOf(0, row()), [report({ at: 88 * MIN })], liveOf(liveOne('local_a', false)), NOW).sessions[0]
-  expect([idle?.note, idle?.isQuiet, idle?.ageMinutes]).toEqual(['idle · report 12m ago', false, 12])
-  const quiet = merge(boardOf(0, row()), [report({ at: 88 * MIN })], liveOf(liveOne('local_a', true)), NOW).sessions[0]
-  expect([quiet?.note, quiet?.isQuiet]).toEqual(['last report 12m ago', true])
-  const busy = merge(boardOf(0, row()), [report({ at: 95 * MIN })], liveOf(liveOne('local_a', true)), NOW).sessions[0]
-  expect([busy?.note, busy?.isQuiet]).toEqual([undefined, false])
 })
 
 test('merge: reports of this master join the board; another master’s workers stay out', () => {
@@ -158,16 +140,13 @@ test('reports tool view: one entry per own worker with age, state and step', () 
   })
 })
 
-test('ask: only running, unarchived workers are targets; the envelope round-trips; no answer after 2 min', () => {
+test('ask: only running, unarchived workers are targets; the envelope round-trips', () => {
   const live = liveOf(liveOne('local_a', true), liveOne('local_b', false), liveOne('local_c', true, { isArchived: true }), liveOne('local_d', true))
   expect(askTargets([report()], live, ['local_a', 'local_b', 'local_c'])).toEqual([{ id: 'local_a', engineId: 'engine-a' }])
   const text = askText({ from: MASTER, at: NOW })
   expect(askOf(`From validator: ${text}`)).toEqual({ from: MASTER, at: NOW })
   expect(askOf('[master-session:ask] {broken')).toBeUndefined()
   expect(askOf('plain message')).toBeUndefined()
-  expect(answerOf(NOW, report({ at: NOW + 1 }), NOW + 5)).toBe('answered')
-  expect(answerOf(NOW, report({ at: NOW - 1 }), NOW + MIN)).toBe('asking')
-  expect(answerOf(NOW, undefined, NOW + 2 * MIN)).toBe('no answer')
 })
 
 test('archive: done or idle rows that are not running, archived or waiting for an answer; the Svg guard stays under 131072', () => {
@@ -198,7 +177,7 @@ test('merge: a stopped worker shows waiting with what it waits on; a running one
 
 test('merge: a board-only working row whose session is not running shows waiting too', () => {
   const idle = merge(boardOf(80 * MIN, row({ now: 'stale board line' })), [], liveOf(liveOne('local_a', false)), NOW).sessions[0]
-  expect([idle?.state, idle?.now, idle?.note]).toEqual(['waiting', 'idle · waiting for the next message', 'idle'])
+  expect([idle?.state, idle?.now]).toEqual(['waiting', 'idle · waiting for the next message'])
   const running = merge(boardOf(80 * MIN, row({ now: 'coding' })), [], liveOf(liveOne('local_a', true)), NOW).sessions[0]
   expect([running?.state, running?.now]).toEqual(['working', 'coding'])
   const unknown = merge(boardOf(80 * MIN, row()), [], liveOf(), NOW).sessions[0]

@@ -84,6 +84,6 @@ export function mergedLineOf(row: Row, trees: readonly Repo[]) {
   const cwd = row.live?.cwd ?? row.board?.cwd
   const found = cwd ? locate(cwd, trees) : undefined
   if (!found || found.tree.dirty || !found.repo.base) return ''
-  const isOnBase = found.tree.isMain ? !!row.board?.sha && !!found.repo.onBase?.includes(row.board.sha) && found.tree.branch === found.repo.base : found.tree.unmerged === 0
+  const isOnBase = !!row.board?.sha && !!found.repo.onBase?.includes(row.board.sha)
   return isOnBase ? `merged to ${found.repo.base}` : ''
 }

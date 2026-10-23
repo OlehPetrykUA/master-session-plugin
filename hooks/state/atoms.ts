@@ -6,7 +6,7 @@ import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, Repo, Report
 const board = atom({ plugin: 'master-session', key: 'board' } as const, null)
 const live = atom({ plugin: 'master-session', key: 'live' } as const, { self: '', title: '', sessions: [], error: '', at: 0 })
 const repos = atom({ plugin: 'master-session', key: 'repos' } as const, [])
-const expanded = atom({ plugin: 'master-session', key: 'expanded' } as const, [])
+const expanded = atom({ plugin: 'master-session', key: 'expanded' } as const, '')
 const confirming = atom({ plugin: 'master-session', key: 'confirming' } as const, '')
 const filter = atom({ plugin: 'master-session', key: 'filter' } as const, 'all')
 const archiveView = atom({ plugin: 'master-session', key: 'archiveView' } as const, 'closed')
@@ -56,7 +56,7 @@ export async function getExpanded($: EngineInterface) {
 }
 
 export function setExpanded($: EngineInterface, change: (value: string[]) => string[]) {
-  return update($, expanded, value => change(idsOf(value).slice(-1)))
+  return update($, expanded, value => change(idsOf(value).slice(-1)).at(-1) ?? '')
 }
 
 export function getConfirming($: EngineInterface) {
