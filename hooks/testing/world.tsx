@@ -92,13 +92,16 @@ export function world(on: On, child: Child = {}) {
   const scans = { messages: 0 }
   const tools: string[] = []
   let sessions = [
-    { sessionId: 'local_env', name: 'env-e2e-test', title: 'Test and validate local agent environment', cwd: `${HOME}/dotfiles`, isRunning: true, isArchived: false, lastActivityAt: AT, startedBy: SELF },
-    { sessionId: 'local_setup', name: 'setup-ui-redo', title: 'Redo toolkit setup UI', cwd: WORKTREE, isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: SELF },
-    { sessionId: 'local_old', name: 'stale-removal', title: 'Remove the stale mod', cwd: `${HOME}/dotfiles`, isRunning: false, isArchived: true, lastActivityAt: AT, startedBy: SELF },
-    { sessionId: 'local_parent', name: 'parent', title: 'Someone else', cwd: '/elsewhere', isRunning: false, isArchived: false, lastActivityAt: AT },
+    ...(child.isBare
+      ? []
+      : [
+        { sessionId: 'local_env', name: 'env-e2e-test', title: 'Test and validate local agent environment', cwd: `${HOME}/dotfiles`, isRunning: true, isArchived: false, lastActivityAt: AT, startedBy: SELF },
+        { sessionId: 'local_setup', name: 'setup-ui-redo', title: 'Redo toolkit setup UI', cwd: WORKTREE, isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: SELF },
+        { sessionId: 'local_old', name: 'stale-removal', title: 'Remove the stale mod', cwd: `${HOME}/dotfiles`, isRunning: false, isArchived: true, lastActivityAt: AT, startedBy: SELF },
+        { sessionId: 'local_parent', name: 'parent', title: 'Someone else', cwd: '/elsewhere', isRunning: false, isArchived: false, lastActivityAt: AT },
+      ]),
     ...(child.sessions ?? []),
   ]
-  if (child.isBare) sessions = sessions.slice(4)
   if (child.parent === MASTER) {
     child.files ??= {}
     child.files[`${HOME}/.claude/state/master-session/boards/${MASTER}.json`] ??= '{}'

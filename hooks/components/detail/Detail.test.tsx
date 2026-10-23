@@ -254,7 +254,7 @@ test('a clean, merged worktree archives in one click; the base is the repo defau
   await ui.unmount()
 })
 
-test('a session whose tree is unknown fails closed: git state unknown on its row, the box on Archive, and Clear done skips it', async ($, on) => {
+test('a session whose tree is unknown fails closed: git state unknown on its row, the box on Archive, and Clear done shows no button', async ($, on) => {
   const { calls } = await started($, on, doneOf('local_lost'), { sessions: [session('local_lost', 'lost-work', `${HOME}/nowhere`)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: 'git state unknown' })).toBeDefined()
@@ -293,7 +293,7 @@ test('a detached main checkout still compares against the default branch, and a 
   await ui.unmount()
 })
 
-test('Clear done with only unmerged work archives nothing and says it skipped them', async ($, on) => {
+test('Clear done with only unmerged work shows no button and archives nothing', async ($, on) => {
   const { calls } = await started($, on, doneOf(), UNMERGED)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ key: 'face-clear-done' })).toBeUndefined()
@@ -404,7 +404,7 @@ test('the Undo bar takes the archived row’s place in its group', async ($, on)
   await ui.unmount()
 })
 
-test('a repo with no origin/HEAD, no main and no master is unknown: the row says so, Archive… asks, Clear done skips', async ($, on) => {
+test('a repo with no origin/HEAD, no main and no master is unknown: the row says so, Archive… asks, Clear done shows no button', async ($, on) => {
   const { calls } = await started($, on, doneOf())
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: 'git state unknown' })).toBeDefined()
@@ -540,7 +540,7 @@ test('archive decides on the git state it just read, not on the stored repos, wh
 
 const SIDE = (patch: Record<string, unknown> = {}) => ({ sessionId: 'local_side', name: 'side-work', title: 'side-work', cwd: WORKTREE, isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: 'local_conductor', ...patch })
 
-test('archiving a session also archives its idle side session, so its losses ask first and Clear done skips it', async ($, on) => {
+test('archiving a session also archives its idle side session, so its losses ask first and Clear done shows no button', async ($, on) => {
   const { calls } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { git: UNMERGED.git, sessions: [CONDUCTOR, SIDE()] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: 'side-work: 2 commits not on main' })).toBeDefined()
@@ -553,6 +553,19 @@ test('archiving a session also archives its idle side session, so its losses ask
   await click(ui, 'hit-top-local_conductor')
   expect(await ui.find({ key: 'face-clear-done' })).toBeUndefined()
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
+  await ui.unmount()
+})
+
+test('Clear done re-checks a side session on fresh trees: the session it belongs to is skipped, its clean partner is archived', async ($, on) => {
+  const git: Record<string, string> = CLEAN_GIT()
+  const { calls } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor'), finished('local_partner')] }, { git, sessions: [CONDUCTOR, session('local_partner', 'partner', `${HOME}/dotfiles`), SIDE({ cwd: CLEAN })] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ key: 'face-clear-done' })).toBeDefined()
+  expect((await textsOf(ui)).filter(text => text.startsWith('side-work:'))).toEqual([])
+  git[`${CLEAN} status`] = '# branch.oid 1111111\n# branch.head feat/clean\n? new.sh\n'
+  await click(ui, 'hit-clear-done')
+  expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_partner'])
+  expect(await ui.find({ type: 'Text', text: 'Archived 1 session · skipped 1 with work to keep' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -623,7 +636,7 @@ test('a running session in a subfolder of the worktree shares it: archive refuse
   await ui.unmount()
 })
 
-test('200 or more family sessions may hide a side session, so every target is unknown: the box asks and Clear done skips', async ($, on) => {
+test('200 or more family sessions may hide a side session, so every target is unknown: the box asks and Clear done shows no button', async ($, on) => {
   const { calls } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { sessions: [CONDUCTOR, ...FILLER(200)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_conductor')

@@ -89,7 +89,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
       )
     }
     if (!one.items.length && undone?.group !== one.id) return empty(`group-${one.id}`)
-    const clear = clearOf(one, data, context)
+    const clear = clearOf(one, trees, context)
     return (
       <Box key={`group-${one.id}`} flexDirection="column">
         <Box flexDirection="row" gap="sm">

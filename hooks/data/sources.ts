@@ -473,12 +473,13 @@ export async function clearDone($: EngineInterface, rows: readonly Row[], skippe
     const finished = itemsOf([], await getAgents($), await getWorkflows($), { at, cleared: before }).filter(item => item.group === 'done')
     const hid = { agents: finished.filter(item => item.kind === 'subagent').length, runs: finished.filter(item => item.kind === 'workflow').length, before }
     if (rows.length) await archive($, rows, { group: 'done', skipped })
-    if (!hid.agents && !hid.runs) return
-    await setCleared($, at)
+    const total = hid.agents + hid.runs
+    if (!total && (rows.length || !skipped)) return
+    if (total) await setCleared($, at)
     const made = await getUndone($)
-    if (made && made.at >= at) return void (await setUndone($, () => ({ ...made, hid })))
+    if (made && made.at >= at) return void (await setUndone($, () => ({ ...made, ...(total ? { hid } : {}) })))
     const now = await $.clock.now()
-    await setUndone($, () => ({ ids: [], name: '', skipped: rows.length ? 0 : skipped, group: 'done', index: 0, at: now, hid }))
+    await setUndone($, () => ({ ids: [], name: '', skipped, group: 'done', index: 0, at: now, ...(total ? { hid } : {}) }))
     expireUndo($, now)
   } finally {
     isClearing = false

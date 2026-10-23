@@ -90,7 +90,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       })
     }
     if (!group.items.length && undone?.group !== group.id) return empty(`group-${group.id}`)
-    const clear = clearOf(group, data, context)
+    const clear = clearOf(group, data.trees, context)
     return Group(ui, {
       id: group.id,
       label: GROUP_LABEL[group.id],

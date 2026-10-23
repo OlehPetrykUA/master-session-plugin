@@ -307,6 +307,13 @@ test('AC18 running subagents and runs stay in Working', async ($, on) => {
   await clock.settle()
   expect(await rowsOf(ui)).toEqual(expect.arrayContaining(['hit-row-Still going', `hit-row-${wf}`]))
   expect(await textsOf(ui)).toContain('Hid 1 subagent and 1 workflow')
+  const keys = await keysOf(ui)
+  const working = keys.indexOf('group-head-working')
+  const done = keys.indexOf('group-head-done')
+  for (const key of ['row-Still going', `row-${wf}`]) {
+    expect(keys.indexOf(key)).toBeGreaterThan(working)
+    expect(keys.indexOf(key)).toBeLessThan(done)
+  }
   await ui.unmount()
 })
 
@@ -385,7 +392,7 @@ test('AC22 Undo with only hidden rows brings them back and the bar has Undo', as
 })
 
 test('AC23 an Undo whose unarchive fails toasts and the bar keeps the failed ids with Undo', async ($, on) => {
-  const { toasts, clock } = await withCrew($, on, DONE, { ...PAIR, unarchiveError: 'cannot restore' })
+  const { toasts, calls, clock } = await withCrew($, on, DONE, { ...PAIR, unarchiveError: 'cannot restore' })
   const ui = await mountPane($)
   await click(ui, 'hit-clear-done')
   await clock.settle()
@@ -394,6 +401,10 @@ test('AC23 an Undo whose unarchive fails toasts and the bar keeps the failed ids
   expect(toasts).toEqual(['Not unarchived: cannot restore'])
   expect(await ui.find({ key: 'undo-bar-done' })).toBeDefined()
   expect(await ui.find({ key: 'face-undo-done' })).toBeDefined()
+  expect(await textsOf(ui)).toContain('Archived 2 sessions')
+  await click(ui, 'hit-undo-done')
+  await clock.settle()
+  expect(unarchives(calls)).toEqual(['local_a', 'local_b', 'local_a', 'local_b'])
   await ui.unmount()
 })
 
@@ -438,6 +449,23 @@ async function bandAndPane($: Engine, on: On, board: unknown, child: Child, with
 }
 
 const WORKER = { id: 'local_w', name: 'local_w', state: 'working', progress: 'step 1 of 4 — build' }
+
+test('AC25 a skipped-only press shows the skipped bar without Undo and leaves the cleared time alone', async ($, on) => {
+  let isStale = false
+  on('state.get', async (_, e, next) => (isStale && e.key === 'agents' ? { value: { value: [], version: 1 } } : next(e)))
+  const { clock } = await withCrew($, on, boardOf(fin('local_b')), { git: gitOf(DIRTY), sessions: [live('local_b', { cwd: CLEAN })] }, false)
+  const ui = await mountPane($)
+  expect(await hitsOf(ui)).toContain('hit-clear-done')
+  isStale = true
+  await click(ui, 'hit-clear-done')
+  await clock.settle()
+  expect(await textsOf(ui)).toContain('Skipped 1 with work to keep')
+  expect(await ui.find({ key: 'face-undo-done' })).toBeUndefined()
+  isStale = false
+  await clock.advance(2_000)
+  expect(await rowsOf(ui)).toContain('hit-row-Review auth flow')
+  await ui.unmount()
+})
 
 test('AC26 the band drops the archived sessions and keeps the hidden subagent and run among its units', async ($, on) => {
   const board = boardOf(fin('local_a'), fin('local_b'), fin('local_c'))
@@ -522,7 +550,7 @@ test('AC32 the archived sessions are neither rows nor units though the board lis
   expect(await rowsOf(pane)).not.toEqual(expect.arrayContaining(['hit-row-local_a']))
   expect(await rowsOf(pane)).not.toEqual(expect.arrayContaining(['hit-row-local_b']))
   expect(await band.findAll({ type: 'Svg' })).toEqual([])
-  expect(calls.filter(one => one.tool.startsWith('mcp__master-session'))).toEqual([])
+  expect(calls.every(one => ['list_sessions', 'get_session', 'archive_session'].includes(one.tool))).toBe(true)
   expect(scans.messages).toBe(before[1])
   expect(writes.length).toBe(before[2])
   await pane.unmount()
