@@ -11,7 +11,7 @@ import { pillOf, testsShownOf } from '../detail/Tests'
 import { CAPTION } from './Summary'
 import { C } from '../../theme/tokens'
 import { ASKS, ELLIPSIS, ROCKET_PX, WIDE_ASKS } from '../../testing/widths'
-import { BOARD, HOME, PANE, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
+import { BOARD, HOME, PANE, WORKTREE, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
 
 const COMMAND = `cd ${HOME}/.claude/worktrees/wt-master-session-plugin-rows-v3 && npm run build -- --filter hooks && node --test hooks/lib/list.test.ts hooks/lib/band.test.ts hooks/components/detail/Detail.test.tsx 2>&1 | tee /private/tmp/claude-501/rows-v3-gate.log && git status --porcelain && git log --oneline -3`
 
@@ -25,6 +25,8 @@ function seeded(on: On, agents: AgentRecord[]) {
 }
 
 const textsIn = (node: unknown): string[] => (typeof node === 'string' ? [node] : node && typeof node === 'object' ? Object.values(node as Record<string, unknown>).flatMap(textsIn) : [])
+
+warmUp()
 
 test('rows: split by width, at most n, the last ends in "…"; emoji count by code point and never leave a lone surrogate', () => {
   const rows = rowsOf('Archive can lose work until this lands: 2 commits exist only on archive-guard, and Archive all would remove its worktree. '.repeat(3), 280, 13, 3)

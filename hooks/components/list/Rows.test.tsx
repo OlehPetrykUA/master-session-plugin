@@ -7,7 +7,7 @@ import { across, tall } from '../../lib/layout'
 import { oneLine } from '../../lib/list'
 import { phaseStrip } from '../../theme/detail'
 import { C } from '../../theme/tokens'
-import { BOARD, PANE, altsOf, click, hitsOf, started, textsOf } from '../../testing/world'
+import { BOARD, PANE, altsOf, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
 
 const NOW = 3_600_000
 
@@ -21,6 +21,8 @@ function seeded(on: On, agents: AgentRecord[]) {
 }
 
 const agent = (id: string, more: Partial<AgentRecord>): AgentRecord => ({ id, type: 'master-session:reviewer', description: `review ${id}`, prompt: 'Run the gate.', state: 'running', startedAt: NOW - 60_000, ...more })
+
+warmUp()
 
 test('a subagent waiting on a prompt in a worker chat: a red row with its parent and question, Open chat opens that worker, its card says where the prompt waits', async ($, on) => {
   seeded(on, [agent('a1', { asking: ASK, parentSessionId: 'local_setup' })])

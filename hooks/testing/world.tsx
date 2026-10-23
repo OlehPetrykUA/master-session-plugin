@@ -1,5 +1,5 @@
 import type { ElementQuery, Engine, FoundElement, MountPointerEvent } from 'claude-code/testing'
-import { mock } from 'claude-code/testing'
+import { mock, test } from 'claude-code/testing'
 import type { AgentSpawnInput, On } from 'claude-code'
 
 import type { Live } from '../../types'
@@ -235,4 +235,16 @@ export type Child = { parent?: string; origin?: string; isDetached?: boolean; fi
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, masterTitle: MASTER_TITLE, board })
   return { parent: MASTER, files: { [`${HOME}/.claude/state/master-session/boards/${MASTER}.json`]: file } }
+}
+
+export const COLD_MS = 30_000
+
+export function warmUp() {
+  test('warm-up: a desktop and a terminal mount take this file’s cold engine start, under their own timeout', { timeoutMs: COLD_MS }, async ($, on) => {
+    await started($, on)
+    for (const surface of ['desktop', 'terminal'] as const) {
+      const ui = await $.ui.mount({ ...PANE, surface })
+      await ui.unmount()
+    }
+  })
 }

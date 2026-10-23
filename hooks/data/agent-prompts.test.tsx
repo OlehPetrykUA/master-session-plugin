@@ -5,7 +5,7 @@ import type { AgentInfo, On } from 'claude-code'
 import type { AgentRecord, Report } from '../../types'
 
 import { workflowRunsOf } from '../lib/agents'
-import { HOME, MASTER, PANE, SPAWN, world } from '../testing/world'
+import { HOME, MASTER, PANE, SPAWN, warmUp, world } from '../testing/world'
 import { merge } from './contract'
 import { reportPath } from './status'
 
@@ -42,6 +42,8 @@ function loops(on: On, ids: string[]) {
 }
 
 const askingOf = (agents: AgentRecord[], id: string) => agents.find(one => one.id === id)?.asking
+
+warmUp()
 
 test('a subagent prompt in the master marks that subagent asking with the prompt, its parent loop kept; the answer, a new turn and its end clear it', { plugins: [PROBE] }, async ($, on) => {
   loops(on, ['a1', 'a2'])

@@ -4,7 +4,7 @@ import type { On } from 'claude-code'
 
 import { across, tall } from '../../lib/layout'
 import { C } from '../../theme/tokens'
-import { AT, BOARD, HOME, PANE, SELF, SPAWN, TOOLKIT, WORKTREE, altsOf, click, hitsOf, started, textsOf } from '../../testing/world'
+import { AT, BOARD, HOME, PANE, SELF, SPAWN, TOOLKIT, WORKTREE, altsOf, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
 import type { Ui } from '../../testing/world'
 
 const CONDUCTOR = { sessionId: 'local_conductor', name: 'conductor-redo', title: 'Conductor redo', cwd: `${HOME}/dotfiles`, isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: SELF }
@@ -52,6 +52,8 @@ async function agentsStarted($: Engine, on: On) {
   await $.turn.complete({ answer: '14 calls found; 12 cite their source.', durationMs: 5, isAborted: false, turnId: 'u3', agentId: 'Find token usages', reason: 'answer', usage } as never)
   return run
 }
+
+warmUp()
 
 test('a session row opens its card in place: the same row on top with Open chat, then Now, Next, place, Git, Time, Permission, Model and Open alone', async ($, on) => {
   await started($, on)

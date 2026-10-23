@@ -9,7 +9,7 @@ import { blocksOf } from '../../lib/list'
 import type { RunSummary } from '../../lib/totals'
 import { subOf, tileInnerOf } from './Summary'
 import { C } from '../../theme/tokens'
-import { BOARD, BOARD_TOOL, HOME, PANE, SELF, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
+import { BOARD, BOARD_TOOL, HOME, PANE, SELF, WORKTREE, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
 
 const BASH = `Allow Bash: P=/Users/opetryk/Work/master-session-plugin; W="$HOME/.claude/worktrees/wt-master-session-plugin-band-v3"; git -C $P merge-base --is-ancestor 9bd146ce23c7d6485d main && git -C "$W" log --oneline -5 && git -C "$W" status --porcelain=v2 --branch --untracked-files=all`
 
@@ -47,6 +47,8 @@ function seeded(on: On, agents: AgentRecord[]) {
 const linked = (sessionId: string, name: string, title: string) => ({ sessionId, name, title, cwd: WORKTREE, isRunning: true, isArchived: false, lastActivityAt: '1970-01-01T00:59:00.000Z', startedBy: SELF })
 
 const asking = (id: string, name: string, needsYou: string) => ({ ...BOARD, sessions: [{ id, name, state: 'needs-you', progress: 'step 1 of 2 — fix', needsYou }, BOARD.sessions[1]] })
+
+warmUp()
 
 test('a needs-you row at the real pane width: the question takes two rows, the second ending in "…", with home as ~; Open chat goes icon-only because the task would show fewer than 12 characters beside its label', async ($, on) => {
   await started($, on, asking('local_impl', 'verify-personas', BASH.replaceAll('/Users/opetryk', HOME)), { sessions: [linked('local_impl', 'verify-personas', 'Implementer · Prompt status data')] })
@@ -222,7 +224,7 @@ test('KPI tiles at 47 columns keep every label and sub whole: Needs you drops it
 })
 
 
-test('KPI subs never truncate from 47 to 60 columns: each tile draws the first of its subs that fits, with 12 asking subagents, a long testsNote, and nothing reported', async ($, on) => {
+test('KPI subs drawn at 47 and 60 columns never truncate: each tile draws the first of its subs that fits, with 12 asking subagents, a long testsNote, and nothing reported', async ($, on) => {
   const asking = Array.from({ length: 12 }, (_, index) => ({ id: `s${index}`, type: 'master-session:reviewer', description: `Review ${index}`, state: 'running' as const, startedAt: 3_500_000, parentSessionId: 'local_setup', asking: { text: 'Allow Bash: ls', since: 3_590_000 } }))
   seeded(on, asking)
   const quiet = { ...BOARD, sessions: [BOARD.sessions[1]], needsYou: [] }
@@ -237,7 +239,7 @@ test('KPI subs never truncate from 47 to 60 columns: each tile draws the first o
   }
   for (const board of [loud, quiet]) {
     await $.tool.call({ tool: BOARD_TOOL, ...board })
-    for (let bodyColumns = 47; bodyColumns <= 60; bodyColumns += 1) {
+    for (const bodyColumns of [47, 60]) {
       const inner = (bodyWidthOf(bodyColumns) - 3 * 8) / 4 - 2 - 16
       const found = await subsAt(bodyColumns)
       expect(found.map(one => one.key)).toEqual(['block-sessions', 'block-needs-you', 'block-subagents', 'block-workflows', 'block-commits', 'block-tests', 'block-duration', 'block-git'])
@@ -259,7 +261,7 @@ test('when "N blockers" is wider than the tile, Needs you draws the bare count',
   await ui.unmount()
 })
 
-test('each tile draws the FIRST of [sub, ...shorts] whose width fits, at 47 and at 60 columns, for long, short and empty data', () => {
+test('each tile draws the FIRST of [sub, ...shorts] whose width fits, and it fits, at every width from 47 to 60 columns, for long, short and empty data', () => {
   const base: RunSummary = {
     sessions: { total: 3, 'needs-you': 0, waiting: 1, working: 1, done: 1, archived: 0 },
     needsYou: { sessions: 0, subagents: 12 },
@@ -276,7 +278,7 @@ test('each tile draws the FIRST of [sub, ...shorts] whose width fits, at 47 and 
     [{ ...base, needsYou: { sessions: 1, subagents: 1000 }, tests: { value: '6 checks', sub: 'passed · no counts' } }, undefined],
     [{ ...base, needsYou: { sessions: 0, subagents: 0 }, subagents: { total: 2, running: 0, done: 2, failed: 0, asking: 0 }, tests: { value: '—', sub: 'none reported' } }, '20:04'],
   ]
-  for (const bodyColumns of [47, 60]) {
+  for (let bodyColumns = 47; bodyColumns <= 60; bodyColumns += 1) {
     const inner = tileInnerOf(bodyWidthOf(bodyColumns), 4)
     for (const [totals, end] of cases)
       for (const block of blocksOf(totals, true, end)) {
@@ -285,6 +287,7 @@ test('each tile draws the FIRST of [sub, ...shorts] whose width fits, at 47 and 
         const first = subs.findIndex(text => textWidth(text, 11) <= inner)
         expect([bodyColumns, block.key, subOf(block, inner)]).toEqual([bodyColumns, block.key, subs[first < 0 ? subs.length - 1 : first]])
         expect(subs.slice(0, first < 0 ? subs.length - 1 : first).every(text => textWidth(text, 11) > inner)).toBe(true)
+        expect([bodyColumns, block.key, textWidth(subOf(block, inner) ?? '', 11) <= inner]).toEqual([bodyColumns, block.key, true])
       }
   }
   const needs = blocksOf({ ...base, needsYou: { sessions: 1, subagents: 1000 } }, true)[1]

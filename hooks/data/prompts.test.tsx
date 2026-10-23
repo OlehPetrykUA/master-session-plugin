@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { BAND, BOARD, HOME, MASTER, PANE, altsOf, hitsOf, started, textsOf, world } from '../testing/world'
+import { BAND, BOARD, HOME, MASTER, PANE, altsOf, hitsOf, started, textsOf, warmUp, world } from '../testing/world'
 import type { Child } from '../testing/world'
 import type { Report } from './contract'
 import { promptTextOf } from './recorder'
@@ -27,6 +27,8 @@ const start = async ($: Engine, run: ReturnType<typeof worker>) => {
   await $.tool.call({ tool: 'mcp__master-session__report', state: 'working', progress: 'step 2 of 4 — build' })
   expect(run.last()?.state).toBe('working')
 }
+
+warmUp()
 
 test('the needs-you text names the tool and its command or path, or the first question asked', () => {
   expect(promptTextOf('Bash', { command: 'rm -rf build', description: 'Remove build' })).toBe('Allow Bash: rm -rf build')

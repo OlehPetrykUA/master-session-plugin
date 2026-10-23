@@ -10,7 +10,7 @@ import { CH, COLUMN, across, tall, textWidth, widthOf } from '../../lib/layout'
 import { freshReport, merge } from '../../data/contract'
 import { progressOf } from '../../lib/board'
 import { rowsOf } from '../../lib/rows'
-import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, dump, started, text, world } from '../../testing/world'
+import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, dump, started, text, warmUp, world } from '../../testing/world'
 import { PERCENT } from '../../theme/band'
 import { I } from '../../theme/icons'
 import { barsWidth, dotsWidth, strip } from '../../theme/strip'
@@ -146,6 +146,8 @@ const pills = (path: string) => path.split('M').filter(Boolean).length
 const BARS = [A('green'), A('failed'), S('green', 0.6), A('green'), A('grey'), S('amber', 0.8), S('red', 16.3 / 32.5), W('green', 1.505 / 3, 3)]
 
 const DOTS = [A('green'), A('red'), S('green', 0.4), A('green'), A('grey'), S('amber', 0.5), S('red', 0.5), W('green', 0.5, 2), S('green', 0.4), A('green'), S('grey', 1), S('green', 0.4), A('green'), A('green'), W('green', 0.5, 1), S('amber', 0.5)]
+
+warmUp()
 
 test('the strip draws lane 7 at 200 px: sessions 10 high, subagents 6×12 after their parent, workflow pieces with 2 px corners, gaps 4 and 2', () => {
   const source = strip(200, BARS)

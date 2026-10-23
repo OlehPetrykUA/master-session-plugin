@@ -5,7 +5,9 @@ import type { On } from 'claude-code'
 import type { AgentRecord, WorkflowRecord } from '../types'
 
 import { subagentsOf, workflowRunsOf } from './lib/agents'
-import { BAND, HOME, PANE, SPAWN, altsOf, childOf, click, started, textsOf, typed, world } from './testing/world'
+import { BAND, HOME, PANE, SPAWN, altsOf, childOf, click, started, textsOf, typed, warmUp, world } from './testing/world'
+
+warmUp()
 
 test('/master-session:start status opens the pane; with a task it also runs the skill', async ($, on) => {
   const { opened, ran, clock } = world(on)

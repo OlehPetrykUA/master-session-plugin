@@ -3,7 +3,9 @@ import type { Engine } from 'claude-code/testing'
 
 import { COLUMN, LH, across, tall } from '../lib/layout'
 import { C, KINDS } from '../theme/tokens'
-import { BOARD, HOME, MASTER_TITLE, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, childOf, click, dump, hitsOf, started, textsOf, world } from '../testing/world'
+import { BOARD, HOME, MASTER_TITLE, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, childOf, click, dump, hitsOf, started, textsOf, warmUp, world } from '../testing/world'
+
+warmUp()
 
 test('v2 one list: header, repos, summary blocks, chips, groups with Needs you pinned first, kind labels, and one press region per row, chip and button', async ($, on) => {
   const { answer } = await started($, on)
