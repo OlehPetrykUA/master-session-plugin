@@ -29,20 +29,19 @@ test('the helpers read a chat board, steps and git porcelain', async () => {
   expect(parseStatus('# branch.oid a\n1 .M N... 100644 100644 100644 a b my file.ts\n? new dir/x.sh\n').paths).toEqual(['my file.ts', 'new dir/x.sh'])
 })
 
-test('progress: mean of segment fills in board order, archived left out', async () => {
+test('progress: segment fills in board order, archived left out', async () => {
   const session = (id: string, state: string, progress?: string) => ({ id, name: id, state, progress })
   const boardOf = (sessions: unknown[]) => ({ sessions, needsYou: [], repos: [], source: 'tool' as const }) as Parameters<typeof progressOf>[0]
   expect(progressOf(null, liveOf()).total).toBe(0)
   expect(progressOf(boardOf([]), liveOf()).total).toBe(0)
-  expect(progressOf(boardOf([session('a', 'done'), session('b', 'done')]), liveOf()).percent).toBe(100)
+  expect(progressOf(boardOf([session('a', 'done'), session('b', 'done')]), liveOf()).segments.map(one => one.fill)).toEqual([1, 1])
   const mixed = progressOf(boardOf([session('a', 'done'), session('b', 'working', 'step 2 of 4 — build'), session('c', 'waiting')]), liveOf())
-  expect(mixed.percent).toBe(50)
-  expect([mixed.done, mixed.total]).toEqual([1, 3])
-  expect(mixed.segments.map(one => [one.id, one.fill, one.reach])).toEqual([
-    ['a', 1, 1],
-    ['b', 0.5, 0.75],
-    ['c', 0, 0],
+  expect(mixed.total).toBe(3)
+  expect(mixed.segments.map(one => [one.id, one.fill])).toEqual([
+    ['a', 1],
+    ['b', 0.5],
+    ['c', 0],
   ])
   const archived = progressOf(boardOf([session('a', 'done'), session('b', 'working', 'step 2 of 4'), session('c', 'waiting'), session('d', 'done')]), liveOf(['d']))
-  expect([archived.percent, archived.total]).toEqual([50, 3])
+  expect([archived.segments.map(one => one.id), archived.total]).toEqual([['a', 'b', 'c'], 3])
 })

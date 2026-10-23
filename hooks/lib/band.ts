@@ -18,7 +18,7 @@ export const HIT = 'band-hit-'
 export const BAR_MIN = 48
 const COUNTS_BELOW = 600
 const PERCENT_BELOW = 340
-const PILL_WIDTH = 2 + PILL.left + PILL.icon + PILL.gap + PILL.right
+export const PILL_WIDTH = 2 + PILL.left + PILL.icon + PILL.gap + PILL.right
 const NEEDS = ' needs you'
 const SEPARATOR = ' · '
 
@@ -189,7 +189,7 @@ export function askingChatOf(current: Board | null, live: Live, agents: AgentCou
   return chat && chat.id !== live.self ? chat : undefined
 }
 
-const IDLE_PROGRESS: Progress = { segments: [], percent: 0, done: 0, total: 0 }
+const IDLE_PROGRESS: Progress = { segments: [], total: 0 }
 
 export function bandProgressWith(current: Board | null, live: Live, { agents, workflows }: AgentCounts) {
   const progress = bandProgress(current, live)
@@ -237,7 +237,7 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
   let pillText = ''
   let leadWidth = isAllDone ? CHECK : hasPercent ? PERCENT : 0
   if (asker) {
-    const avail = around(0, 0) - BAR_MIN - PILL_WIDTH
+    const avail = around(0, 0) - BAR_MIN - PILL_WIDTH - gap
     pillText = !isNarrow && widthOf(full, { isBold: true }) <= avail ? full : widthOf(short, { isBold: true }) <= avail ? short : fit(short, Math.max(0, avail), { isBold: true })
     leadWidth = PILL_WIDTH + widthOf(pillText, { isBold: true })
   }

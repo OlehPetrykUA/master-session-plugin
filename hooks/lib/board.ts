@@ -134,9 +134,7 @@ export function stepOf(progress: string | undefined) {
 }
 
 export type Progress = {
-  segments: { id: string; state: SessionState; fill: number; reach: number }[]
-  percent: number
-  done: number
+  segments: { id: string; state: SessionState; fill: number }[]
   total: number
 }
 
@@ -148,10 +146,8 @@ export function progressOf(board: Board | null, live: Live): Progress {
       const step = stepOf(one.progress)
       const share = step && step.total ? step.done / step.total : 0
       const fill = one.state === 'done' ? 1 : share
-      const reach = one.state === 'working' && step && step.total ? Math.min(1, (step.done + 1) / step.total) : fill
-      return { id: one.id, state: one.state, fill, reach }
+      return { id: one.id, state: one.state, fill }
     })
   const total = segments.length
-  const mean = total ? segments.reduce((sum, one) => sum + one.fill, 0) / total : 0
-  return { segments, percent: Math.round(mean * 100), done: segments.filter(one => one.state === 'done').length, total }
+  return { segments, total }
 }

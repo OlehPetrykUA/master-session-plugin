@@ -4,9 +4,9 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord, Board, BoardSession, Live, WorkflowRecord } from '../../../types'
 
-import { BAR_MIN, agentCountsOf, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, overallOf, percentOf } from '../../lib/band'
+import { BAR_MIN, PILL_WIDTH, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, overallOf, percentOf } from '../../lib/band'
 import type { AgentCounts } from '../../lib/band'
-import { CH, COLUMN, across, tall } from '../../lib/layout'
+import { CH, COLUMN, across, tall, widthOf } from '../../lib/layout'
 import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, started, text, warmUp, world } from '../../testing/world'
 import { glowOf, strip } from '../../theme/strip'
 import { C } from '../../theme/tokens'
@@ -270,7 +270,7 @@ test('the slider: a white band 0 → .55 → 0 of max(16, 30% of the fill), clip
   expect(running).toContain('<animateTransform attributeName="transform" type="translate" from="-30.0 0" to="100.0 0" dur="2.4s" calcMode="linear" repeatCount="indefinite"/>')
   expect(running).toContain('stop-opacity="0"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>')
   expect(running).toContain('<g clip-path="url(#c)">')
-  expect(running).toContain('<clipPath id="c"><path d="M5,0h90.0a5,5 0 0 1 0,10h-90.0a5,5 0 0 1 0,-10Z"/></clipPath>'.replace('M5,0', 'M5.0,0').replace('h90.0', 'h90.0'))
+  expect(running).toContain('<clipPath id="c"><path d="M5.0,0h90.0a5,5 0 0 1 0,10h-90.0a5,5 0 0 1 0,-10Z"/></clipPath>')
   expect(running).toContain('<rect class="s" x="35.0" y="0" width="30.0" height="10" fill="url(#k)"/>')
   expect(running).toContain('@media (prefers-reduced-motion: reduce){.m{display:none}.s{display:inline}}')
   expect(running).toContain('.s{display:none}')
@@ -483,6 +483,16 @@ test('narrow needs you and all done keep the bar at 48 or more: the pill truncat
   expect([tight.barWidth, tight.action?.isIconOnly, tight.actionWidth, tight.pillText.endsWith('…') || tight.pillText === 'Session needs you']).toEqual([expect.any(Number), true, 32, true])
 })
 
+test('a pill truncated to fit leaves the row inside the band width', () => {
+  for (let px = 240; px <= 500; px += 4) {
+    const view = viewOf(NEEDS, IDLE, columnsFor(px)).view
+    const width = columnsFor(px) * COLUMN - 16
+    const sides = [PILL_WIDTH + widthOf(view.pillText, { isBold: true }), view.actionWidth].filter(Boolean)
+    const row = view.padLeft + view.padRight + 2 + sides.reduce((sum, one) => sum + one, 0) + sides.length * view.gap + view.barWidth
+    expect(row).toBeLessThanOrEqual(width + 0.5)
+  }
+})
+
 test('the bar takes the room the button leaves: with the pane open it grows by the button and its gap, and follows bodyColumns', async ($, on) => {
   const run = await band($, on, WORKING)
   const ui = await mount($)
@@ -507,7 +517,7 @@ test('terminal: one bar of block characters, the percent, the counts with their 
   await crew.subagent('docs')
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const texts = await textsOf(ui)
-  expect(texts.slice(0, 2)).toEqual(['80%'.replace('80', '64'), expect.stringMatching(/^█+░*$/)])
+  expect(texts.slice(0, 2)).toEqual(['64%', expect.stringMatching(/^█+░*$/)])
   expect(texts.slice(2)).toEqual(['2 working · 1 waiting · 1 subagent', '2', '1', '1'])
   expect((await ui.findAll({ type: 'Text' })).filter(one => /^\d+$/.test(one.text)).every(one => one.props.weight === 'semibold')).toBe(true)
   expect((await ui.findAll({ type: 'Text' })).find(one => one.text.startsWith('2 working'))?.props.dimColor).toBe(true)
@@ -698,7 +708,7 @@ test('a ready session never makes "All N done": it holds the percent at 99 and t
 })
 
 test('a finished session counts 1 whatever its fill', () => {
-  const units = bandUnitsOf([{ id: 'local_d', state: 'done', fill: 0.4, reach: 0.4 }], boardOf([WORKING[3]!]), IDLE)
+  const units = bandUnitsOf([{ id: 'local_d', state: 'done', fill: 0.4 }], boardOf([WORKING[3]!]), IDLE)
   expect([units[0]?.value, units[0]?.isFinished]).toEqual([1, true])
 })
 
@@ -782,7 +792,7 @@ const barProps = (view: ReturnType<typeof viewOf>['view']): Record<string, unkno
   const stub = (props: Record<string, unknown>) => props.children ?? null
   const Box = (props: Record<string, unknown>) => {
     if (typeof props.key === 'string' && props.key.startsWith('bar-')) keys.push(props.key)
-    return props.children ?? null
+    return stub(props)
   }
   const Svg = (props: Record<string, unknown>) => {
     if (props.isInteractive === true) seen.push(props)
@@ -804,7 +814,6 @@ test('the bar frame is sized to the bar and keyed by width and run state: stable
   const still = viewOf(WORKING.map(one => ({ ...one, state: 'waiting' as const })), IDLE)
   expect(still.view.isRunning).toBe(false)
   expect(barProps(still.view)?.key).toBe(`bar-${still.view.barWidth}-still`)
-  expect(barProps(still.view)?.key).not.toBe(bar?.key)
 })
 
 test('the first agent started with the pane closed draws the bar on the band’s first frame, and a data change redraws it with no pane open', async ($, on) => {
