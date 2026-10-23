@@ -4,7 +4,7 @@ import type { AgentRecord, Board, LiveSession, Repo, WorkflowRecord } from '../.
 
 import { liveOf } from '../testing/world'
 import { I, PERSONA_GLYPH } from '../theme/icons'
-import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, countsOfItems, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, lineOf, lineTextOf, modelFamilyOf, nameText, personaOfType, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived } from './list'
+import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, countsOfItems, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, lineOf, lineTextOf, modelFamilyOf, nameText, personaOfType, relativeOf, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived } from './list'
 import type { Context, RowItem } from './list'
 import type { Row } from './rows'
 import { countsOf, rowsOf } from './rows'
@@ -204,4 +204,12 @@ test('summary blocks read the run totals as the design words them, zeros and das
 
 test('ages read like the design: just now, minutes, hours, days', () => {
   expect([ageOf(10_000), ageOf(5 * 60_000), ageOf(2 * 3_600_000 + 60_000), ageOf(3 * 86_400_000)]).toEqual(['just now', '5m ago', '2h ago', '3d ago'])
+})
+
+test('relative paths: under a root, else under home as ~, and an empty home changes nothing', () => {
+  expect(relativeOf('/home/me/wt/hooks/a.ts', ['/home/me/wt'], '/home/me')).toBe('hooks/a.ts')
+  expect(relativeOf('/home/me/notes/b.md', ['/home/me/wt'], '/home/me')).toBe('~/notes/b.md')
+  expect(relativeOf('~/notes/b.md', ['/home/me/notes'], '/home/me')).toBe('b.md')
+  expect(relativeOf('/Users/x/c.ts', [], '')).toBe('/Users/x/c.ts')
+  expect(relativeOf('~/c.ts', [], '')).toBe('~/c.ts')
 })

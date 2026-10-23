@@ -3,7 +3,8 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord } from '../../../types'
 
-import { across, tall } from '../../lib/layout'
+import { across, tall, textWidth } from '../../lib/layout'
+import { clampText } from '../../lib/list'
 import { BOARD, HOME, PANE, SELF, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 
 const BASH = `Allow Bash: P=/Users/opetryk/Work/master-session-plugin; W="$HOME/.claude/worktrees/wt-master-session-plugin-band-v3"; git -C $P merge-base --is-ancestor 9bd146ce23c7d6485d main && git -C "$W" log --oneline -5 && git -C "$W" status --porcelain=v2 --branch --untracked-files=all`
@@ -23,6 +24,8 @@ const OLD = Array.from({ length: 20 }, (_, index) => ({
 
 type Raise = { scroll: (input: unknown) => Promise<unknown> }
 
+declare const performance: { now: () => number }
+
 const svgChars = (node: unknown): number =>
   Array.isArray(node)
     ? node.reduce((sum: number, one) => sum + svgChars(one), 0)
@@ -37,17 +40,34 @@ function seeded(on: On, agents: AgentRecord[]) {
   })
 }
 
-test('a needs-you row with a long Bash prompt clamps the question to two lines and keeps the title readable by drawing Open chat as an icon', async ($, on) => {
+test('a needs-you row with a long Bash prompt clamps the question to two lines; Open chat keeps its label and the title truncates, icon-only only below 340 px', async ($, on) => {
   await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], title: 'Implementer · Prompt hardening for the worker skills', needsYou: BASH }, BOARD.sessions[1]] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
   const asked = (await textsOf(ui)).find(text => text.startsWith('Allow Bash: P=/Users/opetryk'))
   expect(asked?.endsWith('…')).toBe(true)
   expect(Number(asked?.length)).toBeLessThan(BASH.length / 2)
-  expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).toBe(across(32))
+  expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).not.toBe(across(32))
   await ui.unmount()
-  const wide = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 80 } })
-  expect((await wide.find({ key: 'face-chat-local_env' }))?.props.width).not.toBe(across(32))
-  await wide.unmount()
+  const narrow = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 36 } })
+  expect((await narrow.find({ key: 'face-chat-local_env' }))?.props.width).toBe(across(32))
+  await narrow.unmount()
+})
+
+test('a short needs title keeps the Open chat label at 46 columns', async ($, on) => {
+  await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], title: 'Designer · Pane v2', needsYou: BASH }, BOARD.sessions[1]] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
+  expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).not.toBe(across(32))
+  await ui.unmount()
+})
+
+test('clamping a 20,000-character prompt takes under 10 ms', () => {
+  const prompt = 'Re-run the gate and report each exit code. '.repeat(470)
+  expect(prompt.length).toBeGreaterThan(20_000)
+  const start = performance.now()
+  const clamped = clampText(prompt, 300, 4, 12)
+  expect(performance.now() - start).toBeLessThan(10)
+  expect(clamped.endsWith('…')).toBe(true)
+  expect(textWidth(clamped, 12) * 1.08).toBeLessThanOrEqual(300 * 4 * 0.9)
 })
 
 test('the Archived filter with 20 archived sessions draws the header, the chips and every archived row; the pinned header covers only its own rows', async ($, on) => {
@@ -102,6 +122,8 @@ test('activity from a report draws one line per item with its age on the right, 
   for (const index of [0, 1]) expect((await ui.find({ key: `activity-local_env-${index}` }))?.props).toEqual(expect.objectContaining({ height: tall(20), minWidth: 0 }))
   const texts = await textsOf(ui)
   expect(texts).toEqual(expect.arrayContaining(['commit', '2m', '<1m']))
+  expect((await ui.find({ key: 'activity-local_env-0' }))?.text).toMatch(/^BashAllow Bash/)
+  expect((await ui.find({ key: 'activity-local_env-1' }))?.text).toMatch(/^commit34ebd4c/)
   const rest = (await ui.findAll({ type: 'Text' })).filter(one => String(one.text ?? '').startsWith('34ebd4c fix(pane)'))
   expect(rest.length).toBe(1)
   expect(rest[0]?.props.wrap).toBe('truncate-end')

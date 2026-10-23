@@ -29,6 +29,7 @@ export function passedOf(rows: readonly Row[]) {
 
 export function runSummaryOf({ rows, counts, archived, agents, workflows, board, trees, at }: RunSummaryInput) {
   const runs = workflowRunsOf(agents, workflows)
+  const passed = passedOf(rows)
   const since = Math.min(...rows.flatMap(row => (row.live?.createdAt !== undefined ? [row.live.createdAt] : [])), board?.since ?? at)
   return {
     sessions: { total: rows.length, 'needs-you': counts['needs-you'], waiting: counts.waiting, working: counts.working, done: counts.done, archived },
@@ -36,7 +37,7 @@ export function runSummaryOf({ rows, counts, archived, agents, workflows, board,
     subagents: stateCountsOf(subagentsOf(agents)),
     workflows: { ...stateCountsOf(runs), agents: runs.reduce((sum, run) => sum + run.agents.length, 0), agentsDone: runs.reduce((sum, run) => sum + run.counts.done, 0) },
     commits: { total: rows.reduce((sum, row) => sum + (row.board?.commits?.length ?? 0), 0), repos: trees.length },
-    tests: board?.testsPassed !== undefined ? { passed: board.testsPassed, note: board.testsNote ?? '' } : passedOf(rows) === undefined ? undefined : { passed: passedOf(rows) ?? 0, note: '' },
+    tests: board?.testsPassed !== undefined ? { passed: board.testsPassed, note: board.testsNote ?? '' } : passed === undefined ? undefined : { passed, note: '' },
     duration: { since, ms: at - since },
     git: { dirty: trees.reduce((sum, repo) => sum + repo.worktrees.reduce((count, tree) => count + tree.dirty, 0), 0) },
   }

@@ -1,5 +1,5 @@
 import { dirtyOf } from '../../lib/git'
-import { across, down, faceWidth, tall, textWidth } from '../../lib/layout'
+import { across, down, faceWidth, tall } from '../../lib/layout'
 import { clampText, displayNameOf, elapsedOfItem, lineOf, oneLine, stepsOfItem } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { whereOf } from '../../lib/rows'
@@ -47,10 +47,8 @@ export function Row(ui: Ui, props: RowProps) {
     </Box>
   )
   const isChat = isNeeds && !!props.chat
-  const titleNeed = (textWidth(name.persona, 14) + (name.task ? textWidth(` · ${name.task.slice(0, 12)}…`, 14) : 0)) * 1.08 + 8
-  const columnOf = (button: number) => props.width - 2 - 12 - 8 - 28 - 12 - 14 - 12 - (isChat ? button + 12 : 0)
-  const isChatIcon = isNarrow || (isChat && columnOf(faceWidth(props.chat?.label ?? '', 'b32') + 1) < titleNeed)
-  const column = columnOf(isChatIcon ? 32 : faceWidth(props.chat?.label ?? '', 'b32') + 1)
+  const isChatIcon = isNarrow
+  const column = props.width - 2 - 12 - 8 - 28 - 12 - 14 - 12 - (isChat ? (isChatIcon ? 32 : faceWidth(props.chat?.label ?? '', 'b32') + 1) + 12 : 0)
   const question = (
     <Box key={`${id}-ask`} flexDirection="row" alignItems="flex-start" gap={across(4)} minWidth={0} flexShrink={1}>
       {glyph(`${id}-ask-icon`, 'needs', 'red')}
