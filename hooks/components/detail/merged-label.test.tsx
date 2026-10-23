@@ -6,6 +6,8 @@ const MAIN = `${HOME}/Work/designer-main`
 const OTHER = `${HOME}/Work/other-repo`
 const ON = 'aaaaaaa'
 const OFF = 'bbbbbbb'
+const ON_OTHER = 'ccccccc'
+const ON_TOO = 'ddddddd'
 
 const treesOf = (path: string) => `worktree ${path}\nHEAD d575596be1713c300bf1d8737355ceda0cb3ded3\nbranch refs/heads/main\n\n`
 
@@ -37,9 +39,26 @@ test('a main-checkout session whose sha is not on base does not read merged', as
 })
 
 test('a main-checkout session whose sha is proven an ancestor of base reads merged', async ($, on) => {
-  expect(await merged($, on, ON, gitOf(MAIN, { [`${MAIN} merge-base --is-ancestor ${ON} refs/heads/main`]: 'ok' }))).toBeDefined()
+  expect(await merged($, on, ON_TOO, gitOf(MAIN, { [`${MAIN} merge-base --is-ancestor ${ON_TOO} refs/heads/main`]: 'ok' }))).toBeDefined()
 })
 
 test('a sha proven only in another repo does not read merged', async ($, on) => {
-  expect(await merged($, on, ON, { ...gitOf(MAIN), ...gitOf(OTHER, { [`${OTHER} merge-base --is-ancestor ${ON} refs/heads/main`]: 'ok' }) })).toBeUndefined()
+  expect(await merged($, on, ON_OTHER, { ...gitOf(MAIN), ...gitOf(OTHER, { [`${OTHER} merge-base --is-ancestor ${ON_OTHER} refs/heads/main`]: 'ok' }) })).toBeUndefined()
+})
+
+test('repeat refreshes add no merge-base call while the base head is unchanged, and re-check only the negatives when it moves', async ($, on) => {
+  const shas = Array.from({ length: 20 }, (_, index) => `${index < 10 ? 'e' : 'f'}${String(index).padStart(6, '0')}`)
+  const rows = shas.map((sha, index) => ({ id: `local_r${index}`, name: `r${index}`, state: 'done', progress: 'step 1 of 1 — x', sha, cwd: MAIN }))
+  const git = gitOf(MAIN, Object.fromEntries(shas.filter((_, index) => index < 10).map(sha => [`${MAIN} merge-base --is-ancestor ${sha} refs/heads/main`, 'ok'])))
+  const { gits, clock } = await started($, on, { tick: '19:46', sessions: rows, needsYou: [], repos: [] }, { git, sessions: rows.map(row => ({ ...sessionOf, sessionId: row.id, name: row.name })) })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await clock.advance(1_000)
+  const count = () => gits.filter(argv => argv[4] === 'merge-base').length
+  const first = count()
+  await clock.advance(120_000)
+  const second = count()
+  git[`${MAIN} rev-parse refs/heads/main`] = 'ffffff1\n'
+  await clock.advance(120_000)
+  expect([first, second - first, count() - second]).toEqual([20, 0, 10])
+  await ui.unmount()
 })

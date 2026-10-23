@@ -248,15 +248,32 @@ export async function repoOf($: EngineInterface, path: string): Promise<Repo | u
   }
 }
 
+const ancestry = new Map<string, { isOn: boolean; head: string }>()
+
 async function provenOf($: EngineInterface, repos: Repo[], rows: readonly Row[]) {
   const proven = new Map<string, Set<string>>()
+  const heads = new Map<string, string>()
+  const seen = new Set<string>()
   for (const row of rows) {
     const sha = row.board?.sha ?? ''
     const cwd = row.live?.cwd ?? row.board?.cwd
     const found = cwd ? locate(cwd, repos) : undefined
     if (!found?.repo.base || !found.tree.isMain || !/^[0-9a-f]{7,40}$/i.test(sha)) continue
-    const isOnBase = await git($, found.repo.path, ['merge-base', '--is-ancestor', sha, `refs/heads/${found.repo.base}`]).then(() => true, () => false)
-    if (isOnBase) proven.set(found.repo.path, (proven.get(found.repo.path) ?? new Set()).add(sha))
+    const { path, base } = found.repo
+    const key = `${path}\0${base}\0${sha}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    let known = ancestry.get(key)
+    if (!known?.isOn) {
+      if (!heads.has(path)) heads.set(path, (await git($, path, ['rev-parse', `refs/heads/${base}`]).catch(() => '')).trim())
+      const head = heads.get(path) as string
+      if (!known || known.head !== head) {
+        const isOn = await git($, path, ['merge-base', '--is-ancestor', sha, `refs/heads/${base}`]).then(() => true, () => false)
+        known = { isOn, head }
+        ancestry.set(key, known)
+      }
+    }
+    if (known.isOn) proven.set(path, (proven.get(path) ?? new Set()).add(sha))
   }
   return repos.map(repo => (proven.has(repo.path) ? { ...repo, onBase: [...(proven.get(repo.path) as Set<string>)] } : repo))
 }
