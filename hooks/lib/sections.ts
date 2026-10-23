@@ -30,8 +30,11 @@ export const NARROW_PX = 340
 
 export const chipWidthOf = (chip: ChipSize) => 2 + 12 + (chip.hasMark ? chip.markWidth + 8 : 0) + widthOf(chip.label, { isBold: true }) + 8 + widthOf(String(chip.count), { isBold: true }) + 12
 
-export const dotExtraOf = (block: Block | undefined, inner: number) =>
-  (linesOf((block ? shownDots(block) : []).map(mark => 6 + 2 + textWidth(String(mark.count), 11, { isBold: true })), inner, 4) - 1) * 16
+export const dotWidthOf = (count: number) => 6 + 2 + textWidth(String(count), 11, { isBold: true })
+
+export const dotExtraOf = (block: Block | undefined, inner: number) => (linesOf((block ? shownDots(block) : []).map(mark => dotWidthOf(mark.count)), inner, 4) - 1) * 16
+
+export const tileInnerOf = (width: number, perRow: number) => (width - (perRow - 1) * 8) / perRow - 2 - 16
 
 export const repoWidthOf = (name: string) => 8 + 12 + 4 + textWidth(name, 12, { isMono: true }) + 8
 

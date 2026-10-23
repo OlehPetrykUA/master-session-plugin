@@ -2,9 +2,9 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, FoundElement } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import type { AgentRecord, Board, BoardSession, Live, WorkflowRecord } from '../../../types'
+import type { AgentRecord, Board, BoardSession, Live, Repo, WorkflowRecord } from '../../../types'
 
-import { BAR_MIN, PILL_WIDTH, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, overallOf, percentOf } from '../../lib/band'
+import { BAR_MIN, PILL_WIDTH, askingChatOf, bandItemsOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, overallOf, percentOf } from '../../lib/band'
 import type { AgentCounts } from '../../lib/band'
 import { CH, across, tall, widthOf } from '../../lib/layout'
 import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, started, text, warmUp, world } from '../../testing/world'
@@ -62,7 +62,7 @@ async function band($: Engine, on: On, sessions: BoardSession[], isPaneOpen = fa
 
 const mount = ($: Engine, bodyColumns = 100) => $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns } })
 
-const IDLE = { agents: [], workflows: [] }
+const IDLE = { agents: [], workflows: [], at: 0 }
 
 function crewOf($: Engine, on: On) {
   let running: string[] = []
@@ -140,6 +140,7 @@ const CREW = (asking: { own?: boolean; remote?: boolean; flow?: boolean } = {}) 
       { id: 'w1', type: 'workflow-subagent', description: 'scan 1', state: 'running' as const, startedAt: 8, run: { id: 'wf_1', index: 1 }, ...(asking.flow ? { asking: { ...ask, text: 'Allow Edit: a.ts' } } : {}) },
     ],
     workflows: [{ id: 'wf_1', toolUseId: 't1', name: 'review-changes', phases: ['Scan', 'Check'], startedAt: 6 }],
+    at: 0,
   }
 }
 
@@ -167,22 +168,21 @@ test('no band with no board and no worker of mine, with an empty board and no wo
 
 
 test('unit values: a session is steps done over total and 1 when done, a subagent 0 until it finishes (done or failed) then 1, a run is its agents finished over its agents', () => {
-  const sessions = crewValues(IDLE).filter(one => one.kind === 'session')
-  expect(sessions.map(one => [one.id, one.value, one.isFinished])).toEqual([
-    ['local_a', 0.8, false],
-    ['local_b', 0.6, false],
-    ['local_c', 0.8, false],
-    ['local_d', 1, true],
+  expect(crewValues(IDLE).map(one => [one.value, one.isFinished])).toEqual([
+    [0.8, false],
+    [0.6, false],
+    [0.8, false],
+    [1, true],
   ])
-  const crew = { agents: [agentOf('s1', 'running'), agentOf('s2', 'done'), agentOf('s3', 'failed'), agentOf('n1', 'running', { parentAgentId: 's1' })], workflows: [] }
-  expect(crewValues(crew, []).map(one => [one.id, one.kind, one.value, one.isRunning])).toEqual([
-    ['s1', 'subagent', 0, true],
-    ['n1', 'subagent', 0, true],
-    ['s2', 'subagent', 1, false],
-    ['s3', 'subagent', 1, false],
+  const crew = { agents: [agentOf('s1', 'running'), agentOf('s2', 'done'), agentOf('s3', 'failed'), agentOf('n1', 'running', { parentAgentId: 's1' })], workflows: [], at: 0 }
+  expect(crewValues(crew, []).map(one => [one.value, one.isRunning])).toEqual([
+    [0, true],
+    [0, true],
+    [1, false],
+    [1, false],
   ])
-  const run = (states: AgentRecord['state'][]) => ({ agents: states.map((state, index) => agentOf(`w${index}`, state, { type: 'workflow-subagent', run: { id: 'wf_1', index } })), workflows: [] })
-  const valueOf = (states: AgentRecord['state'][]) => crewValues(run(states), []).find(one => one.kind === 'workflow')
+  const run = (states: AgentRecord['state'][]) => ({ agents: states.map((state, index) => agentOf(`w${index}`, state, { type: 'workflow-subagent', run: { id: 'wf_1', index } })), workflows: [], at: 0 })
+  const valueOf = (states: AgentRecord['state'][]) => crewValues(run(states), [])[0]
   expect([valueOf(['done', 'running', 'running'])?.value, valueOf(['done', 'failed', 'running', 'running'])?.value, valueOf(['running'])?.value]).toEqual([1 / 3, 0.5, 0])
   expect([valueOf(['done', 'failed']), valueOf(['done', 'failed'])?.isFinished]).toEqual([expect.objectContaining({ value: 1, isRunning: false }), true])
 })
@@ -192,7 +192,7 @@ test('overall is the mean of the unit values and the percent its floor: 2 of 3 s
   expect(percentOf(only('step 2 of 3 — x'))).toBe(66)
   expect(percentOf(only('step 5 of 5 — x'))).toBe(99)
   expect(percentOf(only('step 5 of 5 — x', 'done'))).toBe(100)
-  const units = crewValues({ agents: [agentOf('s1', 'running')], workflows: [] })
+  const units = crewValues({ agents: [agentOf('s1', 'running')], workflows: [], at: 0 })
   expect(Math.abs(overallOf(units) - 3.2 / 5)).toBeLessThan(1e-9)
   expect(percentOf(units)).toBe(64)
   expect(percentOf([])).toBe(0)
@@ -202,12 +202,74 @@ test('overall is the mean of the unit values and the percent its floor: 2 of 3 s
 })
 
 test('finishing never lowers the overall: a subagent and a run agent stay counted as 1', () => {
-  const before = { agents: [agentOf('s1', 'running'), agentOf('w0', 'done', { run: { id: 'wf_1', index: 0 } }), agentOf('w1', 'running', { run: { id: 'wf_1', index: 1 } })], workflows: [] }
+  const before = { agents: [agentOf('s1', 'running'), agentOf('w0', 'done', { run: { id: 'wf_1', index: 0 } }), agentOf('w1', 'running', { run: { id: 'wf_1', index: 1 } })], workflows: [], at: 0 }
   const mid = percentOf(crewValues(before))
-  const after = { agents: before.agents.map(one => (one.id === 's1' ? { ...one, state: 'done' as const } : one)), workflows: [] }
+  const after = { agents: before.agents.map(one => (one.id === 's1' ? { ...one, state: 'done' as const } : one)), workflows: [], at: 0 }
   expect(percentOf(crewValues(after))).toBeGreaterThanOrEqual(mid)
-  const ended = { agents: after.agents.map(one => ({ ...one, state: 'done' as const })), workflows: [] }
+  const ended = { agents: after.agents.map(one => ({ ...one, state: 'done' as const })), workflows: [], at: 0 }
   expect(percentOf(crewValues(ended))).toBeGreaterThanOrEqual(percentOf(crewValues(after)))
+})
+
+const own = (id: string, extra: Partial<AgentRecord> = {}) => agentOf(id, 'running', extra)
+
+const ASKING = { text: 'which one?', since: 1 }
+
+const AT = 1_000_000
+
+const TREES: Repo[] = [
+  {
+    path: '/r',
+    name: 'r',
+    localOnly: 0,
+    base: 'main',
+    onBase: ['abc1234'],
+    worktrees: [
+      { path: '/r/one', branch: 'one', sha: 'abc1234', isMain: false, dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0, unmerged: 0 },
+      { path: '/r/two', branch: 'two', sha: 'def5678', isMain: false, dirty: 0, paths: [], upstream: '', ahead: 0, behind: 0, unmerged: 2 },
+    ],
+  },
+]
+
+const READY: BoardSession = { id: 'local_r', name: 'ready-one', state: 'done', progress: 'step 4 of 4 — x', sha: 'abc1234', cwd: '/r/one' }
+
+type Fixture = { name: string; sessions: BoardSession[]; agents: AgentRecord[]; workflows?: WorkflowRecord[]; trees?: Repo[]; family?: boolean; outsiders?: boolean; text: string }
+
+const FIXTURES: Fixture[] = [
+  { name: 'no sessions, a running subagent and a running workflow', sessions: [], agents: [own('s1'), own('w0', { type: 'workflow-subagent', run: { id: 'wf_1', index: 0 } })], text: '2 working · 0 waiting · 1 subagent · 1 workflow' },
+  { name: 'sessions only', sessions: WORKING, agents: [], text: '2 working · 1 waiting' },
+  { name: 'an asking subagent', sessions: WORKING, agents: [own('s1', { asking: ASKING })], text: '2 working · 1 waiting' },
+  { name: 'a running parent subagent with a running child', sessions: [], agents: [own('s1'), own('n1', { parentAgentId: 's1' })], text: '1 working · 1 waiting · 1 subagent' },
+  { name: 'a worker with a remote running run', sessions: WORKING, agents: [own('x0', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } })], text: '2 working · 1 waiting' },
+  { name: 'a local run and a remote running run', sessions: WORKING, agents: [own('w0', { run: { id: 'wf_1', index: 0 } }), own('x0', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } })], text: '3 working · 1 waiting · 1 workflow' },
+  { name: 'a records-only workflow older than 120 s', sessions: [], agents: [], workflows: [{ id: 'wf_old', toolUseId: 't', startedAt: AT - 121_000 }], text: '0 working · 0 waiting' },
+  { name: 'a ready session whose family has unmerged commits', sessions: [READY], agents: [], trees: TREES, family: true, text: '0 working · 1 waiting' },
+  { name: 'no board and sessions that are not workers', sessions: [], agents: [], outsiders: true, text: '1 working · 1 waiting' },
+  { name: 'a mix', sessions: NEEDS, agents: [own('s1'), own('n1', { parentAgentId: 's1' }), agentOf('d1', 'done'), own('r1', { parentSessionId: 'local_b' }), own('w0', { run: { id: 'wf_1', index: 0 } }), own('x0', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } })], text: '5 working · 2 waiting · 2 subagents · 1 workflow' },
+]
+
+const READY_LIVE: Live['sessions'][number] = { id: '', name: 'out', title: 'out', cwd: '/', isRunning: false, isArchived: false, lastActivityAt: 0, startedBy: 'someone-else' }
+
+const fixtureLive = (fixture: Fixture): Live => {
+  const live = liveOf([], fixture.sessions)
+  if (fixture.outsiders) return { ...live, sessions: [{ ...READY_LIVE, id: 'o1', isRunning: true }, { ...READY_LIVE, id: 'o2', isRunning: false }] }
+  if (!fixture.family) return live
+  const side = { id: 'local_f', name: 'side', title: '', cwd: '/r/two', isRunning: false, isArchived: false, lastActivityAt: 0, startedBy: READY.id }
+  return { ...live, sessions: live.sessions.map(one => ({ ...one, cwd: '/r/one' })), family: [...live.sessions.map(one => ({ ...one, cwd: '/r/one' })), side] }
+}
+
+for (const fixture of FIXTURES) test(`the band counts read like the pane chips: ${fixture.name}`, () => {
+  const board = fixture.outsiders ? null : boardOf(fixture.sessions)
+  const counts = { agents: fixture.agents, workflows: fixture.workflows ?? [], at: AT }
+  expect(countsText(countsOf(bandItemsOf(board, counts, fixtureLive(fixture), fixture.trees ?? []), false, 0))).toBe(fixture.text)
+})
+
+test('the band reads the counts from the pane: one own subagent reads 1 working · 0 waiting · 1 subagent, one subagent and one workflow read 2 working · 0 waiting · 1 subagent · 1 workflow', () => {
+  const texts = (agents: AgentRecord[]) => {
+    const view = bandViewOf(100, null, bandProgressWith(null, liveOf([], []), { agents, workflows: [], at: 0 }) ?? { segments: [], total: 0 }, false, { agents, workflows: [], at: 0 }, { board: () => undefined, chat: () => undefined }, liveOf([], []))
+    return countsText(view.parts)
+  }
+  expect(texts([own('s1')])).toBe('1 working · 0 waiting · 1 subagent')
+  expect(texts([own('s1'), own('w0', { run: { id: 'wf_1', index: 0 } })])).toBe('2 working · 0 waiting · 1 subagent · 1 workflow')
 })
 
 test('units count the master’s own subagents and runs, each worker’s subagents and runs, and the ones of a worker that is gone', () => {
@@ -219,18 +281,18 @@ test('units count the master’s own subagents and runs, each worker’s subagen
       agentOf('x0', 'running', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } }),
       agentOf('w0', 'done', { run: { id: 'wf_1', index: 0 } }),
     ],
-    workflows: [],
+    workflows: [], at: 0,
   }
-  expect(crewValues(crew).map(one => [one.id, one.kind])).toEqual([
-    ['o1', 'subagent'],
-    ['local_a', 'session'],
-    ['local_b', 'session'],
-    ['r1', 'subagent'],
-    ['local_c', 'session'],
-    ['wf_9', 'workflow'],
-    ['local_d', 'session'],
-    ['g1', 'subagent'],
-    ['wf_1', 'workflow'],
+  expect(crewValues(crew).map(one => [one.value, one.isRunning])).toEqual([
+    [0, true],
+    [0.8, false],
+    [0.6, true],
+    [0, true],
+    [0.8, true],
+    [0, true],
+    [1, false],
+    [0, true],
+    [1, false],
   ])
 })
 
@@ -238,9 +300,9 @@ test('fill tone: red when anyone needs you, else green while anything runs, else
   const view = (sessions: BoardSession[], crew: AgentCounts = IDLE) => viewOf(sessions, crew).view
   const waiting = WORKING.map(one => ({ ...one, state: 'waiting' as const }))
   expect([view(NEEDS).tone, view(WORKING).tone, view(waiting).tone, view(DONE).tone]).toEqual(['red', 'green', 'grey', 'green'])
-  expect(view(NEEDS, { agents: [agentOf('s1', 'running')], workflows: [] }).tone).toBe('red')
-  expect(view(waiting, { agents: [agentOf('s1', 'running')], workflows: [] }).tone).toBe('green')
-  expect(view(waiting, { agents: [agentOf('s1', 'done')], workflows: [] }).tone).toBe('grey')
+  expect(view(NEEDS, { agents: [agentOf('s1', 'running')], workflows: [], at: 0 }).tone).toBe('red')
+  expect(view(waiting, { agents: [agentOf('s1', 'running')], workflows: [], at: 0 }).tone).toBe('green')
+  expect(view(waiting, { agents: [agentOf('s1', 'done')], workflows: [], at: 0 }).tone).toBe('grey')
   expect([view(DONE).isAllDone, view(DONE).isRunning, view(DONE).overall]).toEqual([true, false, 1])
 })
 
@@ -251,11 +313,11 @@ test('the user’s case: every session done and 2 subagents running reads 66% an
   await crew.subagent('docs')
   await crew.subagent('review')
   const ui = await mount($)
-  expect(await textsOf(ui)).toEqual(['66%', '0 working · 0 waiting · 2 subagents', '0', '0', '2', 'Open board'])
+  expect(await textsOf(ui)).toEqual(['66%', '2 working · 0 waiting · 2 subagents', '2', '0', '2', 'Open board'])
   const source = String((await stripOf(ui))?.props.source)
   expect(source).toContain('animateTransform')
   expect(source).toContain('fill:var(--green)')
-  expect((await stripOf(ui))?.props.alt).toBe('Master session: 66 percent, 0 working, 0 waiting, 2 subagents')
+  expect((await stripOf(ui))?.props.alt).toBe('Master session: 66 percent, 2 working, 0 waiting, 2 subagents')
   await crew.finish('docs')
   await crew.finish('review')
   await ui.unmount()
@@ -330,10 +392,10 @@ test('counts: numbers 600 C.text tabular, words and separators C.muted, the same
   await crew.workflow(3)
   const all = await mount($)
   const found = await styleOf(all)
-  expect(found.text).toBe('2 working · 1 waiting · 2 subagents · 1 workflow')
+  expect(found.text).toBe('5 working · 1 waiting · 2 subagents · 1 workflow')
   expect(found.parent).toEqual(['inactive', undefined])
-  expect(found.numbers).toEqual(['2', '1', '2', '1'].map(value => [value, 'text', 'semibold', true]))
-  expect((await stripOf(all))?.props.alt).toBe('Master session: 45 percent, 2 working, 1 waiting, 2 subagents, 1 workflow')
+  expect(found.numbers).toEqual(['5', '1', '2', '1'].map(value => [value, 'text', 'semibold', true]))
+  expect((await stripOf(all))?.props.alt).toBe('Master session: 45 percent, 5 working, 1 waiting, 2 subagents, 1 workflow')
   const colors = (await all.findAll({ type: 'Text' })).filter(one => one.text !== 'Open board' && !/%$/.test(one.text)).map(one => one.props.color)
   expect(new Set(colors)).toEqual(new Set(['inactive', 'text']))
   await all.unmount()
@@ -462,7 +524,7 @@ for (const point of WIDTHS) {
     await crew.subagent('docs')
     const ui = await mount($, columnsFor(point.px))
     const width = point.px
-    const view = viewOf(WORKING, { agents: [agentOf('docs', 'running')], workflows: [] }, columnsFor(width)).view
+    const view = viewOf(WORKING, { agents: [agentOf('docs', 'running')], workflows: [], at: 0 }, columnsFor(width)).view
     expect([view.showCounts, view.hasPercent]).toEqual([point.counts, point.percent])
     expect(!!(await countsIn(ui))).toBe(point.counts)
     expect(!!(await percentIn(ui))).toBe(point.percent)
@@ -518,9 +580,9 @@ test('terminal: one bar of block characters, the percent, the counts with their 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const texts = await textsOf(ui)
   expect(texts.slice(0, 2)).toEqual(['64%', expect.stringMatching(/^█+░*$/)])
-  expect(texts.slice(2)).toEqual(['2 working · 1 waiting · 1 subagent', '2', '1', '1'])
+  expect(texts.slice(2)).toEqual(['3 working · 1 waiting · 1 subagent', '3', '1', '1'])
   expect((await ui.findAll({ type: 'Text' })).filter(one => /^\d+$/.test(one.text)).every(one => one.props.weight === 'semibold')).toBe(true)
-  expect((await ui.findAll({ type: 'Text' })).find(one => one.text.startsWith('2 working'))?.props.dimColor).toBe(true)
+  expect((await ui.findAll({ type: 'Text' })).find(one => one.text.startsWith('3 working'))?.props.dimColor).toBe(true)
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
   expect((await ui.findAll({ type: 'Text' })).filter(one => /^[█░]+$/.test(one.text))).toHaveLength(1)
   await ui.press({ key: 'band-board' })
@@ -556,13 +618,13 @@ test('with no worker sessions, running subagents still show the band: 0%, the su
   const crew = crewOf($, on)
   await band($, on, [], false, [])
   expect(bandProgressWith(boardOf([]), liveOf([], []), IDLE)).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'done')], workflows: [] })).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'running')], workflows: [] })?.total).toBe(0)
+  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'done')], workflows: [], at: 0 })).toBeUndefined()
+  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'running')], workflows: [], at: 0 })?.total).toBe(0)
   expect(bandProgressWith(boardOf(WORKING), liveOf([], WORKING), IDLE)?.total).toBe(4)
   await crew.subagent('docs')
   await crew.subagent('review')
   const ui = await mount($)
-  expect(await textsOf(ui)).toEqual(['0%', '0 working · 0 waiting · 2 subagents', '0', '0', '2', 'Open board'])
+  expect(await textsOf(ui)).toEqual(['0%', '2 working · 0 waiting · 2 subagents', '2', '0', '2', 'Open board'])
   expect(String((await stripOf(ui))?.props.source)).toContain('animateTransform')
   await ui.unmount()
 })
@@ -608,7 +670,7 @@ test('a worker’s run keeps its phases and counts as one unit, as a unit of age
   const crew = CREW()
   const workflows: WorkflowRecord[] = [...crew.workflows, { id: 'wf_9', toolUseId: '', name: 'remote-review', phases: ['A', 'B', 'C'], startedAt: 5, parentSessionId: 'local_c' }, { id: 'wf_8', toolUseId: '', phases: ['X', 'Y'], startedAt: 6, parentSessionId: 'local_a' }]
   const { view } = viewOf(WORKING, { ...crew, workflows })
-  expect(view.units.filter(one => one.kind === 'workflow').map(one => [one.id, one.value, one.isRunning])).toEqual([['wf_8', 0, true], ['wf_9', 0, true], ['wf_1', 0.5, true]])
+  expect(view.units.map(one => [one.value, one.isRunning])).toEqual([[0, true], [0, true], [0.8, false], [0, true], [0.6, true], [0, true], [0, true], [0.8, true], [0, true], [1, false], [0.5, true]])
 })
 
 test('a plain session that runs a subagent, with no board of its own and no workers, gets no band', async ($, on) => {
@@ -630,6 +692,41 @@ test('a plain session that runs a subagent, with no board of its own and no work
   const ui = await mount($)
   expect(await textsOf(ui)).toEqual(['no band'])
   await ui.unmount()
+})
+
+test('a workflow with no agents stops drawing the band after 120 s, as the pane hides it', async ($, on) => {
+  const crew = crewOf($, on)
+  on('ui.render', { component: 'AbovePrompt' }, ($, event) => {
+    const { Text } = $.ui.resolve(event)
+    return <Text>no band</Text>
+  })
+  const { clock } = await band($, on, [])
+  await crew.workflow(0)
+  const before = await mount($)
+  expect(await textsOf(before)).toEqual(['0%', '1 working · 0 waiting · 1 workflow', '1', '0', '1', 'Open board'])
+  await before.unmount()
+  await clock.advance(121_000)
+  await clock.settle()
+  const after = await mount($)
+  expect(await textsOf(after)).toEqual(['no band'])
+  await after.unmount()
+})
+
+test('subagents that finished stay in the percent: 2 of 3 done read 66% now and after three minutes', async ($, on) => {
+  const crew = crewOf($, on)
+  const { clock } = await band($, on, [])
+  for (const name of ['a', 'b', 'c']) await crew.subagent(name)
+  await crew.finish('a')
+  await crew.finish('b')
+  const before = await mount($)
+  expect(await percentIn(before)).toBe('66%')
+  await before.unmount()
+  await clock.advance(180_000)
+  await clock.settle()
+  const after = await mount($)
+  expect([await percentIn(after), (await textsOf(after))[1]]).toEqual(['66%', '1 working · 0 waiting · 1 subagent'])
+  await after.unmount()
+  await crew.finish('c')
 })
 
 test('the band draws every linked worker on a stale board and leaves the archived one out: 2 of 4 published gives 4 units, and the pane draws the same 4 rows', async ($, on) => {
@@ -687,16 +784,17 @@ const fiveUnits = (sessions: BoardSession[], idle: string[] = ['local_i']) => {
 
 test('unit state follows the pane: a working session that is not live is idle and waits, a ready session (done with a sha) is not finished; five sessions read 1 working · 4 waiting', () => {
   const units = fiveUnits(FIVE)
-  expect(countsText(countsOf(units, false))).toBe('1 working · 4 waiting')
-  expect(units.map(one => [one.id, one.group, one.isRunning, one.isFinished])).toEqual([
-    ['local_a', 'waiting', false, false],
-    ['local_i', 'waiting', false, false],
-    ['local_f', 'waiting', false, false],
-    ['local_w', 'working', true, false],
-    ['local_r', 'waiting', false, false],
+  const items = (sessions: BoardSession[], idle: string[]) => bandItemsOf(boardOf(sessions), IDLE, liveOf([], sessions, idle))
+  expect(countsText(countsOf(items(FIVE, ['local_i']), false, units.length))).toBe('1 working · 4 waiting')
+  expect(units.map(one => [one.isRunning, one.isFinished])).toEqual([
+    [false, false],
+    [false, false],
+    [false, false],
+    [true, false],
+    [false, false],
   ])
   const notLive = fiveUnits([{ ...FIVE[0]!, id: 'local_n' }], ['local_n'])
-  expect([notLive[0]?.group, notLive[0]?.isRunning]).toEqual(['waiting', false])
+  expect(notLive[0]?.isRunning).toBe(false)
 })
 
 test('a ready session never makes "All N done": it holds the percent at 99 and the fill grey', () => {
@@ -716,7 +814,7 @@ test('the pill names the unit that asked first by its since, not by position', (
   const ask = (text: string, since: number) => ({ text, since })
   const crew = (first: number, second: number) => ({
     agents: [agentOf('o1', 'running', { name: 'Reviewer', type: 'master-session:reviewer', asking: ask('late', second) }), agentOf('o2', 'running', { name: 'Designer', type: 'master-session:designer', asking: ask('early', first) })],
-    workflows: [],
+    workflows: [], at: 0,
   })
   expect(viewOf(WORKING, crew(1, 5)).view.pillText).toBe('Designer needs you · early')
   expect(viewOf(WORKING, crew(5, 1)).view.pillText).toBe('Code reviewer needs you · late')

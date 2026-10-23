@@ -1,4 +1,4 @@
-import type { AgentRecord, Board, Live, Repo, SessionState, WorkflowRecord } from '../../types'
+import type { AgentRecord, Board, Live, Repo, WorkflowRecord } from '../../types'
 
 import { BAR, BUTTON, CHECK, PERCENT, PILL } from '../theme/band'
 import { PERSONA_GLYPH } from '../theme/icons'
@@ -9,9 +9,9 @@ import type { WorkflowRun } from './agents'
 import { progressOf } from './board'
 import type { Progress } from './board'
 import { CH, fit, textWidth, widthOf } from './layout'
-import { CHAT_LABEL, GROUP_OF, nameText, personaOfType, sessionNameOf, sessionStatusOf } from './list'
-import { rowsOf } from './rows'
-import type { Row } from './rows'
+import { CHAT_LABEL, countsOfItems, isGhostRun, itemsOf, nameText, personaOfType, sessionNameOf } from './list'
+import type { ListItem } from './list'
+import { familyOf, rowsOf } from './rows'
 
 const DIGIT = 0.64
 export const HIT = 'band-hit-'
@@ -26,13 +26,11 @@ export type BandAction = 'board' | 'chat'
 
 type BandActions = { board: () => void; chat: (id: string, name: string) => void }
 
-export type AgentCounts = { agents: readonly AgentRecord[]; workflows: readonly WorkflowRecord[] }
+export type AgentCounts = { agents: readonly AgentRecord[]; workflows: readonly WorkflowRecord[]; at: number }
 
 type Asker = { name: string; short: string; glyph: IconName; parent?: string; reason?: string; since?: number; chat?: { id: string; name: string } }
 
-type UnitKind = 'session' | 'subagent' | 'workflow'
-
-type Unit = { id: string; kind: UnitKind; value: number; isRunning: boolean; isFinished: boolean; group?: SessionState; asker?: Asker }
+type Unit = { value: number; isRunning: boolean; isFinished: boolean; asker?: Asker }
 
 type CountPart = { text: string; isNumber: boolean }
 
@@ -41,7 +39,7 @@ export const bandAction = (element: string) => {
   return name === 'board' || name === 'chat' ? name : undefined
 }
 
-export const agentCountsOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]): AgentCounts => ({ agents, workflows })
+export const agentCountsOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], at: number): AgentCounts => ({ agents, workflows, at })
 
 const wordFor = (count: number, word: string) => `${word}${count === 1 ? '' : 's'}`
 
@@ -70,8 +68,6 @@ function subagentUnits(agents: readonly AgentRecord[], place: Place): Unit[] {
   return treeOf(agents).map(({ agent, parent }) => {
     const isRunning = agent.state === 'running'
     return {
-      id: agent.id,
-      kind: 'subagent',
       value: isRunning ? 0 : 1,
       isRunning,
       isFinished: !isRunning,
@@ -86,8 +82,6 @@ function runUnits(runs: readonly WorkflowRun[], place: Place): Unit[] {
     const isRunning = run.state === 'running'
     const finished = run.counts.done + run.counts.failed
     return {
-      id: run.id,
-      kind: 'workflow',
       value: isRunning ? (run.counts.total ? finished / run.counts.total : 0) : 1,
       isRunning,
       isFinished: !isRunning,
@@ -96,55 +90,53 @@ function runUnits(runs: readonly WorkflowRun[], place: Place): Unit[] {
   })
 }
 
-const remoteOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], id: string, place: Place) => {
+const liveRunsOf = ({ agents, workflows, at }: AgentCounts) => workflowRunsOf(agents, workflows).filter(run => !isGhostRun(run, at))
+
+const remoteOf = ({ agents, workflows, at }: AgentCounts, id: string, place: Place) => {
   const mine = agents.filter(one => one.parentSessionId === id)
   const runs = runUnits(
     workflowRunsOf(
       mine.map(({ parentSessionId, ...one }) => one),
       workflows.filter(one => one.parentSessionId === id).map(({ parentSessionId, ...one }) => one),
-    ),
+    ).filter(run => !isGhostRun(run, at)),
     { chat: place.chat },
   )
   return { subs: subagentUnits(mine.filter(one => !one.run), place), runs }
 }
 
-export function bandUnitsOf(segments: Progress['segments'], current: Board | null, { agents, workflows }: AgentCounts, live?: Live, trees: readonly Repo[] = []): Unit[] {
+export function bandUnitsOf(segments: Progress['segments'], current: Board | null, counts: AgentCounts, live?: Live, trees: readonly Repo[] = [], items: readonly ListItem[] = bandItemsOf(current, counts, live, trees)): Unit[] {
+  const { agents } = counts
   const own = agents.filter(one => !one.parentSessionId)
   const units: Unit[] = subagentUnits(
     own.filter(one => !one.run),
     {},
   )
   const known = new Set(segments.map(one => one.id))
-  const rows = live ? rowsOf(current, live) : []
   for (const segment of segments) {
     const row = current?.sessions.find(one => one.id === segment.id)
     const name = row?.name ?? segment.id
     const chat = { id: segment.id, name }
     const display = sessionNameOf(live?.sessions.find(one => one.id === segment.id)?.title || row?.title || name, row?.persona)
     const self = { name: nameText(display), short: display.persona, glyph: PERSONA_GLYPH[display.persona] ?? ('session' as const) }
-    const { subs, runs } = remoteOf(agents, workflows, segment.id, { parent: display.persona === 'Session' ? display.task : display.persona, chat })
-    const found: Row = rows.find(one => one.id === segment.id) || { id: segment.id, name, title: row?.title ?? '', state: segment.state, board: row }
-    const group = GROUP_OF[sessionStatusOf(found, trees, live?.sessions ?? [])]
+    const { subs, runs } = remoteOf(counts, segment.id, { parent: display.persona === 'Session' ? display.task : display.persona, chat })
+    const group = items.find(one => one.kind === 'session' && one.id === segment.id)?.group ?? segment.state
     const isAsking = group === 'needs-you'
     const child = isAsking ? [...subs, ...runs].find(one => one.asker && one.asker.reason === row?.needsYou) : undefined
     const isDone = group === 'done'
     units.push({
-      id: segment.id,
-      kind: 'session',
       value: isDone ? 1 : clamp(segment.fill),
       isRunning: group === 'working',
       isFinished: isDone,
-      group,
       asker: isAsking ? (child?.asker ?? { ...self, reason: row?.needsYou, chat }) : undefined,
     })
     units.push(...subs, ...runs)
   }
   const gone = [...new Set(agents.flatMap(one => (one.parentSessionId && !known.has(one.parentSessionId) ? [one.parentSessionId] : [])))]
   gone.forEach(id => {
-    const { subs, runs } = remoteOf(agents, workflows, id, {})
+    const { subs, runs } = remoteOf(counts, id, {})
     units.push(...subs, ...runs)
   })
-  units.push(...runUnits(workflowRunsOf(agents, workflows), {}))
+  units.push(...runUnits(liveRunsOf(counts), {}))
   return units
 }
 
@@ -160,13 +152,16 @@ export const percentOf = (units: readonly Unit[]) => {
   return Math.min(99, Math.floor(overallOf(units) * 100 + 1e-9))
 }
 
-export function countsOf(units: readonly Unit[], isAllDone: boolean): CountPart[] {
-  if (isAllDone) return [{ text: 'All ', isNumber: false }, { text: String(units.length), isNumber: true }, { text: ' done', isNumber: false }]
-  const sessions = (group: SessionState) => units.filter(one => one.kind === 'session' && one.group === group).length
-  const running = (kind: UnitKind) => units.filter(one => one.kind === kind && one.isRunning).length
-  const subagents = running('subagent')
-  const workflows = running('workflow')
-  const entries: [number, string][] = [[sessions('working'), 'working'], [sessions('waiting'), 'waiting']]
+export const bandItemsOf = (current: Board | null, { agents, workflows, at }: AgentCounts, live?: Live, trees: readonly Repo[] = []) =>
+  itemsOf(live ? rowsOf(current, live) : [], agents, workflows, { at, trees, sessions: live ? familyOf(live) : [] })
+
+export function countsOf(items: readonly ListItem[], isAllDone: boolean, total: number): CountPart[] {
+  if (isAllDone) return [{ text: 'All ', isNumber: false }, { text: String(total), isNumber: true }, { text: ' done', isNumber: false }]
+  const counts = countsOfItems(items, 0)
+  const working = (kind: ListItem['kind']) => items.filter(one => one.kind === kind && one.group === 'working').length
+  const subagents = working('subagent')
+  const workflows = working('workflow')
+  const entries: [number, string][] = [[counts.working, 'working'], [counts.waiting, 'waiting']]
   if (subagents) entries.push([subagents, wordFor(subagents, 'subagent')])
   if (workflows) entries.push([workflows, wordFor(workflows, 'workflow')])
   return entries.flatMap(([count, word], index): CountPart[] => [...(index ? [{ text: SEPARATOR, isNumber: false }] : []), { text: String(count), isNumber: true }, { text: ` ${word}`, isNumber: false }])
@@ -191,17 +186,19 @@ export function askingChatOf(current: Board | null, live: Live, agents: AgentCou
 
 const IDLE_PROGRESS: Progress = { segments: [], total: 0 }
 
-export function bandProgressWith(current: Board | null, live: Live, { agents, workflows }: AgentCounts) {
+export function bandProgressWith(current: Board | null, live: Live, counts: AgentCounts) {
+  const { agents } = counts
   const progress = bandProgress(current, live)
   if (progress) return progress
-  const isBusy = agents.some(one => one.state === 'running') || workflowRunsOf(agents, workflows).some(run => run.state === 'running')
+  const isBusy = agents.some(one => one.state === 'running') || liveRunsOf(counts).some(run => run.state === 'running')
   return isBusy ? IDLE_PROGRESS : undefined
 }
 
 export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live?: Live, trees: readonly Repo[] = []) {
   const width = columns * CH - 16
   const isNarrow = width < COUNTS_BELOW
-  const units = bandUnitsOf(progress.segments, current, agents, live, trees)
+  const items = bandItemsOf(current, agents, live, trees)
+  const units = bandUnitsOf(progress.segments, current, agents, live, trees, items)
   const asker = firstAskerOf(units)
   const isAllDone = !asker && units.length > 0 && units.every(one => one.isFinished)
   const isRunning = units.some(one => one.isRunning)
@@ -209,7 +206,7 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
   const percent = percentOf(units)
   const tone: BarTone = asker ? 'red' : isAllDone || isRunning ? 'green' : 'grey'
   const hasPercent = !asker && !isAllDone && width >= PERCENT_BELOW
-  const parts = asker ? [] : countsOf(units, isAllDone)
+  const parts = asker ? [] : countsOf(items, isAllDone, units.length)
   const full = asker ? `${headOf(asker)}${asker.reason ? ` · ${asker.reason}` : ''}` : ''
   const short = asker ? `${asker.short}${NEEDS}` : ''
   const alt = asker

@@ -2,7 +2,6 @@ import { expect, test } from 'claude-code/testing'
 
 import type { AgentRecord, Board, LiveSession, Repo, WorkflowRecord } from '../../types'
 
-import { tileInnerOf } from '../components/list/Summary'
 import { liveOf } from '../testing/world'
 import { I, PERSONA_GLYPH } from '../theme/icons'
 import { modelFamilyOf } from './format'
@@ -12,7 +11,7 @@ import type { Context, RowItem } from './list'
 import type { Row } from './rows'
 import { rowsOf } from './rows'
 import { rowFitOf } from './rowfit'
-import { dotExtraOf } from './sections'
+import { dotExtraOf, dotWidthOf, tileInnerOf } from './sections'
 import { runSummaryOf } from './totals'
 
 const NOW = 10_000_000
@@ -289,7 +288,7 @@ test('the Sessions tile dots add up to its total: needs you, working, waiting an
   expect(tile.dots?.map(mark => mark.count)).toEqual([1, 1, 1, 1])
 })
 
-test('the Sessions tile dots drop zero buckets and wrap inside the tile: known line counts at 41, 47 and 60 columns, every dot fits one line', () => {
+test('the Sessions tile dots drop zero buckets and wrap inside the tile: known line counts at 41, 47 and 60 columns', () => {
   const tile = (counts: number[]) => ({ key: 'sessions', label: 'Sessions', value: '0', sub: '', isAlert: false, dots: (['red', 'green', 'amber', 'grey'] as const).map((tone, index) => ({ tone, count: counts[index] ?? 0 })) })
   expect(shownDots(tile([1, 0, 1, 0])).map(mark => mark.tone)).toEqual(['red', 'amber'])
   const innerOf = (columns: number) => tileInnerOf(bodyWidthOf(columns), columns * CH < 340 ? 3 : 4)
@@ -299,5 +298,8 @@ test('the Sessions tile dots drop zero buckets and wrap inside the tile: known l
   expect([41, 47, 60].map(columns => linesAt([1, 0, 0, 0], columns))).toEqual([1, 1, 1])
   expect([41, 47, 60].map(columns => linesAt([0, 0, 0, 0], columns))).toEqual([1, 1, 1])
   expect(dotExtraOf(undefined, 100)).toBe(0)
-  for (const columns of [41, 47, 60]) for (const count of [1, 12, 88]) expect([columns, count, dotExtraOf(tile([count, 0, 0, 0]), innerOf(columns))]).toEqual([columns, count, 0])
+  for (const columns of [41, 47, 60]) expect([columns, dotExtraOf(tile([88, 0, 0, 0]), innerOf(columns))]).toEqual([columns, 0])
+  expect(dotExtraOf(tile([12, 3, 7, 1]), innerOf(41))).toBe(16)
+  const two = 2 * dotWidthOf(1) + 4
+  expect([dotExtraOf(tile([1, 1, 0, 0]), two), dotExtraOf(tile([1, 1, 0, 0]), two - 0.5)]).toEqual([0, 16])
 })

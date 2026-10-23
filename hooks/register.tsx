@@ -276,7 +276,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, event, next) => {
     if (!(await isMaster($))) return next(event)
     const { board: current } = await boardOf($)
-    const agents = agentCountsOf(await getAgents($), await getWorkflows($))
+    const agents = agentCountsOf(await getAgents($), await getWorkflows($), await $.clock.now())
     const live = await getLive($)
     const progress = bandProgressWith(current, live, agents)
     if (event.props.hasSurvey || !progress) return next(event)

@@ -392,7 +392,7 @@ export async function openSession($: EngineInterface, id: string, name: string) 
 
 export async function openAsking($: EngineInterface) {
   const { board: current } = await boardOf($)
-  const agents = agentCountsOf(await getAgents($), await getWorkflows($))
+  const agents = agentCountsOf(await getAgents($), await getWorkflows($), await $.clock.now())
   const chat = askingChatOf(current, await getLive($), agents, await getRepos($))
   if (chat) await openSession($, chat.id, chat.name)
 }

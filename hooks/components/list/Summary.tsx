@@ -1,6 +1,7 @@
 import { shownDots } from '../../lib/list'
 import type { Block } from '../../lib/list'
 import { across, down, textWidth } from '../../lib/layout'
+import { tileInnerOf } from '../../lib/sections'
 import { dot, numeral } from '../../theme/icons'
 import { C } from '../../theme/tokens'
 import { Icon } from '../Icon'
@@ -10,7 +11,7 @@ export type SummaryProps = { blocks: readonly Block[]; perRow: number; width: nu
 
 export const CAPTION = 11
 
-export const tileInnerOf = (width: number, perRow: number) => (width - (perRow - 1) * 8) / perRow - 2 - 16
+export { tileInnerOf }
 
 export function subOf(one: Block, inner: number) {
   const subs = [one.sub, ...(one.shorts ?? [])]

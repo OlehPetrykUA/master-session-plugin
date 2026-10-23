@@ -1,7 +1,6 @@
 import type { Chip } from '../components/FilterChips'
 import { markWidthOf } from '../components/FilterChips'
 import type { HeaderButton } from '../components/Header'
-import { tileInnerOf } from '../components/list/Summary'
 import type { PaneData } from '../components/types'
 import type { IconName } from '../theme/icons'
 import type { Tone } from '../theme/tokens'
@@ -11,7 +10,7 @@ import { familyOf } from './rows'
 import { ARCHIVED_PEEK, CHAT_LABEL, ageOf, blocksOf, chatTargetOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf } from './list'
 import type { Context } from './list'
 import { rowFitOf } from './rowfit'
-import { NARROW_PX, ROW, contentHeightOf, dotExtraOf, headerRowsOf, sectionTopsOf } from './sections'
+import { NARROW_PX, ROW, contentHeightOf, dotExtraOf, headerRowsOf, sectionTopsOf, tileInnerOf } from './sections'
 import type { SectionInput } from './sections'
 
 export const noticeOf = (error: string) => `Can’t read sessions: ${error}`
@@ -19,12 +18,14 @@ export const noticeOf = (error: string) => `Can’t read sessions: ${error}`
 export const ASK_WIDE = 'Ask for updates'
 export const ASK_WIDE_PX = 460
 
+const newestOf = (data: PaneData) => Math.max(data.live.at, data.board?.at ?? 0, ...data.agents.map(one => Math.max(one.endedAt ?? one.startedAt, one.asking?.since ?? 0)), ...data.workflows.map(one => one.startedAt))
+
 export function statusOf(data: PaneData, isDone: boolean): { text: string; icon: IconName; tone: Tone } {
   if (data.live.error) return { text: 'live data unavailable', icon: 'offline', tone: 'muted' }
   if (data.isRefreshing) return { text: 'refreshing…', icon: 'clock', tone: 'muted' }
   if (data.asked) return { text: `asked ${data.asked.count} worker${data.asked.count === 1 ? '' : 's'} · ${ageOf(data.at - data.asked.at)}`, icon: 'chat', tone: 'muted' }
   if (isDone) return { text: `finished ${data.board?.tick || clockOf(data.at)}`, icon: 'done', tone: 'muted' }
-  return { text: data.live.at ? updatedOf(data.at - data.live.at) : 'loading', icon: 'clock', tone: 'muted' }
+  return { text: data.live.at ? updatedOf(data.at - newestOf(data)) : 'loading', icon: 'clock', tone: 'muted' }
 }
 
 export function paneViewOf(data: PaneData) {
