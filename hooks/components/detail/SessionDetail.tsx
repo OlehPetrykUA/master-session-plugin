@@ -1,6 +1,6 @@
 import { compactOf, modelOf } from '../../lib/format'
 import { across, tall } from '../../lib/layout'
-import { clockOf, oneLine, relativeOf, shortNameOf } from '../../lib/list'
+import { ageOf, askOf, clockOf, foldPath, oneLine, relativeOf, shortNameOf, tildeOf } from '../../lib/list'
 import type { Context, ListItem } from '../../lib/list'
 import { activityOf, headOf, othersOf, syncOf, whereOf } from '../../lib/rows'
 import type { Row } from '../../lib/rows'
@@ -72,6 +72,24 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
   const idle = now ? at - now.lastActivityAt : 0
   const half = (label: string, icon: IconName, children: Parameters<typeof Block>[1]['children'], id: string, gap?: number) => Block(ui, { id: `${id}-${row.id}`, icon, label, children, isHalf: true, gap })
   const base = found?.repo.base ?? 'main'
+  const ask = item.status === 'needs' ? askOf(facts?.needsYou) : undefined
+  const asked = facts?.reportAt ? `asked ${ageOf(at - facts.reportAt)}` : ''
+  const permission = ask
+    ? Callout(ui, {
+        id: `permission-${row.id}`,
+        status: 'needs',
+        icon: 'permission',
+        label: 'Permission',
+        width: props.innerWidth,
+        lines: [
+          { text: `Allow ${ask.tool}`, isStrong: true },
+          { text: tildeOf(ask.rest, home), isStrong: false, isMono: true, rows: 6 },
+          { text: [asked, 'the whole command is in its chat'].filter(Boolean).join(' · '), isStrong: false },
+        ],
+      })
+    : null
+  const risk = facts?.risk ? Callout(ui, { id: `risk-${row.id}`, status: 'unmerged', icon: 'blocker', label: 'Risk', width: props.innerWidth, lines: [{ text: facts.risk, isStrong: true, rows: 3 }] }) : null
+  const pathRoom = props.innerWidth - 24
   const callout =
     item.status === 'ready'
       ? Callout(ui, { id: row.id, status: 'ready', label: 'Ready for verify', lines: [{ text: [`ready ${facts?.sha ?? ''}`.trim(), where?.branch ? `on ${where.branch}` : ''].filter(Boolean).join(' '), isStrong: true }, ...(facts?.tests?.length ? [{ text: oneLine(`gate: ${facts.tests.join(', ')}`), isStrong: false, isOneLine: true }] : [])] })
@@ -81,12 +99,14 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
   return Card(ui, {
     ...props.rowProps,
     children: [
+      permission,
       callout,
       Pair(ui, {
         id: `pair-now-${row.id}`,
         left: half('Now', 'now', Strong(ui, { text: facts?.now || '—', isFull: true }), 'now'),
         right: half('Next', 'next', Strong(ui, { text: facts?.next || '—', isFull: true }), 'next'),
       }),
+      risk,
       activity.length ? Activity(ui, { id: row.id, activity }) : null,
       where
         ? Block(ui, {
@@ -136,7 +156,11 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
             label: 'Files owned',
             children: [
               Strong(ui, { text: `${files.length} file${files.length === 1 ? '' : 's'}`, isFull: true }),
-              ...files.slice(0, 3).map(path => Quiet(ui, { text: oneLine(relativeOf(path, [where?.path ?? '', found?.repo.path ?? ''], home)), isMono: true })),
+              ...files.slice(0, 3).map((path, index) => (
+                <Text key={`file-${row.id}-${index}`} size="footnote" color={C.muted} mono wrap="truncate-middle">
+                  {foldPath(oneLine(relativeOf(path, [where?.path ?? '', found?.repo.path ?? ''], home)), pathRoom)}
+                </Text>
+              )),
               files.length > 3 ? Quiet(ui, { text: `+${files.length - 3} more`, isFull: true }) : null,
             ],
           })
@@ -162,7 +186,6 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
             right: half('Model', 'modelChip', ModelValue(ui, { id: row.id, model: now?.model, text: model || '—' }), 'model', 8),
           })
         : null,
-      facts?.risk ? Block(ui, { id: `risk-${row.id}`, icon: 'blocker', label: 'Risk', children: Strong(ui, { text: facts.risk, isFull: true }) }) : null,
       ActionRow(ui, { row, name: shortNameOf(item), losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, isReadOnly: props.isReadOnly, actions }),
     ],
   })

@@ -4,7 +4,8 @@ import type { On } from 'claude-code'
 import type { AgentRecord } from '../../../types'
 
 import { across, tall, textWidth } from '../../lib/layout'
-import { clampText } from '../../lib/list'
+import { rowsOf } from '../../lib/list'
+import { C } from '../../theme/tokens'
 import { BOARD, HOME, PANE, SELF, WORKTREE, click, hitsOf, started, textsOf } from '../../testing/world'
 
 const BASH = `Allow Bash: P=/Users/opetryk/Work/master-session-plugin; W="$HOME/.claude/worktrees/wt-master-session-plugin-band-v3"; git -C $P merge-base --is-ancestor 9bd146ce23c7d6485d main && git -C "$W" log --oneline -5 && git -C "$W" status --porcelain=v2 --branch --untracked-files=all`
@@ -43,9 +44,11 @@ function seeded(on: On, agents: AgentRecord[]) {
 test('a needs-you row with a long Bash prompt clamps the question to two lines; Open chat keeps its label and the title truncates, icon-only only below 340 px', async ($, on) => {
   await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], title: 'Implementer · Prompt hardening for the worker skills', needsYou: BASH }, BOARD.sessions[1]] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
-  const asked = (await textsOf(ui)).find(text => text.startsWith('Allow Bash: P=/Users/opetryk'))
-  expect(asked?.endsWith('…')).toBe(true)
-  expect(Number(asked?.length)).toBeLessThan(BASH.length / 2)
+  const rows = await ui.findAll({ type: 'Text' })
+  const asked = rows.filter(one => one.props.color === C.red && one.props.wrap === 'truncate-end').map(one => String(one.text))
+  expect(asked.length).toBe(2)
+  expect(asked.join(' ').startsWith('Allow Bash:')).toBe(true)
+  expect(asked[1]?.endsWith('…')).toBe(true)
   expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).not.toBe(across(32))
   await ui.unmount()
   const narrow = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 36 } })
@@ -60,14 +63,15 @@ test('a short needs title keeps the Open chat label at 46 columns', async ($, on
   await ui.unmount()
 })
 
-test('clamping a 20,000-character prompt takes under 10 ms', () => {
+test('splitting a 20,000-character prompt into 4 rows takes under 10 ms, and every row fits', () => {
   const prompt = 'Re-run the gate and report each exit code. '.repeat(470)
   expect(prompt.length).toBeGreaterThan(20_000)
   const start = performance.now()
-  const clamped = clampText(prompt, 300, 4, 12)
+  const rows = rowsOf(prompt, 300, 12, 4)
   expect(performance.now() - start).toBeLessThan(10)
-  expect(clamped.endsWith('…')).toBe(true)
-  expect(textWidth(clamped, 12) * 1.08).toBeLessThanOrEqual(300 * 4 * 0.9)
+  expect(rows.length).toBe(4)
+  expect(rows.at(-1)?.endsWith('…')).toBe(true)
+  for (const row of rows) expect(textWidth(row, 12)).toBeLessThanOrEqual(300)
 })
 
 test('the Archived filter with 20 archived sessions draws the header, the chips and every archived row; the pinned header covers only its own rows', async ($, on) => {
@@ -141,7 +145,7 @@ test('tests chips: repeated labels show once, and one row of chips ends in +N mo
   const more = Number(texts.find(text => /^\+\d+ more$/.test(text))?.slice(1).split(' ')[0] ?? 0)
   expect(chips + more).toBe(5)
   expect(more).toBeGreaterThan(0)
-  expect(texts).toContain('plugin validate --strict · exit 0')
+  expect(texts[texts.lastIndexOf('Tests') + 1]).toBe('plugin validate')
   await ui.unmount()
 })
 
@@ -161,10 +165,11 @@ test('a subagent card clamps a 35-line prompt to a few lines with an ellipsis', 
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-q1')
-  const body = (await textsOf(ui)).find(text => text.startsWith('1. Re-run the gate'))
-  expect(body?.endsWith('…')).toBe(true)
-  expect(Number(body?.length)).toBeLessThan(PROMPT.length / 4)
-  expect(body?.includes('\n')).toBe(false)
+  const body = ((await ui.find({ key: 'task-prompt-q1' }))?.children ?? []) as { text?: string }[]
+  expect(body.length).toBe(4)
+  expect(JSON.stringify(body.at(-1))).toContain('…')
+  expect((await textsOf(ui)).some(text => text.includes('\n'))).toBe(false)
+  expect(await textsOf(ui)).toContain('35-line prompt · the whole prompt is in this chat')
   await ui.unmount()
 })
 
@@ -173,7 +178,7 @@ test('the Tests block sums the pass counts of each session’s latest test label
   const two = ['tsc -p . --noEmit · exit 0', 'plugin test · passed · 298 pass']
   await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], tests: one }, { ...BOARD.sessions[1], tests: two }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await ui.find({ key: 'block-tests' }))?.text).toBe('Testspassed')
+  expect((await ui.find({ key: 'block-tests' }))?.text).toBe('Testsfrom 2 sessions’ checks')
   expect((await ui.findAll({ type: 'Svg' })).some(svg => svg.props.alt === 'Tests 526')).toBe(true)
   await ui.unmount()
 })

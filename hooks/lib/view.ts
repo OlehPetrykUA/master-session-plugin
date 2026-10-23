@@ -18,7 +18,7 @@ export const ASK_WIDE_PX = 460
 
 export function statusOf(data: PaneData, isDone: boolean): { text: string; icon: IconName; tone: Tone } {
   if (data.from) return { text: `from ${data.from}`, icon: 'clock', tone: 'muted' }
-  if (data.live.error) return { text: 'live data unavailable', icon: 'blocker', tone: 'amber' }
+  if (data.live.error) return { text: 'live data unavailable', icon: 'offline', tone: 'muted' }
   if (data.isRefreshing) return { text: 'refreshing…', icon: 'clock', tone: 'muted' }
   if (data.asked) return { text: `asked ${data.asked.count} worker${data.asked.count === 1 ? '' : 's'} · ${ageOf(data.at - data.asked.at)}`, icon: 'chat', tone: 'muted' }
   if (isDone) return { text: `finished ${data.board?.tick || clockOf(data.at)}`, icon: 'done', tone: 'muted' }

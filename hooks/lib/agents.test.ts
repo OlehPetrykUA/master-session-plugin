@@ -72,12 +72,12 @@ test('the run summary counts sessions by state, needs you, subagents, workflows,
     subagents: { total: 2, running: 1, done: 1, failed: 0, asking: 0 },
     workflows: { total: 3, running: 2, done: 1, failed: 0, asking: 0, agents: 3, agentsDone: 1 },
     commits: { total: 3, repos: 0 },
-    tests: { passed: 526, note: 'smoke 398 · hooks 128' },
+    tests: { value: '526', sub: 'smoke 398 · hooks 128' },
     duration: { since: NOW - 3_600_000, ms: 3_600_000 },
     git: { dirty: 0 },
   })
   const empty = runSummaryOf({ rows: [], counts: countsOf([], []), archived: 0, agents: [], workflows: [], board: null, trees: [], at: NOW })
-  expect([empty.tests, empty.duration]).toEqual([undefined, { since: NOW, ms: 0 }])
+  expect([empty.tests, empty.duration]).toEqual([{ value: '—', sub: 'none reported' }, { since: NOW, ms: 0 }])
 })
 
 test("a worker's reported agents stay out of the master's own subagents and workflow runs", () => {

@@ -1,6 +1,6 @@
 import { dirtyOf } from '../../lib/git'
-import { across, down, faceWidth, tall } from '../../lib/layout'
-import { clampText, displayNameOf, elapsedOfItem, lineOf, oneLine, stepsOfItem } from '../../lib/list'
+import { across, down, faceWidth, tall, textWidth } from '../../lib/layout'
+import { displayNameOf, elapsedOfItem, lineOf, oneLine, rowsOf, stepsOfItem, tildeOf } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { whereOf } from '../../lib/rows'
 import { STATUS, gitPill, statusBadge, toneRing } from '../../theme/icons'
@@ -9,6 +9,7 @@ import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
 import { Hit } from '../Hit'
 import { Icon } from '../Icon'
+import { Lines } from '../Lines'
 import type { Ui } from '../types'
 
 export type RowChat = { label: string; onPress: () => void }
@@ -48,14 +49,16 @@ export function Row(ui: Ui, props: RowProps) {
   )
   const isChat = isNeeds && !!props.chat
   const isChatIcon = isNarrow
-  const column = props.width - 2 - 12 - 8 - 28 - 12 - 14 - 12 - (isChat ? (isChatIcon ? 32 : faceWidth(props.chat?.label ?? '', 'b32') + 1) + 12 : 0)
+  const isMeta = !isChat && !isNarrow
+  const metaWidth = isMeta ? Math.max(elapsed ? 16 + textWidth(elapsed, 12) * 1.08 : 0, item.kind === 'session' && !isNeeds ? (git?.width ?? 0) + 4 + 14 : 0) : 0
+  const right = (metaWidth ? metaWidth + 12 : 0) + (steps && !isChat ? 34 + 12 : 0) + (isChat ? (isChatIcon ? 32 : faceWidth(props.chat?.label ?? '', 'b32') + 1) + 12 : 0)
+  const column = props.width - 2 - 12 - 8 - 28 - 12 - 14 - 12 - right
+  const isPersonaCut = textWidth(name.persona, 14) * 1.08 + (name.task ? 16 : 0) > column
   const question = (
     <Box key={`${id}-ask`} flexDirection="row" alignItems="flex-start" gap={across(4)} minWidth={0} flexShrink={1}>
       {glyph(`${id}-ask-icon`, 'needs', 'red')}
       <Box flexShrink={1} minWidth={0}>
-        <Text size="footnote" weight="semibold" color={C.red} wrap="wrap">
-          {clampText(line.text, column - 16, 2, 12)}
-        </Text>
+        {Lines(ui, { id: `${id}-ask-rows`, rows: rowsOf(tildeOf(line.text, props.home), column - 16, 12, 2), size: 'footnote', weight: 'semibold', color: C.red })}
       </Box>
     </Box>
   )
@@ -130,23 +133,23 @@ export function Row(ui: Ui, props: RowProps) {
       <Svg key={`${id}-badge`} source={statusBadge(item.status, 28)} alt={line.word?.text ?? status.word} width={28} height={28} />
       <Box flexDirection="column" gap={down(2)} flexGrow={1} flexShrink={1} minWidth={0}>
         <Box flexDirection="row" alignItems="center" gap={across(4)} minWidth={0}>
-          <Box flexShrink={0}>
+          <Box key={`${id}-persona`} flexShrink={isPersonaCut ? 1 : 0} minWidth={0}>
             {ui.Client ? (
-              <Text weight="semibold" size="heading">
+              <Text weight="semibold" size="heading" wrap="truncate-end">
                 {name.persona}
               </Text>
             ) : (
               <Button key={`${props.isInCard ? 'top' : 'row'}-open-${item.id}`} plain label={name.persona} onPress={props.onOpen} hover={{ backgroundColor: C.clear }} />
             )}
           </Box>
-          {name.task ? (
+          {name.task && !isPersonaCut ? (
             <Box flexShrink={0}>
               <Text size="heading" color={C.muted}>
                 ·
               </Text>
             </Box>
           ) : null}
-          {name.task ? (
+          {name.task && !isPersonaCut ? (
             <Box flexShrink={1} minWidth={0}>
               <Text size="heading" color={C.muted} wrap="truncate-end">
                 {oneLine(name.task)}

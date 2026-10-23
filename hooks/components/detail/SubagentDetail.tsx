@@ -1,9 +1,10 @@
 import { across, tall } from '../../lib/layout'
-import { clampText, clockOf, displayNameOf, modelFamilyOf, nameText, parentsOf, sessionOfAgent, spanOf } from '../../lib/list'
+import { askOf, clockOf, displayNameOf, modelFamilyOf, nameText, parentsOf, rowsOf, sessionOfAgent, spanOf, tildeOf } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
 import { Icon } from '../Icon'
+import { Lines } from '../Lines'
 import { Card } from '../list/Card'
 import type { RowProps } from '../list/Row'
 import { Quiet } from '../Quiet'
@@ -41,6 +42,12 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
   const chain = parents.map(nameText)
   const asked = agent.asking ? `asked ${spanOf(agent.asking.since, undefined, at)} ago` : ''
   const waitsIn = parent ? `the prompt waits in ${parentName}’s chat` : 'the prompt waits in this chat'
+  const ask = askOf(agent.asking?.text)
+  const room = props.innerWidth - 24
+  const promptRows = prompt ? rowsOf(prompt, room, 12, 4) : []
+  const promptLines = prompt ? prompt.split('\n').filter(one => one.trim()).length : 0
+  const holder = parent ? `${displayNameOf({ kind: 'session', id: parent.id, group: parent.state, status: 'working', row: parent }).persona}’s chat` : 'this chat'
+  const isPromptCut = promptLines > 4 || promptRows.at(-1)?.endsWith('…')
   const half = (key: string, icon: Parameters<typeof Block>[1]['icon'], label: string, children: Parameters<typeof Block>[1]['children'], gap?: number) => Block(ui, { id: `${key}-${id}`, icon, label, isHalf: true, children, gap })
   const started = (
     <Text key={`started-text-${id}`} wrap="wrap">
@@ -56,9 +63,33 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
   return Card(ui, {
     ...props.rowProps,
     children: [
-      isNeeds && agent.asking ? Callout(ui, { id, status: 'needs', icon: 'permission', label: 'Permission', lines: [{ text: agent.asking.text, isStrong: true }, { text: [asked, waitsIn].filter(Boolean).join(' · '), isStrong: false }] }) : null,
+      isNeeds && agent.asking
+        ? Callout(ui, {
+            id,
+            status: 'needs',
+            icon: 'permission',
+            label: 'Permission',
+            width: props.innerWidth,
+            lines: [
+              ...(ask ? [{ text: `Allow ${ask.tool}`, isStrong: true }, { text: tildeOf(ask.rest, props.rowProps.home), isStrong: false, isMono: true, rows: 6 }] : [{ text: agent.asking.text, isStrong: true, rows: 3 }]),
+              { text: [asked, waitsIn].filter(Boolean).join(' · '), isStrong: false },
+            ],
+          })
+        : null,
       item.status === 'failed' ? Callout(ui, { id, status: 'failed', label: 'Failed', lines: [{ text: agent.result || 'stopped', isStrong: true }, { text: `took ${durationOf(end - agent.startedAt)}`, isStrong: false }] }) : null,
-      Block(ui, { id: `task-${id}`, icon: 'now', label: 'Task', children: [Strong(ui, { text: description, isFull: true }), prompt ? Quiet(ui, { text: clampText(prompt, props.innerWidth - 24, 4, 12), isFull: true }) : null] }),
+      Block(ui, {
+        id: `task-${id}`,
+        icon: 'now',
+        label: 'Task',
+        children: [
+          Lines(ui, { id: `task-title-${id}`, rows: rowsOf(description, room, 13, 2), weight: 'semibold', color: C.text }),
+          promptRows.length ? Lines(ui, { id: `task-prompt-${id}`, rows: promptRows, size: 'footnote', color: C.muted }) : null,
+          isPromptCut ? Quiet(ui, { text: `${promptLines}-line prompt · the whole prompt is in ${holder}`, isFull: true }) : null,
+        ],
+      }),
+      isNeeds && agent.asking
+        ? Block(ui, { id: `now-${id}`, icon: 'working', label: 'Now', children: [Strong(ui, { text: 'Waiting for your answer', isFull: true }), Quiet(ui, { text: [ask?.tool, asked].filter(Boolean).join(' · '), isFull: true })] })
+        : null,
       item.status === 'done' && (agent.result || agent.tokens)
         ? Block(ui, {
             id: `result-${id}`,

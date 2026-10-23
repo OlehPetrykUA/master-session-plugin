@@ -95,25 +95,85 @@ export function displayNameOf(item: RowItem | { kind: 'master' }): Name {
 
 export const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
 
+const homeOf = (home: string) => home.replace(/\/+$/, '')
+
 export function relativeOf(path: string, roots: readonly string[], home: string) {
-  const full = home && path.startsWith('~/') ? `${home}${path.slice(1)}` : path
-  const root = roots.filter(Boolean).sort((left, right) => right.length - left.length).find(one => full.startsWith(`${one}/`))
-  return root ? full.slice(root.length + 1) : home && full.startsWith(`${home}/`) ? `~${full.slice(home.length)}` : path
+  const root = homeOf(home)
+  const full = root && path.startsWith('~/') ? `${root}${path.slice(1)}` : path
+  const base = roots
+    .map(one => one.replace(/\/+$/, ''))
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)
+    .find(one => full.startsWith(`${one}/`))
+  return base ? full.slice(base.length + 1) : root && full.startsWith(`${root}/`) ? `~${full.slice(root.length)}` : path
 }
 
-export function clampText(text: string, room: number, lines: number, size: number) {
-  const flat = oneLine(text)
-  const budget = Math.max(0, room) * lines * 0.9
-  const head = flat.slice(0, Math.ceil(budget / (0.3 * size * 1.08)) + 1)
-  if (head === flat && textWidth(flat, size) * 1.08 <= budget) return flat
+export function askOf(text: string | undefined) {
+  const found = /^Allow ([^:\n]{1,40}):\s*([\s\S]+)$/.exec(text ?? '')
+  return found ? { tool: found[1] ?? '', rest: found[2] ?? '' } : undefined
+}
+
+export const tildeOf = (text: string, home: string) => (homeOf(home) ? text.split(`${homeOf(home)}/`).join('~/') : text)
+
+const fits = (text: string, room: number, size: number, isMono: boolean) => textWidth(text, size, isMono) <= room
+
+function fitOf(chars: readonly string[], room: number, size: number, isMono: boolean) {
   let low = 0
-  let high = head.length
+  let high = chars.length
   while (low < high) {
     const mid = Math.ceil((low + high) / 2)
-    if (textWidth(`${head.slice(0, mid)}…`, size) * 1.08 <= budget) low = mid
+    if (fits(`${chars.slice(0, mid).join('')}…`, room, size, isMono)) low = mid
     else high = mid - 1
   }
-  return `${head.slice(0, low).trimEnd()}…`
+  return `${chars.slice(0, low).join('').trimEnd()}…`
+}
+
+function headOf(text: string, limit: number) {
+  for (let take = limit * 2; ; take *= 2) {
+    const flat = oneLine(text.slice(0, take))
+    if (take >= text.length || Array.from(flat).length > limit) return flat
+  }
+}
+
+export function rowsOf(text: string, room: number, size: number, count: number, isMono = false): string[] {
+  const all = Array.from(headOf(text, Math.ceil((Math.max(0, room) / (0.28 * size)) * count) + 2))
+  const rows: string[] = []
+  let start = 0
+  while (start < all.length && rows.length < count) {
+    let width = 0
+    let end = start
+    let space = -1
+    while (end < all.length) {
+      const next = width + textWidth(all[end] ?? '', size, isMono)
+      if (next > room) break
+      width = next
+      if (all[end] === ' ') space = end
+      else if (all[end] === '-') space = end + 1
+      end += 1
+    }
+    if (end >= all.length) {
+      rows.push(all.slice(start).join(''))
+      break
+    }
+    if (rows.length === count - 1) {
+      rows.push(fitOf(all.slice(start, end + 1), room, size, isMono))
+      break
+    }
+    const cut = space > start ? space : Math.max(end, start + 1)
+    rows.push(all.slice(start, cut).join('').trimEnd())
+    start = all[cut] === ' ' ? cut + 1 : cut
+  }
+  return rows
+}
+
+export function foldPath(path: string, room: number, size = 12) {
+  const parts = path.split('/')
+  if (parts.length < 3 || fits(path, room, size, true)) return path
+  for (let keep = parts.length - 2; keep >= 1; keep -= 1) {
+    const folded = [parts[0], '…', ...parts.slice(parts.length - keep)].join('/')
+    if (fits(folded, room, size, true)) return folded
+  }
+  return [parts[0], '…', parts.at(-1)].join('/')
 }
 
 export const nameText = (name: Name) => (name.task ? `${name.persona} · ${name.task}` : name.persona)
@@ -342,7 +402,7 @@ export function blocksOf(totals: RunSummary, hasWork: boolean, end?: string): Bl
     { key: 'subagents', label: 'Subagents', value: String(subagents.total), sub: subagents.running ? `${subagents.running} running` : subagents.total ? 'all finished' : 'none', isAlert: false },
     { key: 'workflows', label: 'Workflows', value: String(workflows.total), sub: workflows.total ? `${workflows.agentsDone}/${workflows.agents} agents` : 'none', isAlert: false },
     { key: 'commits', label: 'Commits', value: String(commits.total), sub: commits.total ? plural(commits.repos, 'repo') : '—', isAlert: false },
-    { key: 'tests', label: 'Tests', value: String(tests?.passed ?? 0), sub: tests ? 'passed' : '—', isAlert: false },
+    { key: 'tests', label: 'Tests', value: tests.value, sub: tests.sub, isAlert: false },
     { key: 'duration', label: 'Duration', value: hasWork ? compactOf(duration.ms) : '—', sub: !hasWork ? 'not started' : end ? `${clockOf(duration.since)} – ${end}` : `since ${clockOf(duration.since)}`, isAlert: false },
     { key: 'git', label: 'Git', value: String(git.dirty), sub: git.dirty ? 'to commit' : 'clean', isAlert: false },
   ]

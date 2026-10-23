@@ -21,9 +21,9 @@ export function Header(ui: Ui, props: HeaderProps) {
         </Text>
         <Svg key="live" source={liveDot(props.isLive ? 'green' : 'amber')} alt={props.isLive ? 'live' : 'live data unavailable'} width={14} height={14} />
       </Box>
-      <Box flexDirection="row" alignItems="center" gap={across(4)}>
+      <Box flexDirection="row" alignItems="flex-start" gap={across(4)}>
         {Icon(ui, { id: 'header-status-icon', name: props.status.icon, size: 12, tone: props.status.tone })}
-        <Text size="footnote" color={color} wrap="truncate-end">
+        <Text size="footnote" color={color} wrap="wrap">
           {props.status.text}
         </Text>
       </Box>
@@ -40,7 +40,7 @@ export function Header(ui: Ui, props: HeaderProps) {
       </Box>
     )
   return (
-    <Box key="section-header" flexDirection="row" alignItems="center" flexShrink={0} gap={across(8)} height={tall(56)} paddingLeft={across(16)} paddingRight={across(8)}>
+    <Box key="section-header" flexDirection="row" alignItems="center" flexShrink={0} gap={across(8)} minHeight={tall(56)} paddingLeft={across(16)} paddingRight={across(8)}>
       {title}
       <Box flexGrow={1} />
       {buttons}

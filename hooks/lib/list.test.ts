@@ -178,7 +178,7 @@ test('summary blocks read the run totals as the design words them, zeros and das
     ['Subagents', '2', '1 running', false],
     ['Workflows', '1', '1/3 agents', false],
     ['Commits', '0', '—', false],
-    ['Tests', '0', '—', false],
+    ['Tests', '—', 'none reported', false],
     ['Duration', '0m'.replace('0m', '<1m'), expect.stringMatching(/^since \d\d:\d\d$/), false],
     ['Git', '0', 'clean', false],
   ])
@@ -196,7 +196,7 @@ test('summary blocks read the run totals as the design words them, zeros and das
     ['0', 'none'],
     ['0', 'none'],
     ['0', '—'],
-    ['0', '—'],
+    ['—', 'none reported'],
     ['—', 'not started'],
     ['0', 'clean'],
   ])

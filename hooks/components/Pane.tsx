@@ -32,9 +32,9 @@ export function Pane(ui: Ui, data: PaneData, view = paneViewOf(data), pin = pinO
           <Box key="header-rule" height={tall(1)} flexShrink={0} backgroundColor={C.border} />
           {data.live.error ? (
             <Box key="notice" flexDirection="row" alignItems="center" flexShrink={0} gap={across(8)} marginTop={down(12)} marginLeft={across(16)} marginRight={across(16)} paddingX={across(12)} paddingY={down(8)} borderStyle="round" borderColor={C.clear} backgroundColor={C.amberTint}>
-              {Icon(ui, { id: 'notice-icon', name: 'blocker', size: 16, tone: 'amber' })}
+              {Icon(ui, { id: 'notice-icon', name: 'offline', size: 16, tone: 'amber' })}
               <Box flexShrink={1} minWidth={0}>
-                <Text size="footnote" weight="semibold" color={C.amber}>
+                <Text size="footnote" weight="semibold" color={C.text}>
                   {noticeOf(data.live.error)}
                 </Text>
               </Box>
