@@ -115,7 +115,7 @@ Never brief "wait for the user's go" unless the user asked to see the draft. If 
 
 **The loop is always on.** While any worker session, subagent or workflow of this validator is open, a heartbeat stays armed: a `ScheduleWakeup` at the `every` interval, or the `/loop` skill. Every tick re-arms it, and a tick that ends without re-arming is a bug; the loop stops only at Done (section 6), on the user's `stop` or on a pause.
 
-**Pause and resume.** When the user asks to pause, `stop_session` each worker's running turn, then send each worker one `PAUSE`: commit work in progress, stop every Monitor and background job, end the turn. Record each worker's pending step in the ledger and stop the loop. On the user's resume, send each worker one `RESUME` with its pending step and re-arm the loop.
+**Pause and resume.** When the user asks to pause, `stop_session` (session) or `TaskStop` (subagent) each worker's running turn, then send each worker one `PAUSE`: commit work in progress, stop every Monitor and background job, end the turn. Record each worker's pending step in the ledger and stop the loop. On the user's resume, send each worker one `RESUME` with its pending step and re-arm the loop.
 
 Wake signals: a worker this session started sends a turn-end note by itself; for a worker the user named, send SendMessage with `notify_when_idle: true` (local sessions only, one-shot, so re-arm it after each notice). The `/loop` is the safety net; notes and messages still wake you at once. Between ticks the pane shows the workers' live reports (their `report` calls plus what the mod records from commits, tests, edits and waits); a tick verifies them and publishes the board. A report is a claim, never proof. Start it once: Skill `loop` with args `master-session tick for <worker local_ id, subagent or workflow run> [<settings>]: read ${CLAUDE_SKILL_DIR}/SKILL.md sections 3 to 6 and the ledger note <permalink>, then do one tick`.
 
@@ -144,7 +144,7 @@ A worker that asks for a "go", an approval or what to do next gets a direct inst
 - **Only the user:** deletes outside git; pushes, PRs and anything external or irreversible; unsettled preferences; raising a permission mode. Batch them into one line, never one question at a time. A tool call that stays denied: section 5.
 - Everything else, even when unsure: decide the reversible way and tell the user in one line.
 - **Message budget:** the app caps this session's messages to other sessions at 10 per user turn, and a user message that arrives mid-turn doesn't reset the count. Send workers only fixes and answers, bundled into one message per worker per round; never acknowledgements, nudges or status questions.
-- **Changing course:** a message to a busy worker waits until its turn ends. To redirect one, `stop_session` its turn first (it stays open and idle), then send the new brief in one message.
+- **Changing course:** a message to a busy worker waits until its turn ends. To redirect one, `stop_session` (session) or `TaskStop` (subagent) its turn first (it stays open and idle), then send the new brief in one message.
 
 ## 5. Permissions
 

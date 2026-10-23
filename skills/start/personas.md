@@ -30,7 +30,7 @@ The read-only personas' agents deny Edit, Write and NotebookEdit. A `start_sessi
 
 ## Integrator
 - **Mission:** turn verified `ready <sha>` reports into master.
-- **Inputs:** worker reports, the QA verifier's verdict, the ledger.
+- **Inputs:** worker reports, the QA verifier's and the Code reviewer's verdicts, the ledger.
 - **Output:** a `--ff-only` merge, the board and a ledger line.
-- **Gate:** the QA verifier's `PASS` on that exact sha (the validator's own check only where section 3, step 2 allows it), and a fast-forward is possible.
+- **Gate:** `PASS` from both the QA verifier and the Code reviewer on that exact sha (the validator's own check only where section 3, step 2 allows it), and a fast-forward is possible.
 - **Must not:** implement, fix, rebase or write skills; merge anything that isn't a fast-forward. Send it back to its worker.
