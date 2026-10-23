@@ -1,13 +1,11 @@
-import { isArchivable } from '../data/contract'
 import { TITLE } from '../lib/constants'
 import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, openIdOf, plural, shownArchived, stepsOfItem } from '../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, openIdOf, shownArchived, stepsOfItem, undoTextOf } from '../lib/list'
 import type { ListGroup, ListItem, RowItem } from '../lib/list'
-import type { Row } from '../lib/rows'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
 import { TERMINAL_COLOR } from '../theme/tokens'
-import { lossesOf } from './detail/losses'
+import { clearOf } from './clear'
 import { TextSessionDetail, TextSubagentDetail, TextWorkflowDetail, colorOf } from './detail/TextDetail'
 import type { PaneData, TextUi } from './types'
 import { UnarchiveConfirm } from './UnarchiveConfirm'
@@ -28,15 +26,10 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
   const undoLine = () =>
     undone ? (
       <Box key="undo" flexDirection="row" gap="sm">
-        <Text dimColor>{undone.name ? `${undone.name} archived` : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with work to keep` : ''}`}</Text>
-        {undone.ids.length ? <Button key="undo-archive" plain label="Undo" onPress={actions.undo} /> : null}
+        <Text dimColor>{undone.name ? `${undone.name} archived` : undoTextOf(undone)}</Text>
+        {undone.ids.length || undone.hid ? <Button key="undo-archive" plain label="Undo" onPress={actions.undo} /> : null}
       </Box>
     ) : null
-
-  const archiveAll = (rows: readonly Row[]) => {
-    const clean = rows.filter(one => !lossesOf(one, trees, context.sessions).length)
-    actions.archive(clean, { group: 'done', skipped: rows.length - clean.length })
-  }
 
   const line = (item: RowItem) => {
     const steps = stepsOfItem(item)
@@ -96,14 +89,14 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
       )
     }
     if (!one.items.length && undone?.group !== one.id) return empty(`group-${one.id}`)
-    const idle = one.id === 'done' ? one.items.flatMap((item): Row[] => (item.kind === 'session' && isArchivable(item.row.board ?? { state: item.row.state }, item.row.live) ? [item.row] : [])) : []
+    const clear = clearOf(one, data, context)
     return (
       <Box key={`group-${one.id}`} flexDirection="column">
         <Box flexDirection="row" gap="sm">
           <Text weight="semibold" color={TERMINAL_COLOR[one.id]}>{`${GROUP_LABEL[one.id]} ${one.items.length}`}</Text>
           {one.isPinned ? <Text dimColor>pinned on every filter</Text> : null}
           <Box flexGrow={1} />
-          {one.id === 'done' && idle.length ? <Button key="archive-all" plain label="Archive all" onPress={() => archiveAll(idle)} /> : null}
+          {clear ? <Button key="clear-done" plain label="Clear done" onPress={() => actions.clear(clear.rows, clear.skipped)} /> : null}
         </Box>
         {undone?.group === one.id ? [...one.items.slice(0, undone.index).map(row), undoLine(), ...one.items.slice(undone.index).map(row)] : one.items.map(row)}
       </Box>

@@ -13,7 +13,7 @@ import { itemsOf } from '../lib/list'
 import { runStartOf } from '../lib/totals'
 import { familyOf, rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
-import { getAgents, getBoard, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
+import { getAgents, getBoard, getCleared, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setCleared, setClearing, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
 import { claim, detected, inPlan, isActive, roleOf, sessionFacts } from './recorder'
 import { askForUpdates, readReports, writeBoard } from './status'
@@ -459,6 +459,31 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
   expireUndo($, at)
 }
 
+let isClearing = false
+
+export async function clearDone($: EngineInterface, rows: readonly Row[], skipped: number) {
+  if (isClearing) return
+  isClearing = true
+  await setClearing($, true)
+  try {
+    const at = await $.clock.now()
+    const before = await getCleared($)
+    const finished = itemsOf([], await getAgents($), await getWorkflows($), { at, cleared: before }).filter(item => item.group === 'done')
+    const hid = { agents: finished.filter(item => item.kind === 'subagent').length, runs: finished.filter(item => item.kind === 'workflow').length, before }
+    if (rows.length) await archive($, rows, { group: 'done', skipped })
+    if (!hid.agents && !hid.runs) return
+    await setCleared($, at)
+    const made = await getUndone($)
+    if (made && made.at >= at) return void (await setUndone($, () => ({ ...made, hid })))
+    const now = await $.clock.now()
+    await setUndone($, () => ({ ids: [], name: '', skipped: rows.length ? 0 : skipped, group: 'done', index: 0, at: now, hid }))
+    expireUndo($, now)
+  } finally {
+    isClearing = false
+    await setClearing($, false)
+  }
+}
+
 function expireUndo($: EngineInterface, at: number) {
   $.clock.after(UNDO_MS, () => void setUndone($, value => (value?.at === at ? null : value)))
 }
@@ -466,6 +491,7 @@ function expireUndo($: EngineInterface, at: number) {
 export async function undoArchive($: EngineInterface) {
   const undone = await getUndone($)
   await setUndone($, () => null)
+  if (undone?.hid) await setCleared($, undone.hid.before)
   const failed: string[] = []
   let reason = ''
   for (const id of undone?.ids ?? []) {
@@ -479,7 +505,7 @@ export async function undoArchive($: EngineInterface) {
   if (failed.length && undone) {
     $.ui.toast(`Not unarchived: ${reason}`)
     const at = await $.clock.now()
-    await setUndone($, () => ({ ...undone, ids: failed, at }))
+    await setUndone($, () => ({ ...undone, ids: failed, hid: undefined, at }))
     expireUndo($, at)
   }
   await refreshLive($).catch(() => undefined)

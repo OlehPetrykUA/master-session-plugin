@@ -1,4 +1,4 @@
-import type { AgentRecord, ArchiveView, Board, BoardSession, Filter, LiveSession, Repo, SessionState, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Board, BoardSession, Filter, LiveSession, Repo, SessionState, Undone, WorkflowRecord } from '../../types'
 
 import { lossLineOf, mergedLineOf } from '../components/detail/losses'
 import { STATUS } from '../theme/icons'
@@ -43,6 +43,12 @@ export const CHAT_LABEL = 'Open chat'
 const KIND_ORDER = { session: 0, workflow: 1, subagent: 2 }
 
 export const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
+
+export function undoTextOf({ ids, hid, skipped }: Undone) {
+  const hidden = hid ? [hid.agents && plural(hid.agents, 'subagent'), hid.runs && plural(hid.runs, 'workflow')].filter(Boolean).join(' and ') : ''
+  const text = [ids.length && `archived ${plural(ids.length, 'session')}`, hidden && `hid ${hidden}`, skipped && `skipped ${skipped} with work to keep`].filter(Boolean).join(' · ')
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
 
 export const GROUP_OF: Record<Status, SessionState> = {
   needs: 'needs-you',
@@ -220,10 +226,11 @@ export function runStatusOf(run: WorkflowRun): Status {
 
 export const isGhostRun = (run: WorkflowRun, at: number | undefined) => at !== undefined && !run.agents.length && at - run.startedAt >= AGENT_SHOWN_MS
 
-export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> = {}): ListItem[] {
+export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> & { cleared?: number } = {}): ListItem[] {
   const isOld = (at: number | undefined) => context.at !== undefined && at !== undefined && context.at - at >= AGENT_SHOWN_MS
-  const stale = new Set(workflowRunsOf(agents, workflows).filter(one => isGhostRun(one, context.at) || (one.state !== 'running' && isOld(one.endedAt))).map(one => one.id))
-  const shown = agents.filter(agent => (agent.run ? !stale.has(agent.run.id) : !isOld(agent.endedAt)))
+  const isCleared = (at: number | undefined) => at !== undefined && at <= (context.cleared ?? 0)
+  const stale = new Set(workflowRunsOf(agents, workflows).filter(one => isGhostRun(one, context.at) || (one.state !== 'running' && (isOld(one.endedAt) || isCleared(one.endedAt)))).map(one => one.id))
+  const shown = agents.filter(agent => (agent.run ? !stale.has(agent.run.id) : !isOld(agent.endedAt) && !isCleared(agent.endedAt)))
   const runs = workflows.filter(one => !stale.has(one.id))
   const session = (row: Row): ListItem => {
     const status = sessionStatusOf(row, context.trees, context.sessions)

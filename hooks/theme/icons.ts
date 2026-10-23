@@ -24,6 +24,7 @@ export const I = {
   showAll: 'M7 7l5 5 5-5 M7 13l5 5 5-5',
   open: 'M7 17L17 7 M8 7h9v9',
   archive: 'M3 4h18v4H3Z M5 8v12h14V8 M10 12h4',
+  trash: 'M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13 M10 11v6 M14 11v6',
   unarchive: 'M3 4h18v4H3Z M5 8v12h14V8 M12 17v-6 M9.5 13.5L12 11l2.5 2.5',
   chat: 'M4 5h16v11H9l-5 4Z',
   panel: 'M4 4h16v16H4Z M15 4v16',

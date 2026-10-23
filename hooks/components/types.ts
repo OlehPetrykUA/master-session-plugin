@@ -20,6 +20,7 @@ export type Actions = {
   toggle: (id: string) => void
   collapse: (id: string) => void
   confirm: (what: string) => void
+  clear: (rows: readonly Row[], skipped: number) => void
   archive: (rows: readonly Row[], all?: { group: SessionState; skipped: number }, confirmed?: readonly string[]) => void
   undo: () => void
   stop: (id: string, name: string) => void
@@ -43,6 +44,8 @@ export type PaneData = {
   archiveView: ArchiveView
   asked: Asked | null
   undone: Undone | null
+  cleared: number
+  isClearing: boolean
   isRefreshing: boolean
   at: number
   home: string

@@ -12,6 +12,8 @@ const filter = atom({ plugin: 'master-session', key: 'filter' } as const, 'all')
 const archiveView = atom({ plugin: 'master-session', key: 'archiveView' } as const, 'closed')
 const asked = atom({ plugin: 'master-session', key: 'asked' } as const, null)
 const undone = atom({ plugin: 'master-session', key: 'undone' } as const, null)
+const cleared = atom({ plugin: 'master-session', key: 'cleared' } as const, 0)
+const isClearing = atom({ plugin: 'master-session', key: 'isClearing' } as const, false)
 const isRefreshing = atom({ plugin: 'master-session', key: 'isRefreshing' } as const, false)
 const reports = atom({ plugin: 'master-session', key: 'reports' } as const, [])
 const agents = atom({ plugin: 'master-session', key: 'agents' } as const, [])
@@ -99,6 +101,22 @@ export function getUndone($: EngineInterface) {
 
 export function setUndone($: EngineInterface, change: (value: Undone | null) => Undone | null) {
   return update($, undone, change)
+}
+
+export function getCleared($: EngineInterface) {
+  return read($, cleared)
+}
+
+export function setCleared($: EngineInterface, value: number) {
+  return update($, cleared, () => value)
+}
+
+export function getClearing($: EngineInterface) {
+  return read($, isClearing)
+}
+
+export function setClearing($: EngineInterface, value: boolean) {
+  return update($, isClearing, () => value)
 }
 
 export function getRefreshing($: EngineInterface) {

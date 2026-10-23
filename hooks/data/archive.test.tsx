@@ -37,19 +37,19 @@ test('a session that stays active after archive_session says so and offers no Un
   await ui.unmount()
 })
 
-test('Archive all stops at the first failure and leaves the others alone', async ($, on) => {
+test('Clear done stops at the first failure and leaves the others alone', async ($, on) => {
   const { calls, toasts } = await started($, on, DONE, withSessions({ archiveError: 'denied' }))
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-archive-all')
+  await click(ui, 'hit-clear-done')
   expect(archives(calls)).toEqual(['local_a'])
   expect(toasts).toEqual(['Not archived: denied'])
   await ui.unmount()
 })
 
-test('Archive all without a failure archives every clean session', async ($, on) => {
+test('Clear done without a failure archives every clean session', async ($, on) => {
   const { calls, toasts } = await started($, on, DONE, withSessions({}))
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-archive-all')
+  await click(ui, 'hit-clear-done')
   expect(archives(calls)).toEqual(['local_a', 'local_b'])
   expect(toasts).toEqual([])
   await ui.unmount()

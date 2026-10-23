@@ -9,7 +9,7 @@ import { ActionButton } from '../ActionButton'
 import { Icon } from '../Icon'
 import type { Ui } from '../types'
 
-export type GroupAction = { id: string; icon: IconName; label: string; onPress: () => void }
+export type GroupAction = { id: string; icon: IconName; label: string; isPressed?: boolean; onPress: () => void }
 
 export type GroupProps = { id: string; label: string; count: number; tone?: Tone; icon?: IconName; isPinned: boolean; action?: GroupAction; children: RenderChildren }
 

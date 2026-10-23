@@ -142,12 +142,12 @@ test('work that would be lost asks inside the card: Archive… opens the box in 
   await ui.unmount()
 })
 
-test('Archive all archives the clean sessions without asking, skips unmerged work with an amber line, and says so in an Undo bar', async ($, on) => {
+test('Clear done archives the clean sessions without asking, skips unmerged work with an amber line, and says so in an Undo bar', async ($, on) => {
   const { calls } = await started($, on, DONE_BOARD, UNMERGED)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: '2 commits not on main' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'Archive all' })).toBeDefined()
-  await click(ui, 'hit-archive-all')
+  expect(await ui.find({ type: 'Text', text: 'Clear done' })).toBeDefined()
+  await click(ui, 'hit-clear-done')
   expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
   expect(await ui.find({ type: 'Text', text: 'Archived 1 session · skipped 1 with work to keep' })).toBeDefined()
   expect(await ui.find({ key: 'row-local_setup' })).toBeDefined()
@@ -230,10 +230,10 @@ test('the terminal draws each detail as text: session actions and the archive bo
   await ui.unmount()
 })
 
-test('the terminal Archive all and one-click archive mirror the desktop: no box for clean work, an Undo line after', async ($, on) => {
+test('the terminal Clear done and one-click archive mirror the desktop: no box for clean work, an Undo line after', async ($, on) => {
   const { calls } = await started($, on, DONE_BOARD, UNMERGED)
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  await ui.press({ key: 'archive-all' })
+  await ui.press({ key: 'clear-done' })
   expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
   expect(await textsOf(ui)).toContain('Archived 1 session · skipped 1 with work to keep')
   await ui.press({ key: 'undo-archive' })
@@ -254,7 +254,7 @@ test('a clean, merged worktree archives in one click; the base is the repo defau
   await ui.unmount()
 })
 
-test('a session whose tree is unknown fails closed: git state unknown on its row, the box on Archive, and Archive all skips it', async ($, on) => {
+test('a session whose tree is unknown fails closed: git state unknown on its row, the box on Archive, and Clear done skips it', async ($, on) => {
   const { calls } = await started($, on, doneOf('local_lost'), { sessions: [session('local_lost', 'lost-work', `${HOME}/nowhere`)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: 'git state unknown' })).toBeDefined()
@@ -265,9 +265,8 @@ test('a session whose tree is unknown fails closed: git state unknown on its row
   expect(await textsOf(ui)).toContain('git state unknown')
   await click(ui, 'hit-archive-no-local_lost')
   await click(ui, 'hit-top-local_lost')
-  await click(ui, 'hit-archive-all')
+  expect(await ui.find({ key: 'face-clear-done' })).toBeUndefined()
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
-  expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 2 with work to keep' })).toBeDefined()
   expect(await ui.find({ key: 'face-undo-done' })).toBeUndefined()
   await ui.unmount()
 })
@@ -294,12 +293,11 @@ test('a detached main checkout still compares against the default branch, and a 
   await ui.unmount()
 })
 
-test('Archive all with only unmerged work archives nothing and says it skipped them', async ($, on) => {
+test('Clear done with only unmerged work archives nothing and says it skipped them', async ($, on) => {
   const { calls } = await started($, on, doneOf(), UNMERGED)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-archive-all')
+  expect(await ui.find({ key: 'face-clear-done' })).toBeUndefined()
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
-  expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 1 with work to keep' })).toBeDefined()
   expect(await ui.find({ key: 'row-local_setup' })).toBeDefined()
   await ui.unmount()
 })
@@ -382,12 +380,12 @@ test('archive checks again before it acts: work that appeared since the render o
   await ui.unmount()
 })
 
-test('Archive all checks again before it acts: a row with new work moves into skipped', async ($, on) => {
+test('Clear done checks again before it acts: a row with new work moves into skipped', async ($, on) => {
   const git: Record<string, string> = CLEAN_GIT()
   const { calls } = await started($, on, doneOf('local_conductor', 'local_clean'), { git, sessions: [CONDUCTOR, session('local_clean', 'clean-work', CLEAN)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   git[`${CLEAN} status`] = '# branch.oid 1111111\n# branch.head feat/clean\n? new.sh\n'
-  await click(ui, 'hit-archive-all')
+  await click(ui, 'hit-clear-done')
   expect(calls.filter(one => one.tool === 'archive_session').map(one => one.args.session_id)).toEqual(['local_conductor'])
   expect(await ui.find({ type: 'Text', text: 'Archived 1 session · skipped 2 with work to keep' })).toBeDefined()
   await ui.unmount()
@@ -406,7 +404,7 @@ test('the Undo bar takes the archived row’s place in its group', async ($, on)
   await ui.unmount()
 })
 
-test('a repo with no origin/HEAD, no main and no master is unknown: the row says so, Archive… asks, Archive all skips', async ($, on) => {
+test('a repo with no origin/HEAD, no main and no master is unknown: the row says so, Archive… asks, Clear done skips', async ($, on) => {
   const { calls } = await started($, on, doneOf())
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: 'git state unknown' })).toBeDefined()
@@ -416,9 +414,8 @@ test('a repo with no origin/HEAD, no main and no master is unknown: the row says
   expect(await textsOf(ui)).toContain('git state unknown')
   await click(ui, 'hit-archive-no-local_setup')
   await click(ui, 'hit-top-local_setup')
-  await click(ui, 'hit-archive-all')
+  expect(await ui.find({ key: 'face-clear-done' })).toBeUndefined()
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
-  expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 1 with work to keep' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -543,7 +540,7 @@ test('archive decides on the git state it just read, not on the stored repos, wh
 
 const SIDE = (patch: Record<string, unknown> = {}) => ({ sessionId: 'local_side', name: 'side-work', title: 'side-work', cwd: WORKTREE, isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: 'local_conductor', ...patch })
 
-test('archiving a session also archives its idle side session, so its losses ask first and Archive all skips it', async ($, on) => {
+test('archiving a session also archives its idle side session, so its losses ask first and Clear done skips it', async ($, on) => {
   const { calls } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { git: UNMERGED.git, sessions: [CONDUCTOR, SIDE()] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: 'side-work: 2 commits not on main' })).toBeDefined()
@@ -554,9 +551,8 @@ test('archiving a session also archives its idle side session, so its losses ask
   for (const word of ['side-work: 1 uncommitted file in wt-toolkit-setup-ui', 'side-work: 2 commits on its branch that are not on main', 'side-work: the worktree folder itself']) expect(texts).toContain(word)
   await click(ui, 'hit-archive-no-local_conductor')
   await click(ui, 'hit-top-local_conductor')
-  await click(ui, 'hit-archive-all')
+  expect(await ui.find({ key: 'face-clear-done' })).toBeUndefined()
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
-  expect(await ui.find({ type: 'Text', text: 'Archived 0 sessions · skipped 1 with work to keep' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -627,7 +623,7 @@ test('a running session in a subfolder of the worktree shares it: archive refuse
   await ui.unmount()
 })
 
-test('200 or more family sessions may hide a side session, so every target is unknown: the box asks and Archive all skips', async ($, on) => {
+test('200 or more family sessions may hide a side session, so every target is unknown: the box asks and Clear done skips', async ($, on) => {
   const { calls } = await started($, on, { ...BOARD, sessions: [...BOARD.sessions, finished('local_conductor')] }, { sessions: [CONDUCTOR, ...FILLER(200)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_conductor')
@@ -636,7 +632,7 @@ test('200 or more family sessions may hide a side session, so every target is un
   expect(await textsOf(ui)).toContain('git state unknown')
   await click(ui, 'hit-archive-no-local_conductor')
   await click(ui, 'hit-top-local_conductor')
-  await click(ui, 'hit-archive-all')
+  expect(await ui.find({ key: 'face-clear-done' })).toBeUndefined()
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
   await ui.unmount()
 })
@@ -663,7 +659,7 @@ test('a grandchild side session counts: its repo is read and its unmerged commit
   expect(await textsOf(ui)).toContain('grand-work: 2 commits on feat/g that are not on main')
   await click(ui, 'hit-archive-no-local_conductor')
   await click(ui, 'hit-top-local_conductor')
-  await click(ui, 'hit-archive-all')
+  expect(await ui.find({ key: 'face-clear-done' })).toBeUndefined()
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
   await ui.unmount()
 })
@@ -690,7 +686,7 @@ test('a side session started by an archived child still counts: archive follows 
   expect(await textsOf(ui)).toContain('grand-work: 2 commits on feat/g that are not on main')
   await click(ui, 'hit-archive-no-local_conductor')
   await click(ui, 'hit-top-local_conductor')
-  await click(ui, 'hit-archive-all')
+  expect(await ui.find({ key: 'face-clear-done' })).toBeUndefined()
   expect(calls.some(one => one.tool === 'archive_session')).toBe(false)
   await ui.unmount()
 })

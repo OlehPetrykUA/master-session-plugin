@@ -98,6 +98,7 @@ export function world(on: On, child: Child = {}) {
     { sessionId: 'local_parent', name: 'parent', title: 'Someone else', cwd: '/elsewhere', isRunning: false, isArchived: false, lastActivityAt: AT },
     ...(child.sessions ?? []),
   ]
+  if (child.isBare) sessions = sessions.slice(4)
   if (child.parent === MASTER) {
     child.files ??= {}
     child.files[`${HOME}/.claude/state/master-session/boards/${MASTER}.json`] ??= '{}'
@@ -255,7 +256,7 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean; isPlaced?: boolean; surfaces?: readonly ('desktop' | 'terminal')[]; archiveError?: string; unarchiveError?: string; stuck?: boolean; isLookupDown?: boolean }
+export type Child = { isBare?: boolean; parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean; isPlaced?: boolean; surfaces?: readonly ('desktop' | 'terminal')[]; archiveError?: string; unarchiveError?: string; stuck?: boolean; isLookupDown?: boolean }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, board })

@@ -5,8 +5,8 @@ import { archivedOf, familyOf, rowsOf } from '../lib/rows'
 import { runSummaryOf } from '../lib/totals'
 import { UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
-import { getAgents, getArchiveView, getAsked, getConfirming, getExpanded, getFilter, getLive, getRefreshing, getReports, getRepos, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter } from '../state/atoms'
-import { archive, askAll, boardOf, homeOf, openSession, refreshAll, stopSession, unarchive, undoArchive } from './sources'
+import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getRefreshing, getReports, getRepos, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter } from '../state/atoms'
+import { archive, askAll, clearDone, boardOf, homeOf, openSession, refreshAll, stopSession, unarchive, undoArchive } from './sources'
 
 export async function paneData($: EngineInterface, columns: number, offset = 0, bodyRows = 0, isAligned = false): Promise<PaneData> {
   const { board: current } = await boardOf($)
@@ -36,6 +36,8 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
     archiveView: await getArchiveView($),
     asked: isAnswered ? null : asked,
     undone: undone && at - undone.at < UNDO_MS ? undone : null,
+    cleared: await getCleared($),
+    isClearing: await getClearing($),
     isRefreshing: await getRefreshing($),
     at,
     home: homeOf(),
@@ -50,6 +52,7 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
       toggle: id => setExpanded($, open => (open.includes(id) ? [] : [id])),
       collapse: id => setExpanded($, open => open.filter(one => one !== id)),
       confirm: what => setConfirming($, what),
+      clear: (rows, skipped) => settle(clearDone($, rows, skipped)),
       archive: (targets, all, confirmed) => settle(archive($, targets, all, confirmed)),
       undo: () => settle(undoArchive($)),
       stop: (id, name) => settle(stopSession($, id, name)),

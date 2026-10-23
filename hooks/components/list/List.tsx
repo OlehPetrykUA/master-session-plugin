@@ -1,15 +1,13 @@
 import type { RenderChildren } from 'claude-code'
 
-import { isArchivable } from '../../data/contract'
 import { bodyWidthOf, across, down } from '../../lib/layout'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, openIdOf, plural, shownArchived } from '../../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, openIdOf, shownArchived, undoTextOf } from '../../lib/list'
 import type { ListGroup, RowItem } from '../../lib/list'
-import type { Row as SessionRow } from '../../lib/rows'
 import type { PaneView } from '../../lib/view'
 import type { Tone } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
+import { clearOf } from '../clear'
 import { ArchivedDetail } from '../detail/ArchivedDetail'
-import { lossesOf } from '../detail/losses'
 import { SessionDetail } from '../detail/SessionDetail'
 import { SubagentDetail } from '../detail/SubagentDetail'
 import { UndoBar } from '../detail/UndoBar'
@@ -62,22 +60,16 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
     const drawn = group.items.map(item => itemOf(item, width))
     return undone?.group === group.id ? [...drawn.slice(0, undone.index), undoBar(), ...drawn.slice(undone.index)] : drawn
   }
-  const idleSessions = (group: ListGroup) =>
-    group.items.flatMap((item): SessionRow[] => (item.kind === 'session' && isArchivable(item.row.board ?? { state: item.row.state }, item.row.live) ? [item.row] : []))
   const undone = data.undone
   const undoBar = () =>
     undone
       ? UndoBar(ui, {
           id: undone.group,
           name: undone.name || undefined,
-          text: undone.name ? 'archived' : `Archived ${plural(undone.ids.length, 'session')}${undone.skipped ? ` · skipped ${undone.skipped} with work to keep` : ''}`,
-          onUndo: undone.ids.length ? actions.undo : undefined,
+          text: undone.name ? 'archived' : undoTextOf(undone),
+          onUndo: undone.ids.length || undone.hid ? actions.undo : undefined,
         })
       : null
-  const archiveAll = (rows: readonly SessionRow[]) => {
-    const clean = rows.filter(row => !lossesOf(row, data.trees, context.sessions).length)
-    actions.archive(clean, { group: 'done', skipped: rows.length - clean.length })
-  }
   const groupOf = (group: ListGroup) => {
     if (group.id === 'archived') {
       if (data.chosen === 'archived' && !group.archived.length) return empty('archived')
@@ -98,14 +90,14 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       })
     }
     if (!group.items.length && undone?.group !== group.id) return empty(`group-${group.id}`)
-    const idle = group.id === 'done' ? idleSessions(group) : []
+    const clear = clearOf(group, data, context)
     return Group(ui, {
       id: group.id,
       label: GROUP_LABEL[group.id],
       count: group.items.length,
       tone: TONE[group.id],
       isPinned: group.isPinned,
-      action: idle.length ? { id: 'archive-all', icon: 'archive', label: 'Archive all', onPress: () => archiveAll(idle) } : undefined,
+      action: clear ? { id: 'clear-done', icon: 'trash', label: 'Clear done', isPressed: data.isClearing, onPress: () => actions.clear(clear.rows, clear.skipped) } : undefined,
       children: items(group),
     })
   }

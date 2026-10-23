@@ -8,7 +8,7 @@ export type Role = { role: 'worker' | 'master' | ''; self: string; parent: strin
 
 export type Asked = { at: number; count: number }
 
-export type Undone = { ids: string[]; name: string; skipped: number; group: SessionState; index: number; at: number }
+export type Undone = { ids: string[]; name: string; skipped: number; group: SessionState; index: number; at: number; hid?: { agents: number; runs: number; before: number } }
 
 export type BoardSession = {
   id: string
@@ -205,6 +205,8 @@ declare module 'claude-code' {
       archiveView: ArchiveView
       asked: Asked | null
       undone: Undone | null
+      cleared: number
+      isClearing: boolean
       isRefreshing: boolean
       reports: Report[]
       agents: AgentRecord[]

@@ -30,7 +30,7 @@ export function statusOf(data: PaneData, isDone: boolean): { text: string; icon:
 
 export function paneViewOf(data: PaneData) {
   const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows }
-  const items = itemsOf(data.rows, data.agents, data.workflows, context)
+  const items = itemsOf(data.rows, data.agents, data.workflows, { ...context, cleared: data.cleared })
   const counts = countsOfItems(items, data.archived.length)
   const groups = groupsOf(items, data.archived, data.chosen, data.archiveView, data.undone?.group)
   const isDone = isAllDone(items)
