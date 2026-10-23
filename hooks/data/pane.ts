@@ -5,7 +5,7 @@ import { archivedOf, familyOf, rowsOf } from '../lib/rows'
 import { runSummaryOf } from '../lib/totals'
 import { UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
-import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getRefreshing, getReports, getRepos, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter } from '../state/atoms'
+import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getNarrativeOpen, getRefreshing, getReports, getRepos, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter, setNarrativeOpen } from '../state/atoms'
 import { archive, askAll, clearDone, boardOf, homeOf, openSession, refreshAll, stopSession, unarchive, undoArchive } from './sources'
 
 export async function paneData($: EngineInterface, columns: number, offset = 0, bodyRows = 0, isAligned = false): Promise<PaneData> {
@@ -39,6 +39,7 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
     cleared: await getCleared($),
     isClearing: await getClearing($),
     isRefreshing: await getRefreshing($),
+    isNarrativeOpen: await getNarrativeOpen($),
     at,
     home: homeOf(),
     columns,
@@ -58,6 +59,7 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
       stop: (id, name) => settle(stopSession($, id, name)),
       unarchive: one => settle(unarchive($, one)),
       open: (id, name) => settle(openSession($, id, name)),
+      narrative: () => settle(setNarrativeOpen($, open => !open)),
       ask: () => settle(askAll($).then(text => $.ui.toast(text))),
     },
   }

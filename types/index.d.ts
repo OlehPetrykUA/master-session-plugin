@@ -43,6 +43,7 @@ export type Board = {
   repos: string[]
   testsPassed?: number
   testsNote?: string
+  narrative?: string
   source: 'tool' | 'file' | 'chat'
   since?: number
   at?: number
@@ -208,6 +209,7 @@ declare module 'claude-code' {
       cleared: number
       isClearing: boolean
       isRefreshing: boolean
+      isNarrativeOpen: boolean
       reports: Report[]
       agents: AgentRecord[]
       workflows: WorkflowRecord[]

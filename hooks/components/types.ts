@@ -27,6 +27,7 @@ export type Actions = {
   unarchive: (one: LiveSession) => void
   open: (id: string, name: string) => void
   ask: () => void
+  narrative: () => void
 }
 
 export type PaneData = {
@@ -47,6 +48,7 @@ export type PaneData = {
   cleared: number
   isClearing: boolean
   isRefreshing: boolean
+  isNarrativeOpen: boolean
   at: number
   home: string
   columns: number

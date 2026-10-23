@@ -6,6 +6,7 @@ import { FilterChips } from './FilterChips'
 import { Header } from './Header'
 import { Icon } from './Icon'
 import { List } from './list/List'
+import { Narrative } from './Narrative'
 import { Summary } from './list/Summary'
 import { RepoChips } from './RepoChips'
 import type { PaneData, Ui } from './types'
@@ -16,6 +17,7 @@ export function Pane(ui: Ui, data: PaneData, view = paneViewOf(data), pin = pinO
   return (
     <Box flexDirection="column" flexShrink={0} overflow="hidden">
       <Box key="header-space" height={headerRows} />
+      {view.narrative ? Narrative(ui, { narrative: view.narrative, onToggle: data.actions.narrative }) : null}
       {Summary(ui, { blocks: view.blocks, perRow: view.perRow, width: bodyWidthOf(data.columns) })}
       {FilterChips(ui, { chips: view.chips, chosen: data.chosen, onFilter: data.actions.filter })}
       {List(ui, data, view)}

@@ -34,7 +34,7 @@ import { messageOf } from './lib/format'
 import { elapsedOfItem, openIdOf, runAgentsOf } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
-import { getAgents, getLive, getRepos, getWorkflows, saveBoard, setExpanded, setFilter } from './state/atoms'
+import { getAgents, getLive, getRepos, getWorkflows, saveBoard, setExpanded, setFilter, setNarrativeOpen } from './state/atoms'
 
 let columns = 0
 let pending: { row: number; at: number } | undefined
@@ -48,7 +48,7 @@ async function tickTimes($: EngineInterface) {
   const data = await paneData($, columns)
   const view = paneViewOf(data)
   const shown = view.items.flatMap(item => (item.kind === 'workflow' ? [item, ...runAgentsOf(item.run, data.agents)] : [item]))
-  const labels = [...shown.map(item => elapsedOfItem(item, data.at)), view.status.text, view.blocks.find(block => block.key === 'duration')?.value].join('|')
+  const labels = [...shown.map(item => elapsedOfItem(item, data.at)), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age].join('|')
   if (labels === lastLabels) return
   lastLabels = labels
   $.ui.invalidate('ui.render')
@@ -79,6 +79,7 @@ export const register: Register = on => {
     const started = await next(e)
     startSources(String((await $.env.get('HOME')) ?? ''))
     lastLabels = ''
+    await setNarrativeOpen($, () => false)
     await startRecorder($)
     $.clock.every(
       FILE_MS,

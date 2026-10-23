@@ -19,6 +19,7 @@ const reports = atom({ plugin: 'master-session', key: 'reports' } as const, [])
 const agents = atom({ plugin: 'master-session', key: 'agents' } as const, [])
 const workflows = atom({ plugin: 'master-session', key: 'workflows' } as const, [])
 const role = atom({ plugin: 'master-session', key: 'role' } as const, { role: '', self: '', parent: '' })
+const isNarrativeOpen = atom({ plugin: 'master-session', key: 'isNarrativeOpen' } as const, false)
 const isPlan = atom({ plugin: 'master-session', key: 'isPlan' } as const, false)
 const stopped = atom({ plugin: 'master-session', key: 'stopped' } as const, false)
 
@@ -177,4 +178,12 @@ export function getStopped($: EngineInterface) {
 
 export function saveStopped($: EngineInterface, value: boolean) {
   return update($, stopped, () => value)
+}
+
+export function getNarrativeOpen($: EngineInterface) {
+  return read($, isNarrativeOpen)
+}
+
+export function setNarrativeOpen($: EngineInterface, change: (value: boolean) => boolean) {
+  return update($, isNarrativeOpen, change)
 }

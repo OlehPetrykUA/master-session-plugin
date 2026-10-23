@@ -1,3 +1,4 @@
+import { NARRATIVE_CAP } from './constants'
 import type { Board, BoardSession, Live, SessionState } from '../../types'
 
 export const ORDER: readonly SessionState[] = ['needs-you', 'waiting', 'working', 'done']
@@ -25,6 +26,12 @@ const BY_MARK: Record<string, Field> = {
 const LINK = /\[([^\]]+)\]\(#(local_[\w-]+)\)/
 
 const textOf = (value: unknown) => (typeof value === 'string' && value.trim() && value.trim() !== '—' ? value.trim() : undefined)
+
+const cleanNarrativeOf = (value: unknown) => {
+  const text = textOf(typeof value === 'string' ? value.replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ') : undefined)
+  const chars = Array.from(text ?? '')
+  return chars.length > NARRATIVE_CAP ? `${chars.slice(0, NARRATIVE_CAP).join('')}…` : text
+}
 
 const stringsOf = (value: unknown) => (Array.isArray(value) ? value.flatMap(one => textOf(one) ?? []) : [])
 
@@ -58,6 +65,7 @@ export function boardFromJson(raw: unknown, source: Board['source'] = 'file'): B
     repos: stringsOf(data.repos),
     testsPassed: passed,
     testsNote: textOf(data.testsNote),
+    narrative: cleanNarrativeOf(data.narrative),
     since: typeof data.since === 'number' && Number.isFinite(data.since) ? data.since : undefined,
     source,
   }

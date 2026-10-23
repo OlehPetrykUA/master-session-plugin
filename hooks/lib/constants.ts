@@ -18,8 +18,12 @@ export const AGENT_SHOWN_MS = 120_000
 export const UNDO_MS = 10_000
 export const FAULT_RETRY_MS = 5_000
 export const FAULT_RETRY_MAX_MS = 60_000
+export const NARRATIVE_STALE_MS = 900_000
+export const NARRATIVE_CAP = 500
+export const NARRATIVE_ROWS = 3
+export const NARRATIVE_MAX_ROWS = 40
 export const OPENED = 'Master session pane opened.'
-export const SECTIONS = ['section-header', 'section-summary', 'section-chips', 'section-list', 'section-expanded', 'section-archived'] as const
+export const SECTIONS = ['section-header', 'section-narrative', 'section-summary', 'section-chips', 'section-list', 'section-expanded', 'section-archived'] as const
 
 const LIST = { type: 'array', items: { type: 'string' } }
 
@@ -61,6 +65,11 @@ export const BOARD_SCHEMA = {
     repos: { ...LIST, description: 'repo paths the run touches' },
     testsPassed: { type: 'number', description: 'tests passed in the whole run' },
     testsNote: { type: 'string', description: 'e.g. "smoke 398 · hooks 128"' },
+    narrative: {
+      type: 'string',
+      description:
+        'two to four plain sentences for the user, at most 500 characters: what is happening, what comes next, what needs them (or "Nothing needs you."). Worker names, not ids; no markdown. Write it fresh on every call; it shows in the pane only',
+    },
   },
   required: ['sessions'],
 }

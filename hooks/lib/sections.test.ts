@@ -18,6 +18,8 @@ const input: SectionInput = {
   notice: '',
   status: 'updated just now',
   buttons: ['Ask', 'Refresh'],
+  narrativeRows: 0,
+  hasNarrativeMore: false,
   blockRows: 2,
   blockExtra: 0,
   chips,
@@ -39,6 +41,18 @@ test('the pinned header is the 56 px header, the repos row and the rule; narrow 
   expect(noticePxOf('Can’t read sessions: board.json not found. Retrying in 30s.', 46)).toBe(12 + 16 + 2 * 16)
   expect(noticePxOf('', 46)).toBe(0)
   expect(headerPxOf({ ...input, repos: [] })).toBe(57)
+})
+
+test('D3 the narrative block is 12 + rows × 20 + 4 + 16, or 32 with More, before the summary, and the content height follows', () => {
+  const header = headerRowsOf(input) * LH
+  expect(sectionTopsOf(input)['section-narrative']).toBeUndefined()
+  for (const [rows, hasMore, height] of [[2, false, 12 + 40 + 4 + 16], [3, true, 12 + 60 + 4 + 32]] as const) {
+    const narrated = { ...input, narrativeRows: rows, hasNarrativeMore: hasMore }
+    const tops = sectionTopsOf(narrated)
+    expect(tops['section-narrative']).toBe(header)
+    expect(tops['section-summary']).toBe(header + height)
+    expect((contentHeightOf(narrated) ?? 0) - (contentHeightOf(input) ?? 0)).toBe(height)
+  }
 })
 
 test('section tops follow the drawn layout: summary, chips, then the list with the archived group last', () => {

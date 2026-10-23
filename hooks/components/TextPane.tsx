@@ -127,6 +127,16 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
         </Box>
       ) : null}
       {data.live.error ? <Text color="warning">{`Can’t read sessions: ${data.live.error}`}</Text> : null}
+      {view.narrative ? (
+        <Box key="section-narrative" flexDirection="column">
+          <Text key="narrative-text" wrap="wrap" dimColor={view.narrative.isStale || undefined}>
+            {view.narrative.text}
+          </Text>
+          <Text key="narrative-age" dimColor>
+            {view.narrative.age}
+          </Text>
+        </Box>
+      ) : null}
       <Box key="section-summary" flexDirection="column">
         <Text>{blocks.slice(0, 4).join(' · ')}</Text>
         <Text dimColor>{blocks.slice(4).join(' · ')}</Text>

@@ -4,10 +4,11 @@ import type { HeaderButton } from '../components/Header'
 import type { PaneData } from '../components/types'
 import type { IconName } from '../theme/icons'
 import type { Tone } from '../theme/tokens'
-import { shortOf, updatedOf } from './format'
+import { compactOf, shortOf, updatedOf } from './format'
 import { CH, LH, bodyWidthOf, liftOf } from './layout'
 import { familyOf } from './rows'
-import { ARCHIVED_PEEK, CHAT_LABEL, ageOf, blocksOf, chatTargetOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf } from './list'
+import { NARRATIVE_MAX_ROWS, NARRATIVE_ROWS, NARRATIVE_STALE_MS } from './constants'
+import { ARCHIVED_PEEK, CHAT_LABEL, ageOf, blocksOf, chatTargetOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf, rowsOf } from './list'
 import type { Context } from './list'
 import { rowFitOf } from './rowfit'
 import { NARROW_PX, ROW, contentHeightOf, dotExtraOf, headerRowsOf, sectionTopsOf, tileInnerOf } from './sections'
@@ -26,6 +27,25 @@ export function statusOf(data: PaneData, isDone: boolean): { text: string; icon:
   if (data.asked) return { text: `asked ${data.asked.count} worker${data.asked.count === 1 ? '' : 's'} · ${ageOf(data.at - data.asked.at)}`, icon: 'chat', tone: 'muted' }
   if (isDone) return { text: `finished ${data.board?.tick || clockOf(data.at)}`, icon: 'done', tone: 'muted' }
   return { text: data.live.at ? updatedOf(data.at - newestOf(data)) : 'loading', icon: 'clock', tone: 'muted' }
+}
+
+export function narrativeOf(data: PaneData) {
+  const text = data.board?.narrative
+  const at = data.board?.at
+  if (!text || at === undefined) return undefined
+  const ms = data.at - at
+  const room = bodyWidthOf(data.columns)
+  const full = rowsOf(text, room, 13, NARRATIVE_MAX_ROWS)
+  const hasMore = full.length > NARRATIVE_ROWS
+  const isStale = ms >= NARRATIVE_STALE_MS
+  return {
+    text,
+    rows: hasMore && !data.isNarrativeOpen ? rowsOf(text, room, 13, NARRATIVE_ROWS) : full,
+    hasMore,
+    isOpen: data.isNarrativeOpen,
+    isStale,
+    age: `written ${ms < 60_000 ? 'just now' : `${compactOf(ms)} ago`}${isStale ? ' · stale' : ''}`,
+  }
 }
 
 export function paneViewOf(data: PaneData) {
@@ -54,6 +74,7 @@ export function paneViewOf(data: PaneData) {
     isEmpty,
     chips,
     status: statusOf(data, isDone),
+    narrative: narrativeOf(data),
     blocks: blocksOf(data.totals, data.rows.length > 0 || items.length > 0, isDone ? data.board?.tick || clockOf(data.at) : undefined),
     perRow: isNarrow ? 3 : 4,
     hasMore: data.chosen === 'all' && data.archiveView === 'open' && data.archived.length > ARCHIVED_PEEK,
@@ -80,6 +101,8 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
     notice: data.live.error ? noticeOf(data.live.error) : '',
     status: view.status.text,
     buttons: headerButtonsOf(data, () => undefined, () => undefined).map(button => button.label),
+    narrativeRows: view.narrative?.rows.length ?? 0,
+    hasNarrativeMore: view.narrative?.hasMore ?? false,
     blockRows: Math.ceil(view.blocks.length / view.perRow),
     blockExtra: dotExtraOf(view.blocks.find(block => block.key === 'sessions'), tileInnerOf(bodyWidthOf(data.columns), view.perRow)),
     chips: view.chips.map(chip => ({ label: chip.label, count: chip.count, hasMark: !!markWidthOf(chip), markWidth: markWidthOf(chip) })),

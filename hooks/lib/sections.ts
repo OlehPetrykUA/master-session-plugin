@@ -2,7 +2,7 @@ import { CH, LH, bodyWidthOf, faceWidth, textWidth, widthOf } from './layout'
 import { rowsOf, shownDots } from './list'
 import type { Block } from './list'
 
-export type SectionKey = 'section-header' | 'section-summary' | 'section-chips' | 'section-list' | 'section-expanded' | 'section-archived'
+export type SectionKey = 'section-header' | 'section-narrative' | 'section-summary' | 'section-chips' | 'section-list' | 'section-expanded' | 'section-archived'
 
 export type ChipSize = { label: string; count: number; hasMark: boolean; markWidth: number }
 
@@ -15,6 +15,8 @@ export type SectionInput = {
   notice: string
   status: string
   buttons: readonly string[]
+  narrativeRows: number
+  hasNarrativeMore: boolean
   blockRows: number
   blockExtra: number
   chips: readonly ChipSize[]
@@ -84,6 +86,10 @@ const groupPxOf = (group: GroupSize) => 32 + (group.rows ? 4 + group.rows * ROW 
 export function sectionTopsOf(input: SectionInput) {
   const tops: Partial<Record<SectionKey, number>> = { 'section-header': 0 }
   let top = headerRowsOf(input) * LH
+  if (input.narrativeRows) {
+    tops['section-narrative'] = top
+    top += 12 + input.narrativeRows * 20 + 4 + (input.hasNarrativeMore ? 32 : 16)
+  }
   tops['section-summary'] = top
   top += 12 + input.blockRows * BLOCK + (input.blockRows - 1) * 8 + input.blockExtra
   tops['section-chips'] = top

@@ -79,7 +79,7 @@ export async function hasBoardFile($: Io, home: string, masterId: string) {
 }
 
 export function writeBoard($: Io, home: string, shared: Shared) {
-  return $.fs.write(boardPath(home, shared.masterId), JSON.stringify({ v: 1, kind: 'board', ...shared, board: { ...shared.board, source: undefined } }))
+  return $.fs.write(boardPath(home, shared.masterId), JSON.stringify({ v: 1, kind: 'board', ...shared, board: { ...shared.board, source: undefined, narrative: undefined } }))
 }
 
 function sharedOf(raw: unknown): Shared | undefined {
