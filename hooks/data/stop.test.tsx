@@ -579,3 +579,31 @@ test('AC23 a stopped master given the worker skill prompt rewrites its board fil
   const last = run.writes.filter(one => one.path === OWN).at(-1)
   expect(JSON.parse(last?.text ?? '{}')).toMatchObject({ v: 1, kind: 'board', masterId: SELF })
 })
+
+test('AC14 a republish in flight when the master stops never writes over the tombstone or poisons the cache', async ($, on) => {
+  let isHeld = false
+  let release = () => {}
+  const gate = new Promise<void>(resolve => (release = resolve))
+  on('state.get', async (_, e, next) => {
+    if (isHeld && e.key === 'reports') {
+      isHeld = false
+      await gate
+    }
+    return next(e)
+  })
+  const run = await master($, on)
+  isHeld = true
+  const call = $.tool.call({ tool: BOARD_TOOL, ...BOARD })
+  await run.clock.advance(10)
+  expect(isHeld).toBe(false)
+  expect((await $.command.run(typed(STOP, 'force'))).text).toBe(M3)
+  release()
+  await call
+  await run.clock.settle()
+  const kinds = () => run.writes.filter(one => one.path === OWN).map(one => JSON.parse(one.text).kind)
+  expect(kinds().at(-1)).toBe('stopped')
+  await $.skill.prompt(START)
+  await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
+  await run.clock.settle()
+  expect(kinds().at(-1)).toBe('board')
+})

@@ -15,7 +15,7 @@ import { familyOf, rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
 import { getAgents, getBoard, getCleared, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setCleared, setClearing, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
-import { claim, detected, inPlan, isActive, roleOf, sessionFacts, unstop } from './recorder'
+import { claim, detected, inPlan, isActive, isOff, roleOf, sessionFacts, unstop } from './recorder'
 import { askForUpdates, readReports, writeBoard } from './status'
 
 let home = ''
@@ -111,6 +111,7 @@ export async function republishBoard($: EngineInterface) {
   const repos = [...new Set([...merged.repos, ...(await getRepos($)).map(one => one.path)])]
   const sign = JSON.stringify([merged.sessions.map(one => [one.id, one.name, one.state, one.progress, one.now, one.next, one.needsYou, one.commits?.length, one.tests?.length]), merged.needsYou, repos])
   if (sign === published && at - publishedAt < BOARD_MAX_AGE_MS / 3) return
+  if (isOff()) return
   published = sign
   publishedAt = at
   await writeBoard($, home, { at, masterId, board: { ...merged, repos } })
