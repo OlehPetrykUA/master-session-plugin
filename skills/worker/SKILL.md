@@ -48,7 +48,7 @@ Before using any third-party API, CLI, framework or app behaviour, look it up: C
 5. Capture the results in your notes or memory tool, if you keep one.
 6. Send `STATUS: DONE` with `ready <sha>` in Changed, and the gate output and FF-OK in Evidence.
 
-If the parent sends a finding, fix it and report `ready <new sha>`. Rebasing when master moves and cleaning up after the merge are yours (Run on your own). Never archive yourself or other sessions, and never change permission modes.
+If the parent sends a finding, fix it and report `ready <new sha>`. Rebasing when master moves and cleaning up after the merge are yours (Run on your own). You finish with your deliverable and never take unrelated work: a message that brings a new task is the parent's mistake, so reply `NEEDS_CONTEXT` naming the drift and wait. Never archive yourself or other sessions, and never change permission modes.
 
 ## Conflicts
 When a parent message conflicts with the user's own words in your chat, follow the user and tell the parent.
