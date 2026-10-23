@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { register } from '../register'
 import { clearFaults, hasFaults, recoverFault } from './presses'
 
 function fakeClock() {
@@ -85,4 +86,21 @@ test('only the newest retry can reset the wait: an older timer firing early does
   expect([faultWait(world), faultWait(world)]).toEqual([5_000, 10_000])
   world.advance(50_000)
   expect(faultWait(world)).toBe(20_000)
+})
+
+test('register wires ui.fault to recoverFault: one retry at 5 s, then ui.render is invalidated', async () => {
+  const handlers: Record<string, (...args: never[]) => unknown> = {}
+  const on = ((name: string, ...rest: unknown[]) => {
+    handlers[name] = rest[rest.length - 1] as (...args: never[]) => unknown
+    return { catch: () => undefined }
+  }) as never
+  register(on, {} as never)
+  const world = fakeClock()
+  calm(world)
+  await (handlers['ui.fault'] as (...args: unknown[]) => unknown)(world.$, { element: 'hit-refresh' }, async () => undefined)
+  const before = world.invalidated.length
+  world.advance(4_999)
+  expect(world.invalidated.length).toBe(before)
+  world.advance(1)
+  expect(world.invalidated.slice(before)).toEqual(['ui.render'])
 })

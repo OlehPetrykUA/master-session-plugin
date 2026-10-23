@@ -7,11 +7,9 @@ import type { AgentRecord, WorkflowRecord } from '../types'
 
 import { subagentsOf, workflowRunsOf } from './lib/agents'
 import type { Child } from './testing/world'
-import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, click, started, textsOf, typed, warmUp, world } from './testing/world'
+import { BOARD, BOARD_TOOL, HOME, PANE, PLUGIN_ORIGIN, SELF, SPAWN, click, started, textsOf, typed, warmUp, world } from './testing/world'
 
 warmUp()
-
-const PLUGIN_ORIGIN = { kind: 'plugin', name: 'master-session' }
 
 test('/master-session:start status opens the pane; with a task it also runs the skill', async ($, on) => {
   const { opened, ran, clock } = world(on)
@@ -267,5 +265,6 @@ test('a malformed board is refused with what it needs and changes nothing', asyn
   }
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ key: 'hit-row-local_env' })).toBeDefined()
+  expect(await ui.find({ key: 'hit-row-local_setup' })).toBeDefined()
   await ui.unmount()
 })

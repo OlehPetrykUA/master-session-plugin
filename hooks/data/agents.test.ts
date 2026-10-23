@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { AgentInfo } from 'claude-code'
 
-import type { AgentRecord, WorkflowRecord } from '../../types'
+import type { AgentRecord } from '../../types'
 
 import { workflowRunsOf } from '../lib/agents'
 import { SPAWN } from '../testing/world'

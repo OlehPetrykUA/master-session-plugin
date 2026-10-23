@@ -111,6 +111,14 @@ test('the board file round-trips for child chats, is re-read on change only and 
   expect(await readBoard($, home, 'local_missing', 70 * MIN)).toBeUndefined()
 })
 
+test('a shared board file keeps its good row and drops a bad one', async () => {
+  const home = '/home/rows'
+  const { $, files } = disk()
+  files[boardPath(home, MASTER)] = { text: JSON.stringify({ kind: 'board', masterId: MASTER, at: 60 * MIN, board: { sessions: [{ id: 'x' }, { id: 'local_a', state: 'working' }] } }), mtimeMs: 1 }
+  const shared = await readBoard($, home, MASTER, 61 * MIN)
+  expect(shared?.board.sessions.map(one => one.id)).toEqual(['local_a'])
+})
+
 test('a worker without a known parent finds it in the newest board that lists it', async () => {
   const home = '/home/parent'
   const { $ } = disk({

@@ -9,7 +9,7 @@ import { blocksOf } from '../../lib/list'
 import type { RunSummary } from '../../lib/totals'
 import { subOf, tileInnerOf } from './Summary'
 import { C } from '../../theme/tokens'
-import { BOARD, BOARD_TOOL, HOME, PANE, SELF, WORKTREE, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
+import { BOARD, BOARD_TOOL, HOME, PANE, PLUGIN_ORIGIN, SELF, WORKTREE, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
 
 const BASH = `Allow Bash: P=/Users/opetryk/Work/master-session-plugin; W="$HOME/.claude/worktrees/wt-master-session-plugin-band-v3"; git -C $P merge-base --is-ancestor 9bd146ce23c7d6485d main && git -C "$W" log --oneline -5 && git -C "$W" status --porcelain=v2 --branch --untracked-files=all`
 
@@ -115,7 +115,7 @@ test('every open call moves the pane back to the top, or to the expanded card', 
     return { value: {} }
   }) as never)
   await started($, on)
-  const raise = () => ($.ui as unknown as Raise).scroll({ component: 'Pane', requestId: 'master-session', offset: 30, by: 0, bodyRows: 2, contentRows: 400, origin: { kind: 'plugin', name: 'master-session' } })
+  const raise = () => ($.ui as unknown as Raise).scroll({ component: 'Pane', requestId: 'master-session', offset: 30, by: 0, bodyRows: 2, contentRows: 400, origin: PLUGIN_ORIGIN })
   await $.tool.call({ tool: 'mcp__master-session__open' })
   await raise()
   expect(landed.at(-1)).toBe(0)

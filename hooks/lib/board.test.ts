@@ -49,5 +49,5 @@ test('progress: segment fills in board order, archived left out', async () => {
 test('a board read from JSON drops a row without an id or a valid state and keeps the good one', async () => {
   const good = { id: 'local_a', state: 'working' }
   for (const bad of [{ id: 'x' }, { state: 'working' }, { id: 'x', state: 'nope' }, 'text'])
-    expect(boardFromJson({ sessions: [good, bad] }, 'file')?.sessions.map(one => one.id)).toEqual(['local_a'])
+    expect(boardFromJson({ sessions: [good, bad] })?.sessions.map(one => one.id)).toEqual(['local_a'])
 })

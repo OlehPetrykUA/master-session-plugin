@@ -3,7 +3,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { CH, LH, across, tall } from '../lib/layout'
 import { C, KINDS } from '../theme/tokens'
-import { BOARD, HOME, PANE, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, click, hitsOf, started, textsOf, warmUp } from '../testing/world'
+import { BOARD, HOME, PANE, PLUGIN_ORIGIN, SELF, SPAWN, WORKTREE, altsOf, buttonsOf, click, hitsOf, started, textsOf, warmUp } from '../testing/world'
 
 warmUp()
 
@@ -201,7 +201,7 @@ test('the header: 56 tall, title and live dot over the status line, Ask and Refr
   }
 })
 
-test('the Sessions tile draws only non-zero dots in red, green, amber, grey order, and its dot row wraps at 41 and 47 columns', async ($, on) => {
+test('the Sessions tile draws only non-zero dots in red, green, amber, grey order, and its dot row has flexWrap wrap in that order at 41 and 47 columns', async ($, on) => {
   const session = (id: string, state: string) => ({ id, name: id, state })
   const four = { ...BOARD, sessions: [session('n1', 'needs-you'), session('w1', 'working'), session('p1', 'waiting'), session('d1', 'done')], needsYou: [] }
   await started($, on, four)
@@ -460,7 +460,7 @@ function aimed(on: Parameters<typeof started>[1]) {
 const scrolled = (offset: number) => ({ ...PANE, surface: 'desktop' as const, props: { ...PANE.props, scroll: { offset, bodyRows: 2 } } })
 
 async function pluginScroll($: Engine) {
-  await ($.ui as unknown as Raise).scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 2, contentRows: 400, origin: { kind: 'plugin', name: 'master-session' } })
+  await ($.ui as unknown as Raise).scroll({ component: 'Pane', requestId: 'master-session', offset: 0, by: 0, bodyRows: 2, contentRows: 400, origin: PLUGIN_ORIGIN })
 }
 
 async function aimAt($: Engine, to: string) {

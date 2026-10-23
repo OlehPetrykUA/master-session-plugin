@@ -5,6 +5,8 @@ import type { AgentSpawnInput, On } from 'claude-code'
 import type { Live } from '../../types'
 
 export const HOME = '/home/me'
+
+export const PLUGIN_ORIGIN = { kind: 'plugin', name: 'master-session' }
 export const SELF = 'local_validator'
 export const WORKTREE = `${HOME}/.claude/worktrees/wt-toolkit-setup-ui`
 export const TOOLKIT = `${HOME}/Work/toolkit`
