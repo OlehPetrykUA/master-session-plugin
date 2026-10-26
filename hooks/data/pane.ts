@@ -5,7 +5,7 @@ import { archivedOf, familyOf, rowsOf } from '../lib/rows'
 import { runSummaryOf } from '../lib/totals'
 import { UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
-import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getNarrativeNote, getNarrativeOpen, getRefreshing, getReports, getRepos, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter, setNarrativeOpen } from '../state/atoms'
+import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getNarrativeNote, getNarrativeOpen, getRefreshing, getReports, getRepos, getTasks, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter, setNarrativeOpen } from '../state/atoms'
 import { runningViewOf } from './running'
 import { archive, askAll, clearDone, boardOf, homeOf, openSession, refreshAll, stopSession, unarchive, undoArchive } from './sources'
 
@@ -33,6 +33,7 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
     agents,
     workflows,
     running: runningViewOf(await getReports($), live),
+    tasks: await getTasks($),
     totals: runSummaryOf({ rows, sessions: familyOf(live), agents, workflows, board: current, trees, at }),
     chosen: await getFilter($),
     open: await getExpanded($),

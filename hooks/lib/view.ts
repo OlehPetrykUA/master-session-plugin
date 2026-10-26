@@ -49,7 +49,7 @@ export function narrativeOf(data: PaneData) {
 }
 
 export function paneViewOf(data: PaneData) {
-  const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows, running: data.running }
+  const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows, running: data.running, tasks: data.tasks }
   const items = itemsOf(data.rows, data.agents, data.workflows, { ...context, cleared: data.cleared })
   const counts = countsOfItems(items, data.archived.length)
   const groups = groupsOf(items, data.archived, data.chosen, data.archiveView, data.undone?.group)

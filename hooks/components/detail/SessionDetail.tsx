@@ -21,6 +21,7 @@ import { lossesOf } from './losses'
 import { ModelValue } from './Model'
 import { Pair } from './Pair'
 import { RunningBlock } from './RunningBlock'
+import { TaskBlock } from './TaskBlock'
 import { Tests } from './Tests'
 
 export type SessionDetailProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; rowProps: RowProps; home: string; asking: string; innerWidth: number; actions: Actions }
@@ -103,6 +104,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
       permission,
       callout,
       RunningBlock(ui, { id: row.id, run: runningOfItem(item, context), at }),
+      TaskBlock(ui, { id: row.id, name: shortNameOf(item), task: context.tasks?.[row.id], room: props.innerWidth - 24 }),
       Pair(ui, {
         id: `pair-now-${row.id}`,
         left: half('Now', 'now', Strong(ui, { text: facts?.now || '—', isFull: true }), 'now'),

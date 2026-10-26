@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, NarrativeNote, Repo, Report, Role, Undone, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, NarrativeNote, Repo, Report, Role, TaskText, Undone, WorkflowRecord } from '../../types'
 
 const board = atom({ plugin: 'master-session', key: 'board' } as const, null)
 const live = atom({ plugin: 'master-session', key: 'live' } as const, { self: '', title: '', sessions: [], error: '', at: 0 })
@@ -22,6 +22,7 @@ const role = atom({ plugin: 'master-session', key: 'role' } as const, { role: ''
 const isNarrativeOpen = atom({ plugin: 'master-session', key: 'isNarrativeOpen' } as const, false)
 const narrativeNote = atom({ plugin: 'master-session', key: 'narrativeNote' } as const, { text: '', at: 0, boardAt: 0, sign: '', calledAt: 0 })
 const isPlan = atom({ plugin: 'master-session', key: 'isPlan' } as const, false)
+const tasks = atom({ plugin: 'master-session', key: 'tasks' } as const, {})
 const stopped = atom({ plugin: 'master-session', key: 'stopped' } as const, false)
 
 const isSame = (one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other)
@@ -195,4 +196,13 @@ export function getNarrativeNote($: EngineInterface) {
 
 export function setNarrativeNote($: EngineInterface, change: (value: NarrativeNote) => NarrativeNote) {
   return update($, narrativeNote, change)
+}
+
+export function getTasks($: EngineInterface) {
+  return read($, tasks)
+}
+
+export async function saveTasks($: EngineInterface, change: (value: Record<string, TaskText>) => Record<string, TaskText>) {
+  const before = await read($, tasks)
+  if (!isSame(change(before), before)) await update($, tasks, change)
 }

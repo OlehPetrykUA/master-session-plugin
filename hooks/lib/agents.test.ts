@@ -3,7 +3,8 @@ import { expect, test } from 'claude-code/testing'
 import type { AgentRecord, Board, Report, WorkflowRecord } from '../../types'
 
 import { liveOf } from '../testing/world'
-import { reportAgentsOf, reportRunsOf, stateCountsOf, subagentsOf, withReportedRuns, workflowRunsOf } from './agents'
+import { freshReport } from '../data/contract'
+import { reportAgentsOf, reportRunsOf, stateCountsOf, subagentsOf, withReported, withReportedRuns, workflowRunsOf } from './agents'
 import { rowsOf } from './rows'
 import { runSummaryOf } from './totals'
 
@@ -109,4 +110,15 @@ test("a worker's runs travel in its report with their phases and join the master
   const merged = withReportedRuns([own, { ...own, id: 'wf_stale', parentSessionId: 'local_b' }], [report])
   expect(merged.map(one => [one.id, one.parentSessionId])).toEqual([['wf_1', undefined], ['wf_9', 'local_b']])
   expect(workflowRunsOf([], merged).map(one => one.id)).toEqual(['wf_1'])
+})
+
+test('a worker’s report carries each agent’s model as its row reads it and its finished task, and the master’s record holds both', () => {
+  const mine: AgentRecord[] = [
+    { id: 'b1', type: 'general-purpose', description: 'Row model', model: 'claude-haiku-5-5', requestedModel: 'haiku', state: 'running', startedAt: NOW, task: { state: 'done', text: 'Adds the model to each row.' } },
+    { id: 'b2', type: 'general-purpose', description: 'Other', model: 'claude-opus-5-5', state: 'running', startedAt: NOW, task: { state: 'pending' } },
+  ]
+  const report: Report = { ...freshReport('local_work', 'local_master', 'engine', NOW), agents: reportAgentsOf(mine) }
+  const reported = [['b2', 'claude-opus-5-5', undefined], ['b1', 'haiku', { state: 'done', text: 'Adds the model to each row.' }]]
+  expect(report.agents?.map(one => [one.id, one.model, one.task])).toEqual(reported)
+  expect(withReported([], [report]).map(one => [one.id, one.model, one.task])).toEqual(reported)
 })

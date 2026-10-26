@@ -1,4 +1,4 @@
-import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, ReportRun, Running, Step } from '../../types'
+import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, ReportRun, Running, Step, TaskText } from '../../types'
 
 import { ORDER, parseStep, stateOf } from '../lib/board'
 import { compactOf } from '../lib/format'
@@ -73,6 +73,13 @@ export function parseRunning(value: unknown): Running | undefined {
   const data = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
   if (typeof data.tool !== 'string' || !data.tool || !Number.isFinite(data.since)) return undefined
   return data.tool !== 'Bash' && typeof data.text === 'string' && data.text ? { tool: data.tool, text: capOf(data.text), since: Number(data.since) } : { tool: data.tool, since: Number(data.since) }
+}
+
+const TASK_MAX = 600
+
+const parseTask = (value: unknown): TaskText | undefined => {
+  const data = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  return data.state === 'done' && typeof data.text === 'string' && data.text.trim() ? { state: 'done', text: data.text.length > TASK_MAX ? `${data.text.slice(0, TASK_MAX)}…` : data.text } : undefined
 }
 
 const AGENT_STATES = new Set(['running', 'done', 'failed'])
@@ -188,8 +195,8 @@ export function parseReport(raw: unknown): Report | undefined {
     waits: listOf<NonNullable<Report['waits']>>([data.waits], item => Number.isFinite(item.since))[0],
     git: listOf<NonNullable<Report['git']>>([data.git], item => typeof item.branch === 'string' && Number.isFinite(item.dirty))[0],
     running: parseRunning(data.running),
-    agents: listOf<ReportAgent>(data.agents, isReportAgent).map(one => ({ ...one, running: parseRunning(one.running) })),
-    runs: listOf<ReportRun>(data.runs, item => typeof item.id === 'string' && Number.isFinite(item.startedAt)),
+    agents: listOf<ReportAgent>(data.agents, isReportAgent).map(one => ({ ...one, running: parseRunning(one.running), task: parseTask(one.task) })),
+    runs: listOf<ReportRun>(data.runs, item => typeof item.id === 'string' && Number.isFinite(item.startedAt)).map(one => ({ ...one, task: parseTask(one.task) })),
   }
 }
 

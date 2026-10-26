@@ -1,6 +1,6 @@
 import type { BoxProps, ButtonProps, ClientProps, ElementConstructor, SvgProps, TextProps } from 'claude-code'
 
-import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Repo, Running, SessionState, Undone, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Repo, Running, SessionState, TaskText, Undone, WorkflowRecord } from '../../types'
 
 import type { Row } from '../lib/rows'
 import type { RunSummary } from '../lib/totals'
@@ -39,6 +39,7 @@ export type PaneData = {
   agents: readonly AgentRecord[]
   workflows: readonly WorkflowRecord[]
   running: Readonly<Record<string, Running>>
+  tasks: Readonly<Record<string, TaskText>>
   totals: RunSummary
   chosen: Filter
   open: readonly string[]

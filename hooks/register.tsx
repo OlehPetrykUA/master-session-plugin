@@ -23,7 +23,8 @@ import {
   startSources,
 } from './data/sources'
 import { clearPresses, hasFaults, recoverFault, runPress } from './data/presses'
-import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
+import { describeSession, describeSpawn, recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
+import { settleTasks } from './data/describe'
 import { refreshNarrative } from './data/narrative'
 import { skipWhileBusy } from './data/flight'
 import { briefed, claim, engage, inPlan, isActive, isOff, recordTurnEnd, recorder, startRecorder, unstop } from './data/recorder'
@@ -89,6 +90,7 @@ export const register: Register = on => {
     lastLabels = ''
     await setNarrativeOpen($, () => false)
     await startRecorder($)
+    await settleTasks($).catch(() => undefined)
     $.clock.every(
       FILE_MS,
       skipWhileBusy(async () => {
@@ -128,12 +130,19 @@ export const register: Register = on => {
   on('agent.spawn', async ($, e, next) => {
     const out = await next(e)
     await recordSpawn($, e, out).catch(() => undefined)
+    await describeSpawn($, e, out).catch(() => undefined)
     return out
   }).catch(($, e, next) => next(e))
 
   on('tool.call', { tool: 'Workflow' }, async ($, e, next) => {
     const out = await next(e)
     await recordWorkflow($, e, out.result).catch(() => undefined)
+    return out
+  }).catch(($, e, next) => next(e))
+
+  on('tool.call', { tool: 'mcp__ccd_session__start_session' }, async ($, e, next) => {
+    const out = await next(e)
+    await describeSession($, e, out.result).catch(() => undefined)
     return out
   }).catch(($, e, next) => next(e))
 

@@ -146,6 +146,8 @@ export type AgentState = 'running' | 'done' | 'failed'
 
 export type AgentAsk = { text: string; since: number }
 
+export type TaskText = { state: 'pending' | 'done'; text?: string }
+
 export type AgentRecord = {
   id: string
   name?: string
@@ -167,9 +169,10 @@ export type AgentRecord = {
   asking?: AgentAsk
   parentAgentId?: string
   parentSessionId?: string
+  task?: TaskText
 }
 
-export type ReportAgent = Pick<AgentRecord, 'id' | 'type' | 'description' | 'state' | 'startedAt' | 'name' | 'endedAt' | 'asking' | 'parentAgentId'> & { runId?: string; runIndex?: number; running?: Running }
+export type ReportAgent = Pick<AgentRecord, 'id' | 'type' | 'description' | 'state' | 'startedAt' | 'name' | 'endedAt' | 'asking' | 'parentAgentId' | 'task' | 'model'> & { runId?: string; runIndex?: number; running?: Running }
 
 export type WorkflowRecord = {
   id: string
@@ -180,15 +183,17 @@ export type WorkflowRecord = {
   phases?: string[]
   startedAt: number
   parentSessionId?: string
+  task?: TaskText
 }
 
 export type NarrativeNote = { text: string; at: number; boardAt: number; sign: string; calledAt: number }
 
-export type ReportRun = Pick<WorkflowRecord, 'id' | 'name' | 'phases' | 'startedAt'>
+export type ReportRun = Pick<WorkflowRecord, 'id' | 'name' | 'phases' | 'startedAt' | 'task'>
 
 declare module 'claude-code' {
   interface McpToolInputs {
     'mcp__master-session__scroll': { to: string }
+    'mcp__ccd_session__start_session': { prompt?: string; title?: string }
     'mcp__master-session__open': {}
     'mcp__master-session__reports': {}
     'mcp__master-session__board': Pick<Board, 'tick' | 'testsPassed' | 'testsNote' | 'plan'> & { sessions: BoardSession[]; needsYou?: string[]; repos?: string[] }
@@ -228,6 +233,7 @@ declare module 'claude-code' {
       role: Role
       isPlan: boolean
       stopped: boolean
+      tasks: Record<string, TaskText>
     }
   }
 }

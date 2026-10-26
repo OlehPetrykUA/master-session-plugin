@@ -1,4 +1,4 @@
-import type { AgentAsk, AgentRecord, AgentState, Report, ReportAgent, ReportRun, WorkflowRecord } from '../../types'
+import type { AgentAsk, AgentRecord, AgentState, Report, ReportAgent, ReportRun, TaskText, WorkflowRecord } from '../../types'
 
 const REPORTED_MAX = 20
 
@@ -6,17 +6,20 @@ const REPORTED_TEXT = 300
 
 const clip = (text: string) => text.slice(0, REPORTED_TEXT)
 
+const doneOf = (task: TaskText | undefined) => (task?.state === 'done' ? task : undefined)
+
 const rankOf = (agent: AgentRecord) => (agent.state === 'running' && agent.asking ? 0 : agent.state === 'running' ? 1 : 2)
 
 export type StateCounts = Record<AgentState, number> & { total: number; asking: number }
 
-export type WorkflowAgent = { id: string; index: number; label: string; type: string; model?: string; state: AgentState; startedAt: number; endedAt?: number; result?: string; tokens?: number; asking?: AgentAsk }
+export type WorkflowAgent = { id: string; index: number; label: string; type: string; model?: string; state: AgentState; startedAt: number; endedAt?: number; result?: string; tokens?: number; asking?: AgentAsk; task?: TaskText }
 
 export type WorkflowRun = {
   id: string
   name: string
   description: string
   taskId?: string
+  task?: TaskText
   phases: string[]
   state: AgentState
   startedAt: number
@@ -49,6 +52,7 @@ export function workflowRunsOf(all: readonly AgentRecord[], records: readonly Wo
       name: record?.name || id,
       description: record?.description ?? '',
       taskId: record?.taskId,
+      task: record?.task,
       phases: record?.phases ?? [],
       state: isRunning ? 'running' : counts.failed ? 'failed' : 'done',
       startedAt: Math.min(record?.startedAt ?? Infinity, ...members.map(agent => agent.startedAt)),
@@ -65,6 +69,7 @@ export function workflowRunsOf(all: readonly AgentRecord[], records: readonly Wo
         result: agent.result,
         tokens: agent.tokens,
         asking: agent.asking,
+        task: agent.task,
       })),
       counts,
       tokens: members.reduce((sum, agent) => sum + (agent.tokens ?? 0), 0),
@@ -93,6 +98,8 @@ export const reportAgentsOf = (agents: readonly AgentRecord[]): ReportAgent[] =>
       parentAgentId: one.parentAgentId,
       runId: one.run?.id,
       runIndex: one.run?.index,
+      model: one.requestedModel || one.model,
+      task: doneOf(one.task),
     }))
 
 export const withReported = (agents: AgentRecord[], reports: readonly Report[]): AgentRecord[] => [
@@ -106,7 +113,7 @@ export const reportRunsOf = (workflows: readonly WorkflowRecord[]): ReportRun[] 
   workflows
     .filter(one => !one.parentSessionId)
     .slice(-REPORTED_MAX)
-    .map(one => ({ id: one.id, name: one.name ? one.name.slice(0, REPORTED_TEXT) : undefined, phases: one.phases?.slice(0, REPORTED_MAX).map(clip), startedAt: one.startedAt }))
+    .map(one => ({ id: one.id, name: one.name ? one.name.slice(0, REPORTED_TEXT) : undefined, phases: one.phases?.slice(0, REPORTED_MAX).map(clip), startedAt: one.startedAt, task: doneOf(one.task) }))
 
 export const withReportedRuns = (workflows: WorkflowRecord[], reports: readonly Report[]): WorkflowRecord[] => [
   ...workflows.filter(one => !one.parentSessionId),

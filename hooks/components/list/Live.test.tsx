@@ -210,16 +210,14 @@ test('files owned show relative to the worktree, not as absolute paths', async (
   await ui.unmount()
 })
 
-test('a subagent card clamps a 35-line prompt to a few lines with an ellipsis', async ($, on) => {
+test('a subagent card draws no prompt rows and no N-line prompt line, whatever the prompt holds', async ($, on) => {
   seeded(on, [{ id: 'q1', type: 'master-session:qa-verifier', description: 'Live check every item', prompt: PROMPT, state: 'running', startedAt: 3_540_000 }])
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-q1')
-  const body = ((await ui.find({ key: 'task-prompt-q1' }))?.children ?? []) as { text?: string }[]
-  expect(body.length).toBe(4)
-  expect(JSON.stringify(body.at(-1))).toContain('…')
-  expect((await textsOf(ui)).some(text => text.includes('\n'))).toBe(false)
-  expect(await textsOf(ui)).toContain('35-line prompt · the whole prompt is in this chat')
+  expect(await ui.find({ key: 'task-prompt-q1' })).toBeUndefined()
+  expect(await ui.find({ key: 'task-title-q1' })).toBeDefined()
+  expect((await textsOf(ui)).some(text => text.includes('-line prompt') || text.includes('the whole prompt is in'))).toBe(false)
   await ui.unmount()
 })
 

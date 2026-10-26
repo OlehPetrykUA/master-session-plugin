@@ -36,7 +36,7 @@ test('a subagent waiting on a prompt in a worker chat: a red row with its parent
   expect(await hitsOf(ui)).not.toContain('hit-chat-a1')
   await click(ui, 'hit-row-a1')
   const card = await textsOf(ui)
-  for (const word of ['PERMISSION', 'asked 10s ago · the prompt waits in Session · Redo toolkit setup UI’s chat', 'Task', 'Run the gate.', 'Started by', 'Redo toolkit setup UI']) expect(card.some(text => text.includes(word))).toBe(true)
+  for (const word of ['PERMISSION', 'asked 10s ago · the prompt waits in Session · Redo toolkit setup UI’s chat', 'Task', 'Started by', 'Redo toolkit setup UI']) expect(card.some(text => text.includes(word))).toBe(true)
   expect(await hitsOf(ui)).toContain('hit-top-a1')
   expect((await hitsOf(ui)).filter(one => one.includes('chat') && one.endsWith('a1'))).toEqual([])
   await ui.unmount()

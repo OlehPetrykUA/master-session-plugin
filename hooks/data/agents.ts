@@ -3,6 +3,7 @@ import type { AgentInfo, AgentSpawnInput, AgentSpawnResult, AgentStatus, EngineI
 import type { AgentRecord, AgentState, WorkflowRecord } from '../../types'
 
 import { saveAgents, saveWorkflows } from '../state/atoms'
+import { PLACEHOLDER, SOURCE_MAX, describe, isMasterRole } from './describe'
 import { syncAgents } from './recorder'
 
 const ENDED: Partial<Record<AgentStatus, AgentState>> = { completed: 'done', failed: 'failed', killed: 'failed' }
@@ -11,7 +12,7 @@ const TEXT_MAX = 2_000
 
 export type AgentOutcome = { result?: string; tokens?: number }
 
-const clipped = (text: string) => (text.length > TEXT_MAX ? `${text.slice(0, TEXT_MAX)}…` : text)
+export const clipped = (text: string) => (text.length > TEXT_MAX ? `${text.slice(0, TEXT_MAX)}…` : text)
 
 export const tokensOf = (usage: TurnUsage | undefined) =>
   usage ? usage.input_tokens + usage.output_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens : undefined
@@ -51,6 +52,23 @@ export function phasesOf(script: string) {
   return [...script.slice(start, closeOf(masked, start)).matchAll(TITLE)].map(match => unquoted(match[1] ?? ''))
 }
 
+const META_DESCRIPTION = /\bdescription\s*:\s*('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`)/
+
+export function descriptionOf(script: string) {
+  const masked = script.replace(QUOTED, quoted => `${quoted[0]}${' '.repeat(quoted.length - 2)}${quoted[0]}`)
+  const meta = masked.search(META)
+  if (meta < 0) return ''
+  const open = masked.indexOf('{', meta)
+  const body = script.slice(open, closeOf(masked, open))
+  const found = body.match(META_DESCRIPTION)
+  return found ? unquoted(found[1] ?? '') : ''
+}
+
+export function workflowSource(description: string, phases: readonly string[], script: string) {
+  const head = [description, phases.length ? `Phases: ${phases.join(', ')}` : ''].filter(Boolean).join('\n')
+  return [head, script].filter(Boolean).join('\n\n').slice(0, SOURCE_MAX)
+}
+
 export function spawned(agents: AgentRecord[], e: AgentSpawnInput, out: AgentSpawnResult, now: number) {
   const id = out.agentId
   if (!id || e.isTeammate) return agents
@@ -63,7 +81,7 @@ export function spawned(agents: AgentRecord[], e: AgentSpawnInput, out: AgentSpa
     model: out.model || e.model,
     requestedModel: e.model,
     parentModel: e.parentModel,
-    prompt: clipped(e.prompt),
+    prompt: e.resume ? (known?.prompt ?? clipped(e.prompt)) : clipped(e.prompt),
     isBackground: e.background,
     isFork: e.fork,
     spawnedBy: known?.spawnedBy,
@@ -72,6 +90,7 @@ export function spawned(agents: AgentRecord[], e: AgentSpawnInput, out: AgentSpa
     state: 'running',
     startedAt: known?.startedAt ?? now,
     tokens: known?.tokens,
+    task: known?.task,
   }
   return known ? agents.map(one => (one.id === id ? agent : one)) : [...agents, agent]
 }
@@ -130,6 +149,13 @@ export async function recordAgentEnd($: EngineInterface, e: TurnCompleteInput) {
   await syncAgents($)
 }
 
+export async function describeSpawn($: EngineInterface, e: AgentSpawnInput, out: AgentSpawnResult) {
+  const id = out.agentId
+  const source = clipped(e.prompt)
+  if (!id || e.isTeammate || e.resume || e.prompt === PLACEHOLDER || !source.trim()) return
+  await describe($, { target: { type: 'agent', id }, kind: e.workflow?.runId ? 'workflow agent' : 'subagent', name: e.description, source })
+}
+
 export async function recordWorkflow($: EngineInterface, e: { tool_use_id: string; script?: string }, result: unknown) {
   const now = await $.clock.now()
   const path = textOf(launchOf(result).scriptPath)
@@ -137,6 +163,10 @@ export async function recordWorkflow($: EngineInterface, e: { tool_use_id: strin
   const phases = phasesOf(script)
   await saveWorkflows($, workflows => launched(workflows, e.tool_use_id, result, phases, now))
   await syncAgents($)
+  const launch = launchOf(result)
+  const id = launch.status === 'async_launched' ? textOf(launch.runId) : undefined
+  const source = workflowSource(descriptionOf(script) || textOf(launch.summary) || '', phases, script)
+  if (id) await describe($, { target: { type: 'run', id }, kind: 'workflow', name: textOf(launch.workflowName) ?? id, source })
 }
 
 export async function refreshAgents($: EngineInterface) {
@@ -144,4 +174,13 @@ export async function refreshAgents($: EngineInterface) {
   const now = await $.clock.now()
   await saveAgents($, agents => listed(agents, infos, now))
   await syncAgents($)
+}
+
+const SESSION_ID = /local_[A-Za-z0-9][A-Za-z0-9_-]*/
+
+export async function describeSession($: EngineInterface, e: { prompt?: unknown; title?: unknown }, result: unknown) {
+  const id = JSON.stringify(result ?? '').match(SESSION_ID)?.[0]
+  const source = typeof e.prompt === 'string' ? clipped(e.prompt) : ''
+  if (!id || !source.trim() || !isMasterRole()) return
+  await describe($, { target: { type: 'session', id }, kind: 'side chat', name: typeof e.title === 'string' && e.title ? e.title : id, source })
 }

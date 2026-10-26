@@ -9,6 +9,7 @@ import type { Actions, TextUi } from '../types'
 import { LOST } from './ArchiveBox'
 import { durationOf, runningTimeOf, tokensOf } from './format'
 import { lossesOf } from './losses'
+import { taskLinesOf } from './TaskBlock'
 import { pillsOf } from './Tests'
 
 type Line = { text: string; color?: string; key?: string }
@@ -67,6 +68,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
     head: headOfItem(item, context),
     lines: [
       runningLineOf(item, context),
+      ...taskLinesOf(shortNameOf(item), context.tasks?.[row.id]),
       facts?.now ? `Now: ${facts.now}` : '',
       facts?.next ? `Next: ${facts.next}` : '',
       ...(facts?.activity ?? []).slice(0, 3).map(line => `• ${line}`),
@@ -119,7 +121,7 @@ export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
     title: nameText(displayNameOf(item)),
     isNeeds: item.status === 'needs',
     head: headOfItem(item, context),
-    lines: [`run ${run.id} · ${counts.done}/${counts.total} done`, ...failed.map(agent => ({ text: `Failed: ${agent.label}${agent.result ? ` — ${agent.result}` : ''}`, color: 'error' }))],
+    lines: [`run ${run.id} · ${counts.done}/${counts.total} done`, ...taskLinesOf(shortNameOf(item), run.task), ...failed.map(agent => ({ text: `Failed: ${agent.label}${agent.result ? ` — ${agent.result}` : ''}`, color: 'error' }))],
     body: runAgentsOf(run, context.agents).map(agent =>
       agent.kind === 'agent' && props.open.includes(agent.id) ? (
         TextSubagentDetail(ui, { item: agent, context, onCollapse: () => props.onToggle(run.id) })
@@ -158,8 +160,7 @@ export function TextSubagentDetail(ui: TextUi, props: TextSubagentProps) {
     lines: [
       runningLineOf(item, context),
       ...(item.status === 'needs' && agent.asking ? [{ text: `Permission: ${agent.asking.text}`, color: 'error' }] : []),
-      `Task: ${item.kind === 'subagent' ? item.agent.description : item.agent.label}`,
-      item.kind === 'subagent' ? (item.agent.prompt ?? '') : '',
+      ...taskLinesOf(item.kind === 'subagent' ? item.agent.description : item.agent.label, agent.task),
       `Model: ${model || '—'} · ${agent.type}`,
       `Started by: ${parentsOf(item, context).map(nameText).join(' › ')} · ${how}`,
       isRunning ? `Time: ${item.status === 'needs' && agent.asking ? 'waiting' : 'running'} ${runningTimeOf(item, at)} · started ${clockOf(agent.startedAt)}` : `Time: took ${durationOf(end - agent.startedAt)} · ${clockOf(agent.startedAt)} – ${clockOf(end)}`,

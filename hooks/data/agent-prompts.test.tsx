@@ -129,8 +129,8 @@ test("a subagent prompt in a worker goes into the worker's report agents with it
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm -rf build' }, agent_id: 'a2' } as never)
   const asking = written.at(-1)
   expect(asking?.agents).toEqual([
-    { id: 'a2', type: 'Explore', description: 'Check one caller', state: 'running', startedAt: NOW, parentAgentId: 'a1', asking: { text: 'Allow Bash', since: NOW } },
-    { id: 'a1', type: 'Explore', description: 'Find callers', state: 'running', startedAt: NOW },
+    { id: 'a2', type: 'Explore', description: 'Check one caller', state: 'running', startedAt: NOW, parentAgentId: 'a1', asking: { text: 'Allow Bash', since: NOW }, model: 'claude-haiku-5-5' },
+    { id: 'a1', type: 'Explore', description: 'Find callers', state: 'running', startedAt: NOW, model: 'claude-haiku-5-5' },
   ])
   const rowOf = (report: Report | undefined) => merge(null, report ? [report] : [], { self: MASTER, title: '', sessions: [], error: '', at: 0 }, NOW).sessions[0]
   expect([rowOf(asking)?.state, rowOf(asking)?.needsYou, rowOf(asking)?.persona]).toEqual(['needs-you', 'Allow Bash', 'Implementer'])

@@ -19,6 +19,7 @@ type Asked = { model: string; prompt: string; system?: string; effort?: string; 
 function model(on: On, reply: (count: number) => Promise<unknown> | unknown = () => ({ isAnswered: true, text: FRESH, usage: USAGE })) {
   const asked: Asked[] = []
   on('model.complete', async (_, e) => {
+    if (String(e.system ?? '').startsWith('Describe this task')) return { value: FAILED }
     asked.push(e as Asked)
     return { value: (await reply(asked.length)) as never }
   })

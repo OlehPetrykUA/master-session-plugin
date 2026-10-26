@@ -94,7 +94,7 @@ test('a session asking "Allow Bash: …" leads its card with a Permission callou
   await ui.unmount()
 })
 
-test('a subagent asking for Bash: Permission callout, a Now block, the description in 2 rows, the prompt in 4, then its line count and where it is', async ($, on) => {
+test('a subagent asking for Bash: Permission callout, a Now block, the description in 2 rows and no prompt', async ($, on) => {
   seeded(on, [
     { id: 'q1', type: 'master-session:qa-verifier', description: 'Verify rows-v3 at 48187ca in a clean detached worktree, then compare every changed board with the v3 canvas and report each mismatch', prompt: PROMPT, state: 'running', startedAt: 3_540_000, parentSessionId: 'local_setup', asking: { text: `Allow Bash: ${COMMAND}`, since: 3_560_000 } },
   ])
@@ -103,9 +103,9 @@ test('a subagent asking for Bash: Permission callout, a Now block, the descripti
   await click(ui, 'hit-row-q1')
   expect((await ui.find({ key: 'callout-q1-rows-1' }))?.children?.length).toBe(6)
   expect((await ui.find({ key: 'task-title-q1' }))?.children?.length).toBe(2)
-  expect((await ui.find({ key: 'task-prompt-q1' }))?.children?.length).toBe(4)
+  expect(await ui.find({ key: 'task-prompt-q1' })).toBeUndefined()
   const texts = await textsOf(ui)
-  expect(texts).toContain('35-line prompt · the whole prompt is in Session’s chat')
+  expect(texts.some(text => text.includes('-line prompt'))).toBe(false)
   expect(texts).toEqual(expect.arrayContaining(['Waiting for your answer', 'Bash · asked 40s ago']))
   await ui.unmount()
 })

@@ -16,6 +16,7 @@ import { Block } from './Block'
 import { Callout } from './Callout'
 import { durationOf, runningTimeOf, tokensOf } from './format'
 import { Pair } from './Pair'
+import { TaskBlock } from './TaskBlock'
 
 export type WorkflowDetailProps = { item: Extract<ListItem, { kind: 'workflow' }>; context: Context; rowProps: RowProps; innerWidth: number; agentOf: (item: RowItem) => RenderChildren }
 
@@ -53,6 +54,7 @@ export function WorkflowDetail(ui: Ui, props: WorkflowDetailProps) {
             lines: failed.flatMap(agent => [{ text: agent.label, isStrong: true }, ...(agent.result ? [{ text: agent.result, isStrong: false }] : [])]),
           })
         : null,
+      TaskBlock(ui, { id, name: run.name, task: run.task, room: props.innerWidth - 24 }),
       <Box key={`agents-${id}`} flexDirection="column" gap={down(4)} paddingX={across(11)} paddingY={down(7)} borderStyle="round" borderColor={C.clear} backgroundColor={C.inset}>
         <Box flexDirection="row" alignItems="center" gap={across(8)} height={tall(20)}>
           {Icon(ui, { id: `agents-icon-${id}`, name: look.icon, size: 14, tone: look.tone, weight: 2 })}

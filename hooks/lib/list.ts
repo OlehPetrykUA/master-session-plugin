@@ -1,4 +1,4 @@
-import type { AgentRecord, ArchiveView, Board, BoardSession, Filter, LiveSession, Repo, Running, SessionState, Undone, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Board, BoardSession, Filter, LiveSession, Repo, Running, SessionState, TaskText, Undone, WorkflowRecord } from '../../types'
 
 import { lossLineOf, mergedLineOf } from '../components/detail/losses'
 import { STATUS } from '../theme/icons'
@@ -26,7 +26,7 @@ export type RowItem =
 
 export type ListGroup = { id: SessionState | 'archived'; items: readonly ListItem[]; archived: readonly LiveSession[]; isPinned: boolean; isOpen: boolean }
 
-export type Context = { at: number; trees: readonly Repo[]; sessions: readonly LiveSession[]; agents: readonly AgentRecord[]; rows: readonly Row[]; running?: Readonly<Record<string, Running>> }
+export type Context = { at: number; trees: readonly Repo[]; sessions: readonly LiveSession[]; agents: readonly AgentRecord[]; rows: readonly Row[]; running?: Readonly<Record<string, Running>>; tasks?: Readonly<Record<string, TaskText>> }
 
 export type Name = { persona: string; task: string }
 
