@@ -61,7 +61,7 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
     expect(await hitsOf(other)).toEqual([])
     if (surface === 'terminal') {
       const lines = await textsOf(other)
-      expect(lines).toEqual(expect.arrayContaining(['Needs you 1', 'Waiting 1', 'Archived 1', 'Approve the settings.json edit', 'waiting · waiting for the go · 50m · 2/5']))
+      expect(lines).toEqual(expect.arrayContaining(['Needs you 1', 'Waiting 1', 'Archived 1', 'Approve the settings.json edit · opus', 'waiting · waiting for the go · opus · 50m · 2/5']))
       expect(lines.some(line => line.startsWith('Sessions 2 (1 / 0 / 1 / 0) · Needs you 1 1 session'))).toBe(true)
       expect((await other.find({ key: 'row-open-local_env' }))?.text).toBe('Session · Test and validate local agent environment')
     }
@@ -117,7 +117,8 @@ test('subagents and workflows are rows with their kind and the same groups: runn
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const texts = await textsOf(ui)
   for (const word of ['Workflow', 'review-changes', 'verify:band.ts', 'Explore', 'Review auth flow', 'Researcher', 'token-finder', 'Validator ›', 'running', 'done']) expect(texts).toContain(word)
-  for (const word of ['review:bugs', 'workflow-subagent', 'master-session:researcher', 'haiku', 'sonnet']) expect(texts).not.toContain(word)
+  for (const word of ['review:bugs', 'workflow-subagent', 'master-session:researcher']) expect(texts).not.toContain(word)
+  expect([(await ui.find({ key: 'row-Review auth flow-model' }))?.text, (await ui.find({ key: 'row-Find token usages-model' }))?.text, await ui.find({ key: 'row-wf_7-model' })]).toEqual(['haiku', 'sonnet', undefined])
   const heads = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
   expect(heads).toEqual(['group-head-needs-you', 'group-head-working', 'group-head-waiting', 'group-head-done', 'group-head-archived'])
   expect((await hitsOf(ui)).filter(hit => hit.startsWith('hit-row-') && !hit.endsWith('-chevron'))).toEqual(['hit-row-local_env', 'hit-row-wf_7', 'hit-row-Review auth flow', 'hit-row-local_setup', 'hit-row-Find token usages'])
@@ -127,7 +128,7 @@ test('subagents and workflows are rows with their kind and the same groups: runn
   expect(await altsOf(ui)).toContain('All 5')
   await ui.unmount()
   const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await textsOf(terminal)).toEqual(expect.arrayContaining(['Working 2', 'verify:band.ts · 0s · 1/2', 'Validator › running · 0s', 'Done 1', 'Validator › done · found · 0s']))
+  expect(await textsOf(terminal)).toEqual(expect.arrayContaining(['Working 2', 'verify:band.ts · 0s · 1/2', 'Validator › running · haiku · 0s', 'Done 1', 'Validator › done · found · sonnet · 0s']))
   await terminal.unmount()
 })
 

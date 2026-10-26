@@ -7,6 +7,7 @@ import { STATUS, statusBadge, toneRing } from '../../theme/icons'
 import type { IconName } from '../../theme/icons'
 import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
+import { familyGlyph } from '../detail/Model'
 import { Hit } from '../Hit'
 import { Icon } from '../Icon'
 import { Lines } from '../Lines'
@@ -24,7 +25,7 @@ export function Row(ui: Ui, props: RowProps) {
   const { Box, Text, Button, Svg } = ui
   const { item, context, isNarrow } = props
   const fit = rowFitOf(item, context, { width: props.width, isNarrow, home: props.home, chat: props.chat?.label })
-  const { name, line, isNeeds, elapsed, steps, where, dirty, git, isChatIcon, isPersonaCut } = fit
+  const { name, line, model, isNeeds, elapsed, steps, where, dirty, git, isChatIcon, isPersonaCut } = fit
   const status = STATUS[item.status]
   const id = `${props.isInCard ? 'top' : 'row'}-${item.id}`
   const scope = `toggle-${id}`.slice(0, 64)
@@ -151,6 +152,14 @@ export function Row(ui: Ui, props: RowProps) {
             <Box flexShrink={1} minWidth={0}>
               <Text size="heading" color={C.muted} wrap="truncate-end">
                 {oneLine(name.task)}
+              </Text>
+            </Box>
+          ) : null}
+          {model ? (
+            <Box key={`${id}-model`} flexDirection="row" alignItems="center" gap={across(4)} marginLeft={across(4)} flexShrink={0}>
+              {glyph(`${id}-model-glyph`, familyGlyph(model), 'muted')}
+              <Text size="footnote" color={C.muted}>
+                {model}
               </Text>
             </Box>
           ) : null}

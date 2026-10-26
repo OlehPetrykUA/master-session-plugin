@@ -74,13 +74,15 @@ test('Open chat keeps its label when the task fits whole beside it, or when at l
     await ui.unmount()
     return width === across(32) ? 'icon' : 'label'
   }
-  const room = (bodyColumns: number) => bodyWidthOf(bodyColumns) - 94 - faceWidth('Open chat', 'b32') - 1 - 12
+  const room = (bodyColumns: number) => bodyWidthOf(bodyColumns) - 94 - faceWidth('Open chat', 'b32') - 1 - 12 - (4 + 4 + 12 + 4 + textWidth('opus', 12))
   const shown = (persona: string, task: string, bodyColumns: number) => rowsOf(task, room(bodyColumns) - textWidth(persona, 14, { isBold: true }) - 8 - textWidth('·', 14), 14, 1)[0] ?? ''
   expect(shown('Designer', 'Pane v2', 52)).toBe('Pane v2')
   expect(await face('local_pane', 52)).toBe('label')
-  const cut = shown('Implementer', 'Prompt status data and more', 60)
+  const cut = shown('Implementer', 'Prompt status data and more', 64)
   expect([cut.endsWith('…'), Array.from(cut).length - 1 >= 12]).toEqual([true, true])
-  expect(await face('local_long', 60)).toBe('label')
+  expect(await face('local_long', 64)).toBe('label')
+  expect(Array.from(shown('Implementer', 'Prompt status data and more', 60)).length - 1).toBeLessThan(12)
+  expect(await face('local_long', 60)).toBe('icon')
   expect(Array.from(shown('Implementer', 'Prompt status data and more', 52)).length - 1).toBeLessThan(12)
   expect(await face('local_long', 52)).toBe('icon')
   expect(await face('local_pane', 40)).toBe('icon')

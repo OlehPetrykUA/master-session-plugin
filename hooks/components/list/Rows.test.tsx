@@ -288,7 +288,7 @@ test('a status line with newlines stays one line on a narrow row and in the term
   expect((await textsOf(narrow)).some(text => text.includes('\n'))).toBe(false)
   await narrow.unmount()
   const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await textsOf(terminal)).toContain('waiting · waiting for the go · 50m · 2/5')
+  expect(await textsOf(terminal)).toContain('waiting · waiting for the go · opus · 50m · 2/5')
   expect((await textsOf(terminal)).some(text => text.includes('\n'))).toBe(false)
   await terminal.unmount()
 })

@@ -3,6 +3,7 @@ import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
 import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, openIdOf, shownArchived, stepsOfItem, undoTextOf } from '../lib/list'
 import type { ListGroup, ListItem, RowItem } from '../lib/list'
+import { modelWordOf } from '../lib/rowfit'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
 import { TERMINAL_COLOR } from '../theme/tokens'
 import { clearOf } from './clear'
@@ -35,7 +36,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
     const steps = stepsOfItem(item)
     const chat = chatTargetOf(item)
     const isNeeds = item.status === 'needs'
-    const tail = [lineTextOf(lineOf(item, context)), isNeeds ? '' : elapsedOfItem(item, at), steps && !isNeeds ? `${steps.done}/${steps.total}` : ''].filter(Boolean).join(' · ')
+    const tail = [lineTextOf(lineOf(item, context)), modelWordOf(item), isNeeds ? '' : elapsedOfItem(item, at), steps && !isNeeds ? `${steps.done}/${steps.total}` : ''].filter(Boolean).join(' · ')
     return (
       <Box key={`row-${item.id}`} flexDirection="row" gap="sm">
         <Text color={colorOf(item)}>●</Text>
