@@ -224,6 +224,8 @@ export function runStatusOf(run: WorkflowRun): Status {
   return run.state === 'failed' ? 'failed' : 'done'
 }
 
+export const agentIdsOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]) => new Set([...agents.flatMap(agent => [agent.id, ...(agent.run ? [agent.run.id] : [])]), ...workflows.map(one => one.id)])
+
 export const isGhostRun = (run: WorkflowRun, at: number | undefined) => at !== undefined && !run.agents.length && at - run.startedAt >= AGENT_SHOWN_MS
 
 export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> & { cleared?: number } = {}): ListItem[] {
@@ -244,8 +246,8 @@ export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], wo
     const status = agentStatusOf(agent, shown)
     return { kind: 'subagent', id: agent.id, group: GROUP_OF[status], status, agent }
   }
+  const taken = agentIdsOf(agents, workflows)
   const flights = workflowRunsOf(shown, runs)
-  const taken = new Set([...shown.map(agent => agent.id), ...flights.map(one => one.id)])
   return [...rows.filter(row => !taken.has(row.id)).map(session), ...flights.map(run), ...shown.filter(agent => !agent.run).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
 }
 

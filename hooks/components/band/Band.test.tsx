@@ -823,6 +823,12 @@ test('the pill names the unit that asked first by its since, not by position', (
   expect(viewOf(WORKING, crew(5, 1)).view.pillText).toBe('Code reviewer needs you · late')
 })
 
+test('a board row named after a subagent of this chat is no session: no needs-you pill from it and no Open chat', () => {
+  const plain = viewOf(WORKING, CREW())
+  const named = viewOf([...WORKING, { id: 'o2', name: 'reviewer', state: 'needs-you', needsYou: 'Allow Bash: ls' }], CREW())
+  expect([named.view.pillText, named.view.action?.label, named.view.alt]).toEqual([plain.view.pillText, plain.view.action?.label, plain.view.alt])
+})
+
 test('Open chat hides when the prompt is already in this chat, and opens the asker’s own chat otherwise', () => {
   const own = viewOf([{ id: SELF, name: 'master', state: 'needs-you', needsYou: 'ok?', progress: 'step 1 of 2 — x' }, ...WORKING], IDLE)
   expect([own.view.pillText.includes('needs you'), own.view.action]).toEqual([true, undefined])

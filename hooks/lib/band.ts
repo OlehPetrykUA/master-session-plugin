@@ -9,7 +9,7 @@ import type { WorkflowRun } from './agents'
 import { progressOf } from './board'
 import type { Progress } from './board'
 import { CH, fit, textWidth, widthOf } from './layout'
-import { CHAT_LABEL, countsOfItems, isGhostRun, itemsOf, nameText, personaOfType, sessionNameOf } from './list'
+import { CHAT_LABEL, agentIdsOf, countsOfItems, isGhostRun, itemsOf, nameText, personaOfType, sessionNameOf } from './list'
 import type { ListItem } from './list'
 import { familyOf, rowsOf } from './rows'
 
@@ -112,7 +112,9 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
     {},
   )
   const known = new Set(segments.map(one => one.id))
+  const taken = agentIdsOf(agents, counts.workflows)
   for (const segment of segments) {
+    if (taken.has(segment.id)) continue
     const row = current?.sessions.find(one => one.id === segment.id)
     const name = row?.name ?? segment.id
     const chat = { id: segment.id, name }
