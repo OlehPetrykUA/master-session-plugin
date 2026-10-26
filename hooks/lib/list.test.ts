@@ -42,6 +42,12 @@ const archived = (count: number): LiveSession[] => Array.from({ length: count },
 
 const items = itemsOf(rowsOf(board, liveOf()), agents, workflows)
 
+test('a board row named after an agent or a workflow is dropped, so no row is drawn twice', () => {
+  const named: Board = { ...board, sessions: [...board.sessions, { id: 'x1', name: 'scout', state: 'working' }, { id: 'w3', name: 'verify', state: 'working' }, { id: 'wf_1', name: 'flow', state: 'done' }] }
+  const ids = itemsOf(rowsOf(named, liveOf()), agents, workflows).map(item => [item.kind, item.id])
+  expect(ids).toEqual(items.map(item => [item.kind, item.id]))
+})
+
 test('the list holds sessions, then workflows, then subagents; each lands in its state group, finished agents in Done; workflow agents are no items', () => {
   expect(items.map(item => [item.kind, item.id, item.group])).toEqual([
     ['session', 'a', 'needs-you'],

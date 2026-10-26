@@ -244,7 +244,9 @@ export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], wo
     const status = agentStatusOf(agent, shown)
     return { kind: 'subagent', id: agent.id, group: GROUP_OF[status], status, agent }
   }
-  return [...rows.map(session), ...workflowRunsOf(shown, runs).map(run), ...shown.filter(agent => !agent.run).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
+  const flights = workflowRunsOf(shown, runs)
+  const taken = new Set([...shown.map(agent => agent.id), ...flights.map(one => one.id)])
+  return [...rows.filter(row => !taken.has(row.id)).map(session), ...flights.map(run), ...shown.filter(agent => !agent.run).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
 }
 
 export function runAgentsOf(run: WorkflowRun, agents: readonly AgentRecord[] = []): RowItem[] {
