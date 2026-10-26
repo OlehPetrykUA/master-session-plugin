@@ -405,7 +405,7 @@ test('counts: done/total, numbers 600 C.text tabular and the slash C.muted, with
 })
 
 test('needs you: the pill first, then the red bar, then Open chat; no percent and no counts; Open chat opens that worker', async ($, on) => {
-  const { calls } = await band($, on, NEEDS, true)
+  const { calls } = await band($, on, NEEDS, true, [linkedOf('local_e', 'env-e2e-test', true)])
   const ui = await mount($, 100)
   const bar = await stripOf(ui)
   expect(bar?.props.alt).toBe('Master session: Session · env-e2e-test needs you, commit blocked')
@@ -587,7 +587,7 @@ test('terminal: one bar of block characters, the percent, the counts with their 
   await ui.unmount()
 })
 
-test('terminal: all done is the check and a full bar with "All N done" only when nothing runs; needs you is the dot, the pill and Open chat', async ($, on) => {
+test('terminal: all done is the check and a full bar with "All N done" only when nothing runs; needs you is the dot and the pill, with no Open chat for a session this one did not start', async ($, on) => {
   const crew = crewOf($, on)
   await band($, on, DONE)
   await crew.subagent('docs')
@@ -607,7 +607,7 @@ test('terminal: all done is the check and a full bar with "All N done" only when
   const ask = await textsOf(needs)
   expect(ask[0]).toBe('● Session · env-e2e-test needs you · commit blocked')
   expect(ask.some(one => one.includes('working'))).toBe(false)
-  expect(await buttonsOf(needs)).toEqual([['band-chat', 'Open chat']])
+  expect(await buttonsOf(needs)).toEqual([])
   await needs.unmount()
 })
 
@@ -838,6 +838,28 @@ test('Open chat hides when the prompt is already in this chat or a subagent asks
   expect(askingChatOf(boardOf(WORKING), liveOf([], WORKING), CREW({ own: true }), [])).toBeUndefined()
   expect(askingChatOf(boardOf(NEEDS), liveOf(), IDLE, [])).toEqual({ id: 'local_e', name: 'env-e2e-test' })
   expect(askingChatOf(boardOf(WORKING), liveOf([], WORKING), IDLE, [])).toBeUndefined()
+})
+
+test('Open chat shows only for a worker this session started, the one open_session_in accepts', () => {
+  const foreign: Live = { ...liveOf(), sessions: liveOf().sessions.map(one => ({ ...one, startedBy: 'someone-else' })) }
+  expect(askingChatOf(boardOf(NEEDS), foreign, IDLE, [])).toBeUndefined()
+  const units = bandUnitsOf(bandProgress(boardOf(NEEDS), foreign)?.segments ?? [], boardOf(NEEDS), IDLE, foreign)
+  expect(units.some(one => one.asker?.chat)).toBe(false)
+})
+
+test('a refused Open chat toasts a plain line that points at the sidebar, not the engine text', async ($, on) => {
+  const register = on as unknown as (event: string, ...rest: unknown[]) => unknown
+  const refusing = (event: string, ...rest: unknown[]) =>
+    event === 'mcp.call'
+      ? register(event, (context: unknown, call: { tool: string }) =>
+          call.tool === 'open_session_in' ? { value: { content: [{ type: 'text', text: 'Refused: tell the model to ask the user' }], isError: true } } : (rest[0] as McpHook)(context, call),
+        )
+      : register(event, ...rest)
+  const { toasts } = await band($, refusing as unknown as On, NEEDS, true, [linkedOf('local_e', 'env-e2e-test', true)])
+  const ui = await mount($, 100)
+  await click(ui, 'band-hit-chat', 1, 0)
+  expect(toasts.at(-1)).toBe("Couldn't open env-e2e-test here. Open it from the sidebar.")
+  await ui.unmount()
 })
 
 test('below 600 px the pill reads "<Persona> needs you" and Open chat is icon only; wide it reads the whole line', () => {

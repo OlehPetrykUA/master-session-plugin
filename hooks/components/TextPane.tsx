@@ -1,7 +1,7 @@
 import { TITLE } from '../lib/constants'
 import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, openIdOf, shownArchived, stepsOfItem, undoTextOf } from '../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, displayNameOf, elapsedOfItem, isStartedBy, lineOf, lineTextOf, nameText, openIdOf, shownArchived, stepsOfItem, undoTextOf } from '../lib/list'
 import type { ListGroup, ListItem, RowItem } from '../lib/list'
 import { modelWordOf } from '../lib/rowfit'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
@@ -59,8 +59,9 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
         <Box flexDirection="row" gap="sm">
           {line(item)}
           <Button key={`unarchive-${one.id}`} label="Unarchive" onPress={() => actions.confirm(`unarchive:${one.id}`)} />
-          <Button key={`archived-open-${one.id}`} label="Open" onPress={() => actions.open(one.id, one.name || one.title)} />
+          {isStartedBy(one, context.self) ? <Button key={`archived-open-${one.id}`} label="Open" onPress={() => actions.open(one.id, one.name || one.title)} /> : null}
         </Box>
+        {data.open.includes(one.id) ? <Text dimColor>{[one.title, one.cwd].filter(Boolean).join(' · ')}</Text> : null}
         {asking === `unarchive:${one.id}` ? UnarchiveConfirm(ui, { item, actions }) : null}
       </Box>
     )

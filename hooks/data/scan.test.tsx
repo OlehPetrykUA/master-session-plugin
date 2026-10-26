@@ -198,6 +198,15 @@ test('each tracked repo counts what landed on its base since the run start, with
   expect(gits.filter(argv => argv.some(one => one.startsWith('--since='))).length).toBe(before)
 })
 
+test('the landed count asks git for the user’s own commits only: the repo’s user.email as a fixed-string author', { plugins: [PROBE] }, async ($, on) => {
+  const git = repo()
+  git[`${WORKTREE} config`] = 'me@example.com\n'
+  const { gits } = await started($, on, BOARD, { git, files: files() })
+  const count = gits.find(argv => argv.some(one => one.startsWith('--since=')))
+  expect(count).toEqual(expect.arrayContaining(['rev-list', '--fixed-strings', '--author=<me@example.com>']))
+  expect(gits.some(argv => argv.includes('config') && argv.includes('user.email'))).toBe(true)
+})
+
 test('a base move seen in the worktree listing rescans the unmerged count of a worktree whose index did not change', { plugins: [PROBE] }, async ($, on) => {
   const { clock, git } = await master($, on)
   const path = TREES[2] ?? ''

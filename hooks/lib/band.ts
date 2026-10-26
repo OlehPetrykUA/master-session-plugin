@@ -115,8 +115,9 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
     if (taken.has(segment.id)) continue
     const row = current?.sessions.find(one => one.id === segment.id)
     const name = row?.name ?? segment.id
-    const chat = { id: segment.id, name }
-    const display = sessionNameOf(live.sessions.find(one => one.id === segment.id)?.title || row?.title || name, row?.persona)
+    const found = live.sessions.find(one => one.id === segment.id)
+    const chat = found?.startedBy === live.self ? { id: segment.id, name } : undefined
+    const display = sessionNameOf(found?.title || row?.title || name, row?.persona)
     const self = { name: nameText(display), short: display.persona, glyph: PERSONA_GLYPH[display.persona] ?? ('session' as const) }
     const { subs, runs } = remoteOf(counts, segment.id, { parent: display.persona === 'Session' ? display.task : display.persona })
     const group = items.find(one => one.kind === 'session' && one.id === segment.id)?.group

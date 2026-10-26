@@ -52,7 +52,7 @@ export const whereOf = (row: Row, trees: readonly Repo[]) => {
   return cwd ? locate(cwd, trees) : undefined
 }
 
-export const elapsedOf = (row: Row, at: number) => (row.live?.createdAt !== undefined ? compactOf(at - row.live.createdAt) : (row.board?.time ?? ''))
+export const elapsedOf = (row: Row, at: number) => (row.live?.createdAt !== undefined ? compactOf((row.live.isRunning ? at : row.live.lastActivityAt || at) - row.live.createdAt) : (row.board?.time ?? ''))
 
 export const titleOf = (row: Row) => row.live?.title || row.title || row.name
 

@@ -11,7 +11,7 @@ import { pillOf, testsShownOf } from '../detail/Tests'
 import { CAPTION } from './Summary'
 import { C } from '../../theme/tokens'
 import { ASKS, ELLIPSIS, ROCKET_PX, WIDE_ASKS } from '../../testing/widths'
-import { BOARD, HOME, PANE, WORKTREE, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
+import { AT, BOARD, HOME, PANE, SELF, WORKTREE, click, hitsOf, started, textsOf, warmUp } from '../../testing/world'
 
 const COMMAND = `cd ${HOME}/.claude/worktrees/wt-master-session-plugin-rows-v3 && npm run build -- --filter hooks && node --test hooks/lib/list.test.ts hooks/lib/band.test.ts hooks/components/detail/Detail.test.tsx 2>&1 | tee /private/tmp/claude-501/rows-v3-gate.log && git status --porcelain && git log --oneline -3`
 
@@ -111,7 +111,7 @@ test('a subagent asking for Bash: Permission callout, a Now block, the descripti
 })
 
 test('a needs row whose task cannot show 12 characters beside the Open chat label draws it icon-only; the persona is cut last, after the task is gone', async ($, on) => {
-  await started($, on, { ...BOARD, sessions: [{ id: 'local_d1', name: 'd1', title: 'Compare the live pane with every lane', persona: 'Design checker', state: 'needs-you', needsYou: 'Allow Read: /etc/hosts' }] })
+  await started($, on, { ...BOARD, sessions: [{ id: 'local_d1', name: 'd1', title: 'Compare the live pane with every lane', persona: 'Design checker', state: 'needs-you', needsYou: 'Allow Read: /etc/hosts' }] }, { sessions: [{ sessionId: 'local_d1', name: 'd1', title: '', cwd: '/', isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: SELF }] })
   const at = async (bodyColumns: number) => {
     const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
     const found = {
@@ -123,7 +123,8 @@ test('a needs row whose task cannot show 12 characters beside the Open chat labe
     return found
   }
   expect(await at(70)).toEqual({ chat: 'label', shrink: 0, hasTask: true })
-  expect(await at(41)).toEqual({ chat: 'icon', shrink: 0, hasTask: true })
+  expect(await at(42)).toEqual({ chat: 'icon', shrink: 0, hasTask: true })
+  expect(await at(41)).toEqual({ chat: 'icon', shrink: 1, hasTask: false })
   expect(await at(30)).toEqual({ chat: 'icon', shrink: 1, hasTask: false })
 })
 
@@ -233,12 +234,12 @@ test('the header wraps a long status line and grows; offline shows I.offline mut
   await ui.unmount()
 })
 
-test('L8 at 47 columns with real glyph widths: "Designer · band diff" keeps the Open chat label, and a Validator prompt "Allow Read outside the project: ~/.agents/RULES.md?" takes 2 whole rows', async ($, on) => {
+test('L8 at 53 columns with real glyph widths: "Designer · band diff" keeps the Open chat label, and a Validator prompt "Allow Read outside the project: ~/.agents/RULES.md?" takes 2 whole rows', async ($, on) => {
   seeded(on, [
     { id: 'c1', name: 'canvas v3 check', type: 'master-session:reviewer', description: 'Check the canvas', state: 'running', startedAt: 3_570_000, asking: { text: 'Allow Read outside the project: ~/.agents/RULES.md?', since: 3_590_000 } },
   ])
-  await started($, on, { ...BOARD, sessions: [{ id: 'local_b1', name: 'b1', title: 'band diff', persona: 'Designer', state: 'needs-you', needsYou: 'Allow Bash: rm -rf dist?' }] })
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 47 } })
+  await started($, on, { ...BOARD, sessions: [{ id: 'local_b1', name: 'b1', title: 'band diff', persona: 'Designer', state: 'needs-you', needsYou: 'Allow Bash: rm -rf dist?' }] }, { sessions: [{ sessionId: 'local_b1', name: 'b1', title: '', cwd: '/', isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: SELF }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 53 } })
   expect((await ui.find({ key: 'face-chat-local_b1' }))?.props.width).not.toBe(across(32))
   expect(textsIn((await ui.find({ key: 'row-local_b1' }))?.children)).toEqual(expect.arrayContaining(['Designer', 'band diff']))
   expect(await hitsOf(ui)).not.toContain('hit-chat-c1')
@@ -246,7 +247,7 @@ test('L8 at 47 columns with real glyph widths: "Designer · band diff" keeps the
   const texts = rows.map(row => textsIn(row).at(-1))
   expect(texts).toEqual(['Allow Read outside the project:', '~/.agents/RULES.md?'])
   await ui.unmount()
-  const tight = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
+  const tight = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 52 } })
   expect((await tight.find({ key: 'face-chat-local_b1' }))?.props.width).toBe(across(32))
   await tight.unmount()
 })

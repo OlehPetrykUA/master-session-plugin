@@ -6,10 +6,10 @@ import { liveOf } from '../testing/world'
 import { I, PERSONA_GLYPH } from '../theme/icons'
 import { modelFamilyOf } from './format'
 import { CH, bodyWidthOf } from './layout'
-import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, countsOfItems, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, lineOf, lineTextOf, nameText, personaOfType, relativeOf, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived, shownDots } from './list'
+import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, chatTargetOf, countsOfItems, isStartedBy, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, lineOf, lineTextOf, listedRowsOf, nameText, personaOfType, relativeOf, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived, shownDots } from './list'
 import type { Context, RowItem } from './list'
 import type { Row } from './rows'
-import { rowsOf } from './rows'
+import { elapsedOf, rowsOf } from './rows'
 import { rowFitOf } from './rowfit'
 import { dotExtraOf, dotWidthOf, tileInnerOf } from './sections'
 import { runSummaryOf } from './totals'
@@ -48,6 +48,43 @@ test('a board row named after an agent or a workflow is dropped, so no row is dr
   expect(ids).toEqual(items.map(item => [item.kind, item.id]))
   const later = itemsOf(rowsOf(named, liveOf()), agents, workflows, { at: NOW + 86_400_000 }).map(item => item.id)
   expect(later.filter(id => ['x1', 'x2', 'w3', 'wf_1'].includes(id))).toEqual(['wf_1', 'x1'])
+  const totalOf = (rows: Row[]) => runSummaryOf({ rows, sessions: [], agents, workflows, board: named, trees: [], at: NOW }).sessions.total
+  const all = rowsOf(named, liveOf())
+  expect(all.length).toBeGreaterThan(rowsOf(board, liveOf()).length)
+  expect(totalOf(listedRowsOf(all, agents, workflows))).toBe(totalOf(rowsOf(board, liveOf())))
+  expect(listedRowsOf(all, agents, workflows).map(row => row.id)).toEqual(items.filter(item => item.kind === 'session').map(item => item.id))
+})
+
+test('an expanded finished subagent or workflow card outlives AGENT_SHOWN_MS while open; Clear done still hides it', () => {
+  const late = NOW + 86_400_000
+  const finished = agents.map(one => (one.state === 'running' ? { ...one, state: 'done' as const, endedAt: NOW - 1 } : one))
+  const ids = (open: string[], cleared?: number) => itemsOf(rowsOf(board, liveOf()), finished, workflows, { at: late, open, cleared }).map(item => item.id)
+  expect(ids([])).not.toContain('x2')
+  expect(ids([])).not.toContain('wf_1')
+  expect(ids(['x2'])).toContain('x2')
+  expect(ids(['wf_1'])).toContain('wf_1')
+  expect(ids(['w2'])).toContain('wf_1')
+  expect(ids(['x2', 'wf_1'], late)).not.toContain('x2')
+  expect(ids(['x2', 'wf_1'], late)).not.toContain('wf_1')
+})
+
+test('Open chat targets only a needs-you session this session started, the sessions open_session_in accepts', () => {
+  const own = liveOf()
+  const mine: Row = { id: 'a', name: 'a', title: '', state: 'needs-you', live: { ...own.sessions[0]!, startedBy: own.self } }
+  const theirs: Row = { ...mine, live: { ...mine.live!, startedBy: 'someone-else' } }
+  const chatOf = (row: Row, self?: string) => itemsOf([row], [], [], { self }).map(chatTargetOf)
+  expect(chatOf(mine, own.self)).toEqual([mine])
+  expect(chatOf(theirs, own.self)).toEqual([undefined])
+  expect(chatOf(mine)).toEqual([undefined])
+  expect([isStartedBy(mine.live, own.self), isStartedBy(theirs.live, own.self), isStartedBy(mine.live, undefined), isStartedBy(undefined, own.self)]).toEqual([true, false, false, false])
+})
+
+test('a finished session stops its clock at its last activity; a running one counts to now', () => {
+  const live = { ...liveOf().sessions[0]!, createdAt: NOW - 3_600_000, lastActivityAt: NOW - 1_800_000 }
+  const row = (isRunning: boolean): Row => ({ id: 'a', name: 'a', title: '', state: 'done', live: { ...live, isRunning } })
+  expect(elapsedOf(row(true), NOW)).toBe('1h 0m')
+  expect(elapsedOf(row(false), NOW)).toBe('30m')
+  expect(elapsedOf(row(false), NOW + 7_200_000)).toBe('30m')
 })
 
 test('the list holds sessions, then workflows, then subagents; each lands in its state group, finished agents in Done; workflow agents are no items', () => {

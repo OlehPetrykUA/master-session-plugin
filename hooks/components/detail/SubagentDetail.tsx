@@ -1,4 +1,3 @@
-import { modelFamilyOf } from '../../lib/format'
 import { across, tall } from '../../lib/layout'
 import { askOf, clockOf, displayNameOf, nameText, parentsOf, runningOfItem, sessionOfAgent, spanOf, tildeOf } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
@@ -6,6 +5,7 @@ import { C } from '../../theme/tokens'
 import { Icon } from '../Icon'
 import { Card } from '../list/Card'
 import type { RowProps } from '../list/Row'
+import { modelWordOf } from '../../lib/rowfit'
 import { Quiet } from '../Quiet'
 import { Strong } from '../Strong'
 import type { Ui } from '../types'
@@ -31,7 +31,7 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
   const parentName = parent ? nameText(displayNameOf({ kind: 'session', id: parent.id, group: parent.state, status: 'working', row: parent })) : ''
   const mode = parent?.live?.permissionMode
   const type = 'type' in agent ? agent.type : ''
-  const model = modelFamilyOf(item.kind === 'subagent' ? item.agent.requestedModel || item.agent.model : agent.model)
+  const model = modelWordOf(item)
   const isNeeds = item.status === 'needs'
   const isRunning = agent.state === 'running'
   const description = item.kind === 'subagent' ? item.agent.description : item.agent.label

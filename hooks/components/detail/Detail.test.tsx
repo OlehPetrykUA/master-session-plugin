@@ -303,13 +303,12 @@ test('Clear done with only unmerged work shows no button and archives nothing', 
   await ui.unmount()
 })
 
-test('Open shows for a session without live data; Archive and Stop need it', async ($, on) => {
+test('Open, Archive and Stop all need live data: a session this one did not start cannot be opened', async ($, on) => {
   await started($, on, doneOf('local_ghost'))
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_ghost')
   const hits = await hitsOf(ui)
-  expect(hits).toContain('hit-open-local_ghost')
-  for (const absent of ['hit-archive-local_ghost', 'hit-stop-local_ghost']) expect(hits).not.toContain(absent)
+  for (const absent of ['hit-open-local_ghost', 'hit-archive-local_ghost', 'hit-stop-local_ghost']) expect(hits).not.toContain(absent)
   await ui.unmount()
 })
 

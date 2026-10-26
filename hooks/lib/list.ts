@@ -15,7 +15,7 @@ import type { Row } from './rows'
 import type { RunSummary } from './totals'
 
 export type ListItem =
-  | { kind: 'session'; id: string; group: SessionState; status: Status; row: Row }
+  | { kind: 'session'; id: string; group: SessionState; status: Status; row: Row; isOwn?: boolean }
   | { kind: 'workflow'; id: string; group: SessionState; status: Status; run: WorkflowRun }
   | { kind: 'subagent'; id: string; group: SessionState; status: Status; agent: AgentRecord }
 
@@ -26,7 +26,9 @@ export type RowItem =
 
 export type ListGroup = { id: SessionState | 'archived'; items: readonly ListItem[]; archived: readonly LiveSession[]; isPinned: boolean; isOpen: boolean }
 
-export type Context = { at: number; trees: readonly Repo[]; sessions: readonly LiveSession[]; agents: readonly AgentRecord[]; rows: readonly Row[]; running?: Readonly<Record<string, Running>>; tasks?: Readonly<Record<string, TaskText>> }
+export type Context = { at: number; trees: readonly Repo[]; sessions: readonly LiveSession[]; agents: readonly AgentRecord[]; rows: readonly Row[]; running?: Readonly<Record<string, Running>>; tasks?: Readonly<Record<string, TaskText>>; self?: string }
+
+export const isStartedBy = (live: LiveSession | undefined, self: string | undefined) => self !== undefined && live?.startedBy === self
 
 export type Name = { persona: string; task: string }
 
@@ -226,17 +228,23 @@ export function runStatusOf(run: WorkflowRun): Status {
 
 export const agentIdsOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]) => new Set([...agents.flatMap(agent => [agent.id, ...(agent.run ? [agent.run.id] : [])]), ...workflows.map(one => one.id)])
 
+export const listedRowsOf = (rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]) => {
+  const taken = agentIdsOf(agents, workflows)
+  return rows.filter(row => !taken.has(row.id))
+}
+
 export const isGhostRun = (run: WorkflowRun, at: number | undefined) => at !== undefined && !run.agents.length && at - run.startedAt >= AGENT_SHOWN_MS
 
-export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> & { cleared?: number } = {}): ListItem[] {
+export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> & { cleared?: number; open?: readonly string[]; self?: string } = {}): ListItem[] {
+  const isOpen = (ids: readonly string[]) => ids.some(id => context.open?.includes(id))
   const isOld = (at: number | undefined) => context.at !== undefined && at !== undefined && context.at - at >= AGENT_SHOWN_MS
   const isCleared = (at: number | undefined) => at !== undefined && at <= (context.cleared ?? 0)
-  const stale = new Set(workflowRunsOf(agents, workflows).filter(one => isGhostRun(one, context.at) || (one.state !== 'running' && (isOld(one.endedAt) || isCleared(one.endedAt)))).map(one => one.id))
-  const shown = agents.filter(agent => (agent.run ? !stale.has(agent.run.id) : !isOld(agent.endedAt) && !isCleared(agent.endedAt)))
+  const stale = new Set(workflowRunsOf(agents, workflows).filter(one => isGhostRun(one, context.at) || (one.state !== 'running' && ((isOld(one.endedAt) && !isOpen([one.id, ...one.agents.map(agent => agent.id)])) || isCleared(one.endedAt)))).map(one => one.id))
+  const shown = agents.filter(agent => (agent.run ? !stale.has(agent.run.id) : (!isOld(agent.endedAt) || isOpen([agent.id])) && !isCleared(agent.endedAt)))
   const runs = workflows.filter(one => !stale.has(one.id))
   const session = (row: Row): ListItem => {
     const status = sessionStatusOf(row, context.trees, context.sessions)
-    return { kind: 'session', id: row.id, group: GROUP_OF[status], status, row }
+    return { kind: 'session', id: row.id, group: GROUP_OF[status], status, row, isOwn: isStartedBy(row.live, context.self) }
   }
   const run = (one: WorkflowRun): ListItem => {
     const status = runStatusOf(one)
@@ -246,9 +254,8 @@ export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], wo
     const status = agentStatusOf(agent, shown)
     return { kind: 'subagent', id: agent.id, group: GROUP_OF[status], status, agent }
   }
-  const taken = agentIdsOf(agents, workflows)
   const flights = workflowRunsOf(shown, runs)
-  return [...rows.filter(row => !taken.has(row.id)).map(session), ...flights.map(run), ...shown.filter(agent => !agent.run).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
+  return [...listedRowsOf(rows, agents, workflows).map(session), ...flights.map(run), ...shown.filter(agent => !agent.run).map(helper)].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind])
 }
 
 export function runAgentsOf(run: WorkflowRun, agents: readonly AgentRecord[] = []): RowItem[] {
@@ -315,7 +322,7 @@ export function sessionOfAgent(agent: AgentRecord, context: Pick<Context, 'agent
   return undefined
 }
 
-export const chatTargetOf = (item: RowItem): Row | undefined => (item.status === 'needs' && item.kind === 'session' ? item.row : undefined)
+export const chatTargetOf = (item: RowItem): Row | undefined => (item.status === 'needs' && item.kind === 'session' && item.isOwn ? item.row : undefined)
 
 export function chainOf(item: RowItem, context: Context) {
   if (item.kind !== 'subagent') return ''

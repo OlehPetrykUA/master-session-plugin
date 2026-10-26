@@ -321,6 +321,17 @@ test('an agent sync that began before the answer never writes the old ask back o
   expect(run.reportNow()?.agents?.[0]?.asking).toBeUndefined()
 })
 
+test('turn.start after complete: a subagent woken by a message reopens its finished record, a workflow agent stays done', async () => {
+  const run = world()
+  const done = { id: 'a1', type: 'Explore', description: 'Fix round', state: 'done', startedAt: NOW, endedAt: NOW + 1, tokens: 10 }
+  run.seed('agents', [done, { ...done, id: 'w1', run: { id: 'wf_1', index: 1 } }])
+  await run.start()
+  await run.fire('turn.start', { text: 'one more fix', turnId: 's1', agentId: 'a1' })
+  await run.fire('turn.start', { text: 'again', turnId: 's2', agentId: 'w1' })
+  await settle()
+  expect(run.reportNow()?.agents?.map(one => [one.id, one.state])).toEqual(expect.arrayContaining([['a1', 'running'], ['w1', 'done']]))
+})
+
 test('a save never drops a change another save made while it waited', async () => {
   const run = world()
   await run.start()

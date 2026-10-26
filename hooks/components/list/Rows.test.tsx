@@ -284,11 +284,11 @@ test('the Ready callout draws its gate line as one truncated line, whatever the 
 test('a status line with newlines stays one line on a narrow row and in the terminal pane', async ($, on) => {
   await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], now: 'waiting\nfor the go' }] })
   const narrow = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 36 } })
-  expect(await textsOf(narrow)).toEqual(expect.arrayContaining(['waiting for the go', '50m']))
+  expect(await textsOf(narrow)).toEqual(expect.arrayContaining(['waiting for the go', '40m']))
   expect((await textsOf(narrow)).some(text => text.includes('\n'))).toBe(false)
   await narrow.unmount()
   const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await textsOf(terminal)).toContain('waiting · waiting for the go · opus · 50m · 2/5')
+  expect(await textsOf(terminal)).toContain('waiting · waiting for the go · opus · 40m · 2/5')
   expect((await textsOf(terminal)).some(text => text.includes('\n'))).toBe(false)
   await terminal.unmount()
 })

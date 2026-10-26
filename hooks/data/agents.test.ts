@@ -109,9 +109,12 @@ test('the live event sequence of one workflow run, as engine 2.1.304 raised it, 
   expect(agents.find(agent => agent.id === 'ac4722447cd2102ce')).toEqual(expect.objectContaining({ name: 'probe-helper', state: 'done', run: undefined }))
 })
 
-test('engine limit: a subagent resumed by SendMessage raises no agent.spawn, so it stays done even when the list shows it running again', () => {
-  const over: AgentRecord = { ...RUNNING, state: 'done', endedAt: NOW }
+test('a finished subagent woken by SendMessage and reopened takes the second answer and tokens; a plain done record still ignores the list', () => {
+  const over: AgentRecord = { ...RUNNING, state: 'done', endedAt: NOW, tokens: 100 }
   expect(listed([over], [info('a1', 'running')], NOW + 5)).toEqual([over])
+  const reopened: AgentRecord = { ...over, state: 'running', endedAt: undefined, asking: undefined }
+  expect(listed([reopened], [info('a1', 'running')], NOW + 5)[0]?.state).toBe('running')
+  expect(ended([reopened], 'a1', true, NOW + 9, { result: 'second', tokens: 50 })[0]).toEqual(expect.objectContaining({ state: 'done', result: 'second', tokens: 150, endedAt: NOW + 9 }))
 })
 
 test("an agent's end keeps its answer, clipped at 2,000 characters, and adds up its tokens over resumed runs; the list names the plugin that spawned it", () => {

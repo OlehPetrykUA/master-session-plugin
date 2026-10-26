@@ -1,6 +1,7 @@
 import type { RenderChildren } from 'claude-code'
 
-import { compactOf, modelFamilyOf, modelOf } from '../../lib/format'
+import { compactOf, modelOf } from '../../lib/format'
+import { modelWordOf } from '../../lib/rowfit'
 import { clockOf, displayNameOf, elapsedOfItem, lineOf, lineTextOf, nameText, parentsOf, plural, runAgentsOf, runningOfItem, runningTextOf, shortNameOf } from '../../lib/list'
 import type { Context, ListItem, RowItem } from '../../lib/list'
 import { headOf, syncOf, whereOf } from '../../lib/rows'
@@ -98,7 +99,7 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
         </Box>
       ) : (
         <Box key={`actions-${row.id}`} flexDirection="row" gap="sm">
-          <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} />
+          {item.isOwn ? <Button key={`open-${row.id}`} label="Open" onPress={() => actions.open(row.id, row.name)} /> : null}
           {isStoppable ? <Button key={`stop-${row.id}`} label="Stop" onPress={() => actions.stop(row.id, row.name)} /> : null}
           {canArchive ? <Button key={`archive-${row.id}`} label={losses.length ? 'Archive…' : 'Archive'} onPress={() => (losses.length ? actions.confirm(`archive:${row.id}`) : actions.archive([row], undefined, losses))} /> : null}
         </Box>
@@ -149,7 +150,7 @@ export function TextSubagentDetail(ui: TextUi, props: TextSubagentProps) {
   const { agent } = item
   const at = context.at
   const end = agent.endedAt ?? at
-  const model = modelFamilyOf(item.kind === 'subagent' ? item.agent.requestedModel || item.agent.model : agent.model)
+  const model = modelWordOf(item)
   const isRunning = agent.state === 'running'
   const how = item.kind === 'agent' ? `workflow agent ${item.agent.index} of ${item.run.counts.total}` : item.agent.isBackground ? 'background' : 'foreground'
   return TextCard(ui, {

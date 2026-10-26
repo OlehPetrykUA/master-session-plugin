@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { PaneData } from '../components/types'
+import { listedRowsOf } from '../lib/list'
 import { archivedOf, familyOf, rowsOf } from '../lib/rows'
 import { runSummaryOf } from '../lib/totals'
 import { UNDO_MS } from '../lib/constants'
@@ -15,10 +16,10 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
   const current = own && note.text && note.boardAt === own.at ? { ...own, narrative: note.text, narrativeAt: note.at } : own
   const live = await getLive($)
   const trees = await getRepos($)
-  const rows = rowsOf(current, live)
   const archived = archivedOf(live)
   const agents = await getAgents($)
   const workflows = await getWorkflows($)
+  const rows = listedRowsOf(rowsOf(current, live), agents, workflows)
   const at = await $.clock.now()
   const asked = await getAsked($)
   const isAnswered = !!asked && (await getReports($)).some(one => one.modelAt > asked.at)

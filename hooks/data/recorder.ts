@@ -6,7 +6,7 @@ import { expandHome, parseStatus } from '../lib/git'
 import { getAgents, getBoard, getLive, getPlan, getRole, getStopped, getWorkflows, saveAgents, saveLive, savePlan, saveRole, saveStopped } from '../state/atoms'
 import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIntent, askOf, freshReport, parseIntent, reportsView, stamped, withFiles } from './contract'
 import type { Report } from './contract'
-import type { ReportAgent, ReportRun, Role, SessionState } from '../../types'
+import type { AgentRecord, ReportAgent, ReportRun, Role, SessionState } from '../../types'
 import { MAIN, beginCall, capOf, dropLoop, endCall, hostOf, isShown, isSlow, resetRunning, runOf, runningOf } from './running'
 import { hasBoardFile, parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
@@ -250,6 +250,15 @@ async function agentCleared($: EngineInterface, id: string) {
   if (main?.by === id) await mainClosed($, main)
   await saveAgents($, agents => asked(agents, id, undefined))
   await syncAgents($)
+}
+
+async function agentWoken($: EngineInterface, id: string) {
+  await saveAgents($, agents =>
+    agents.map((one): AgentRecord =>
+      one.id === id && !one.run && !one.parentSessionId && one.state !== 'running' ? { ...one, state: 'running', endedAt: undefined } : one,
+    ),
+  )
+  await agentCleared($, id)
 }
 
 async function detect($: EngineInterface) {
@@ -581,7 +590,7 @@ export function recorder(on: On) {
   on('turn.start', async ($, e, next) => {
     const started = await next(e)
     if (e.agentId === undefined) await detected().then(() => turnStarted($)).catch(() => undefined)
-    else await agentCleared($, e.agentId).catch(() => undefined)
+    else await agentWoken($, e.agentId).catch(() => undefined)
     return started
   })
 

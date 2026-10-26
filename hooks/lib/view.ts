@@ -49,8 +49,8 @@ export function narrativeOf(data: PaneData) {
 }
 
 export function paneViewOf(data: PaneData) {
-  const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows, running: data.running, tasks: data.tasks }
-  const items = itemsOf(data.rows, data.agents, data.workflows, { ...context, cleared: data.cleared })
+  const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows, running: data.running, tasks: data.tasks, self: data.live.self }
+  const items = itemsOf(data.rows, data.agents, data.workflows, { ...context, cleared: data.cleared, open: data.open, self: data.live.self })
   const counts = countsOfItems(items, data.archived.length)
   const groups = groupsOf(items, data.archived, data.chosen, data.archiveView, data.undone?.group)
   const isDone = isAllDone(items)
@@ -75,7 +75,7 @@ export function paneViewOf(data: PaneData) {
     chips,
     status: statusOf(data, isDone),
     narrative: narrativeOf(data),
-    blocks: blocksOf(data.totals, data.rows.length > 0 || items.length > 0, isDone ? data.board?.tick || clockOf(data.at) : undefined),
+    blocks: blocksOf(isDone ? { ...data.totals, duration: { ...data.totals.duration, ms: (data.board?.at ?? data.at) - data.totals.duration.since } } : data.totals, data.rows.length > 0 || items.length > 0, isDone ? data.board?.tick || clockOf(data.at) : undefined),
     perRow: isNarrow ? 3 : 4,
     hasMore: data.chosen === 'all' && data.archiveView === 'open' && data.archived.length > ARCHIVED_PEEK,
   }

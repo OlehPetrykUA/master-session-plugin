@@ -332,7 +332,7 @@ export const register: Register = on => {
     const resync = isStale && !isResyncing ? pin.endRow : undefined
     isResyncing = isStale
     if (resync !== undefined) void scrollToRow($, resync)
-    clearPresses()
+    if (Client) clearPresses()
     return Svg ? Pane({ Box, Text, Button, Svg, Client }, data, view, pin) : TextPane({ Box, Text, Button }, data, view)
   })
 }

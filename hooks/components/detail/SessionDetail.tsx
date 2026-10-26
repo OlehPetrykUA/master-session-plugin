@@ -26,7 +26,7 @@ import { Tests } from './Tests'
 
 export type SessionDetailProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; rowProps: RowProps; home: string; asking: string; innerWidth: number; actions: Actions }
 
-type ActionRowProps = { row: Row; name: string; losses: readonly string[]; width: number; isAsking: boolean; actions: Actions }
+type ActionRowProps = { row: Row; canOpen: boolean; name: string; losses: readonly string[]; width: number; isAsking: boolean; actions: Actions }
 
 function ActionRow(ui: Ui, props: ActionRowProps) {
   const { Box } = ui
@@ -45,11 +45,13 @@ function ActionRow(ui: Ui, props: ActionRowProps) {
         : null
   return (
     <Box key={`actions-${id}`} flexDirection="row" gap={across(8)}>
-      <Box flexDirection="row" width={second ? '50%' : '100%'} flexShrink={1} minWidth={0}>
-        {ActionButton(ui, { id: `open-${id}`, kind: 'secondary', icon: 'open', label: 'Open', size: 'b40', iconSize: 16, wide: second ? (width - 8) / 2 : width, onPress: () => actions.open(id, row.name) })}
-      </Box>
+      {props.canOpen ? (
+        <Box flexDirection="row" width={second ? '50%' : '100%'} flexShrink={1} minWidth={0}>
+          {ActionButton(ui, { id: `open-${id}`, kind: 'secondary', icon: 'open', label: 'Open', size: 'b40', iconSize: 16, wide: second ? (width - 8) / 2 : width, onPress: () => actions.open(id, row.name) })}
+        </Box>
+      ) : null}
       {second ? (
-        <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
+        <Box flexDirection="row" width={props.canOpen ? '50%' : '100%'} flexShrink={1} minWidth={0}>
           {second}
         </Box>
       ) : null}
@@ -190,7 +192,7 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
             right: half('Model', 'modelChip', ModelValue(ui, { id: row.id, model: now?.model, text: model || '—' }), 'model', 8),
           })
         : null,
-      ActionRow(ui, { row, name: shortNameOf(item), losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, actions }),
+      ActionRow(ui, { row, canOpen: !!item.isOwn, name: shortNameOf(item), losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, actions }),
     ],
   })
 }

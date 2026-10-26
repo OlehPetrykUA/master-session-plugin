@@ -234,7 +234,9 @@ async function factsOf($: EngineInterface, path: string, tick: Tick, key: string
   const found = await baseOf($, path, tick)
   const base = found?.name
   const localOnly = (await git($, path, ['for-each-ref', 'refs/heads', '--format=x%(upstream:short)'], tick).catch(soft(''))).split('\n').filter(line => line === 'x').length
-  const landed = base ? Number((await git($, path, ['rev-list', '--count', `--since=${new Date(start).toISOString()}`, `refs/heads/${base}`], tick).catch(soft('0'))).trim()) || 0 : 0
+  const email = (await git($, path, ['config', 'user.email'], tick).catch(soft(''))).trim()
+  const mine = email ? ['--fixed-strings', `--author=<${email}>`] : []
+  const landed = base ? Number((await git($, path, ['rev-list', '--count', ...mine, `--since=${new Date(start).toISOString()}`, `refs/heads/${base}`], tick).catch(soft('0'))).trim()) || 0 : 0
   return { key, at, base, baseSha: found?.sha ?? '', localOnly, landed }
 }
 
@@ -395,8 +397,8 @@ export async function openPane($: EngineInterface) {
 export async function openSession($: EngineInterface, id: string, name: string) {
   try {
     await call($, 'ccd_window', 'open_session_in', { session_id: id, target: 'focus' })
-  } catch (error) {
-    $.ui.toast(`Couldn't open ${name}: ${messageOf(error)}`)
+  } catch {
+    $.ui.toast(`Couldn't open ${name} here. Open it from the sidebar.`)
   }
 }
 

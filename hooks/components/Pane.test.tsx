@@ -36,7 +36,7 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
     expect(at).toBeGreaterThan(from)
     from = at
   }
-  for (const word of ['1 session', 'none', '—', 'Session', 'Approve the settings.json edit', 'Redo toolkit setup UI', 'waiting', 'waiting for the go', '50m']) expect(texts).toContain(word)
+  for (const word of ['1 session', 'none', '—', 'Session', 'Approve the settings.json edit', 'Redo toolkit setup UI', 'waiting', 'waiting for the go', '40m']) expect(texts).toContain(word)
   expect(texts.some(text => /^since \d\d:\d\d$/.test(text))).toBe(true)
   expect((await ui.find({ key: 'block-needs-you' }))?.props).toEqual(expect.objectContaining({ backgroundColor: C.redTint, borderColor: C.red, borderStyle: 'round' }))
   expect((await ui.find({ key: 'row-local_env' }))?.props).toEqual(expect.objectContaining({ borderColor: C.red, minHeight: tall(56), paddingLeft: across(12), paddingRight: across(4), gap: across(12) }))
@@ -61,7 +61,7 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
     expect(await hitsOf(other)).toEqual([])
     if (surface === 'terminal') {
       const lines = await textsOf(other)
-      expect(lines).toEqual(expect.arrayContaining(['Needs you 1', 'Waiting 1', 'Archived 1', 'Approve the settings.json edit · opus', 'waiting · waiting for the go · opus · 50m · 2/5']))
+      expect(lines).toEqual(expect.arrayContaining(['Needs you 1', 'Waiting 1', 'Archived 1', 'Approve the settings.json edit · opus', 'waiting · waiting for the go · opus · 40m · 2/5']))
       expect(lines.some(line => line.startsWith('Sessions 2 (1 / 0 / 1 / 0) · Needs you 1 1 session'))).toBe(true)
       expect((await other.find({ key: 'row-open-local_env' }))?.text).toBe('Session · Test and validate local agent environment')
     }
@@ -192,7 +192,7 @@ test('the header: 56 tall, title and live dot over the status line, Ask and Refr
     expect((await ui.findAll({ type: 'Box' })).filter(box => box.props.position === 'absolute' && box.props.display === 'none' && box.text !== '')).toEqual([])
     if (isNarrow) {
       expect(await ui.find({ key: 'row-local_setup-meta' })).toBeUndefined()
-      expect(await textsOf(ui)).toEqual(expect.arrayContaining(['waiting for the go', '50m']))
+      expect(await textsOf(ui)).toEqual(expect.arrayContaining(['waiting for the go', '40m']))
       expect((await ui.find({ key: 'row-local_setup-elapsed-narrow' }))?.props.flexShrink).toBe(0)
       expect(await altsOf(ui)).toContain('2 of 5')
       expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).toBe(across(32))
@@ -558,4 +558,20 @@ test('the pane clips its pinned header, so the pin can never stretch the scroll 
   const root = (await ui.findAll({ type: 'Box' }))[0]
   expect(root?.props).toEqual(expect.objectContaining({ flexDirection: 'column', flexShrink: 0, overflow: 'hidden' }))
   await ui.unmount()
+})
+
+test('a board session whose id equals a subagent id is no row and no Sessions tile count', async ($, on) => {
+  on('agent.list', () => ({ value: [] }))
+  on('agent.spawn', (_, e) => ({ model: 'claude-haiku-5-5', agentId: e.description }))
+  await started($, on)
+  const tile = async () => {
+    const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    const line = (await textsOf(ui)).find(text => text?.startsWith('Sessions '))
+    await ui.unmount()
+    return Number(/^Sessions (\d+)/.exec(line ?? '')?.[1])
+  }
+  const before = await tile()
+  await $.agent.spawn({ ...SPAWN, name: undefined, description: 'local_setup', subagentType: 'Explore', model: 'haiku' })
+  const after = await tile()
+  expect([before, after]).toEqual([2, 1])
 })

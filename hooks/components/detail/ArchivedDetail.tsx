@@ -1,7 +1,7 @@
 import { compactOf, modelOf } from '../../lib/format'
 import { locate } from '../../lib/git'
 import { across, down, faceWidth } from '../../lib/layout'
-import { ageOf, clockOf, displayNameOf } from '../../lib/list'
+import { ageOf, clockOf, displayNameOf, isStartedBy } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
@@ -44,12 +44,15 @@ export function ArchivedDetail(ui: Ui, props: ArchivedDetailProps) {
       </Box>
     </Box>
   )
+  const canOpen = isStartedBy(one, context.self)
   const buttons = (
     <Box key={`archived-actions-${id}`} flexDirection="row" gap={across(8)}>
-      <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
-        {ActionButton(ui, { id: `archived-open-${id}`, kind: 'secondary', icon: 'open', label: 'Open', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.open(id, label) })}
-      </Box>
-      <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
+      {canOpen ? (
+        <Box flexDirection="row" width="50%" flexShrink={1} minWidth={0}>
+          {ActionButton(ui, { id: `archived-open-${id}`, kind: 'secondary', icon: 'open', label: 'Open', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.open(id, label) })}
+        </Box>
+      ) : null}
+      <Box flexDirection="row" width={canOpen ? '50%' : '100%'} flexShrink={1} minWidth={0}>
         {ActionButton(ui, { id: `unarchive-${id}`, kind: 'secondary', icon: 'unarchive', label: 'Unarchive', size: 'b40', iconSize: 16, wide: (width - 8) / 2, onPress: () => actions.confirm(`unarchive:${id}`) })}
       </Box>
     </Box>
