@@ -22,6 +22,19 @@ check 'no agent gets nothing' '{"session_id":"x","source":"startup"}' ''
 check 'bad input gets nothing' 'not json' ''
 check 'empty input gets nothing' '' ''
 
+step=$(grep -F '**Status pane:**' "$root/skills/start/SKILL.md")
+
+has() {
+  if printf '%s' "$step" | grep -qF -- "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi
+}
+
+has 'AC31 step 6 lists plan[]' '`plan[]`: every piece of the whole run, written from the ledger on every board call, queued ones included'
+has 'AC31 step 6 lists name, the five states and progress' '`name`, `state` (queued, working, verifying, done, dropped), `progress` ("step N of M — label"'
+has 'AC32 step 6 says a piece is a deliverable of any shape' 'A piece is a deliverable of any shape'
+has 'AC32 step 6 says helpers are not pieces' 'helpers (QA verifier, Code reviewer, Researcher checks) are not pieces'
+has 'AC32 step 6 says a fix round adds no piece' 'A fix round after a FAIL adds no piece'
+has 'AC32 step 6 says user work extends the plan' 'work the user adds mid-run adds one'
+
 tmp=$(mktemp -d)
 trap 'rm -r "$tmp"' EXIT
 odd="$tmp/a&b|c\\d"

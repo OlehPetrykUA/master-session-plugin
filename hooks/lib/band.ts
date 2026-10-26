@@ -6,21 +6,22 @@ import type { IconName } from '../theme/icons'
 import type { BarTone } from '../theme/strip'
 import { workflowRunsOf } from './agents'
 import type { WorkflowRun } from './agents'
-import { progressOf } from './board'
+import { progressOf, stepOf } from './board'
 import type { Progress } from './board'
 import { CH, fit, textWidth, widthOf } from './layout'
-import { CHAT_LABEL, agentIdsOf, countsOfItems, isGhostRun, itemsOf, nameText, personaOfType, sessionNameOf } from './list'
+import { CHAT_LABEL, agentIdsOf, isGhostRun, itemsOf, nameText, personaOfType, sessionNameOf } from './list'
 import type { ListItem } from './list'
 import { familyOf, rowsOf } from './rows'
 
 const DIGIT = 0.64
 export const HIT = 'band-hit-'
 export const BAR_MIN = 48
-const COUNTS_BELOW = 600
+const WORKING_CAP = 0.85
+const VERIFYING_VALUE = 0.9
+const NARROW_BELOW = 600
 const PERCENT_BELOW = 340
 export const PILL_WIDTH = 2 + PILL.left + PILL.icon + PILL.gap + PILL.right
 const NEEDS = ' needs you'
-const SEPARATOR = ' · '
 
 export type BandAction = 'board' | 'chat'
 
@@ -40,8 +41,6 @@ export const bandAction = (element: string) => {
 }
 
 export const agentCountsOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], at: number): AgentCounts => ({ agents, workflows, at })
-
-const wordFor = (count: number, word: string) => `${word}${count === 1 ? '' : 's'}`
 
 const clamp = (value: number) => Math.min(1, Math.max(0, value))
 
@@ -153,20 +152,28 @@ export const percentOf = (units: readonly Unit[]) => {
   return Math.min(99, Math.floor(overallOf(units) * 100 + 1e-9))
 }
 
+type Piece = NonNullable<Board['plan']>[number]
+
+const pieceValueOf = (piece: Piece) => {
+  if (piece.state === 'done') return 1
+  if (piece.state === 'verifying') return VERIFYING_VALUE
+  if (piece.state !== 'working') return 0
+  const step = stepOf(piece.progress)
+  return step && step.total ? Math.min(WORKING_CAP, step.done / step.total) : 0
+}
+
+const piecesOf = (current: Board | null) => {
+  const counted = (current?.plan ?? []).filter(one => one.state !== 'dropped')
+  return counted.length ? counted : undefined
+}
+
 export const bandItemsOf = (current: Board | null, { agents, workflows, at }: AgentCounts, live: Live, trees: readonly Repo[] = []) =>
   itemsOf(rowsOf(current, live), agents, workflows, { at, trees, sessions: familyOf(live) })
 
-export function countsOf(items: readonly ListItem[], isAllDone: boolean, total: number): CountPart[] {
-  if (isAllDone) return [{ text: 'All ', isNumber: false }, { text: String(total), isNumber: true }, { text: ' done', isNumber: false }]
-  const counts = countsOfItems(items, 0)
-  const working = (kind: ListItem['kind']) => items.filter(one => one.kind === kind && one.group === 'working').length
-  const subagents = working('subagent')
-  const workflows = working('workflow')
-  const entries: [number, string][] = [[counts.working, 'working'], [counts.waiting, 'waiting']]
-  if (subagents) entries.push([subagents, wordFor(subagents, 'subagent')])
-  if (workflows) entries.push([workflows, wordFor(workflows, 'workflow')])
-  return entries.flatMap(([count, word], index): CountPart[] => [...(index ? [{ text: SEPARATOR, isNumber: false }] : []), { text: String(count), isNumber: true }, { text: ` ${word}`, isNumber: false }])
-}
+export const countsOf = (done: number, total: number, isAllDone: boolean): CountPart[] =>
+  isAllDone
+    ? [{ text: 'All ', isNumber: false }, { text: String(total), isNumber: true }, { text: ' done', isNumber: false }]
+    : [{ text: String(done), isNumber: true }, { text: '/', isNumber: false }, { text: String(total), isNumber: true }]
 
 export const countsText = (parts: readonly CountPart[]) => parts.map(one => one.text).join('')
 
@@ -192,29 +199,33 @@ export function bandProgressWith(current: Board | null, live: Live, counts: Agen
   const progress = bandProgress(current, live)
   if (progress) return progress
   const isBusy = agents.some(one => one.state === 'running') || liveRunsOf(counts).some(run => run.state === 'running')
-  return isBusy ? IDLE_PROGRESS : undefined
+  return isBusy || piecesOf(current) ? IDLE_PROGRESS : undefined
 }
 
 export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live: Live, trees: readonly Repo[] = []) {
   const width = columns * CH - 16
-  const isNarrow = width < COUNTS_BELOW
+  const isNarrow = width < NARROW_BELOW
   const items = bandItemsOf(current, agents, live, trees)
   const units = bandUnitsOf(progress.segments, current, agents, live, trees, items)
   const asker = firstAskerOf(units)
-  const isAllDone = !asker && units.length > 0 && units.every(one => one.isFinished)
+  const pieces = piecesOf(current)
   const isRunning = units.some(one => one.isRunning)
-  const overall = overallOf(units)
-  const percent = percentOf(units)
+  const isPlanDone = !!pieces && pieces.every(one => one.state === 'done')
+  const isAllDone = !asker && units.length > 0 && units.every(one => one.isFinished)
+  const overall = pieces ? pieces.reduce((sum, one) => sum + pieceValueOf(one), 0) / pieces.length : overallOf(units)
+  const percent = pieces ? (isPlanDone ? 100 : Math.min(99, Math.floor(overall * 100 + 1e-9))) : percentOf(units)
+  const total = pieces ? pieces.length : units.length
+  const done = pieces ? pieces.filter(one => one.state === 'done').length : units.filter(one => one.isFinished).length
   const tone: BarTone = asker ? 'red' : isAllDone || isRunning ? 'green' : 'grey'
   const hasPercent = !asker && !isAllDone && width >= PERCENT_BELOW
-  const parts = asker ? [] : countsOf(items, isAllDone, units.length)
+  const parts = asker ? [] : countsOf(done, isAllDone ? units.length : total, isAllDone)
   const full = asker ? `${headOf(asker)}${asker.reason ? ` · ${asker.reason}` : ''}` : ''
   const short = asker ? `${asker.short}${NEEDS}` : ''
   const alt = asker
     ? `Master session: ${headOf(asker)}${asker.reason ? `, ${asker.reason}` : ''}`
     : isAllDone
       ? `Master session: all ${units.length} done`
-      : `Master session: ${[`${percent} percent`, ...countsText(parts).split(SEPARATOR)].join(', ')}`
+      : `Master session: ${percent} percent, ${done} of ${total} done`
   const chat = asker?.chat && asker.chat.id !== live?.self ? asker.chat : undefined
   const action = asker
     ? chat
@@ -240,7 +251,7 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
     leadWidth = PILL_WIDTH + widthOf(pillText, { isBold: true })
   }
   const countsWidth = countsWidthOf(parts)
-  const showCounts = !isNarrow && parts.length > 0 && around(leadWidth, countsWidth) >= BAR_MIN
+  const showCounts = (isAllDone ? !isNarrow : width >= PERCENT_BELOW) && parts.length > 0 && around(leadWidth, countsWidth) >= BAR_MIN
   const barWidth = Math.max(BAR_MIN, Math.round(around(leadWidth, showCounts ? countsWidth : 0)))
   return { units, asker, isAllDone, isRunning, hasPercent, overall, percent, tone, parts, showCounts, alt, action, actionWidth, padLeft, padRight, gap, barWidth, pillText }
 }

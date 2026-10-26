@@ -1,6 +1,6 @@
 import type { Board, BoardSession, EndReason, Live, LiveSession, Report, ReportAgent, ReportRun, Running, Step } from '../../types'
 
-import { ORDER, stateOf } from '../lib/board'
+import { ORDER, parseStep, stateOf } from '../lib/board'
 import { compactOf } from '../lib/format'
 import { capOf } from './running'
 
@@ -18,6 +18,7 @@ const COMMITS_CAP = 20
 const TESTS_CAP = 20
 const FILES_CAP = 50
 
+export { parseStep }
 export type { EndReason, Report, Step }
 
 export type Intent = Partial<Pick<Report, 'state' | 'persona' | 'progress' | 'now' | 'next' | 'needsYou' | 'risk'>> & { activity: string[]; files: string[] }
@@ -67,14 +68,6 @@ const listOf = <T>(value: unknown, isItem: (item: Record<string, unknown>) => bo
   Array.isArray(value) ? (value.filter(item => item && typeof item === 'object' && isItem(item as Record<string, unknown>)) as T[]) : []
 
 const progressText = (step: Step) => `step ${step.step} of ${step.of}${step.label ? ` — ${step.label}` : ''}`
-
-export function parseStep(text: string): Step | undefined {
-  const match = text.match(/^\s*step\s+(\d+)\s+of\s+(\d+)\s*(?:[—–:-]\s*(.*))?$/i)
-  if (!match) return undefined
-  const step = Number(match[1])
-  const of = Number(match[2])
-  return of > 0 && step <= of ? { step, of, label: (match[3] ?? '').trim() } : undefined
-}
 
 export function parseRunning(value: unknown): Running | undefined {
   const data = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}

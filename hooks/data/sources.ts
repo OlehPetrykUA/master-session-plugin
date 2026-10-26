@@ -110,7 +110,7 @@ export async function republishBoard($: EngineInterface) {
   const at = await $.clock.now()
   const merged = merge(own, await getReports($), me, at)
   const repos = [...new Set([...merged.repos, ...(await getRepos($)).map(one => one.path)].map(path => expandHome(path, home)))]
-  const sign = JSON.stringify([merged.sessions.map(one => [one.id, one.name, one.state, one.progress, one.now, one.next, one.needsYou, one.commits?.length, one.tests?.length]), merged.needsYou, [...repos].sort()])
+  const sign = JSON.stringify([merged.sessions.map(one => [one.id, one.name, one.state, one.progress, one.now, one.next, one.needsYou, one.commits?.length, one.tests?.length]), merged.needsYou, [...repos].sort(), merged.plan])
   if (sign === published && at - publishedAt < BOARD_MAX_AGE_MS / 3) return
   if (isOff()) return
   published = sign

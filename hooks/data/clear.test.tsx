@@ -480,13 +480,13 @@ test('AC26 the band drops the archived sessions and keeps the hidden subagent an
   await band.unmount()
 })
 
-test('AC27 the band reads 75 then 62 percent and the working and waiting counts do not move', async ($, on) => {
+test('AC27 the band reads 75 then 62 percent and the working and waiting chips do not move', async ($, on) => {
   const { pane, band, clock } = await bandAndPane($, on, boardOf(WORKER, fin('local_a')), { sessions: [live('local_w', { isRunning: true }), live('local_a')] }, true, false)
-  expect(await alt(band)).toMatch(/^Master session: 75 percent, 1 working, 0 waiting/)
+  expect(await alt(band)).toBe('Master session: 75 percent, 2 of 3 done')
   expect([await chip(pane, 'working'), await chip(pane, 'waiting')]).toEqual([1, 0])
   await click(pane, 'hit-clear-done')
   await clock.settle()
-  expect(await alt(band)).toMatch(/^Master session: 62 percent, 1 working, 0 waiting/)
+  expect(await alt(band)).toMatch(/^Master session: 62 percent, \d of \d done$/)
   expect([await chip(pane, 'working'), await chip(pane, 'waiting')]).toEqual([1, 0])
   await pane.unmount()
   await band.unmount()
@@ -513,13 +513,13 @@ test('AC29 sessions working with only finished subagents in Done: the band is th
   await band.unmount()
 })
 
-test('AC30 after a clear the band counts equal the pane chips', async ($, on) => {
+test('AC30 after a clear the band count is finished/units and the pane chips still count working and waiting', async ($, on) => {
   const waiting = { id: 'local_q', name: 'local_q', state: 'waiting', progress: 'step 1 of 3 — wait', now: 'waiting for the go' }
   const { pane, band, clock } = await bandAndPane($, on, boardOf(WORKER, waiting, fin('local_a')), { sessions: [live('local_w', { isRunning: true }), live('local_q', { isRunning: true }), live('local_a')] }, true)
   await click(pane, 'hit-clear-done')
   await clock.settle()
-  const [, working, idle] = /(\d+) working, (\d+) waiting/.exec(await alt(band)) ?? []
-  expect([await chip(pane, 'working'), await chip(pane, 'waiting')]).toEqual([Number(working), Number(idle)])
+  expect(await alt(band)).toMatch(/^Master session: \d+ percent, \d+ of \d+ done$/)
+  expect([await chip(pane, 'working'), await chip(pane, 'waiting')]).toEqual([1, 1])
   await pane.unmount()
   await band.unmount()
 })

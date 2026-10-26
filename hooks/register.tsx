@@ -29,7 +29,7 @@ import { skipWhileBusy } from './data/flight'
 import { briefed, claim, engage, inPlan, isActive, isOff, recordTurnEnd, recorder, startRecorder, unstop } from './data/recorder'
 import { stopMode } from './data/stop'
 import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/band'
-import { boardFromJson } from './lib/board'
+import { boardFromJson, planOf } from './lib/board'
 import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, NOT_MASTER, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, STOP, TICK_MS } from './lib/constants'
 import { messageOf } from './lib/format'
 import { runningTimeOf } from './components/detail/format'
@@ -202,6 +202,8 @@ export const register: Register = on => {
 
   on('tool.call', { tool: 'mcp__master-session__board' }, async ($, e) => {
     if (isOff()) return { deny: NOT_MASTER }
+    const flaw = planOf(e.plan).error
+    if (flaw) return { deny: `The board was refused and nothing was saved: ${flaw}.` }
     const next = boardFromJson(e, 'tool')
     const sent = Array.isArray(e.sessions) ? e.sessions.length : 0
     if (!next || next.sessions.length < sent) return { deny: 'The board needs a sessions array whose items carry id and state.' }

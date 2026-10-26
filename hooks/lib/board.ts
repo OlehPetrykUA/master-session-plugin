@@ -1,5 +1,5 @@
-import { NARRATIVE_CAP } from './constants'
-import type { Board, BoardSession, Live, SessionState } from '../../types'
+import { LIVE_LIMIT, NARRATIVE_CAP, PLAN_NAME_CAP, PLAN_STATES } from './constants'
+import type { Board, BoardSession, Live, PlanPiece, PlanState, SessionState, Step } from '../../types'
 
 export const ORDER: readonly SessionState[] = ['needs-you', 'waiting', 'working', 'done']
 
@@ -43,6 +43,39 @@ export const stateOf = (value: unknown): SessionState | undefined => {
   return ORDER.find(state => state === word) ?? BY_ICON[firstOf(word)]
 }
 
+export function parseStep(text: string): Step | undefined {
+  const match = text.match(/^\s*step\s+(\d+)\s+of\s+(\d+)\s*(?:[—–:-]\s*(.*))?$/i)
+  if (!match) return undefined
+  const step = Number(match[1])
+  const of = Number(match[2])
+  return of > 0 && step <= of ? { step, of, label: (match[3] ?? '').trim() } : undefined
+}
+
+const planStateOf = (value: unknown) => PLAN_STATES.find((state): state is PlanState => state === value)
+
+export function planOf(value: unknown): { plan?: PlanPiece[]; error?: string } {
+  if (value === undefined || value === null) return {}
+  if (!Array.isArray(value)) return { error: 'plan must be an array of pieces, each with a name and a state' }
+  if (value.length > LIVE_LIMIT) return { error: `plan has ${value.length} pieces: the cap is ${LIVE_LIMIT}` }
+  const seen = new Set<string>()
+  const plan: PlanPiece[] = []
+  for (const [index, one] of value.entries()) {
+    const piece = one && typeof one === 'object' ? (one as Record<string, unknown>) : {}
+    const name = textOf(piece.name)
+    const state = planStateOf(piece.state)
+    if (!name) return { error: `plan piece ${index + 1} needs a non-empty name` }
+    if (!state) return { error: `plan piece "${name}" needs a state of ${PLAN_STATES.join(', ')}` }
+    const chars = Array.from(name)
+    const cut = chars.length > PLAN_NAME_CAP ? `${chars.slice(0, PLAN_NAME_CAP).join('')}…` : name
+    if (seen.has(cut)) return { error: `plan names "${cut}" twice: every piece needs its own name` }
+    seen.add(cut)
+    const progress = textOf(piece.progress)
+    if (state === 'working' && progress && !parseStep(progress)) return { error: `plan piece "${cut}": progress must read "step N of M — label", with M above 0 and N at most M` }
+    plan.push({ name: cut, state, ...(state === 'working' && progress ? { progress } : {}) })
+  }
+  return { plan }
+}
+
 export function boardFromJson(raw: unknown, source: Board['source'] = 'file'): Board | null {
   if (!raw || typeof raw !== 'object') return null
   const data = raw as Record<string, unknown>
@@ -57,10 +90,12 @@ export function boardFromJson(raw: unknown, source: Board['source'] = 'file'): B
     const lists = Object.fromEntries(LISTS.flatMap(key => (stringsOf(row[key]).length ? [[key, stringsOf(row[key])]] : [])))
     return [{ ...fields, ...lists, id, name: textOf(row.name) ?? id, state, worktrees: stringsOf(row.worktrees) }]
   })
+  const plan = planOf(data.plan).plan
   const passed = typeof data.testsPassed === 'number' && Number.isFinite(data.testsPassed) ? data.testsPassed : undefined
   return {
     tick: textOf(data.tick),
     sessions,
+    plan: plan?.length ? plan : undefined,
     needsYou: stringsOf(data.needsYou),
     repos: stringsOf(data.repos),
     testsPassed: passed,

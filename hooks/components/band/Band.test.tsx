@@ -4,7 +4,7 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord, Board, BoardSession, Live, Repo, WorkflowRecord } from '../../../types'
 
-import { BAR_MIN, PILL_WIDTH, askingChatOf, bandItemsOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, overallOf, percentOf } from '../../lib/band'
+import { BAR_MIN, PILL_WIDTH, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, overallOf, percentOf } from '../../lib/band'
 import type { AgentCounts } from '../../lib/band'
 import { CH, across, tall, widthOf } from '../../lib/layout'
 import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, started, text, warmUp, world } from '../../testing/world'
@@ -114,7 +114,7 @@ const iconsOf = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).filter(
 
 const percentIn = async (ui: Found) => (await textsOf(ui)).find(one => /^\d+%$/.test(one))
 
-const countsIn = async (ui: Found) => (await ui.findAll({ type: 'Text' })).find(one => one.props.color === 'inactive' && /working/.test(one.text))
+const countsIn = async (ui: Found) => (await ui.findAll({ type: 'Text' })).find(one => one.props.color === 'inactive' && /^(\d+\/\d+|All \d+ done)$/.test(one.text))
 
 const scopesOf = async (ui: Found) => (await faceOf(ui)).map(one => one.key)
 
@@ -235,16 +235,16 @@ const READY: BoardSession = { id: 'local_r', name: 'ready-one', state: 'done', p
 type Fixture = { name: string; sessions: BoardSession[]; agents: AgentRecord[]; workflows?: WorkflowRecord[]; trees?: Repo[]; family?: boolean; outsiders?: boolean; text: string }
 
 const FIXTURES: Fixture[] = [
-  { name: 'no sessions, a running subagent and a running workflow', sessions: [], agents: [own('s1'), own('w0', { type: 'workflow-subagent', run: { id: 'wf_1', index: 0 } })], text: '2 working · 0 waiting · 1 subagent · 1 workflow' },
-  { name: 'sessions only', sessions: WORKING, agents: [], text: '2 working · 1 waiting' },
-  { name: 'an asking subagent', sessions: WORKING, agents: [own('s1', { asking: ASKING })], text: '2 working · 1 waiting' },
-  { name: 'a running parent subagent with a running child', sessions: [], agents: [own('s1'), own('n1', { parentAgentId: 's1' })], text: '1 working · 1 waiting · 1 subagent' },
-  { name: 'a worker with a remote running run', sessions: WORKING, agents: [own('x0', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } })], text: '2 working · 1 waiting' },
-  { name: 'a local run and a remote running run', sessions: WORKING, agents: [own('w0', { run: { id: 'wf_1', index: 0 } }), own('x0', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } })], text: '3 working · 1 waiting · 1 workflow' },
-  { name: 'a records-only workflow older than 120 s', sessions: [], agents: [], workflows: [{ id: 'wf_old', toolUseId: 't', startedAt: AT - 121_000 }], text: '0 working · 0 waiting' },
-  { name: 'a ready session whose family has unmerged commits', sessions: [READY], agents: [], trees: TREES, family: true, text: '0 working · 1 waiting' },
-  { name: 'no board and sessions that are not workers', sessions: [], agents: [], outsiders: true, text: '1 working · 1 waiting' },
-  { name: 'a mix', sessions: NEEDS, agents: [own('s1'), own('n1', { parentAgentId: 's1' }), agentOf('d1', 'done'), own('r1', { parentSessionId: 'local_b' }), own('w0', { run: { id: 'wf_1', index: 0 } }), own('x0', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } })], text: '5 working · 2 waiting · 2 subagents · 1 workflow' },
+  { name: 'no sessions, a running subagent and a running workflow', sessions: [], agents: [own('s1'), own('w0', { type: 'workflow-subagent', run: { id: 'wf_1', index: 0 } })], text: '0/2' },
+  { name: 'sessions only', sessions: WORKING, agents: [], text: '1/4' },
+  { name: 'an asking subagent', sessions: WORKING, agents: [own('s1', { asking: ASKING })], text: '' },
+  { name: 'a running parent subagent with a running child', sessions: [], agents: [own('s1'), own('n1', { parentAgentId: 's1' })], text: '0/2' },
+  { name: 'a worker with a remote running run', sessions: WORKING, agents: [own('x0', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } })], text: '1/5' },
+  { name: 'a local run and a remote running run', sessions: WORKING, agents: [own('w0', { run: { id: 'wf_1', index: 0 } }), own('x0', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } })], text: '1/6' },
+  { name: 'a records-only workflow older than 120 s', sessions: [], agents: [], workflows: [{ id: 'wf_old', toolUseId: 't', startedAt: AT - 121_000 }], text: '' },
+  { name: 'a ready session whose family has unmerged commits', sessions: [READY], agents: [], trees: TREES, family: true, text: '0/1' },
+  { name: 'no board and sessions that are not workers', sessions: [], agents: [], outsiders: true, text: '' },
+  { name: 'a mix', sessions: NEEDS, agents: [own('s1'), own('n1', { parentAgentId: 's1' }), agentOf('d1', 'done'), own('r1', { parentSessionId: 'local_b' }), own('w0', { run: { id: 'wf_1', index: 0 } }), own('x0', { parentSessionId: 'local_c', run: { id: 'wf_9', index: 0 } })], text: '' },
 ]
 
 const READY_LIVE: Live['sessions'][number] = { id: '', name: 'out', title: 'out', cwd: '/', isRunning: false, isArchived: false, lastActivityAt: 0, startedBy: 'someone-else' }
@@ -257,19 +257,24 @@ const fixtureLive = (fixture: Fixture): Live => {
   return { ...live, sessions: live.sessions.map(one => ({ ...one, cwd: '/r/one' })), family: [...live.sessions.map(one => ({ ...one, cwd: '/r/one' })), side] }
 }
 
-for (const fixture of FIXTURES) test(`the band counts read like the pane chips: ${fixture.name}`, () => {
+const NO_ACT = { board: () => undefined, chat: () => undefined }
+
+for (const fixture of FIXTURES) test(`the band count reads finished/units, and nothing when it has no band or a pill: ${fixture.name}`, () => {
   const board = fixture.outsiders ? null : boardOf(fixture.sessions)
   const counts = { agents: fixture.agents, workflows: fixture.workflows ?? [], at: AT }
-  expect(countsText(countsOf(bandItemsOf(board, counts, fixtureLive(fixture), fixture.trees ?? []), false, 0))).toBe(fixture.text)
+  const live = fixtureLive(fixture)
+  const progress = bandProgressWith(board, live, counts)
+  const view = progress && bandViewOf(200, board, progress, false, counts, NO_ACT, live, fixture.trees ?? [])
+  expect(view ? countsText(view.parts) : '').toBe(fixture.text)
 })
 
-test('the band reads the counts from the pane: one own subagent reads 1 working · 0 waiting · 1 subagent, one subagent and one workflow read 2 working · 0 waiting · 1 subagent · 1 workflow', () => {
+test('the band reads finished/units: one own subagent running reads 0/1, one subagent and one workflow running read 0/2', () => {
   const texts = (agents: AgentRecord[]) => {
-    const view = bandViewOf(100, null, bandProgressWith(null, liveOf([], []), { agents, workflows: [], at: 0 }) ?? { segments: [], total: 0 }, false, { agents, workflows: [], at: 0 }, { board: () => undefined, chat: () => undefined }, liveOf([], []))
+    const view = bandViewOf(100, null, bandProgressWith(null, liveOf([], []), { agents, workflows: [], at: 0 }) ?? { segments: [], total: 0 }, false, { agents, workflows: [], at: 0 }, NO_ACT, liveOf([], []))
     return countsText(view.parts)
   }
-  expect(texts([own('s1')])).toBe('1 working · 0 waiting · 1 subagent')
-  expect(texts([own('s1'), own('w0', { run: { id: 'wf_1', index: 0 } })])).toBe('2 working · 0 waiting · 1 subagent · 1 workflow')
+  expect(texts([own('s1')])).toBe('0/1')
+  expect(texts([own('s1'), own('w0', { run: { id: 'wf_1', index: 0 } })])).toBe('0/2')
 })
 
 test('units count the master’s own subagents and runs, each worker’s subagents and runs, and the ones of a worker that is gone', () => {
@@ -284,7 +289,7 @@ test('units count the master’s own subagents and runs, each worker’s subagen
     workflows: [], at: 0,
   }
   const { view } = viewOf(WORKING, crew)
-  expect([view.percent, countsText(view.parts)]).toEqual([46, '5 working · 1 waiting · 3 subagents'])
+  expect([view.percent, countsText(view.parts)]).toEqual([46, '2/9'])
 })
 
 test('fill tone: red when anyone needs you, else green while anything runs, else grey; green and full when all done', () => {
@@ -304,11 +309,11 @@ test('the user’s case: every session done and 2 subagents running reads 66% an
   await crew.subagent('docs')
   await crew.subagent('review')
   const ui = await mount($)
-  expect(await textsOf(ui)).toEqual(['66%', '2 working · 0 waiting · 2 subagents', '2', '0', '2', 'Open board'])
+  expect(await textsOf(ui)).toEqual(['66%', '4/6', '4', '6', 'Open board'])
   const source = String((await stripOf(ui))?.props.source)
   expect(source).toContain('animateTransform')
   expect(source).toContain('fill:var(--green)')
-  expect((await stripOf(ui))?.props.alt).toBe('Master session: 66 percent, 2 working, 0 waiting, 2 subagents')
+  expect((await stripOf(ui))?.props.alt).toBe('Master session: 66 percent, 4 of 6 done')
   await crew.finish('docs')
   await crew.finish('review')
   await ui.unmount()
@@ -354,9 +359,9 @@ test('working, pane closed: percent, one bar with the slider, uniform counts, an
   const { opened } = await band($, on, WORKING)
   const ui = await mount($)
   const bar = await stripOf(ui)
-  expect(bar?.props.alt).toBe('Master session: 80 percent, 2 working, 1 waiting')
+  expect(bar?.props.alt).toBe('Master session: 80 percent, 1 of 4 done')
   expect(bar?.props.isInteractive).toBe(true)
-  expect(await textsOf(ui)).toEqual(['80%', '2 working · 1 waiting', '2', '1', 'Open board'])
+  expect(await textsOf(ui)).toEqual(['80%', '1/4', '1', '4', 'Open board'])
   expect(await buttonsOf(ui)).toEqual([])
   const [hit] = await hitsOf(ui)
   const columns = (hit?.[2] as { columns: number }).columns
@@ -367,7 +372,7 @@ test('working, pane closed: percent, one bar with the slider, uniform counts, an
   await ui.unmount()
 })
 
-test('counts: numbers 600 C.text tabular, words and separators C.muted, the same style for every part; working and waiting always, subagents and workflows only above 0', async ($, on) => {
+test('counts: done/total, numbers 600 C.text tabular and the slash C.muted, with no words and no zero counts', async ($, on) => {
   const crew = crewOf($, on)
   await band($, on, WORKING)
   const styleOf = async (ui: Found) => {
@@ -376,17 +381,17 @@ test('counts: numbers 600 C.text tabular, words and separators C.muted, the same
     return { text: counts?.text, parent: [counts?.props.color, counts?.props.weight], numbers: numbers.map(one => [one.text, one.props.color, one.props.weight, one.props.tabular]) }
   }
   const none = await mount($)
-  expect(await styleOf(none)).toEqual({ text: '2 working · 1 waiting', parent: ['inactive', undefined], numbers: [['2', 'text', 'semibold', true], ['1', 'text', 'semibold', true]] })
+  expect(await styleOf(none)).toEqual({ text: '1/4', parent: ['inactive', undefined], numbers: [['1', 'text', 'semibold', true], ['4', 'text', 'semibold', true]] })
   await none.unmount()
   await crew.subagent('docs')
   await crew.subagent('review')
   await crew.workflow(3)
   const all = await mount($)
   const found = await styleOf(all)
-  expect(found.text).toBe('5 working · 1 waiting · 2 subagents · 1 workflow')
+  expect(found.text).toBe('1/7')
   expect(found.parent).toEqual(['inactive', undefined])
-  expect(found.numbers).toEqual(['5', '1', '2', '1'].map(value => [value, 'text', 'semibold', true]))
-  expect((await stripOf(all))?.props.alt).toBe('Master session: 45 percent, 5 working, 1 waiting, 2 subagents, 1 workflow')
+  expect(found.numbers).toEqual(['1', '7'].map(value => [value, 'text', 'semibold', true]))
+  expect((await stripOf(all))?.props.alt).toBe('Master session: 45 percent, 1 of 7 done')
   const colors = (await all.findAll({ type: 'Text' })).filter(one => one.text !== 'Open board' && !/%$/.test(one.text)).map(one => one.props.color)
   expect(new Set(colors)).toEqual(new Set(['inactive', 'text']))
   await all.unmount()
@@ -394,9 +399,9 @@ test('counts: numbers 600 C.text tabular, words and separators C.muted, the same
   await crew.finish('review')
   for (const index of [0, 1, 2]) await crew.finish(`wf_1-${index}`)
   const after = await mount($)
-  expect((await styleOf(after)).text).toBe('2 working · 1 waiting')
+  expect((await styleOf(after)).text).toBe('4/7')
   await after.unmount()
-  expect(countsText([{ text: '1', isNumber: true }, { text: ' subagent', isNumber: false }])).toBe('1 subagent')
+  expect(countsText(countsOf(3, 7, false))).toBe('3/7')
 })
 
 test('needs you: the pill first, then the red bar, then Open chat; no percent and no counts; Open chat opens that worker', async ($, on) => {
@@ -502,9 +507,9 @@ test('without a Client: one native Button per face, each press runs its action',
 const WIDTHS = [
   { px: 760, counts: true, percent: true, board: 'Open board' },
   { px: 606, counts: true, percent: true, board: 'Open board' },
-  { px: 598, counts: false, percent: true, board: 'Board' },
-  { px: 400, counts: false, percent: true, board: 'Board' },
-  { px: 342, counts: false, percent: true, board: 'Board' },
+  { px: 598, counts: true, percent: true, board: 'Board' },
+  { px: 400, counts: true, percent: true, board: 'Board' },
+  { px: 342, counts: true, percent: true, board: 'Board' },
   { px: 330, counts: false, percent: false, board: 'Board' },
   { px: 200, counts: false, percent: false, board: 'Board' },
 ] as const
@@ -572,9 +577,9 @@ test('terminal: one bar of block characters, the percent, the counts with their 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const texts = await textsOf(ui)
   expect(texts.slice(0, 2)).toEqual(['64%', expect.stringMatching(/^█+░*$/)])
-  expect(texts.slice(2)).toEqual(['3 working · 1 waiting · 1 subagent', '3', '1', '1'])
+  expect(texts.slice(2)).toEqual(['1/5', '1', '5'])
   expect((await ui.findAll({ type: 'Text' })).filter(one => /^\d+$/.test(one.text)).every(one => one.props.weight === 'semibold')).toBe(true)
-  expect((await ui.findAll({ type: 'Text' })).find(one => one.text.startsWith('3 working'))?.props.dimColor).toBe(true)
+  expect((await ui.findAll({ type: 'Text' })).find(one => one.text === '1/5')?.props.dimColor).toBe(true)
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
   expect((await ui.findAll({ type: 'Text' })).filter(one => /^[█░]+$/.test(one.text))).toHaveLength(1)
   await ui.press({ key: 'band-board' })
@@ -616,7 +621,7 @@ test('with no worker sessions, running subagents still show the band: 0%, the su
   await crew.subagent('docs')
   await crew.subagent('review')
   const ui = await mount($)
-  expect(await textsOf(ui)).toEqual(['0%', '2 working · 0 waiting · 2 subagents', '2', '0', '2', 'Open board'])
+  expect(await textsOf(ui)).toEqual(['0%', '0/2', '0', '2', 'Open board'])
   expect(String((await stripOf(ui))?.props.source)).toContain('animateTransform')
   await ui.unmount()
 })
@@ -656,13 +661,13 @@ test('the needs-you pill names any kind: a session with Open chat; a worker’s 
   expect([session.view.pillText, session.view.action?.label]).toEqual(['Session · env-e2e-test needs you · commit blocked', 'Open chat'])
 })
 
-test('a worker’s records-only run counts as one more unit in the percent, while the counts text never lists it', () => {
+test('a worker’s records-only run counts as one more unit in the percent and in the count', () => {
   const crew = CREW()
   const workflows: WorkflowRecord[] = [...crew.workflows, { id: 'wf_9', toolUseId: '', name: 'remote-review', phases: ['A', 'B', 'C'], startedAt: 5, parentSessionId: 'local_c' }, { id: 'wf_8', toolUseId: '', phases: ['X', 'Y'], startedAt: 6, parentSessionId: 'local_a' }]
   const { view } = viewOf(WORKING, { ...crew, workflows })
-  expect([view.percent, countsText(view.parts)]).toEqual([33, '5 working · 3 waiting · 2 subagents · 1 workflow'])
+  expect([view.percent, countsText(view.parts)]).toEqual([33, '1/11'])
   const without = viewOf(WORKING, { ...crew, workflows: workflows.filter(one => one.id !== 'wf_8') }).view
-  expect([without.percent, countsText(without.parts)]).toEqual([37, countsText(view.parts)])
+  expect([without.percent, countsText(without.parts)]).toEqual([37, '1/10'])
 })
 
 test('a plain session that runs a subagent, with no board of its own and no workers, gets no band', async ($, on) => {
@@ -695,7 +700,7 @@ test('a workflow with no agents stops drawing the band after 120 s, as the pane 
   const { clock } = await band($, on, [])
   await crew.workflow(0)
   const before = await mount($)
-  expect(await textsOf(before)).toEqual(['0%', '1 working · 0 waiting · 1 workflow', '1', '0', '1', 'Open board'])
+  expect(await textsOf(before)).toEqual(['0%', '0/1', '0', '1', 'Open board'])
   await before.unmount()
   await clock.advance(121_000)
   await clock.settle()
@@ -716,7 +721,7 @@ test('subagents that finished stay in the percent: 2 of 3 done read 66% now and 
   await clock.advance(180_000)
   await clock.settle()
   const after = await mount($)
-  expect([await percentIn(after), (await textsOf(after))[1]]).toEqual(['66%', '1 working · 0 waiting · 1 subagent'])
+  expect([await percentIn(after), (await textsOf(after))[1]]).toEqual(['66%', '2/3'])
   await after.unmount()
   await crew.finish('c')
 })
@@ -724,8 +729,8 @@ test('subagents that finished stay in the percent: 2 of 3 done read 66% now and 
 test('the band draws every linked worker on a stale board and leaves the archived one out: 2 of 4 published gives 4 units, and the pane draws the same 4 rows', async ($, on) => {
   await band($, on, WORKING.slice(0, 2), false, WORKING.map((one, index) => linkedOf(one.id, one.name, index !== 3)).concat(linkedOf('local_z', 'gone', false, true)))
   const ui = await mount($)
-  expect(await textsOf(ui)).toEqual(['35%', '2 working · 2 waiting', '2', '2', 'Open board'])
-  expect((await stripOf(ui))?.props.alt).toBe('Master session: 35 percent, 2 working, 2 waiting')
+  expect(await textsOf(ui)).toEqual(['35%', '0/4', '0', '4', 'Open board'])
+  expect((await stripOf(ui))?.props.alt).toBe('Master session: 35 percent, 0 of 4 done')
   await ui.unmount()
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const rows = (await pane.findAll({ type: 'Box' })).flatMap(box => box.key?.match(/^row-(local_\w+)$/)?.slice(1) ?? [])
@@ -774,10 +779,8 @@ const fiveUnits = (sessions: BoardSession[], idle: string[] = ['local_i']) => {
   return bandUnitsOf(bandProgress(boardOf(sessions), live)?.segments ?? [], boardOf(sessions), IDLE, live)
 }
 
-test('unit state follows the pane: a working session that is not live is idle and waits, a ready session (done with a sha) is not finished; five sessions read 1 working · 4 waiting', () => {
+test('unit state follows the pane: a working session that is not live is idle and waits, a ready session (done with a sha) is not finished; five sessions have none finished', () => {
   const units = fiveUnits(FIVE)
-  const items = (sessions: BoardSession[], idle: string[]) => bandItemsOf(boardOf(sessions), IDLE, liveOf([], sessions, idle))
-  expect(countsText(countsOf(items(FIVE, ['local_i']), false, units.length))).toBe('1 working · 4 waiting')
   expect(units.map(one => [one.isRunning, one.isFinished])).toEqual([
     [false, false],
     [false, false],
@@ -930,7 +933,7 @@ test('the first agent started with the pane closed draws the bar on the band’s
   await clock.settle()
   const drawn = await stripOf(ui)
   expect(String(drawn?.props.alt)).not.toBe(before)
-  expect(String(drawn?.props.alt)).toContain('1 subagent')
+  expect(String(drawn?.props.alt)).toContain('1 of 5 done')
   expect(String(drawn?.props.source)).toContain('animateTransform')
   expect(drawn?.props.width).toBe(await barWidthOf(ui))
   expect((await ui.findAll({ type: 'Box' })).map(one => one.key).filter(one => one?.startsWith('bar-'))).toEqual([`bar-${await barWidthOf(ui)}-run`])

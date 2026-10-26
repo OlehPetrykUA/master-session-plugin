@@ -20,6 +20,8 @@ export const FAULT_RETRY_MS = 5_000
 export const FAULT_RETRY_MAX_MS = 60_000
 export const NARRATIVE_STALE_MS = 900_000
 export const NARRATIVE_CAP = 500
+export const PLAN_NAME_CAP = 80
+export const PLAN_STATES = ['queued', 'working', 'verifying', 'done', 'dropped'] as const
 export const NARRATIVE_ROWS = 3
 export const NARRATIVE_MAX_ROWS = 40
 export const OPENED = 'Master session pane opened.'
@@ -65,6 +67,19 @@ export const BOARD_SCHEMA = {
     repos: { ...LIST, description: 'repo paths the run touches' },
     testsPassed: { type: 'number', description: 'tests passed in the whole run' },
     testsNote: { type: 'string', description: 'e.g. "smoke 398 · hooks 128"' },
+    plan: {
+      type: 'array',
+      description: `every piece of the whole run, queued ones included, written from the ledger on every call; helpers (QA verifier, Code reviewer, Researcher checks) are not pieces. At most ${LIVE_LIMIT} pieces, names unique. The band's percent measures it`,
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: `the piece, unique in the plan, at most ${PLAN_NAME_CAP} characters` },
+          state: { type: 'string', enum: [...PLAN_STATES] },
+          progress: { type: 'string', description: 'step N of M — label, for a working piece' },
+        },
+        required: ['name', 'state'],
+      },
+    },
     narrative: {
       type: 'string',
       description:
