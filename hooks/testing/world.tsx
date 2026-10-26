@@ -174,6 +174,7 @@ export function world(on: On, child: Child = {}) {
     }
     const failure = e.tool === 'list_sessions' ? child.listError?.() : undefined
     if (failure) return { value: { content: [{ type: 'text' as const, text: failure }], isError: true } }
+    if (e.tool === 'list_sessions' && child.listText !== undefined) return { value: { content: [{ type: 'text' as const, text: child.listText }], isError: false } }
     if (e.tool === 'list_sessions') return text(sessions.filter(one => e.args.include_archived === true || !one.isArchived).slice(0, Number(e.args.limit ?? 20)))
     const refusal = e.tool === 'archive_session' ? child.archiveError : e.tool === 'unarchive_session' ? child.unarchiveError : undefined
     if (refusal) return { value: { content: [{ type: 'text' as const, text: refusal }], isError: true } }
@@ -259,7 +260,7 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { isBare?: boolean; parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean; isPlaced?: boolean; surfaces?: readonly ('desktop' | 'terminal')[]; archiveError?: string; unarchiveError?: string; stuck?: boolean; isLookupDown?: boolean }
+export type Child = { isBare?: boolean; parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; listText?: string; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean; isPlaced?: boolean; surfaces?: readonly ('desktop' | 'terminal')[]; archiveError?: string; unarchiveError?: string; stuck?: boolean; isLookupDown?: boolean }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, board })

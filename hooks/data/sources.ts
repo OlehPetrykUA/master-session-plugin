@@ -135,7 +135,8 @@ export async function askAll($: EngineInterface) {
 
 async function listSessions($: EngineInterface, known: readonly LiveSession[], args: { include_archived: boolean; limit: number }, hasFacts = true) {
   const before = new Map(known.map(one => [one.id, one]))
-  const list = JSON.parse(await call($, 'ccd_session_mgmt', 'list_sessions', { linked: true, ...args })) as Record<string, unknown>[]
+  const body = await call($, 'ccd_session_mgmt', 'list_sessions', { linked: true, ...args })
+  const list = (/^No\b/.test(body.trim()) ? [] : JSON.parse(body)) as Record<string, unknown>[]
   return Promise.all(
     list.map(async (row): Promise<LiveSession> => {
       const id = String(row.sessionId ?? '')

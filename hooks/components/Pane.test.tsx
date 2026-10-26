@@ -222,6 +222,18 @@ test('the Sessions tile leaves out the dot of an empty bucket', async ($, on) =>
   expect(dots).toEqual(['block-dot-box-sessions-green', 'block-dot-box-sessions-amber', 'block-dot-box-sessions-grey'])
 })
 
+const offlineOf = async ($: Engine) => (await textsOf(await $.ui.mount({ ...PANE, surface: 'desktop' }))).filter(one => one.startsWith('Can’t read sessions') || one === 'live data unavailable')
+
+test('a plain No answer from the session list is an empty family, not an error', async ($, on) => {
+  await started($, on, BOARD, { listText: 'No sessions found.' })
+  expect(await offlineOf($)).toEqual([])
+})
+
+test('control: other plain text from the session list still reads as unavailable', async ($, on) => {
+  await started($, on, BOARD, { listText: 'Not now' })
+  expect(await offlineOf($)).toContain('live data unavailable')
+})
+
 test('header states: offline turns the dot and line amber with a notice under the repos; Asked replaces Ask until a worker answers', async ($, on) => {
   let failure: string | undefined
   const { clock } = await started($, on, BOARD, { listError: () => failure })
