@@ -24,6 +24,7 @@ import {
 } from './data/sources'
 import { clearPresses, hasFaults, recoverFault, runPress } from './data/presses'
 import { recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
+import { refreshNarrative } from './data/narrative'
 import { skipWhileBusy } from './data/flight'
 import { briefed, claim, engage, inPlan, isActive, isOff, recordTurnEnd, recorder, startRecorder, unstop } from './data/recorder'
 import { stopMode } from './data/stop'
@@ -47,6 +48,7 @@ let lastLabels = ''
 
 async function tickTimes($: EngineInterface) {
   if (!isActive() || !(await isMaster($)) || !(await isPaneOpen($))) return
+  void refreshNarrative($).catch(() => undefined)
   const data = await paneData($, columns || 48)
   const view = paneViewOf(data)
   const shown = view.groups.flatMap(group => group.items).flatMap(item => (item.kind === 'workflow' && openIdOf(item, data.open) ? [item, ...runAgentsOf(item.run, data.agents)] : [item]))
@@ -54,7 +56,7 @@ async function tickTimes($: EngineInterface) {
     const line = lineOf(item, view.context)
     return [elapsedOfItem(item, data.at), line.cmdElapsed ? `${line.text}~${line.cmdElapsed}` : '', openIdOf(item, data.open) ? runningTimeOf(item, data.at) : ''].join('~')
   }
-  const labels = [...shown.map(labelOf), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age].join('|')
+  const labels = [...shown.map(labelOf), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age, view.narrative?.text].join('|')
   if (labels === lastLabels) return
   lastLabels = labels
   $.ui.invalidate('ui.render')

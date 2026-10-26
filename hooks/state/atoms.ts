@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, Repo, Report, Role, Undone, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, NarrativeNote, Repo, Report, Role, Undone, WorkflowRecord } from '../../types'
 
 const board = atom({ plugin: 'master-session', key: 'board' } as const, null)
 const live = atom({ plugin: 'master-session', key: 'live' } as const, { self: '', title: '', sessions: [], error: '', at: 0 })
@@ -20,6 +20,7 @@ const agents = atom({ plugin: 'master-session', key: 'agents' } as const, [])
 const workflows = atom({ plugin: 'master-session', key: 'workflows' } as const, [])
 const role = atom({ plugin: 'master-session', key: 'role' } as const, { role: '', self: '', parent: '' })
 const isNarrativeOpen = atom({ plugin: 'master-session', key: 'isNarrativeOpen' } as const, false)
+const narrativeNote = atom({ plugin: 'master-session', key: 'narrativeNote' } as const, { text: '', at: 0, boardAt: 0, sign: '', calledAt: 0 })
 const isPlan = atom({ plugin: 'master-session', key: 'isPlan' } as const, false)
 const stopped = atom({ plugin: 'master-session', key: 'stopped' } as const, false)
 
@@ -186,4 +187,12 @@ export function getNarrativeOpen($: EngineInterface) {
 
 export function setNarrativeOpen($: EngineInterface, change: (value: boolean) => boolean) {
   return update($, isNarrativeOpen, change)
+}
+
+export function getNarrativeNote($: EngineInterface) {
+  return read($, narrativeNote)
+}
+
+export function setNarrativeNote($: EngineInterface, change: (value: NarrativeNote) => NarrativeNote) {
+  return update($, narrativeNote, change)
 }

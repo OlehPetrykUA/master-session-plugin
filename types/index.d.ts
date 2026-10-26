@@ -44,6 +44,7 @@ export type Board = {
   testsPassed?: number
   testsNote?: string
   narrative?: string
+  narrativeAt?: number
   source: 'tool' | 'file' | 'chat'
   since?: number
   at?: number
@@ -176,6 +177,8 @@ export type WorkflowRecord = {
   parentSessionId?: string
 }
 
+export type NarrativeNote = { text: string; at: number; boardAt: number; sign: string; calledAt: number }
+
 export type ReportRun = Pick<WorkflowRecord, 'id' | 'name' | 'phases' | 'startedAt'>
 
 declare module 'claude-code' {
@@ -213,6 +216,7 @@ declare module 'claude-code' {
       isClearing: boolean
       isRefreshing: boolean
       isNarrativeOpen: boolean
+      narrativeNote: NarrativeNote
       reports: Report[]
       agents: AgentRecord[]
       workflows: WorkflowRecord[]

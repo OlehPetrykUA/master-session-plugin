@@ -27,7 +27,7 @@ const LINK = /\[([^\]]+)\]\(#(local_[\w-]+)\)/
 
 const textOf = (value: unknown) => (typeof value === 'string' && value.trim() && value.trim() !== '—' ? value.trim() : undefined)
 
-const cleanNarrativeOf = (value: unknown) => {
+export const cleanNarrativeOf = (value: unknown) => {
   const text = textOf(typeof value === 'string' ? value.replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ') : undefined)
   const chars = Array.from(text ?? '')
   return chars.length > NARRATIVE_CAP ? `${chars.slice(0, NARRATIVE_CAP).join('')}…` : text

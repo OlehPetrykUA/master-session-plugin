@@ -31,7 +31,7 @@ export function statusOf(data: PaneData, isDone: boolean): { text: string; icon:
 
 export function narrativeOf(data: PaneData) {
   const text = data.board?.narrative
-  const at = data.board?.at
+  const at = data.board?.narrativeAt ?? data.board?.at
   if (!text || at === undefined) return undefined
   const ms = data.at - at
   const room = bodyWidthOf(data.columns)

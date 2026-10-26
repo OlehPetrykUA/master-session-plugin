@@ -5,12 +5,14 @@ import { archivedOf, familyOf, rowsOf } from '../lib/rows'
 import { runSummaryOf } from '../lib/totals'
 import { UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
-import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getNarrativeOpen, getRefreshing, getReports, getRepos, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter, setNarrativeOpen } from '../state/atoms'
+import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getNarrativeNote, getNarrativeOpen, getRefreshing, getReports, getRepos, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter, setNarrativeOpen } from '../state/atoms'
 import { runningViewOf } from './running'
 import { archive, askAll, clearDone, boardOf, homeOf, openSession, refreshAll, stopSession, unarchive, undoArchive } from './sources'
 
 export async function paneData($: EngineInterface, columns: number, offset = 0, bodyRows = 0, isAligned = false): Promise<PaneData> {
-  const { board: current } = await boardOf($)
+  const { board: own } = await boardOf($)
+  const note = await getNarrativeNote($)
+  const current = own && note.text && note.boardAt === own.at ? { ...own, narrative: note.text, narrativeAt: note.at } : own
   const live = await getLive($)
   const trees = await getRepos($)
   const rows = rowsOf(current, live)
