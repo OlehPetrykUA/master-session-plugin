@@ -40,7 +40,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
     })
   }
   const chatOf = (item: RowItem): RowChat | undefined => {
-    const target = chatTargetOf(item, context)
+    const target = chatTargetOf(item)
     return target ? { label: CHAT_LABEL, onPress: () => actions.open(target.id, target.name) } : undefined
   }
   const itemOf = (item: RowItem, room: number): RenderChildren => {
@@ -52,7 +52,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
     if (!openIdOf(item, data.open)) return Row(ui, rowProps)
     const innerWidth = room - CARD_INSET
     if (item.kind === 'workflow') return WorkflowDetail(ui, { item, context, rowProps, innerWidth, agentOf: agent => itemOf(agent, innerWidth - 24) })
-    if (item.kind === 'subagent' || item.kind === 'agent') return SubagentDetail(ui, { item, context, rowProps, innerWidth, actions })
+    if (item.kind === 'subagent' || item.kind === 'agent') return SubagentDetail(ui, { item, context, rowProps, innerWidth })
     if (item.kind === 'archived') return ArchivedDetail(ui, { item, context, rowProps, asking: data.asking, innerWidth, actions })
     return SessionDetail(ui, { item, context, rowProps, home: data.home, asking: data.asking, innerWidth, actions })
   }

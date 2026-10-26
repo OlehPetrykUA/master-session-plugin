@@ -3,14 +3,13 @@ import { across, tall } from '../../lib/layout'
 import { askOf, clockOf, displayNameOf, nameText, parentsOf, rowsOf, runningOfItem, sessionOfAgent, spanOf, tildeOf } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { C } from '../../theme/tokens'
-import { ActionButton } from '../ActionButton'
 import { Icon } from '../Icon'
 import { Lines } from '../Lines'
 import { Card } from '../list/Card'
 import type { RowProps } from '../list/Row'
 import { Quiet } from '../Quiet'
 import { Strong } from '../Strong'
-import type { Actions, Ui } from '../types'
+import type { Ui } from '../types'
 import { Block } from './Block'
 import { Callout } from './Callout'
 import { durationOf, runningTimeOf, tokensOf } from './format'
@@ -18,11 +17,11 @@ import { ModelValue } from './Model'
 import { Pair } from './Pair'
 import { RunningBlock } from './RunningBlock'
 
-export type SubagentDetailProps = { item: Extract<RowItem, { kind: 'subagent' | 'agent' }>; context: Context; rowProps: RowProps; innerWidth: number; actions: Actions }
+export type SubagentDetailProps = { item: Extract<RowItem, { kind: 'subagent' | 'agent' }>; context: Context; rowProps: RowProps; innerWidth: number }
 
 export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
   const { Box, Text } = ui
-  const { item, context, actions } = props
+  const { item, context } = props
   const agent = item.agent
   const id = item.id
   const at = context.at
@@ -123,9 +122,6 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
         left: half('started', item.kind === 'agent' ? 'flow' : 'agent', 'Started by', [started, how ? Quiet(ui, { text: how, isFull: true }) : null]),
         right: half('time', 'elapsed', 'Time', time),
       }),
-      parent && !isNeeds
-        ? ActionButton(ui, { id: `parent-chat-${id}`, kind: 'secondary', icon: 'chat', label: `Open ${displayNameOf({ kind: 'session', id: parent.id, group: parent.state, status: 'working', row: parent }).persona} chat`, size: 'b40', iconSize: 16, wide: props.innerWidth, onPress: () => actions.open(parent.id, parent.name) })
-        : null,
       !parent && isNeeds ? (
         <Box key={`info-${id}`} flexDirection="row" alignItems="flex-start" gap={across(8)}>
           <Box flexDirection="row" alignItems="center" height={tall(16)}>

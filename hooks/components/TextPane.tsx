@@ -33,7 +33,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
 
   const line = (item: RowItem) => {
     const steps = stepsOfItem(item)
-    const chat = chatTargetOf(item, context)
+    const chat = chatTargetOf(item)
     const isNeeds = item.status === 'needs'
     const tail = [lineTextOf(lineOf(item, context)), isNeeds ? '' : elapsedOfItem(item, at), steps && !isNeeds ? `${steps.done}/${steps.total}` : ''].filter(Boolean).join(' · ')
     return (

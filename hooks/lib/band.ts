@@ -51,7 +51,7 @@ const agentAskerOf = (type: string, label: string) => {
   return { name: glyph ? persona : label, short: persona, glyph: glyph ?? ('agent' as const) }
 }
 
-type Place = { parent?: string; chat?: { id: string; name: string } }
+type Place = { parent?: string }
 
 function treeOf(agents: readonly AgentRecord[]) {
   const ids = new Set(agents.map(one => one.id))
@@ -71,12 +71,12 @@ function subagentUnits(agents: readonly AgentRecord[], place: Place): Unit[] {
       value: isRunning ? 0 : 1,
       isRunning,
       isFinished: !isRunning,
-      asker: isRunning && agent.asking ? { ...agentAskerOf(agent.type, agent.name || agent.description), parent: parent ? agentAskerOf(parent.type, parent.name || parent.description).name : place.parent, reason: agent.asking.text, since: agent.asking.since, chat: place.chat } : undefined,
+      asker: isRunning && agent.asking ? { ...agentAskerOf(agent.type, agent.name || agent.description), parent: parent ? agentAskerOf(parent.type, parent.name || parent.description).name : place.parent, reason: agent.asking.text, since: agent.asking.since } : undefined,
     }
   })
 }
 
-function runUnits(runs: readonly WorkflowRun[], place: Place): Unit[] {
+function runUnits(runs: readonly WorkflowRun[]): Unit[] {
   return runs.map(run => {
     const asking = run.agents.find(one => one.state === 'running' && one.asking)
     const isRunning = run.state === 'running'
@@ -85,7 +85,7 @@ function runUnits(runs: readonly WorkflowRun[], place: Place): Unit[] {
       value: isRunning ? (run.counts.total ? finished / run.counts.total : 0) : 1,
       isRunning,
       isFinished: !isRunning,
-      asker: asking?.asking ? { ...agentAskerOf(asking.type, asking.label), parent: run.name, reason: asking.asking.text, since: asking.asking.since, chat: place.chat } : undefined,
+      asker: asking?.asking ? { ...agentAskerOf(asking.type, asking.label), parent: run.name, reason: asking.asking.text, since: asking.asking.since } : undefined,
     }
   })
 }
@@ -99,7 +99,6 @@ const remoteOf = ({ agents, workflows, at }: AgentCounts, id: string, place: Pla
       mine.map(({ parentSessionId, ...one }) => one),
       workflows.filter(one => one.parentSessionId === id).map(({ parentSessionId, ...one }) => one),
     ).filter(run => !isGhostRun(run, at)),
-    { chat: place.chat },
   )
   return { subs: subagentUnits(mine.filter(one => !one.run), place), runs }
 }
@@ -120,7 +119,7 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
     const chat = { id: segment.id, name }
     const display = sessionNameOf(live.sessions.find(one => one.id === segment.id)?.title || row?.title || name, row?.persona)
     const self = { name: nameText(display), short: display.persona, glyph: PERSONA_GLYPH[display.persona] ?? ('session' as const) }
-    const { subs, runs } = remoteOf(counts, segment.id, { parent: display.persona === 'Session' ? display.task : display.persona, chat })
+    const { subs, runs } = remoteOf(counts, segment.id, { parent: display.persona === 'Session' ? display.task : display.persona })
     const group = items.find(one => one.kind === 'session' && one.id === segment.id)?.group
     const isAsking = group === 'needs-you'
     const child = isAsking ? [...subs, ...runs].find(one => one.asker && one.asker.reason === row?.needsYou) : undefined
@@ -138,7 +137,7 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
     const { subs, runs } = remoteOf(counts, id, {})
     units.push(...subs, ...runs)
   })
-  units.push(...runUnits(liveRunsOf(counts), {}))
+  units.push(...runUnits(liveRunsOf(counts)))
   return units
 }
 

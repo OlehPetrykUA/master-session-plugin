@@ -315,11 +315,7 @@ export function sessionOfAgent(agent: AgentRecord, context: Pick<Context, 'agent
   return undefined
 }
 
-export function chatTargetOf(item: RowItem, context: Pick<Context, 'agents' | 'rows'>): Row | undefined {
-  if (item.status !== 'needs') return undefined
-  if (item.kind === 'session') return item.row
-  return item.kind === 'subagent' ? sessionOfAgent(item.agent, context) : undefined
-}
+export const chatTargetOf = (item: RowItem): Row | undefined => (item.status === 'needs' && item.kind === 'session' ? item.row : undefined)
 
 export function chainOf(item: RowItem, context: Context) {
   if (item.kind !== 'subagent') return ''

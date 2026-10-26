@@ -25,21 +25,20 @@ const agent = (id: string, more: Partial<AgentRecord>): AgentRecord => ({ id, ty
 
 warmUp()
 
-test('a subagent waiting on a prompt in a worker chat: a red row with its parent and question, Open chat opens that worker, its card says where the prompt waits', async ($, on) => {
+test('a subagent waiting on a prompt in a worker chat: a red row with its parent and question, no Open chat, its card says where the prompt waits', async ($, on) => {
   seeded(on, [agent('a1', { asking: ASK, parentSessionId: 'local_setup' })])
-  const { calls } = await started($, on)
+  await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect((await ui.find({ key: 'row-a1' }))?.props.borderColor).toBe(C.red)
   const texts = await textsOf(ui)
   for (const word of ['Code reviewer', 'review a1', 'Session ›', 'Allow Bash: rm -rf dist?']) expect(texts).toContain(word)
-  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Subagent', 'needs you', 'Open chat']))
-  await click(ui, 'hit-chat-a1')
-  expect(calls.filter(one => one.tool === 'open_session_in').map(one => one.args.session_id)).toEqual(['local_setup'])
+  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Subagent', 'needs you']))
+  expect(await hitsOf(ui)).not.toContain('hit-chat-a1')
   await click(ui, 'hit-row-a1')
   const card = await textsOf(ui)
   for (const word of ['PERMISSION', 'asked 10s ago · the prompt waits in Session · Redo toolkit setup UI’s chat', 'Task', 'Run the gate.', 'Started by', 'Redo toolkit setup UI']) expect(card.some(text => text.includes(word))).toBe(true)
-  expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-top-a1', 'hit-chat-a1']))
-  expect(await hitsOf(ui)).not.toContain('hit-parent-chat-a1')
+  expect(await hitsOf(ui)).toContain('hit-top-a1')
+  expect((await hitsOf(ui)).filter(one => one.includes('chat') && one.endsWith('a1'))).toEqual([])
   await ui.unmount()
 })
 
@@ -67,21 +66,20 @@ test('a subagent of the Validator has no Open chat: the row shows its time and e
   await ui.unmount()
 })
 
-test('a nested subagent names its immediate parent and folds the earlier ones; a finished subagent of a worker offers Open <persona> chat in its card', async ($, on) => {
+test('a nested subagent names its immediate parent and folds the earlier ones; no subagent of a worker offers a chat button, asking or finished', async ($, on) => {
   seeded(on, [
     agent('p1', { type: 'master-session:qa-verifier', description: 'verify a38c72e', parentSessionId: 'local_setup' }),
     agent('k1', { description: 'review a38c72e', parentAgentId: 'p1', asking: ASK }),
     agent('d1', { type: 'master-session:researcher', description: 'find usages', state: 'done', endedAt: NOW - 1_000, result: 'found 3', parentSessionId: 'local_setup' }),
   ])
-  const { calls } = await started($, on)
+  await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const texts = await textsOf(ui)
   for (const word of ['QA verifier', 'Session ›', 'waiting', 'on Code reviewer · review a38c72e', '… › QA verifier ›', 'Researcher', 'found 3']) expect(texts).toContain(word)
-  expect(await hitsOf(ui)).toContain('hit-chat-k1')
+  expect(await hitsOf(ui)).not.toContain('hit-chat-k1')
   await click(ui, 'hit-row-d1')
   expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Result', 'found 3', 'Session', 'Redo toolkit setup UI']))
-  await click(ui, 'hit-parent-chat-d1')
-  expect(calls.filter(one => one.tool === 'open_session_in').map(one => one.args.session_id)).toEqual(['local_setup'])
+  expect(await hitsOf(ui)).not.toContain('hit-parent-chat-d1')
   await ui.unmount()
 })
 

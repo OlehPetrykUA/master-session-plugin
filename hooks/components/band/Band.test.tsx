@@ -642,13 +642,11 @@ test('geometry: bar 56 with gap 12, percent 36, pill 34 with 0 12 0 8, check 18,
   await done.unmount()
 })
 
-test('the needs-you pill names any kind: a session, a worker’s subagent with its parent and Open chat to that worker, this chat’s subagent or workflow agent with no Open chat', () => {
+test('the needs-you pill names any kind: a session with Open chat; a worker’s subagent with its parent, this chat’s subagent or workflow agent with no Open chat', () => {
   const asking = WORKING.map(one => (one.id === 'local_b' ? { ...one, state: 'needs-you' as const, needsYou: 'Allow Bash: rm -rf dist' } : one))
   const remote = viewOf(asking, CREW({ remote: true }))
   expect([remote.view.pillText, remote.view.alt]).toEqual(['Code reviewer, in QA verifier, needs you · Allow Bash: rm -rf dist', 'Master session: Code reviewer, in QA verifier, needs you, Allow Bash: rm -rf dist'])
-  expect(remote.view.action?.label).toBe('Open chat')
-  remote.view.action?.press()
-  expect(remote.chats).toEqual(['local_b mod-ui'])
+  expect(remote.view.action).toBeUndefined()
   expect(viewOf(asking, CREW({ remote: true }), columnsFor(400)).view.pillText).toBe('Code reviewer needs you')
   const own = viewOf(WORKING, CREW({ own: true }))
   expect([own.view.pillText, own.view.action]).toEqual(['Code reviewer, in QA verifier, needs you · Allow Bash: rm -rf dist', undefined])
@@ -829,12 +827,11 @@ test('a board row named after a subagent of this chat is no session: no needs-yo
   expect([named.view.pillText, named.view.action?.label, named.view.alt]).toEqual([plain.view.pillText, plain.view.action?.label, plain.view.alt])
 })
 
-test('Open chat hides when the prompt is already in this chat, and opens the asker’s own chat otherwise', () => {
+test('Open chat hides when the prompt is already in this chat or a subagent asks, and opens the asking session’s chat otherwise', () => {
   const own = viewOf([{ id: SELF, name: 'master', state: 'needs-you', needsYou: 'ok?', progress: 'step 1 of 2 — x' }, ...WORKING], IDLE)
   expect([own.view.pillText.includes('needs you'), own.view.action]).toEqual([true, undefined])
   const crew = CREW({ remote: true })
-  const chat = askingChatOf(boardOf(WORKING), liveOf([], WORKING), crew, [])
-  expect(chat).toEqual({ id: 'local_b', name: 'mod-ui' })
+  expect(askingChatOf(boardOf(WORKING), liveOf([], WORKING), crew, [])).toBeUndefined()
   expect(askingChatOf(boardOf(WORKING), liveOf([], WORKING), CREW({ own: true }), [])).toBeUndefined()
   expect(askingChatOf(boardOf(NEEDS), liveOf(), IDLE, [])).toEqual({ id: 'local_e', name: 'env-e2e-test' })
   expect(askingChatOf(boardOf(WORKING), liveOf([], WORKING), IDLE, [])).toBeUndefined()

@@ -110,7 +110,7 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
       .filter(group => group.id === 'archived' || group.items.length)
       .map(group => ({
         rows: group.id === 'archived' ? (group.isOpen ? (data.chosen === 'archived' || data.archiveView === 'all' ? group.archived.length : Math.min(ARCHIVED_PEEK, group.archived.length)) : 0) : group.items.length,
-        extra: group.items.reduce((sum, item) => sum + rowFitOf(item, context, { width: bodyWidthOf(data.columns), isNarrow: view.isNarrow, home: data.home, chat: chatTargetOf(item, context) ? CHAT_LABEL : undefined }).height - ROW, 0),
+        extra: group.items.reduce((sum, item) => sum + rowFitOf(item, context, { width: bodyWidthOf(data.columns), isNarrow: view.isNarrow, home: data.home, chat: chatTargetOf(item) ? CHAT_LABEL : undefined }).height - ROW, 0),
         isArchived: group.id === 'archived',
       })),
     hasMore: view.hasMore,
