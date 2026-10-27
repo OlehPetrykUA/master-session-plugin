@@ -52,7 +52,7 @@ Find a named worker in the "Linked sessions now" roster note or `list_sessions {
 - run the ready pieces whose owned files are disjoint;
 - at most one suite-runner (an agent, or your inline Checker gate, running a full suite or build) at a time; in a risk-flagged pair only the QA verifier runs it; a builder runs only its Your checks;
 - doc-only work (research, spec, design, review) is never held back by machine load, nor gated on the user's own processes;
-- cost: fewer agents and cheaper models for simple work, one agent for T0 and T1;
+- cost: fewer agents and cheaper models for simple work, one agent by default for T0 and T1;
 - soft ceiling 4 running agents, nested included; above it only with the reason in the count line.
 
 The only waits: a dependency not merged, the one-suite-runner rule, a user decision. Invent no other.
@@ -127,7 +127,7 @@ On every wake, do one tick:
 
 A worker asking for a "go", an approval or what next gets a direct instruction quoting the user's words, never a bounce to the user.
 - **Approve yourself:** drafts, plans and design choices that fit the brief (UI designs excepted); work inside its owned files; retries, fixes; `--ff-only` merges of verified work; archiving captured workers; anything reversible inside the brief.
-- **Only the user:** UI designs; deletes outside git; pushes, PRs, anything external or irreversible; unsettled preferences; raising a permission mode. Batch them in one line.
+- **Only the user:** UI designs; deletes outside git; pushes, PRs, anything external or irreversible; open preferences; raising a permission mode. Batch them in one line.
 - Else decide the reversible way and tell the user in one line. A user rule is never an option: apply it to every case it covers at once.
 - **Message budget:** the app caps messages to other sessions at 10 per user turn; send workers only fixes and answers.
 - **Changing course:** `stop_session` or `TaskStop` the turn first, then send the new brief in one message.
