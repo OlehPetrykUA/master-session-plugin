@@ -49,21 +49,17 @@ export const isUnsafe = (reply: string, source: string) =>
     .split(' ')
     .some(word => isShaped(stripped(word), source) || isShaped(core(word), source))
 
-const ID_SHAPED = /(^|\s)(?=[\p{L}\p{N}]*\d)[\p{L}\p{N}]+(?=[.,;:]?(?:\s|$))/gu
-
-export const masked = (text: string) => text.replace(ID_SHAPED, '$1it')
-
 export const normalized = (reply: string) => reply.replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ').trim()
 
 export const capped = (text: string) => (text.length > STORED_MAX ? `${text.slice(0, STORED_MAX)}…` : text)
 
 export const cleaned = (reply: string) => capped(normalized(reply))
 
-const promptOf = (job: Job, isStrict: boolean) => `Kind: ${job.kind}\nShort name: ${isStrict ? masked(job.name) : job.name}\n\nThe task as it was given:\n${isStrict ? masked(job.source) : job.source}`
+const promptOf = (job: Job) => `Kind: ${job.kind}\nShort name: ${job.name}\n\nThe task as it was given:\n${job.source}`
 
 async function attempt($: EngineInterface, job: Job, isStrict: boolean): Promise<Outcome> {
   const asked = $.model
-    .complete({ model: MODEL, effort: 'low', maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, system: isStrict ? `${INSTRUCTION} ${STRICT}` : INSTRUCTION, prompt: promptOf(job, isStrict) })
+    .complete({ model: MODEL, effort: 'low', maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, system: isStrict ? `${INSTRUCTION} ${STRICT}` : INSTRUCTION, prompt: promptOf(job) })
     .catch(() => undefined)
   const result = await Promise.race([asked, $.clock.sleep(TIMEOUT_MS).then(() => undefined)])
   if (!result?.isAnswered) return { ok: false, isGuard: false }

@@ -15,7 +15,7 @@ import { C } from '../theme/tokens'
 import { CREDENTIALS } from '../testing/credentials'
 import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, childOf, liveOf, started, textsOf, altsOf, warmUp, world } from '../testing/world'
 import type { Child } from '../testing/world'
-import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, isUnsafe, masked, normalized } from './describe'
+import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, isUnsafe, normalized } from './describe'
 import { reportPath } from './status'
 
 const NOW = 3_600_000
@@ -813,21 +813,6 @@ test('a resumed agent that has a task is not described again by ticks', async ($
   expect(seen.length).toBe(1)
 })
 
-test('when the first reply is guard-rejected, the strict retry sees the source without its identifiers and its reply is stored', async ($, on) => {
-  const { seen } = stub(on, (_, nth) => say(nth === 1 ? 'Writes the design for M8 and P1.' : T))
-  const run = await master($, on)
-  await spawn($, { prompt: 'Write the design for M8 and P1, then report back.' })
-  await run.clock.settle()
-  expect(seen.length).toBe(2)
-  expect(String(seen[0]?.prompt)).toContain('M8')
-  expect(String(seen[1]?.prompt)).not.toContain('M8')
-  expect(String(seen[1]?.prompt)).not.toContain('P1')
-  const ui = await pane($)
-  await open($, 'a1')
-  expect(await plainOf(ui, 'a1')).toBe(T)
-  await ui.unmount()
-})
-
 test('a copied strict reply stays rejected when the secret is a plain word next to a flag', async ($, on) => {
   const { seen } = stub(on, request => say(String(request.prompt)))
   const run = await master($, on)
@@ -849,17 +834,22 @@ test('a copied strict reply stays rejected when the secret is a plain word next 
   }
 })
 
-test('the strict retry masks only id-shaped words, in the short name too, and keeps flags and plain words', () => {
-  expect(masked('Write M8 and P1/P2 with MD5, then -p hunter --password letmein "q"')).toBe('Write it and P1/P2 with it, then -p hunter --password letmein "q"')
-})
-
-test('the short name is masked in the strict retry', async ($, on) => {
-  const { seen } = stub(on, (_, nth) => say(nth === 1 ? 'Writes the design for M8 and P1.' : T))
+test('a plain secret next to an id-shaped word is never stored or drawn, even when both replies copy the prompt', { plugins: [PROBE] }, async ($, on) => {
+  const { seen } = stub(on, request => say(String(request.prompt)))
   const run = await master($, on)
-  await spawn($, { description: 'Design M8', prompt: 'Write the design for M8 and P1, then report back.' })
-  await run.clock.settle()
-  expect(String(seen[0]?.prompt)).toContain('Short name: Design M8')
-  expect(String(seen[1]?.prompt)).toContain('Short name: Design it')
+  const prompts = ['Connect as user7 with password hunter and report back.', 'Log in to db2 with the password hunter, then report back.']
+  for (const [index, prompt] of prompts.entries()) {
+    const before = seen.length
+    await spawn($, { description: `ids ${index}`, prompt })
+    await run.clock.settle()
+    expect(seen.length - before).toBe(2)
+    const ui = await pane($)
+    await open($, `a${index + 1}`)
+    expect(await ui.find({ key: `task-plain-a${index + 1}` })).toBeUndefined()
+    expect(secretsIn(JSON.stringify([await textsOf(ui), await altsOf(ui)]), ['hunter'])).toEqual([])
+    await ui.unmount()
+  }
+  expect((await atomsOf($)).agents.map(one => one.task)).toEqual([{ state: 'failed' }, { state: 'failed' }])
 })
 
 test('two spawn events for one agent id at once make one call', async ($, on) => {
