@@ -14,9 +14,11 @@ export type RunPath = { path: string; owner: string }
 
 export type ProcContext = { home: string; masterPid: number; paths: readonly RunPath[]; trees: readonly string[] }
 
-export type Shown = { pid: number; lstart: string; ucomm: string; owner: string; cpu: number; rss: number; etime: number; canStop: boolean; group: 'run' | 'left'; worktree: string }
+export type Shown = { pid: number; lstart: string; ucomm: string; owner: string; cpu: number; rss: number; etime: number; canStop: boolean; group: 'run' | 'left' | 'tools'; worktree: string }
 
-export type Model = { run: Shown[]; left: Shown[]; engines: Record<number, string>; ancestors: number[] }
+export type Model = { run: Shown[]; left: Shown[]; tools: Shown[]; engines: Record<number, string>; ancestors: number[] }
+
+export const OWN_CALLS = ['ps', 'lsof', 'sysctl', 'kill', 'id'] as const
 
 const LINE = /^\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+[\d:]+\s+\d{4})\s+([\d.]+)\s+(\d+)\s+([\d:.-]+)\s+(.+?)\s*$/
 
@@ -79,8 +81,11 @@ export function ownerPathOf(cwd: string | undefined, paths: readonly RunPath[]) 
   return best
 }
 
-export function worktreeOf(cwd: string | undefined, context: Pick<ProcContext, 'trees'>) {
-  if (!cwd) return ''
+export const treesOf = (paths: readonly string[]) => paths.map(path => path.replace(/\/+$/, '')).filter(path => path.startsWith('/') && path.length > 1)
+
+export function worktreeOf(cwd: string | undefined, context: Pick<ProcContext, 'trees' | 'home'>) {
+  const home = context.home.replace(/\/+$/, '')
+  if (!cwd || !home || !cwd.startsWith(`${home}/.claude/worktrees/`)) return ''
   let best = ''
   for (const tree of context.trees) if (isUnder(cwd, tree) && tree.length > best.length) best = tree
   return best.split('/').filter(Boolean).at(-1) ?? ''
@@ -144,7 +149,7 @@ export function modelOf(table: readonly Proc[], cwds: ReadonlyMap<number, string
   const guarded = new Set([context.masterPid, ...ancestors])
   const seen = new Set<number>()
   const run: Shown[] = []
-  const shown = (one: Proc, group: 'run' | 'left', owner: string, worktree: string): Shown => ({
+  const shown = (one: Proc, group: Shown['group'], owner: string, worktree: string): Shown => ({
     pid: one.pid,
     lstart: one.lstart,
     ucomm: one.ucomm,
@@ -167,6 +172,9 @@ export function modelOf(table: readonly Proc[], cwds: ReadonlyMap<number, string
       }
     }
   }
+  const tools = (kids.get(context.masterPid) ?? [])
+    .filter(one => engineSet.has(context.masterPid) && !isShell(one) && !engineSet.has(one.pid) && !(OWN_CALLS as readonly string[]).includes(one.ucomm))
+    .map(one => ({ ...shown(one, 'tools', '', ''), canStop: false }))
   const left: Shown[] = []
   for (const root of table.filter(one => one.ppid === 1 && !seen.has(one.pid) && !engineSet.has(one.pid) && !guarded.has(one.pid))) {
     const worktree = worktreeOf(cwds.get(root.pid), context)
@@ -177,14 +185,16 @@ export function modelOf(table: readonly Proc[], cwds: ReadonlyMap<number, string
       left.push(shown(one, 'left', `left:${worktree}`, worktree))
     }
   }
-  return { run: run.sort(lessOf), left: left.sort(lessOf), engines: Object.fromEntries(engines.map(one => [one.pid, one.lstart])), ancestors }
+  return { run: run.sort(lessOf), left: left.sort(lessOf), tools: tools.sort(lessOf), engines: Object.fromEntries(engines.map(one => [one.pid, one.lstart])), ancestors }
 }
 
 export type ProcNames = Readonly<Record<string, string>>
 
 export const ownerText = (one: Pick<Shown, 'owner' | 'worktree'>, names: ProcNames) => (one.owner.startsWith('left:') ? `left behind (${one.worktree})` : one.owner === 'master' ? 'master' : one.owner ? names[one.owner] || '—' : '—')
 
-export type ProcRow = { key: string; pid: number; lstart: string; program: string; owner: string; cpu: string; memory: string; time: string; canStop: boolean; group: 'run' | 'left' }
+export type ProcRow = { key: string; pid: number; lstart: string; program: string; owner: string; cpu: string; memory: string; time: string; canStop: boolean; group: Shown['group'] }
+
+export const stopGroupOf = (row: Pick<ProcRow, 'group'>): 'run' | 'left' => (row.group === 'left' ? 'left' : 'run')
 
 export type ProcState = {
   isOpen: boolean
@@ -193,24 +203,25 @@ export type ProcState = {
   error: string
   run: readonly Shown[]
   left: readonly Shown[]
+  tools: readonly Shown[]
   asking: string
   stopping: Readonly<Record<string, number>>
   notes: Readonly<Record<string, string>>
 }
 
-export type ProcGroup = { id: 'run' | 'left'; rows: ProcRow[]; more: number; total: number }
+export type ProcGroup = { id: Shown['group']; rows: ProcRow[]; more: number; total: number }
 
 export type ProcView = { isOpen: boolean; count: number; load: string; error: string; groups: ProcGroup[]; isEmpty: boolean; asking: string; stopping: Readonly<Record<string, number>>; notes: Readonly<Record<string, string>> }
 
 export function processesViewOf(state: ProcState, names: ProcNames): ProcView {
-  const group = (id: 'run' | 'left', list: readonly Shown[]): ProcGroup => ({
+  const group = (id: Shown['group'], list: readonly Shown[]): ProcGroup => ({
     id,
     total: list.length,
     more: Math.max(0, list.length - PROC_ROWS),
-    rows: list.slice(0, PROC_ROWS).map(one => ({ key: keyOf(one), pid: one.pid, lstart: one.lstart, program: one.ucomm, owner: ownerText(one, names), cpu: cpuText(one.cpu), memory: memText(one.rss), time: timeText(one.etime), canStop: one.canStop, group: id })),
+    rows: list.slice(0, PROC_ROWS).map(one => ({ key: keyOf(one), pid: one.pid, lstart: one.lstart, program: one.ucomm, owner: id === 'tools' ? '' : ownerText(one, names), cpu: cpuText(one.cpu), memory: memText(one.rss), time: timeText(one.etime), canStop: id !== 'tools' && one.canStop, group: id })),
   })
-  const groups = state.error ? [] : [group('run', state.run), ...(state.left.length ? [group('left', state.left)] : [])]
-  const count = groups.reduce((sum, one) => sum + one.total, 0)
+  const groups = state.error ? [] : [group('run', state.run), ...(state.left.length ? [group('left', state.left)] : []), ...(state.tools.length ? [group('tools', state.tools)] : [])]
+  const count = groups.filter(one => one.id !== 'tools').reduce((sum, one) => sum + one.total, 0)
   return { isOpen: state.isOpen, count, load: state.load, error: state.error, groups, isEmpty: state.isRead && !state.error && !count, asking: state.asking, stopping: state.stopping, notes: state.notes }
 }
 
@@ -229,9 +240,7 @@ export function processesPxOf(view: ProcView, columns: number) {
   const isNarrow = width < NARROW
   const room = bodyWidthOf(columns)
   const lines = (text: string, space: number) => Math.max(1, rowsOf(text, space, 12, 8).length)
-  const body = () => {
-    if (view.error) return 8 + lines(view.error, room - 24 - 24) * 16 + 8
-    if (view.isEmpty) return 16
+  const list = () => {
     let height = 2 + (isNarrow ? 0 : 25)
     let items = 0
     const add = (px: number) => {
@@ -239,7 +248,7 @@ export function processesPxOf(view: ProcView, columns: number) {
       items += 1
     }
     for (const group of view.groups) {
-      if (group.id === 'left') add(28)
+      if (group.id !== 'run') add(28)
       for (const row of group.rows) {
         const note = view.notes[row.key]
         const isAsking = view.asking === row.key
@@ -252,9 +261,15 @@ export function processesPxOf(view: ProcView, columns: number) {
     }
     return height
   }
-  const parts = [32, ...(view.load ? [16] : []), body()]
+  const body = () => {
+    if (view.error) return [8 + lines(view.error, room - 24 - 24) * 16 + 8]
+    const hasList = view.groups.some(one => one.rows.length)
+    if (view.isEmpty) return [16, ...(hasList ? [list()] : [])]
+    return [list()]
+  }
+  const parts = [32, ...(view.load ? [16] : []), ...body()]
   return 12 + parts.reduce((sum, px) => sum + px, 0) + (parts.length - 1) * 8
 }
 
-export const signOf = (load: string, error: string, model: Pick<Model, 'run' | 'left'>) =>
-  JSON.stringify([load, error, [...model.run, ...model.left].map(one => [one.pid, one.lstart, one.ucomm, one.owner, one.canStop, cpuText(one.cpu), memText(one.rss), timeText(one.etime)])])
+export const signOf = (load: string, error: string, model: Pick<Model, 'run' | 'left' | 'tools'>) =>
+  JSON.stringify([load, error, [...model.run, ...model.left, ...model.tools].map(one => [one.pid, one.lstart, one.ucomm, one.owner, one.canStop, cpuText(one.cpu), memText(one.rss), timeText(one.etime)])])

@@ -8,7 +8,7 @@ import type { FakeProc } from '../testing/procs'
 import type { Child, Clickable, Ui as Found } from '../testing/world'
 
 type Ui = Found & Clickable
-import { AT, HOME, PANE, SELF, click, childOf, started, textsOf, warmUp } from '../testing/world'
+import { AT, HOME, PANE, SELF, click, childOf, started, textsOf, warmUp, world } from '../testing/world'
 
 warmUp()
 
@@ -54,11 +54,28 @@ const all = async (ui: Found) => JSON.stringify(await section(ui))
 
 const keysOf = async (ui: Found) => (await ui.findAll({ type: 'Box' })).map(one => one.key ?? '')
 
-const section = async (ui: Found) => {
+const whole = async (ui: Found) => {
   const texts = await textsOf(ui)
   const from = texts.indexOf('Processes')
   const to = texts.indexOf('Needs you', from)
-  return texts.slice(from, to < 0 ? undefined : to)
+  return { texts, from, to: to < 0 ? texts.length : to }
+}
+
+const section = async (ui: Found) => {
+  const { texts, from, to } = await whole(ui)
+  const tools = texts.indexOf('Chat tools', from)
+  return texts.slice(from, tools > -1 && tools < to ? tools : to)
+}
+
+const toolsOf = async (ui: Found) => {
+  const { texts, from, to } = await whole(ui)
+  const at = texts.indexOf('Chat tools', from)
+  return at > -1 && at < to ? texts.slice(at, to) : []
+}
+
+const outside = async (ui: Found) => {
+  const { texts, from, to } = await whole(ui)
+  return from < 0 ? texts : [...texts.slice(0, from), ...texts.slice(to)]
 }
 
 const shown = async (ui: Found, text: string) => (await section(ui)).filter(one => one === text).length
@@ -176,14 +193,36 @@ test('AC14: the section changes nothing else in the pane', async ($, on) => {
   const run = await started($, on, BOARD_P, { ...CHILD, proc: fake.handle })
   await run.clock.settle()
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  const before = (await textsOf(ui)).filter(one => !/^Processes$|^Show$|^Hide$/.test(one))
+  const before = await outside(ui)
+  expect(before.length).toBeGreaterThan(3)
   await click(ui, 'hit-processes-toggle')
   await run.clock.settle()
-  const expanded = (await textsOf(ui)).filter(one => before.includes(one))
-  expect(expanded.slice(0, 3)).toEqual(before.slice(0, 3))
+  expect(await shown(ui, 'node')).toBe(3)
+  expect(await outside(ui)).toEqual(before)
   await click(ui, 'hit-processes-toggle')
   await run.clock.settle()
-  expect((await textsOf(ui)).filter(one => !/^Processes$|^Show$|^Hide$/.test(one))).toEqual(before)
+  expect(await outside(ui)).toEqual(before)
+  await ui.unmount()
+  masterOutside = before
+})
+
+let masterOutside: string[] = []
+
+async function workerPane($: Engine, on: On) {
+  const fake = fakeProcesses(FIXTURE)
+  const run = world(on, { ...childOf(3_600_000, BOARD_P), isPaneOpen: true, proc: fake.handle })
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.advance(30_000)
+  return { fake, run }
+}
+
+test('AC14: a worker pane holds none of the section’s texts', async ($, on) => {
+  await workerPane($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const texts = await textsOf(ui)
+  expect(masterOutside.length).toBeGreaterThan(3)
+  for (const one of ['Processes', 'Show', 'Hide', 'Mac load', 'Left behind', 'Chat tools', 'node']) expect(texts).not.toContain(one)
+  expect(texts.some(one => /%\s·\s.*MB/.test(one))).toBe(false)
   await ui.unmount()
 })
 
@@ -232,12 +271,14 @@ test('AC18: every lsof names its pids with -p and never -u', async ($, on) => {
 })
 
 test('AC19: a worker pane makes no ps, lsof, sysctl or kill call and draws no section', async ($, on) => {
-  const child = childOf(3_600_000, BOARD_P)
-  const fake = fakeProcesses(FIXTURE)
-  const run = await started($, on, BOARD_P, { ...child, isBare: true, proc: fake.handle })
-  await run.clock.settle()
-  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
-  await run.clock.advance(30_000)
+  const { fake } = await workerPane($, on)
+  expect(fake.calls.length).toBe(0)
+  for (const surface of ['desktop', 'terminal'] as const) {
+    const ui = await $.ui.mount({ ...PANE, surface })
+    expect(await keysOf(ui)).not.toContain('section-processes')
+    expect(await textsOf(ui)).not.toContain('Processes')
+    await ui.unmount()
+  }
   expect(fake.calls.length).toBe(0)
 })
 
@@ -245,12 +286,18 @@ test('AC36: the section sits after the summary tiles and before the filter chips
   const fake = fakeProcesses(FIXTURE)
   const run = await started($, on, BOARD_P, { ...CHILD, proc: fake.handle })
   await run.clock.settle()
+  const first = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(first, 'hit-processes-toggle')
+  await run.clock.settle()
+  await first.unmount()
   for (const [surface, columns] of [['desktop', 68], ['desktop', 47], ['desktop', 36], ['terminal', 60]] as const) {
     const ui = await $.ui.mount({ ...PANE, surface, props: { ...PANE.props, bodyColumns: columns } } as never)
     const keys = await keysOf(ui)
     const at = (key: string) => keys.indexOf(key)
     expect(at('section-summary')).toBeGreaterThan(-1)
     expect(at('section-processes')).toBeGreaterThan(at('section-summary'))
+    expect(at('process-530')).toBeGreaterThan(at('section-processes'))
+    expect(at('section-chips')).toBeGreaterThan(at('process-530'))
     expect(at('section-chips')).toBeGreaterThan(at('section-processes'))
     await ui.unmount()
   }
@@ -501,6 +548,47 @@ test('AC30: 950 and 951 show in a Left behind group under the list, owned by the
   expect(texts.filter(one => one === 'left behind (wt-app-k3)').length).toBe(2)
   const keys = await keysOf(ui)
   expect(keys.indexOf('process-group-left')).toBeGreaterThan(keys.indexOf('process-group-run'))
+  await ui.unmount()
+})
+
+test('Chat tools: the master’s MCP and tool servers list read-only after the rows, by CPU, with program, CPU, memory and elapsed and no Stop or owner', async ($, on) => {
+  const { fake, ui } = await boot($, on, { procs: [...FIXTURE, proc(111, 100, 'uv', { cpu: 8, rss: 86016, etime: '02:00' }), proc(112, 100, 'ps')] })
+  const tools = await toolsOf(ui)
+  expect(tools).toEqual(['Chat tools', '2', 'uv', '8%', '84 MB', '2m', 'node', '0%', '1 MB', '10s'])
+  expect(await section(ui)).not.toContain('Chat tools')
+  expect(await ui.find({ key: 'hit-process-stop-110' })).toBeUndefined()
+  expect(await ui.find({ key: 'hit-process-stop-111' })).toBeUndefined()
+  const keys = await keysOf(ui)
+  expect(keys.indexOf('process-group-tools')).toBeGreaterThan(keys.indexOf('process-group-run'))
+  expect(fake.kills).toEqual([])
+  await ui.unmount()
+})
+
+test('Chat tools: with no tool child there is no group', async ($, on) => {
+  const { ui } = await boot($, on, { procs: FIXTURE.filter(one => one.pid !== 110) })
+  expect(await toolsOf(ui)).toEqual([])
+  expect(await keysOf(ui)).not.toContain('process-group-tools')
+  await ui.unmount()
+})
+
+test('Chat tools: with only tools the empty line stays and the group follows', async ($, on) => {
+  const { ui } = await boot($, on, { procs: FIXTURE.filter(one => ![520, 530, 531, 130, 120].includes(one.pid)) })
+  expect(await all(ui)).toContain('No processes from this run.')
+  expect(await toolsOf(ui)).toEqual(['Chat tools', '1', 'node', '0%', '1 MB', '10s'])
+  await ui.unmount()
+})
+
+test('Chat tools: a terminal pane draws them as text lines with no Stop button', async ($, on) => {
+  const fake = fakeProcesses(FIXTURE)
+  const run = await started($, on, BOARD_P, { ...CHILD, proc: fake.handle })
+  await run.clock.settle()
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await $.ui.press({ plugin: 'master-session', key: 'processes-toggle' })
+  await run.clock.settle()
+  expect((await toolsOf(ui)).slice(0, 4)).toEqual(['Chat tools', '1', 'node', '0% · 1 MB · 10s'])
+  expect(await ui.find({ key: 'process-stop-110' })).toBeUndefined()
+  expect(await ui.find({ key: 'process-stop-530' })).toBeDefined()
+  expect(fake.kills).toEqual([])
   await ui.unmount()
 })
 

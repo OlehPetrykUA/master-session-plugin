@@ -1,4 +1,4 @@
-import { confirmText, processLineOf, stoppingText } from '../lib/processes'
+import { confirmText, processLineOf, stopGroupOf, stoppingText } from '../lib/processes'
 import type { ProcRow, ProcView } from '../lib/processes'
 import type { Actions, TextUi } from './types'
 
@@ -14,9 +14,11 @@ export function TextProcesses(ui: TextUi, props: TextProcessesProps) {
       <Box key={`process-${one.pid}`} flexDirection="column">
         <Box flexDirection="row" gap="sm">
           <Text weight="semibold">{one.program}</Text>
-          <Text dimColor wrap="truncate-end">
-            {one.owner}
-          </Text>
+          {one.group === 'tools' ? null : (
+            <Text dimColor wrap="truncate-end">
+              {one.owner}
+            </Text>
+          )}
           <Text dimColor>{processLineOf(one)}</Text>
           <Box flexGrow={1} />
           {seconds !== undefined ? <Text dimColor>{stoppingText(seconds)}</Text> : one.canStop ? <Button key={`process-stop-${one.pid}`} plain label="Stop" onPress={() => actions.askStop(one.key)} /> : null}
@@ -27,7 +29,7 @@ export function TextProcesses(ui: TextUi, props: TextProcessesProps) {
             <Text size="footnote">{confirmText(one)}</Text>
             <Box flexDirection="row" gap="sm">
               <Button key={`process-no-${one.pid}`} label="Cancel" onPress={actions.cancelStop} />
-              <Button key={`process-yes-${one.pid}`} label="Stop" variant="primary" onPress={() => actions.stopProcess({ pid: one.pid, lstart: one.lstart, ucomm: one.program, group: one.group })} />
+              <Button key={`process-yes-${one.pid}`} label="Stop" variant="primary" onPress={() => actions.stopProcess({ pid: one.pid, lstart: one.lstart, ucomm: one.program, group: stopGroupOf(one) })} />
             </Box>
           </Box>
         ) : null}
@@ -48,10 +50,10 @@ export function TextProcesses(ui: TextUi, props: TextProcessesProps) {
       {view.isOpen
         ? view.groups.map(group => (
             <Box key={`process-group-${group.id}`} flexDirection="column">
-              {group.id === 'left' ? (
+              {group.id !== 'run' ? (
                 <Box flexDirection="row" gap="sm">
-                  <Text color="warning">●</Text>
-                  <Text weight="semibold">Left behind</Text>
+                  {group.id === 'left' ? <Text color="warning">●</Text> : null}
+                  <Text weight="semibold">{group.id === 'left' ? 'Left behind' : 'Chat tools'}</Text>
                   <Text dimColor>{String(group.total)}</Text>
                 </Box>
               ) : null}

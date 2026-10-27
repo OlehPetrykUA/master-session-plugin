@@ -18,6 +18,7 @@ import {
   parseLsof,
   parsePs,
   signOf,
+  treesOf,
   worktreeOf,
 } from '../lib/processes'
 import type { Model, ProcContext, ProcState, Proc, RunPath } from '../lib/processes'
@@ -31,7 +32,7 @@ const ASKING = 'process:'
 
 type Snapshot = { isRead: boolean; load: string; error: string; model: Model }
 
-const EMPTY: Snapshot = { isRead: false, load: '', error: '', model: { run: [], left: [], engines: {}, ancestors: [] } }
+const EMPTY: Snapshot = { isRead: false, load: '', error: '', model: { run: [], left: [], tools: [], engines: {}, ancestors: [] } }
 
 let uid = ''
 let master = 0
@@ -105,7 +106,7 @@ async function contextOf($: EngineInterface, masterPid: number): Promise<ProcCon
   }
   for (const repo of repos) for (const tree of repo.worktrees) if (!tree.isMain) add(tree.path, '')
   const paths: RunPath[] = [...owned].map(([path, owner]) => ({ path, owner }))
-  return { home, masterPid, paths, trees: repos.flatMap(repo => repo.worktrees.filter(tree => !tree.isMain).map(tree => tree.path.replace(/\/+$/, ''))) }
+  return { home, masterPid, paths, trees: treesOf(repos.flatMap(repo => repo.worktrees.filter(tree => !tree.isMain).map(tree => tree.path))) }
 }
 
 async function readOnce($: EngineInterface) {
@@ -153,6 +154,7 @@ export async function processesStateOf($: EngineInterface, at: number): Promise<
     error: snapshot.error,
     run: snapshot.model.run,
     left: snapshot.model.left,
+    tools: snapshot.model.tools,
     asking: asking.startsWith(ASKING) ? asking.slice(ASKING.length) : '',
     stopping: since,
     notes: Object.fromEntries(notes),

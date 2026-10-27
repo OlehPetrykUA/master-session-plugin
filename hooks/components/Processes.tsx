@@ -1,5 +1,5 @@
 import { CH, across, down, tall } from '../lib/layout'
-import { NARROW, STOP_WIDE, confirmText, processLineOf, stoppingText } from '../lib/processes'
+import { NARROW, STOP_WIDE, confirmText, processLineOf, stopGroupOf, stoppingText } from '../lib/processes'
 import type { ProcGroup, ProcRow, ProcView } from '../lib/processes'
 import { dot } from '../theme/icons'
 import { C } from '../theme/tokens'
@@ -66,11 +66,13 @@ export function Processes(ui: Ui, props: ProcessesProps) {
           {row.program}
         </Text>
       </Box>
-      <Box flexShrink={3} minWidth={0}>
-        <Text size="footnote" color={C.muted} wrap="truncate-end">
-          {row.owner}
-        </Text>
-      </Box>
+      {row.group === 'tools' ? null : (
+        <Box flexShrink={3} minWidth={0}>
+          <Text size="footnote" color={C.muted} wrap="truncate-end">
+            {row.owner}
+          </Text>
+        </Box>
+      )}
     </Box>
   )
   const lineUnder = (row: ProcRow, text: string, color: string) => (
@@ -87,7 +89,7 @@ export function Processes(ui: Ui, props: ProcessesProps) {
       </Text>
       <Box flexDirection="row" gap={across(8)}>
         {ActionButton(ui, { id: `process-no-${row.pid}`, kind: 'secondary', icon: 'fail', label: 'Cancel', size: 'b32', iconSize: 16, onPress: actions.cancelStop })}
-        {ActionButton(ui, { id: `process-yes-${row.pid}`, kind: 'primary', icon: 'stop', label: 'Stop', size: 'b32', iconSize: 16, onPress: () => actions.stopProcess({ pid: row.pid, lstart: row.lstart, ucomm: row.program, group: row.group }) })}
+        {ActionButton(ui, { id: `process-yes-${row.pid}`, kind: 'primary', icon: 'stop', label: 'Stop', size: 'b32', iconSize: 16, onPress: () => actions.stopProcess({ pid: row.pid, lstart: row.lstart, ucomm: row.program, group: stopGroupOf(row) }) })}
       </Box>
     </Box>
   )
@@ -123,13 +125,13 @@ export function Processes(ui: Ui, props: ProcessesProps) {
   }
   const group = (one: ProcGroup, index: number) => (
     <Box key={`process-group-${one.id}`} flexDirection="column">
-      {one.id === 'left' ? (
-        <Box key="process-left-head" flexDirection="column">
-          {index ? rule('left') : null}
+      {one.id !== 'run' ? (
+        <Box key={`process-${one.id}-head`} flexDirection="column">
+          {index ? rule(one.id) : null}
           <Box flexDirection="row" alignItems="center" gap={across(8)} height={tall(28)} paddingX={across(12)}>
-            <Svg key="process-left-dot" source={dot('amber', 8)} alt="left behind" width={8} height={8} />
+            {one.id === 'left' ? <Svg key="process-left-dot" source={dot('amber', 8)} alt="left behind" width={8} height={8} /> : null}
             <Text size="footnote" weight="semibold">
-              Left behind
+              {one.id === 'left' ? 'Left behind' : 'Chat tools'}
             </Text>
             <Text size="footnote" color={C.muted} tabular>
               {String(one.total)}
@@ -139,7 +141,7 @@ export function Processes(ui: Ui, props: ProcessesProps) {
       ) : null}
       {one.rows.map((row, at) => (
         <Box key={`process-wrap-${row.pid}`} flexDirection="column">
-          {at || one.id === 'left' ? rule(String(row.pid)) : null}
+          {at || one.id !== 'run' ? rule(String(row.pid)) : null}
           {line(row)}
         </Box>
       ))}
@@ -166,15 +168,14 @@ export function Processes(ui: Ui, props: ProcessesProps) {
         </Box>
       )
     }
-    if (view.isEmpty) {
-      return (
-        <Text key="processes-empty" size="footnote" color={C.muted}>
-          No processes from this run.
-        </Text>
-      )
-    }
-    if (!view.groups.length) return null
-    return (
+    const empty = view.isEmpty ? (
+      <Text key="processes-empty" size="footnote" color={C.muted}>
+        No processes from this run.
+      </Text>
+    ) : null
+    const groups = view.isEmpty ? view.groups.filter(one => one.rows.length) : view.groups
+    if (!groups.length) return empty
+    const list = (
       <Box key="processes-list" flexDirection="column" borderStyle="round" borderColor={C.border} backgroundColor={C.surface} overflow="hidden">
         {isNarrow ? null : (
           <Box key="processes-columns" flexDirection="column">
@@ -202,9 +203,10 @@ export function Processes(ui: Ui, props: ProcessesProps) {
             {rule('columns')}
           </Box>
         )}
-        {view.groups.map(group)}
+        {groups.map(group)}
       </Box>
     )
+    return empty ? [empty, list] : list
   }
   return (
     <Box key="section-processes" flexDirection="column" gap={down(8)} paddingLeft={across(16)} paddingRight={across(16)} paddingTop={down(12)} paddingBottom={view.isOpen ? 0 : down(12)}>

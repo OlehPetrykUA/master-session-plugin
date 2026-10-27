@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { LSTART, proc } from '../testing/procs'
-import { cpuText, cwdPidsOf, etimeOf, isPid, memText, modelOf, ownerPathOf, parseLoad, parseLsof, parsePs, processesPxOf, processesViewOf, signOf, timeText, worktreeOf } from './processes'
+import { cpuText, cwdPidsOf, etimeOf, isPid, memText, modelOf, ownerPathOf, parseLoad, parseLsof, parsePs, processesPxOf, processesViewOf, signOf, timeText, treesOf, worktreeOf } from './processes'
 import type { Proc, ProcContext, ProcState } from './processes'
 import { sectionTopsOf } from './sections'
 import type { SectionInput } from './sections'
@@ -50,9 +50,46 @@ test('AC31: a left-behind worktree needs the board’s repo name followed by a d
 test('a worktree is owned only when a board repo lists its exact path', () => {
   const web = `${HOME}/.claude/worktrees/wt-app-web-k1`
   const feature = `${HOME}/.claude/worktrees/wt-app-feature-x`
-  expect(worktreeOf(`${web}/src`, { trees: [K1, web] })).toBe('wt-app-web-k1')
-  expect(worktreeOf(web, { trees: [K1] })).toBe('')
-  expect(worktreeOf(`${feature}/a`, { trees: [K1, feature] })).toBe('wt-app-feature-x')
+  expect(worktreeOf(`${web}/src`, { home: HOME, trees: [K1, web] })).toBe('wt-app-web-k1')
+  expect(worktreeOf(web, { home: HOME, trees: [K1] })).toBe('')
+  expect(worktreeOf(`${feature}/a`, { home: HOME, trees: [K1, feature] })).toBe('wt-app-feature-x')
+})
+
+test('R6: a listed worktree outside $HOME/.claude/worktrees/ never owns a process', () => {
+  const outside = '/srv/trees/wt-app-x'
+  expect(worktreeOf(`${outside}/web`, { home: HOME, trees: [outside] })).toBe('')
+  expect(worktreeOf(`${K1}/web`, { home: '/other', trees: [K1] })).toBe('')
+  expect(worktreeOf(`${K1}/web`, { home: '', trees: [K1] })).toBe('')
+  const table = [row(proc(100, 10, 'claude')), row(proc(950, 1, 'node'))]
+  expect(modelOf(table, new Map([[950, `${outside}/web`]]), { ...CONTEXT, trees: [outside] }).left).toEqual([])
+})
+
+test('empty and "/" tree paths are dropped before matching', () => {
+  expect(treesOf(['', '/', '//', '/a/b/', 'rel', K1])).toEqual(['/a/b', K1])
+})
+
+test('Chat tools: the master’s non-shell children, by CPU, with no Stop; its own calls, shells, engines and other engines’ children are left out', () => {
+  const table = [
+    row(proc(100, 10, 'claude')),
+    row(proc(110, 100, 'node', { cpu: 2 })),
+    row(proc(111, 100, 'uv', { cpu: 9 })),
+    row(proc(112, 110, 'node', { cpu: 50 })),
+    row(proc(120, 100, 'zsh')),
+    row(proc(121, 100, 'ps')),
+    row(proc(122, 100, 'lsof')),
+    row(proc(123, 100, 'sysctl')),
+    row(proc(500, 10, 'claude')),
+    row(proc(510, 500, 'node', { cpu: 70 })),
+    row(proc(520, 100, 'python', { cpu: 2, etime: '05:00' })),
+  ]
+  const out = modelOf(table, new Map([[500, K1]]), CONTEXT)
+  expect(out.tools.map(one => [one.pid, one.ucomm, one.canStop, one.group])).toEqual([[111, 'uv', false, 'tools'], [520, 'python', false, 'tools'], [110, 'node', false, 'tools']])
+  const view = processesViewOf({ ...STATE, tools: out.tools }, {})
+  expect(view.groups.map(one => one.id)).toEqual(['run', 'tools'])
+  expect(view.count).toBe(0)
+  expect(view.isEmpty).toBe(true)
+  expect(view.groups[1]?.rows.map(one => [one.program, one.owner, one.canStop])).toEqual([['uv', '', false], ['python', '', false], ['node', '', false]])
+  expect(processesViewOf(STATE, {}).groups.map(one => one.id)).toEqual(['run'])
 })
 
 test('AC9: rows sort by CPU, then longest elapsed, then pid', () => {
@@ -112,12 +149,21 @@ test('F3: the cwd read covers engines, shells and their descendants, and parent-
   expect(cwdPidsOf(table)).toEqual([100, 120, 130, 950])
 })
 
+test('Chat tools move the redraw sign, and height grows by one header and the rows', () => {
+  const base = modelOf([row(proc(100, 10, 'claude'))], new Map(), CONTEXT)
+  const withTool = modelOf([row(proc(100, 10, 'claude')), row(proc(110, 100, 'node', { cpu: 5 }))], new Map(), CONTEXT)
+  expect(signOf('l', '', withTool)).not.toBe(signOf('l', '', base))
+  const empty = processesPxOf(processesViewOf({ ...STATE, tools: base.tools }, {}), 60)
+  const one = processesPxOf(processesViewOf({ ...STATE, tools: withTool.tools }, {}), 60)
+  expect(one - empty).toBe(2 + 25 + 28 + 1 + 36 + 8)
+})
+
 test('S2: only integers above 1 are pids', () => {
   expect([1, 0, -1, 1.5, 2, 4211].map(isPid)).toEqual([false, false, false, false, true, true])
   expect([isPid('7'), isPid(NaN), isPid(undefined)]).toEqual([false, false, false])
 })
 
-const STATE: ProcState = { isOpen: true, isRead: true, load: '1.0 · 1.0 · 1.0 · 4 cores', error: '', run: [], left: [], asking: '', stopping: {}, notes: {} }
+const STATE: ProcState = { isOpen: true, isRead: true, load: '1.0 · 1.0 · 1.0 · 4 cores', error: '', run: [], left: [], tools: [], asking: '', stopping: {}, notes: {} }
 
 test('Q9: 15 shown rows become 12 and +3 more; the count is all of them', () => {
   const table = [row(proc(100, 10, 'claude')), row(proc(120, 100, 'zsh')), ...Array.from({ length: 15 }, (_, index) => row(proc(200 + index, 120, 'node', { cpu: index })))]
