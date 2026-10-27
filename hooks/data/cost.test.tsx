@@ -2,12 +2,12 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { AgentInfo, On } from 'claude-code'
 
-import { BOARD, BOARD_TOOL, HOME, PANE, SPAWN, world } from '../testing/world'
+import { BAND, BOARD, BOARD_TOOL, HOME, PANE, SPAWN, world } from '../testing/world'
 import type { Child } from '../testing/world'
 
 const SECONDS = 300
 const USAGE = { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
-const ONE = { ...BOARD, sessions: BOARD.sessions.slice(0, 1), needsYou: [], narrative: 'Two workers are running. env-e2e-test needs you to approve a settings edit. Nothing else is pending.' }
+const ONE = { ...BOARD, sessions: [{ ...BOARD.sessions[0], state: 'working', needsYou: undefined }], needsYou: [], narrative: 'Two workers are running. env-e2e-test needs you to approve a settings edit. Nothing else is pending.' }
 
 type Cost = {
   fired: number
@@ -19,6 +19,29 @@ type Cost = {
   read: number
   write: number
   model: number
+  svgs: number
+  interactive: number
+  animatedInteractive: number
+  animated: number
+  svgChanges: number
+}
+
+const ENDLESS = /repeatCount="indefinite"|infinite/
+
+async function surfaces($: Engine, open: boolean) {
+  const mounted = [await $.ui.mount({ ...BAND, surface: 'desktop' })]
+  if (open) mounted.push(await $.ui.mount({ ...PANE, surface: 'desktop' }))
+  return mounted
+}
+
+async function svgsOf(mounted: Awaited<ReturnType<typeof surfaces>>) {
+  const found = new Map<string, { source: string; isInteractive: boolean }>()
+  for (const [index, ui] of mounted.entries()) {
+    for (const [at, one] of (await ui.findAll({ type: 'Svg' })).entries()) {
+      found.set(`${index}:${one.key ?? at}`, { source: String(one.props.source ?? ''), isInteractive: one.props.isInteractive === true })
+    }
+  }
+  return found
 }
 
 function running(on: On, count: number) {
@@ -65,20 +88,31 @@ async function measured($: Engine, on: On, child: Child, subagents: number, open
   await run.clock.settle()
   if (board) await $.tool.call({ tool: BOARD_TOOL, ...ONE })
   await run.clock.settle()
-  const ui = open ? await $.ui.mount({ ...PANE, surface: 'desktop' }) : undefined
+  const mounted = board ? await surfaces($, open) : []
   for (let index = 0; index < subagents; index += 1) await $.agent.spawn({ ...SPAWN, description: `Docs lookup ${index}`, subagentType: 'Explore' })
   await run.clock.settle()
   const base = now()
   let worked = 0
+  let svgChanges = 0
+  let last = await svgsOf(mounted)
   for (let second = 0; second < SECONDS; second += 1) {
     const before = now()
     await run.clock.advance(1000)
     const after = now()
     if (after.fired > before.fired && work(after) > work(before)) worked += 1
+    const seen = await svgsOf(mounted)
+    for (const [key, one] of seen) if (last.has(key) && last.get(key)?.source !== one.source) svgChanges += 1
+    last = seen
   }
   const end = now()
-  await ui?.unmount()
+  const all = [...last.values()]
+  for (const ui of mounted) await ui.unmount()
   return {
+    svgs: all.length,
+    interactive: all.filter(one => one.isInteractive).length,
+    animatedInteractive: all.filter(one => one.isInteractive && ENDLESS.test(one.source)).length,
+    animated: all.filter(one => ENDLESS.test(one.source)).length,
+    svgChanges,
     fired: end.fired - base.fired,
     worked,
     render: end.render - base.render,
@@ -92,9 +126,9 @@ async function measured($: Engine, on: On, child: Child, subagents: number, open
 }
 
 const BOUNDS: Record<'plain' | 'closed' | 'open', Cost> = {
-  plain: { fired: 520, worked: 0, render: 0, invalidate: 0, process: 0, mcp: 0, read: 0, write: 0, model: 0 },
-  closed: { fired: 520, worked: 100, render: 0, invalidate: 0, process: 114, mcp: 20, read: 160, write: 0, model: 2 },
-  open: { fired: 520, worked: 140, render: 64, invalidate: 64, process: 114, mcp: 20, read: 160, write: 0, model: 2 },
+  plain: { fired: 520, worked: 0, render: 0, invalidate: 0, process: 0, mcp: 0, read: 0, write: 0, model: 0, svgs: 0, interactive: 0, animatedInteractive: 0, animated: 0, svgChanges: 0 },
+  closed: { fired: 520, worked: 100, render: 0, invalidate: 0, process: 114, mcp: 20, read: 160, write: 0, model: 2, svgs: 2, interactive: 1, animatedInteractive: 1, animated: 1, svgChanges: 0 },
+  open: { fired: 520, worked: 140, render: 64, invalidate: 64, process: 114, mcp: 20, read: 160, write: 0, model: 2, svgs: 62, interactive: 1, animatedInteractive: 1, animated: 1, svgChanges: 5 },
 }
 
 function within(cost: Cost, bound: Cost) {
