@@ -16,8 +16,8 @@ One per piece, named in the ledger; the first match wins.
 ## Pause and resume
 
 - On pause, each running subagent gets `TaskStop` and nothing else: a message would resume it. Each worker session gets `stop_session`, then one `PAUSE` (commit work in progress, stop every Monitor and background job, end the turn), since its Monitors can wake it. A running workflow, and your own background Bash, Monitors and inline gate, get `TaskStop` too; record their pieces as paused.
-- Record each piece's pending step and its worktree's `git status --short` in the ledger and stop the loop; nothing runs until resume.
-- On resume: a fresh agent per paused subagent piece, briefed as in [Worker lifetime](#worker-lifetime) to continue in its recorded worktree at its sha with its uncommitted work, never in a new worktree; each session one `RESUME` with its pending step; `git worktree remove --force` each stopped checker's verify worktree, so the next tick starts a fresh checker on the same sha; re-arm the loop.
+- Record each piece's pending step and its worktree's `git status --short` in the ledger and stop the loop (Heartbeat line to none); nothing runs until resume.
+- On resume: a fresh agent per paused subagent piece, briefed as in [Worker lifetime](#worker-lifetime) to continue in its recorded worktree at its sha with its uncommitted work, never in a new worktree; each session one `RESUME` with its pending step; `git worktree remove --force` each verify worktree a stopped checker or your inline gate left, so the next tick starts a fresh checker on the same sha; start each paused workflow piece again with a fresh `Workflow` call (workflows are read-only); arm again each Monitor and background wait the ledger lists; re-arm the loop.
 
 ## Names
 
@@ -27,5 +27,5 @@ Names describe the deliverable. `title`: `<Persona> · <task>`, 2 to 5 words, un
 
 One agent per piece.
 - A fix round or rebase goes to the same agent by ID while its context is under ~150k tokens (`subagent_tokens` in its completion notice). Otherwise, and on every resume of a paused subagent, a fresh agent gets a handover brief: done so far, what is left, and "continue in <worktree> at <sha, or HEAD> (make no new worktree): review `git diff master...HEAD` and `git status --short` there, finish from the pending step, remove that worktree after the merge". Never a user question.
-- A new task gets a new worker; a retired worker is never resumed for new work. Retire one once its sha is on master: a subagent is resumed by ID for its post-merge worktree removal, then retires; `stop_session` or `TaskStop` if mid-turn; worktree and branch gone.
+- A new task gets a new worker; a retired worker is never resumed for new work. Retire one once its sha is on master: a subagent is resumed by ID for its post-merge worktree removal, then retires; `stop_session` or `TaskStop` if mid-turn; worktree and branch gone. Before flagging a leftover worktree, check who holds it (`lsof +D <path>`).
 - Drift is a defect: stop the worker, hand over to a fresh one.

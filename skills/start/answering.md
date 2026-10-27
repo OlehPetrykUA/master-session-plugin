@@ -5,7 +5,7 @@ Sections 4 and 5 of the [start](SKILL.md) skill.
 ## 4. Answering the worker
 
 A worker asking for a "go", an approval or what next gets a direct instruction quoting the user's words, never a bounce to the user.
-- **Approve yourself:** drafts, plans and design choices that fit the brief (UI designs excepted); work inside its owned files; retries, fixes; `--ff-only` merges of verified work; archiving merged, captured workers (never this session, never a delete); a push the user's task asks for ([section 6](SKILL.md#6-ledger-and-clean-up), Done); anything reversible inside the brief.
+- **Approve yourself:** drafts, plans and design choices that fit the brief (UI designs excepted); work inside its owned files; retries, fixes; `--ff-only` merges of verified work; archiving merged, captured workers (never this session, never a delete); a push or PR the user's task asks for, quoting its words in the ledger ([section 6](SKILL.md#6-ledger-and-clean-up), Done); anything reversible inside the brief.
 - **Only the user:** UI designs; deletes outside git; pushes and PRs the task didn't ask for, anything external or irreversible; open preferences; raising a permission mode. Batch them in one line.
 - Else decide the reversible way and tell the user in one line. A user rule is never an option: apply it to every case it covers at once.
 - **Message budget:** the app caps messages to other sessions at 10 per user turn; send workers only fixes and answers.
