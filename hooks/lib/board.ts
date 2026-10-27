@@ -73,8 +73,7 @@ export function planOf(value: unknown): { plan?: PlanPiece[]; error?: string } {
     if (state === 'working' && progress && !parseStep(progress)) return { error: `plan piece "${cut}": progress must read "step N of M — label", with M above 0 and N at most M` }
     const tier = PLAN_TIERS.find(one => one === piece.tier)
     if (piece.tier !== undefined && piece.tier !== null && !tier) return { error: `plan piece "${cut}": tier must be one of ${PLAN_TIERS.join(', ')}` }
-    const since = typeof piece.since === 'number' && Number.isFinite(piece.since) ? piece.since : undefined
-    plan.push({ name: cut, state, ...(state === 'working' && progress ? { progress } : {}), ...(tier ? { tier } : {}), ...(since === undefined ? {} : { since }) })
+    plan.push({ name: cut, state, ...(state === 'working' && progress ? { progress } : {}), ...(tier ? { tier } : {}) })
   }
   return { plan }
 }

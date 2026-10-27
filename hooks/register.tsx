@@ -193,7 +193,8 @@ export const register: Register = on => {
     if (!next || next.sessions.length < sent) return { deny: 'The board needs a sessions array whose items carry id and state.' }
     const at = await $.clock.now()
     const before = await getBoard($)
-    const isNewRun = !before || next.run !== before.run
+    const isNewRun = !before || (next.run !== undefined && next.run !== before.run)
+    if (!isNewRun && next.run === undefined) next.run = before?.run
     const merged = mergePlan(isNewRun ? undefined : before?.plan, next.plan, at)
     if (merged.now > PLAN_LIMIT) return { deny: `The board was refused and nothing was saved: the merged plan would hold ${merged.now} pieces not dropped: the cap is ${PLAN_LIMIT}.` }
     claim($)

@@ -93,7 +93,7 @@ export function syncTimers($: EngineInterface) {
         await filesOf($)
         if (await isMaster($)) {
           await refreshAll($)
-          if (await bandStale($)) $.ui.invalidate('ui.render')
+          if (!whileOpen.length && (await bandStale($))) $.ui.invalidate('ui.render')
         }
         syncTimers($)
       }),

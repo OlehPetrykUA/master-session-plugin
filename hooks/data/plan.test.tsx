@@ -121,6 +121,16 @@ test('a run name starts a new window: a new run resets the plan and the elapsed,
   expect(next.board?.since).toBeGreaterThan(first ?? Infinity)
 })
 
+test('a call that omits run after one that carried it stays in the same run: the plan and the window are kept', async ($, on) => {
+  const run = await master($, on, { plan: PLAN, run: 'one' })
+  const first = (JSON.parse(run.writes.at(-1) ?? '{}') as { board?: { since?: number } }).board?.since
+  await run.clock.advance(5 * MIN)
+  await call($, { plan: [{ name: 'Extra', state: 'queued' }] })
+  await run.clock.settle()
+  const next = JSON.parse(run.writes.at(-1) ?? '{}') as { board?: { plan?: PlanPiece[]; since?: number; run?: string } }
+  expect([next.board?.plan?.length, next.board?.run, next.board?.since]).toEqual([5, 'one', first])
+})
+
 test('AC22 a hot reload with no new board call shows the same percent and piece count', async ($, on) => {
   const run = await master($, on)
   const before = await bandTexts($)

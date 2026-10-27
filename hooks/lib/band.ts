@@ -178,7 +178,7 @@ export const pieceValueOf = (piece: Piece, at: number) => {
   if (piece.state !== 'working') return 0
   const step = stepOf(piece.progress)
   if (step && step.total) return Math.min(WORKING_CAP, step.done / step.total)
-  return piece.since === undefined ? 0 : Math.min(TIMED_CAP, Math.max(0, at - piece.since) / MINUTE / tierOf(piece).box)
+  return piece.since === undefined ? 0 : Math.min(TIMED_CAP, Math.floor(Math.max(0, at - piece.since) / MINUTE) / tierOf(piece).box)
 }
 
 const weightedOf = (pieces: readonly Piece[], at: number) => {

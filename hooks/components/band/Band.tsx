@@ -41,16 +41,8 @@ export function Band(ui: Ui, props: BandProps) {
   ) : null
   const counter = showCounts ? (
     <Box flexDirection="row" alignItems="center" flexShrink={0}>
-      <Text color={C.muted} wrap="truncate-end">
-        {parts.map((part, index) =>
-          part.isNumber ? (
-            <Text key={`c${index}`} weight="semibold" color={C.text} tabular>
-              {part.text}
-            </Text>
-          ) : (
-            part.text
-          ),
-        )}
+      <Text weight="semibold" color={C.text} wrap="truncate-end" tabular>
+        {parts.map(part => part.text).join('')}
       </Text>
     </Box>
   ) : null
@@ -61,7 +53,7 @@ export function Band(ui: Ui, props: BandProps) {
   )
   const elapsed = view.hasElapsed ? (
     <Box flexDirection="row" alignItems="center" flexShrink={0} gap={across(ELAPSED_GAP)}>
-      {icon('elapsed', ELAPSED_ICON, 'muted', 2)}
+      {icon('elapsed', ELAPSED_ICON, 'muted', 2.2)}
       <Text size="footnote" color={C.muted} tabular>
         {view.elapsed}
       </Text>

@@ -239,6 +239,16 @@ test('T5 a T1 piece working with no progress is worth minutes over its 30 minute
   expect([at(6), at(20), at(60), at(6, 'step 1 of 4 — x')]).toEqual([20, 50, 50, 25])
 })
 
+test('the time-based value moves once a minute: the percent holds within a minute', () => {
+  const at = (ms: number) => viewOf([piece('A', 'working', undefined, { tier: 'T0', since: AT - ms })], { sessions: ONE_RUNNING }).percent
+  expect(at(MIN)).toBe(at(MIN + 59_000))
+  expect(at(2 * MIN)).toBeGreaterThan(at(MIN + 59_000))
+})
+
+test('a since sent in the tool input is ignored', () => {
+  expect(planOf([{ name: 'A', state: 'working', since: 5 }]).plan).toEqual([piece('A', 'working')])
+})
+
 test('an untiered piece is timed against 30 minutes', () => {
   expect(viewOf([piece('A', 'working', undefined, { since: AT - 15 * MIN })], { sessions: ONE_RUNNING }).percent).toBe(50)
 })
