@@ -53,7 +53,7 @@ export function parseStep(text: string): Step | undefined {
 
 const planStateOf = (value: unknown) => PLAN_STATES.find((state): state is PlanState => state === value)
 
-export function planOf(value: unknown): { plan?: PlanPiece[]; error?: string } {
+export function planOf(value: unknown, isStored = false): { plan?: PlanPiece[]; error?: string } {
   if (value === undefined || value === null) return {}
   if (!Array.isArray(value)) return { error: 'plan must be an array of pieces, each with a name and a state' }
   if (value.length > LIVE_LIMIT) return { error: `plan has ${value.length} pieces: the cap is ${LIVE_LIMIT}` }
@@ -73,7 +73,8 @@ export function planOf(value: unknown): { plan?: PlanPiece[]; error?: string } {
     if (state === 'working' && progress && !parseStep(progress)) return { error: `plan piece "${cut}": progress must read "step N of M — label", with M above 0 and N at most M` }
     const tier = PLAN_TIERS.find(one => one === piece.tier)
     if (piece.tier !== undefined && piece.tier !== null && !tier) return { error: `plan piece "${cut}": tier must be one of ${PLAN_TIERS.join(', ')}` }
-    plan.push({ name: cut, state, ...(state === 'working' && progress ? { progress } : {}), ...(tier ? { tier } : {}) })
+    const since = isStored && typeof piece.since === 'number' && Number.isFinite(piece.since) ? piece.since : undefined
+    plan.push({ name: cut, state, ...(state === 'working' && progress ? { progress } : {}), ...(tier ? { tier } : {}), ...(since === undefined ? {} : { since }) })
   }
   return { plan }
 }
@@ -110,7 +111,7 @@ export function boardFromJson(raw: unknown, source: Board['source'] = 'file'): B
     const lists = Object.fromEntries(LISTS.flatMap(key => (stringsOf(row[key]).length ? [[key, stringsOf(row[key])]] : [])))
     return [{ ...fields, ...lists, id, name: textOf(row.name) ?? id, state, worktrees: stringsOf(row.worktrees) }]
   })
-  const plan = planOf(data.plan).plan
+  const plan = planOf(data.plan, source === 'file').plan
   const passed = typeof data.testsPassed === 'number' && Number.isFinite(data.testsPassed) ? data.testsPassed : undefined
   return {
     tick: textOf(data.tick),

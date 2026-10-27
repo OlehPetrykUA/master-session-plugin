@@ -378,7 +378,7 @@ test('working, pane closed: percent, one bar with the slider, uniform counts, an
   await ui.unmount()
 })
 
-test('counts: done/total, numbers 600 C.text tabular and the slash C.muted, with no words and no zero counts', async ($, on) => {
+test('counts: done/total, numbers and slash 600 C.text, numbers tabular, with no words and no zero counts', async ($, on) => {
   const crew = crewOf($, on)
   await band($, on, WORKING)
   const styleOf = async (ui: Found) => {
@@ -387,7 +387,7 @@ test('counts: done/total, numbers 600 C.text tabular and the slash C.muted, with
     return { text: counts?.text, parent: [counts?.props.color, counts?.props.weight], numbers: numbers.map(one => [one.text, one.props.color, one.props.weight, one.props.tabular]) }
   }
   const none = await mount($)
-  expect(await styleOf(none)).toEqual({ text: '1/4', parent: ['inactive', undefined], numbers: [['1', 'text', 'semibold', true], ['4', 'text', 'semibold', true]] })
+  expect(await styleOf(none)).toEqual({ text: '1/4', parent: ['text', 'semibold'], numbers: [['1', 'text', 'semibold', true], ['4', 'text', 'semibold', true]] })
   await none.unmount()
   await crew.subagent('docs')
   await crew.subagent('review')
@@ -395,7 +395,7 @@ test('counts: done/total, numbers 600 C.text tabular and the slash C.muted, with
   const all = await mount($)
   const found = await styleOf(all)
   expect(found.text).toBe('1/7')
-  expect(found.parent).toEqual(['inactive', undefined])
+  expect(found.parent).toEqual(['text', 'semibold'])
   expect(found.numbers).toEqual(['1', '7'].map(value => [value, 'text', 'semibold', true]))
   expect((await stripOf(all))?.props.alt).toBe('Master session: 45 percent, 1 of 7 done. <1m elapsed.')
   const colors = (await all.findAll({ type: 'Text' })).filter(one => one.text !== 'Open board' && !/%$/.test(one.text)).map(one => one.props.color)
