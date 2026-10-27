@@ -15,9 +15,13 @@ One per piece, named in the ledger; the first match wins.
 
 ## Pause and resume
 
-- On pause, each running subagent gets `TaskStop` and nothing else: a message would resume it. Each worker session gets `stop_session`, then one `PAUSE` (commit work in progress, stop every Monitor and background job, end the turn), since its Monitors can wake it. A running workflow, and your own background Bash, Monitors and inline gate, get `TaskStop` too; record their pieces as paused.
+- On pause, each running subagent gets `TaskStop` and nothing else: a message would resume it. Each worker session gets `stop_session`, then one `PAUSE` (commit work in progress, stop every Monitor and background job, end the turn), since its Monitors can wake it. A running workflow, and your own background Bash, Monitors and inline gate, get `TaskStop` too; record their pieces as paused and list each Monitor and wait with its command in the ledger.
 - Record each piece's pending step and its worktree's `git status --short` in the ledger and stop the loop (Heartbeat line to none); nothing runs until resume.
 - On resume: a fresh agent per paused subagent piece, briefed as in [Worker lifetime](#worker-lifetime) to continue in its recorded worktree at its sha with its uncommitted work, never in a new worktree; each session one `RESUME` with its pending step; `git worktree remove --force` each verify worktree a stopped checker or your inline gate left, so the next tick starts a fresh checker on the same sha; start each paused workflow piece again with a fresh `Workflow` call (workflows are read-only); arm again each Monitor and background wait the ledger lists; re-arm the loop.
+
+## Design pass
+
+Design only when visuals change; logic behind an existing element (which rows show, when the band updates) skips it. The design canvas is the single source of truth for visuals ([Designer](../designer/SKILL.md)). One Designer pass per plan covers every piece whose visuals change; the user approves before any UI build brief. An approved design gets no new pass unless the user asks for a visual change (mid-build, in a fix round, after a merge): that goes to a Designer pass first, then the build. The build brief always names the canvas id, version and artboard names.
 
 ## Names
 

@@ -28,7 +28,7 @@ Find a named worker in the "Linked sessions now" roster note or `list_sessions {
 
 **Plan** the whole run once, in the ledger: every piece with one deliverable, its tier, persona ([personas.md](personas.md)), shape, owned files and the dependency graph. Default to one piece end to end. Pieces run in parallel only when unblocked with disjoint owned files; pieces sharing a file run in turn.
 
-**Plan list.** Before the first spawn, write the run's plan list as one table in the ledger, edited in place; the board's `plan[]` is a copy of it. List the whole chain up front: Spec (if behaviour choices) and Architect (if 2+ modules or workers) per feature, one `Design` piece per run when any visuals change, and one Build per expected worker (`<feature> build 1`, `<feature> build 2` when an Architect will split it). Give each piece its tier, `doc` for spec, design and architect pieces. Approvals, checks, fix rounds, rebases and the merge are the build's verifying stage, not pieces. Add one queued `Follow-ups` piece (T1, builds the accepted nit backlog) and one `Wrap-up` piece (T0, your own Done step in section 6, done inline) per run; mark them dropped if unused. Names are stable for life: a split marks the old piece dropped and adds the parts; never rename or fold pieces together.
+**Plan list.** Before the first spawn, write the run's plan list as one table in the ledger, edited in place; the board's `plan[]` is a copy of it. List the whole chain up front: Spec (if behaviour choices) and Architect (if 2+ modules or workers) per feature, one `Design` piece per plan (a batch added mid-run gets its own) when any visuals change, and one Build per expected worker (`<feature> build 1`, `<feature> build 2` when an Architect will split it). Give each piece its tier, `doc` for spec, design and architect pieces. Approvals, checks, fix rounds, rebases and the merge are the build's verifying stage, not pieces. Add one queued `Follow-ups` piece (T1, builds the accepted nit backlog) and one `Wrap-up` piece (T0, your own Done step in section 6, done inline) per run; mark them dropped if unused. Names are stable for life: a split marks the old piece dropped and adds the parts; never rename or fold pieces together.
 
 **Tiers.** The highest matching row wins; the risk flag adds the second checker to any tier.
 
@@ -43,7 +43,7 @@ Find a named worker in the "Linked sessions now" roster note or `list_sessions {
 - A behaviour choice is one two reasonable implementers could make differently in a way the user would notice: a rule, a formula, a state and when it shows. Without one, the ACs go in the brief, not a spec tab, unless the Architect runs: it writes them into the feature's tab with its design.
 - Set the `Agent` call's `model` and `effort` only where the table says.
 - One spec tab per feature, changed in place with a changelog; the Architect's design goes in it. The validator approves both before any build brief.
-- Design only when visuals change; logic behind an existing element (which rows show, when the band updates) skips it. The design canvas is the single source of truth for visuals ([Designer](../designer/SKILL.md)). One Designer pass per plan covers every piece whose visuals change; the user approves before any UI build brief. An approved design gets no new pass unless the user asks for a visual change (mid-build, in a fix round, after a merge): that goes to a Designer pass first, then the build. The build brief always names the canvas id, version and artboard names.
+- Design pass: the design canvas is the single source of truth for visuals; one pass per plan, only when visuals change, and a later visual change (mid-build, in a fix round, after a merge) goes to a Designer pass first. Details: [shape.md](shape.md#design-pass).
 
 **Count and waits.** Every tick that starts agents writes one ledger line: `Count: N running (ready: <pieces>; suite-runner: yes|no; ≤4 or <reason>)`. The rule:
 - run the ready pieces whose owned files are disjoint;
@@ -52,7 +52,7 @@ Find a named worker in the "Linked sessions now" roster note or `list_sessions {
 - cost: fewer agents and cheaper models for simple work, one agent by default for T0 and T1;
 - soft ceiling 4 running agents, nested and a workflow's included; above it only with the reason (such as a read-only fan-out) in the count line.
 
-The only waits: a dependency not merged, the one-suite-runner rule, a user decision. Invent no other.
+The only waits: a dependency not done (merged, or approved for a doc piece), the one-suite-runner rule, a user decision. Invent no other.
 
 **Brief.** A session brief starts `You are a worker session of master session <validator local_id>. Load the master-session:worker and master-session:<persona> skills first.`, a subagent brief `You are a background subagent of master session <validator local_id>; your final message is your report in the format below.` Then, in order:
 ```
@@ -76,8 +76,9 @@ Open:     <questions, or "none">
 - The first brief holds the whole scope. No scope is added to a running piece: new scope is a new queued piece, or stop the piece and re-brief it in full.
 - At the timebox the worker reports done and left; cut Nice, re-brief or cancel, never extend.
 - Hygiene, commits and clean-up live in [the worker skill](../worker/SKILL.md), not in briefs.
-- A dependent piece starts only after its dependency is done (merged, or approved for a doc piece): a session watches it with a Monitor, a subagent is spawned on the merge.
+- A dependent piece starts only after its dependency is done (merged, or approved for a doc piece): a session watches it with a Monitor, a subagent is spawned when it is done.
 - Never brief "wait for the user's go" unless the user asked for the draft.
+
 **Names** (`title`, `name`, `description`, `label`): [shape.md](shape.md#names).
 
 **Execution shape.** One per piece, named in the ledger; the first match wins.
@@ -125,7 +126,7 @@ Worker permission mode, denied calls and prompts that need the user: read [answe
 - No silent drops: a finding stays until fixed, rejected with a reason or deferred by the user.
 - Archive ledger workers whose result is merged and captured; list any other as done and ask. Never archive this session or delete one.
 - Workers remove their own worktrees, branches and scratch.
-- Done: every piece done or dropped (builds merged and verified, doc pieces approved), every repo clean, `git worktree list` shows none of this run's worktrees; an unmerged session branch goes to the user as one `git branch -D` line. When the user's task asks for a push or a PR, push the merged work or open the PR and quote the task's words in the ledger; otherwise both stay the user's call. Then stop the loop (`ScheduleWakeup` `stop: true`, Heartbeat line to none), post the final board and one `PushNotification`.
+- Done: every piece done or dropped (builds merged and verified, doc pieces approved), every repo clean, `git worktree list` shows none of this run's worktrees; an unmerged session branch goes to the user as one `git branch -D` line. When the user's task asks for a push or a PR, push the merged work or open the PR and quote the task's words in the ledger; otherwise both stay the user's call. Then stop the loop (`ScheduleWakeup` `stop: true`, Heartbeat line to none), mark `Wrap-up` done, post the final board and one `PushNotification`.
 
 ## Rules
 
