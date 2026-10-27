@@ -17,25 +17,21 @@ import {
   openSession,
   refreshAll,
   refreshBoard,
-  refreshReports,
   workerNote,
   republishBoard,
   startSources,
 } from './data/sources'
 import { clearPresses, hasFaults, recoverFault, runPress } from './data/presses'
-import { describeSession, describeSpawn, recordAgentEnd, recordSpawn, recordWorkflow, refreshAgents } from './data/agents'
+import { describeSession, describeSpawn, recordAgentEnd, recordSpawn, recordWorkflow } from './data/agents'
 import { settleTasks } from './data/describe'
-import { refreshNarrative } from './data/narrative'
-import { skipWhileBusy } from './data/flight'
-import { briefed, claim, engage, inPlan, isActive, isOff, recordTurnEnd, recorder, startRecorder, unstop } from './data/recorder'
+import { briefed, claim, engage, inPlan, isOff, recordTurnEnd, recorder, startRecorder, unstop } from './data/recorder'
+import { resetLabels, setColumns, startOpenTimers, stopOpenTimers, stopTimers, syncTimers } from './data/timers'
 import { stopMode } from './data/stop'
 import { agentCountsOf, bandAction, bandProgressWith, bandViewOf } from './lib/band'
 import { boardFromJson, planOf } from './lib/board'
-import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, FILE_MS, INFO, LIVE_MS, NOT_MASTER, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, STOP, TICK_MS } from './lib/constants'
+import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, INFO, NOT_MASTER, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, STOP } from './lib/constants'
 import { messageOf } from './lib/format'
-import { runningTimeOf } from './components/detail/format'
-import { elapsedOfItem, lineOf, openIdOf, runAgentsOf } from './lib/list'
-import type { RowItem } from './lib/list'
+import { openIdOf } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
 import { getAgents, getLive, getRepos, getWorkflows, saveBoard, setExpanded, setFilter, setNarrativeOpen } from './state/atoms'
@@ -45,23 +41,6 @@ let pending: { row: number; at: number } | undefined
 let shown = { offset: 0, renders: 0 }
 let isResyncing = false
 let aimedRow: number | undefined
-let lastLabels = ''
-
-async function tickTimes($: EngineInterface) {
-  if (!isActive() || !(await isMaster($)) || !(await isPaneOpen($))) return
-  void refreshNarrative($).catch(() => undefined)
-  const data = await paneData($, columns || 48)
-  const view = paneViewOf(data)
-  const shown = view.groups.flatMap(group => group.items).flatMap(item => (item.kind === 'workflow' && openIdOf(item, data.open) ? [item, ...runAgentsOf(item.run, data.agents)] : [item]))
-  const labelOf = (item: RowItem) => {
-    const line = lineOf(item, view.context)
-    return [elapsedOfItem(item, data.at), line.cmdElapsed ? `${line.text}~${line.cmdElapsed}` : '', openIdOf(item, data.open) ? runningTimeOf(item, data.at) : ''].join('~')
-  }
-  const labels = [...shown.map(labelOf), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age, view.narrative?.text].join('|')
-  if (labels === lastLabels) return
-  lastLabels = labels
-  $.ui.invalidate('ui.render')
-}
 
 function lastShown() {
   return shown
@@ -86,20 +65,12 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
+    stopTimers()
     startSources(String((await $.env.get('HOME')) ?? ''))
-    lastLabels = ''
+    resetLabels()
     await setNarrativeOpen($, () => false)
     await startRecorder($)
     await settleTasks($).catch(() => undefined)
-    $.clock.every(
-      FILE_MS,
-      skipWhileBusy(async () => {
-        if (isActive() && (await isMaster($))) await refreshReports($)
-      }),
-    )
-    $.clock.every(FILE_MS, skipWhileBusy(async () => (isActive() ? refreshAgents($) : undefined)))
-    $.clock.every(TICK_MS, skipWhileBusy(() => tickTimes($)))
-    $.clock.every(LIVE_MS, () => void refreshAll($).catch(() => undefined))
     await $.tool.register({
       name: 'open',
       description: 'Opens the master session pane beside the chat. Use it when the user asks to see the sessions board or the status pane. expand opens one item’s card; archived: true opens the Archived list.',
@@ -216,7 +187,7 @@ export const register: Register = on => {
     const next = boardFromJson(e, 'tool')
     const sent = Array.isArray(e.sessions) ? e.sessions.length : 0
     if (!next || next.sessions.length < sent) return { deny: 'The board needs a sessions array whose items carry id and state.' }
-    claim()
+    claim($)
     void engage($)
     const at = await $.clock.now()
     await saveBoard($, prev => ({ ...next, since: prev?.since ?? at, at }))
@@ -278,12 +249,14 @@ export const register: Register = on => {
   on('ui.open', { id: PANE }, async ($, event, next) => {
     const opened = await next(event)
     $.ui.invalidate('ui.render')
+    syncTimers($)
     return opened
   })
 
   on('ui.close', { id: PANE }, async ($, event, next) => {
     const closed = await next(event)
     $.ui.invalidate('ui.render')
+    stopOpenTimers()
     return closed
   })
 
@@ -323,6 +296,8 @@ export const register: Register = on => {
     const Svg = e.surface !== 'terminal' && 'Svg' in table ? guardSvg(table.Svg, Text) : undefined
     const Client = e.surface === 'desktop' && 'Client' in table && !hasFaults() ? table.Client : undefined
     columns = e.props.bodyColumns || 48
+    setColumns(columns)
+    startOpenTimers($)
     if (e.surface !== 'terminal') shown = { offset: e.props.scroll?.offset ?? 0, renders: shown.renders + 1 }
     const offset = e.surface === 'terminal' ? 0 : (e.props.scroll?.offset ?? 0)
     const data = await paneData($, columns, offset, e.props.scroll?.bodyRows ?? 0, offset === aimedRow)

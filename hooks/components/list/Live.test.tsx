@@ -170,7 +170,7 @@ test('activity from a report draws one line per item with its age on the right, 
   const commit = 'commit 34ebd4c fix(pane): one-line callout, commits, files and row text after rebase onto main with the archive guard'
   const report = { v: 1, kind: 'status', session: 'local_env', engineId: 'engine-env', parent: SELF, seq: 2, at: 3_590_000, run: { isRunning: true }, modelAt: 3_590_000, state: 'working', activity: [{ at: 3_480_000, text: commit }, { at: 3_590_000, text: `Bash ${BASH}` }], commits: [], tests: [], files: [], git: { branch: '', dirty: 0, ahead: 0, at: 3_590_000, path: WORKTREE } }
   const { clock } = await started($, on, BOARD, { files: { [`${HOME}/.claude/state/master-session/sessions/local_env.json`]: JSON.stringify(report) } })
-  await clock.advance(3_000)
+  await clock.advance(5_000)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_env')
   for (const index of [0, 1]) expect((await ui.find({ key: `activity-local_env-${index}` }))?.props).toEqual(expect.objectContaining({ height: tall(20), minWidth: 0 }))

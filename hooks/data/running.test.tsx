@@ -423,11 +423,11 @@ test('AC16: a worker’s subagent Bash writes running on its report agent once a
   expect(mine().length).toBe(before + 2)
 })
 
-test('AC17: a Working worker row reads "Bash · 15s" from its report and keeps its step count', async ($, on) => {
+test('AC17: a Working worker row reads "Bash · 17s" from its report and keeps its step count', async ($, on) => {
   const run = await started($, on, WORK_BOARD, workChild(workReport()))
   const ui = await pane($)
   await run.clock.advance(FILE_MS)
-  expect(await lineOf(ui, 'local_work')).toBe('Bash · 15s')
+  expect(await lineOf(ui, 'local_work')).toBe('Bash · 17s')
   expect(await altsOf(ui)).toContain('2 of 4')
   await ui.unmount()
 })
@@ -465,7 +465,7 @@ test('AC20: a worker’s report agent shows its own command and its elapsed', as
   const run = await started($, on, WORK_BOARD, workChild(workReport({ running: undefined, agents: [agent] })))
   const ui = await pane($)
   await run.clock.advance(FILE_MS)
-  expect(await lineOf(ui, 'b1')).toBe('Bash · 5s')
+  expect(await lineOf(ui, 'b1')).toBe('Bash · 7s')
   await ui.unmount()
 })
 
@@ -876,6 +876,6 @@ test('AC41: a seeded Bash text in a report is never read back', async ($, on) =>
   const run = await started($, on, WORK_BOARD, workChild(workReport({ running: { tool: 'Bash', text: 'mysql Xk9wq2Lm', since: NOW - 12_000 } })))
   const ui = await pane($)
   await run.clock.advance(FILE_MS)
-  expect(await lineOf(ui, 'local_work')).toBe('Bash · 15s')
+  expect(await lineOf(ui, 'local_work')).toBe('Bash · 17s')
   await ui.unmount()
 })

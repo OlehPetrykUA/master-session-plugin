@@ -28,7 +28,7 @@ test('the reports tick skips while the last reports read is still running', asyn
   const before = flights.list.started
   await clock.advance(60_000)
   expect(flights.list.started - before).toBeGreaterThanOrEqual(3)
-  expect(flights.list.started - before).toBeLessThanOrEqual(5)
+  expect(flights.list.started - before).toBeLessThanOrEqual(6)
   expect(flights.list.peak).toBe(1)
 })
 
@@ -49,6 +49,6 @@ test('the agents tick skips while the last agent list is still running', async (
   await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
   await run.clock.advance(60_000)
   expect(calls).toBeGreaterThanOrEqual(3)
-  expect(calls).toBeLessThanOrEqual(5)
+  expect(calls).toBeLessThanOrEqual(6)
   expect(peak).toBe(1)
 })

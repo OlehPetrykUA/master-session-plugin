@@ -165,19 +165,19 @@ test("the master merges a worker's reported subagents under that worker within o
   await clock.settle()
   await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
   await $.agent.spawn({ ...SPAWN, description: 'Docs lookup' })
-  await clock.advance(3_000)
+  await clock.advance(5_000)
   expect((await agentsOf($)).map(one => [one.id, one.parentSessionId, one.parentAgentId, one.asking])).toEqual([
     ['a1', undefined, undefined, undefined],
     ['a2', 'local_setup', 'a1', undefined],
   ])
   files[reportPath(HOME, 'local_setup')] = JSON.stringify({ ...report, seq: 6, at: NOW + 1_000, agents: [{ ...report.agents?.[0], asking: { text: 'Allow Bash', since: NOW + 1_000 } }] })
-  await clock.advance(3_000)
+  await clock.advance(5_000)
   expect(askingOf(await agentsOf($), 'a2')).toEqual({ text: 'Allow Bash', since: NOW + 1_000 })
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect((await pane.find({ key: 'row-local_setup' }))?.props.borderColor).toBe('error')
   await pane.unmount()
   files[reportPath(HOME, 'local_setup')] = JSON.stringify({ ...report, seq: 7, at: NOW + 4_000 })
-  await clock.advance(3_000)
+  await clock.advance(5_000)
   expect(askingOf(await agentsOf($), 'a2')).toBeUndefined()
   expect((await agentsOf($)).find(one => one.id === 'a1')?.state).toBe('running')
   const after = await $.ui.mount({ ...PANE, surface: 'desktop' })

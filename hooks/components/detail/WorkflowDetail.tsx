@@ -45,7 +45,7 @@ export function WorkflowDetail(ui: Ui, props: WorkflowDetailProps) {
           </Text>
         </Box>
       </Box>,
-      <Svg key={`strip-${id}`} source={strip} alt={`${counts.done} of ${counts.total} agents done`} width={Math.round(props.innerWidth)} height={10} isInteractive />,
+      <Svg key={`strip-${id}`} source={strip} alt={`${counts.done} of ${counts.total} agents done`} width={Math.round(props.innerWidth)} height={10} />,
       failed.length
         ? Callout(ui, {
             id,

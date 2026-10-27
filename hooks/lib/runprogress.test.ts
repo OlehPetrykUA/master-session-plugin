@@ -85,7 +85,7 @@ test('AC5 one working piece with no progress reads 0% with at least a 16 px fill
   expect(view.percent).toBe(0)
   const source = stripOf(view)
   expect(fillOf(source, 'green')).toBeGreaterThanOrEqual(16)
-  expect(source).toContain('animateTransform')
+  expect(source).toContain('linearGradient')
 })
 
 test('AC6 one verifying piece reads 90%', () => {
@@ -139,7 +139,7 @@ test('AC12 every piece done while a subagent runs reads 100% on a green full fil
   expect([view.percent, view.tone, view.isAllDone, view.isRunning, view.hasPercent]).toEqual([100, 'green', false, true, true])
   const source = stripOf(view)
   expect(fillOf(source, 'green')).toBe(view.barWidth)
-  expect(source).toContain('animateTransform')
+  expect(source).toContain('linearGradient')
 })
 
 test('AC13 archiving done sessions changes nothing when a plan is present', () => {
@@ -168,7 +168,7 @@ test('AC16 a unit asking the user shows the pill and Open chat, with no percent 
 test('AC17 a plan not all done with nothing running reads on a grey fill, with no slider', () => {
   const view = viewOf([piece('A', 'done'), piece('B', 'queued')], { sessions: ONE_RUNNING, running: [] })
   expect([view.tone, view.isRunning, view.percent, countsText(view.parts)]).toEqual(['grey', false, 50, '1/2'])
-  expect(stripOf(view)).not.toContain('animateTransform')
+  expect(stripOf(view)).not.toContain('linearGradient')
 })
 
 const TODAY = [sessionOf('local_a', 'waiting', 'step 4 of 5 — x'), sessionOf('local_b', 'working', 'step 3 of 5 — x'), sessionOf('local_c', 'working', 'step 4 of 5 — x'), sessionOf('local_d', 'done', 'step 5 of 5 — x')]

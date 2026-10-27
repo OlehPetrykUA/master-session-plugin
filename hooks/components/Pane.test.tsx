@@ -358,7 +358,7 @@ test('the expanded card shows Now in full, and the row clamps a long question to
 test('a worker that works in a worktree shows that worktree in its place and Git cells, from its report', async ($, on) => {
   const report = { v: 1, kind: 'status', session: 'local_env', engineId: 'engine-env', parent: SELF, seq: 2, at: 3_590_000, run: { isRunning: true }, modelAt: 3_590_000, state: 'working', activity: [], commits: [], tests: [], files: [], git: { branch: '', dirty: 1, ahead: 0, at: 3_590_000, path: WORKTREE } }
   const { clock } = await started($, on, BOARD, { files: { [`${HOME}/.claude/state/master-session/sessions/local_env.json`]: JSON.stringify(report) } })
-  await clock.advance(3_000)
+  await clock.advance(5_000)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-local_env')
   const texts = await textsOf(ui)

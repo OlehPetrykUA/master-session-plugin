@@ -7,10 +7,6 @@ const LIGHT =
 const DARK =
   '--text:#FAF9F5;--muted:#B0AEA5;--faint:#9C9A92;--accentBtn:#D97757;--onAccent:#141413;--accentText:#F0A58A;--red:#F06A60;--redTint:rgba(240,106,96,0.14);--amber:#E8B04B;--amberTint:rgba(232,176,75,0.14);--green:#7BC46A;--greenTint:rgba(123,196,106,0.14);--grey:#9C9A92;--greyTint:rgba(156,154,146,0.16);--track:rgba(250,249,245,0.12);--surface2:#30302E;--redT:rgba(240,106,96,.14);--amberT:rgba(232,176,75,.14);--greenT:rgba(123,196,106,.14);--greyT:rgba(156,154,146,.16);--accentBtnHover:#E3896B;--accentTint:rgba(217,119,87,0.18);--accentTint2:rgba(217,119,87,0.26);--hoverBg:#30302E'
 const FONT = "'Anthropic Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif"
-const MOTION =
-  '@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}@keyframes tw{0%,100%{opacity:1}50%{opacity:.3}}@keyframes glow{0%,100%{opacity:1}50%{opacity:.8}}' +
-  '.p{animation:pulse 1.8s ease-in-out infinite}.t0,.t1,.t2,.t3{animation:tw 2.2s ease-in-out infinite}.t1{animation-duration:2.8s;animation-delay:-.7s}.t2{animation-duration:1.9s;animation-delay:-1.3s}.t3{animation-duration:3.3s;animation-delay:-.4s}' +
-  '@media (prefers-reduced-motion: reduce){.p,.t0,.t1,.t2,.t3{animation:none}}'
 
 export const I = {
   needs: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M12 7.5v5.5 M12 16.4v.1',
@@ -99,8 +95,7 @@ function svg(width: number, height: number, body: string, box = `0 0 ${width} ${
   const light = usedOf(LIGHT, body)
   const theme = light ? `svg{${light}}@media (prefers-color-scheme: dark){svg{${usedOf(DARK, body)}}}` : ''
   const text = body.includes('<text') ? `text{font-family:${FONT};font-variant-numeric:tabular-nums}` : ''
-  const motion = /class="(p|t\d)"/.test(body) ? MOTION : ''
-  const style = theme + text + motion
+  const style = theme + text
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${box}">${style ? `<style>${style}</style>` : ''}${body}</svg>`
 }
 

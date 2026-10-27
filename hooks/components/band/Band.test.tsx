@@ -104,13 +104,13 @@ const buttonsOf = async (ui: Found) => (await ui.findAll({ type: 'Button' })).ma
 
 const hitsOf = async (ui: Found) => (await ui.findAll({ type: 'Client' })).map(one => [one.key, one.props.module, one.props.props])
 
-const stripOf = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).find(one => one.props.isInteractive === true)
+const stripOf = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).find(one => String(one.props.source).includes('width="4096"'))
 
 const barWidthOf = async (ui: Found) => Number(String((await stripOf(ui))?.props.source).match(/viewBox="0 0 ([\d.]+) 10"/)?.[1])
 
 const faceOf = async (ui: Found) => (await ui.findAll({ type: 'Box' })).filter(one => one.key?.startsWith('face-band-'))
 
-const iconsOf = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).filter(one => one.props.isInteractive !== true).map(one => String(one.props.alt))
+const iconsOf = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).filter(one => !String(one.props.source).includes('width="4096"')).map(one => String(one.props.alt))
 
 const percentIn = async (ui: Found) => (await textsOf(ui)).find(one => /^\d+%$/.test(one))
 
@@ -311,7 +311,7 @@ test('the user’s case: every session done and 2 subagents running reads 66% an
   const ui = await mount($)
   expect(await textsOf(ui)).toEqual(['66%', '4/6', '4', '6', 'Open board'])
   const source = String((await stripOf(ui))?.props.source)
-  expect(source).toContain('animateTransform')
+  expect(source).toContain('linearGradient')
   expect(source).toContain('fill:var(--green)')
   expect((await stripOf(ui))?.props.alt).toBe('Master session: 66 percent, 4 of 6 done')
   await crew.finish('docs')
@@ -319,22 +319,21 @@ test('the user’s case: every session done and 2 subagents running reads 66% an
   await ui.unmount()
   const done = await mount($)
   expect(await textsOf(done)).toEqual(['All 6 done', '6', 'Open board'])
-  expect(String((await stripOf(done))?.props.source)).not.toContain('animateTransform')
+  expect(String((await stripOf(done))?.props.source)).not.toContain('linearGradient')
   await done.unmount()
 })
 
-test('the slider: a white band 0 → .55 → 0 of max(16, 30% of the fill), clipped to the fill, 2.4 s linear and repeating while anything runs; none when nothing runs; still at 35% under reduced motion', () => {
+test('the highlight: a still white band 0 → .55 → 0 of max(16, 30% of the fill) at 35%, clipped to the fill while anything runs; none when nothing runs; nothing ever animates', () => {
   const running = strip({ width: 200, overall: 0.5, tone: 'green', isSliding: true })
-  expect(running).toContain('<animateTransform attributeName="transform" type="translate" from="-30.0 0" to="100.0 0" dur="2.4s" calcMode="linear" repeatCount="indefinite"/>')
+  expect(running).not.toContain('animate')
+  expect(running).not.toContain('class="m"')
   expect(running).toContain('stop-opacity="0"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>')
   expect(running).toContain('<g clip-path="url(#c)">')
   expect(running).toContain('<clipPath id="c"><path d="M5.0,0h90.0a5,5 0 0 1 0,10h-90.0a5,5 0 0 1 0,-10Z"/></clipPath>')
-  expect(running).toContain('<rect class="s" x="35.0" y="0" width="30.0" height="10" fill="url(#k)"/>')
-  expect(running).toContain('@media (prefers-reduced-motion: reduce){.m{display:none}.s{display:inline}}')
-  expect(running).toContain('.s{display:none}')
+  expect(running).toContain('<rect x="35.0" y="0" width="30.0" height="10" fill="url(#k)"/>')
   expect(glowOf(100)).toBe(30)
   expect(glowOf(40)).toBe(16)
-  expect(strip({ width: 200, overall: 0.05, tone: 'green', isSliding: true })).toContain('width="16.0" height="10" fill="url(#k)"><animateTransform')
+  expect(strip({ width: 200, overall: 0.05, tone: 'green', isSliding: true })).toContain('width="16.0" height="10" fill="url(#k)"/>')
   const still = strip({ width: 200, overall: 0.5, tone: 'green', isSliding: false })
   expect(still).not.toContain('animate')
   expect(still).not.toContain('linearGradient')
@@ -360,7 +359,7 @@ test('working, pane closed: percent, one bar with the slider, uniform counts, an
   const ui = await mount($)
   const bar = await stripOf(ui)
   expect(bar?.props.alt).toBe('Master session: 80 percent, 1 of 4 done')
-  expect(bar?.props.isInteractive).toBe(true)
+  expect(bar?.props.isInteractive).toBeUndefined()
   expect(await textsOf(ui)).toEqual(['80%', '1/4', '1', '4', 'Open board'])
   expect(await buttonsOf(ui)).toEqual([])
   const [hit] = await hitsOf(ui)
@@ -414,7 +413,7 @@ test('needs you: the pill first, then the red bar, then Open chat; no percent an
   expect(await percentIn(ui)).toBeUndefined()
   expect(await countsIn(ui)).toBeUndefined()
   expect(await iconsOf(ui)).toEqual(['session', 'Open chat'])
-  const order = (await ui.findAll({})).filter(one => one.type === 'Svg' || one.key === 'face-band-chat' || one.props.borderColor === 'error').map(one => (one.type === 'Svg' ? (one.props.isInteractive ? 'bar' : one.props.alt) : one.props.borderColor === 'error' ? 'pill' : 'chat'))
+  const order = (await ui.findAll({})).filter(one => one.type === 'Svg' || one.key === 'face-band-chat' || one.props.borderColor === 'error').map(one => (one.type === 'Svg' ? (String(one.props.source).includes('width="4096"') ? 'bar' : one.props.alt) : one.props.borderColor === 'error' ? 'pill' : 'chat'))
   expect(order).toEqual(['pill', 'session', 'bar', 'chat', 'Open chat'])
   expect((await hitsOf(ui)).map(one => one[0])).toEqual(['band-hit-chat'])
   await click(ui, 'band-hit-chat', 1, 0)
@@ -622,7 +621,7 @@ test('with no worker sessions, running subagents still show the band: 0%, the su
   await crew.subagent('review')
   const ui = await mount($)
   expect(await textsOf(ui)).toEqual(['0%', '0/2', '0', '2', 'Open board'])
-  expect(String((await stripOf(ui))?.props.source)).toContain('animateTransform')
+  expect(String((await stripOf(ui))?.props.source)).toContain('linearGradient')
   await ui.unmount()
 })
 
@@ -761,7 +760,7 @@ test('a running unit at 0% still shows: one subagent running and nothing finishe
   expect(await percentIn(ui)).toBe('0%')
   const source = String((await stripOf(ui))?.props.source)
   expect(source).toContain('M5.0,0h6.0a5,5 0 0 1 0,10h-6.0a5,5 0 0 1 0,-10Z" style="fill:var(--green)"')
-  expect(source).toContain('animateTransform')
+  expect(source).toContain('linearGradient')
   await ui.unmount()
   expect(strip({ width: 200, overall: 0, tone: 'grey', isSliding: false })).not.toContain('var(--grey)"/><')
 })
@@ -925,7 +924,7 @@ const barProps = (view: ReturnType<typeof viewOf>['view']): Record<string, unkno
     return stub(props)
   }
   const Svg = (props: Record<string, unknown>) => {
-    if (props.isInteractive === true) seen.push(props)
+    if (String(props.source).includes('width="4096"')) seen.push(props)
     return null
   }
   const ui = { Box, Text: stub, Button: stub, Svg } as unknown as Parameters<typeof Band>[0]
@@ -956,12 +955,12 @@ test('the first agent started with the pane closed draws the bar on the band’s
   const drawn = await stripOf(ui)
   expect(String(drawn?.props.alt)).not.toBe(before)
   expect(String(drawn?.props.alt)).toContain('1 of 5 done')
-  expect(String(drawn?.props.source)).toContain('animateTransform')
+  expect(String(drawn?.props.source)).toContain('linearGradient')
   expect(drawn?.props.width).toBeUndefined()
   expect((await ui.findAll({ type: 'Box' })).map(one => one.key).filter(one => one?.startsWith('bar-'))).toEqual([`bar-${await barWidthOf(ui)}-run`])
   await ui.unmount()
   const fresh = await mount($)
-  expect(String((await stripOf(fresh))?.props.source)).toContain('animateTransform')
+  expect(String((await stripOf(fresh))?.props.source)).toContain('linearGradient')
   await fresh.unmount()
 })
 
@@ -986,7 +985,7 @@ for (const [finished = 0, total = 0] of [[3, 7], [23, 31]]) {
       Band({ Box, Text: stub, Button: stub, Svg } as unknown as Parameters<typeof Band>[0], { view })
       const bar = boxes.find(one => String(one.key).startsWith('bar-'))
       expect([bar?.flexGrow, bar?.flexShrink, bar?.width, bar?.minWidth]).toEqual([1, 1, 0, 0])
-      const drawn = svgs.find(one => one.isInteractive === true)
+      const drawn = svgs.find(one => String(one.source).includes('width="4096"'))
       expect(drawn?.width).toBeUndefined()
       const source = String(drawn?.source)
       expect(source).toContain('width="4096"')

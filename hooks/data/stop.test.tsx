@@ -490,10 +490,10 @@ test('AC31 a master drops a report whose file became the tombstone, its row stay
   const report = JSON.stringify({ v: 1, kind: 'status', session: 'local_env', parent: SELF, seq: 1, at: 3_590_000, run: { isRunning: true }, modelAt: 3_590_000, state: 'working', activity: [], commits: [], tests: [], files: [] })
   const own: Record<string, string> = { [path]: report }
   const run = await master($, on, BOARD, { files: own })
-  await run.clock.advance(3_000)
+  await run.clock.advance(5_000)
   expect((await atomsOf($)).reports.map(one => one.session)).toContain('local_env')
   own[path] = JSON.stringify({ v: 1, kind: 'stopped', session: 'local_env', at: 3_700_000 })
-  await run.clock.advance(3_000)
+  await run.clock.advance(5_000)
   expect((await atomsOf($)).reports.map(one => one.session)).not.toContain('local_env')
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect((await textsOf(pane)).join(' ')).toContain('Test and validate local agent environment')
@@ -507,7 +507,7 @@ test('AC31 a master’s reports view drops its own board once that file is the t
   const view = async () => ((await $.tool.call({ tool: REPORTS })) as { result?: string }).result ?? ''
   expect(await view()).toContain('local_env')
   own[OWN] = JSON.stringify({ v: 1, kind: 'stopped', session: SELF, at: 3_700_000 })
-  await run.clock.advance(3_000)
+  await run.clock.advance(5_000)
   expect(await view()).not.toContain('local_env')
 })
 

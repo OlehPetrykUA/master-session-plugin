@@ -346,7 +346,7 @@ test('AC22 a narrative adds no git, session call, transcript scan or file write'
   const period = async (patch: Record<string, unknown>) => {
     const before = tally()
     await call($, patch)
-    await run.clock.advance(10 * FILE_MS)
+    await run.clock.advance(9 * FILE_MS)
     await run.clock.advance(LIVE_MS)
     return tally().map((count, index) => count - (before[index] ?? 0))
   }

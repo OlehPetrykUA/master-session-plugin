@@ -47,7 +47,7 @@ const keysOf = async (ui: Ui) => (await ui.findAll({ type: 'Box' })).map(box => 
 
 const chip = async (ui: Ui, id: string) => Number(/(\d+)$/.exec(String((await ui.find({ key: `chip-${id}` }))?.text))?.[1])
 
-const alt = async (band: Ui) => String((await band.findAll({ type: 'Svg' })).find(one => one.props.isInteractive === true)?.props.alt)
+const alt = async (band: Ui) => String((await band.findAll({ type: 'Svg' })).find(one => String(one.props.source).includes('width="4096"'))?.props.alt)
 
 function crew($: Engine, on: On) {
   let running: string[] = []

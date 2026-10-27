@@ -6,7 +6,7 @@ import { lossesOf, sideOf } from '../components/detail/losses'
 import { withReported, withReportedRuns } from '../lib/agents'
 import { agentCountsOf, askingChatOf } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
-import { ARCHIVE_LIMIT, BOARD_TOOL, GIT_CAP, LIVE_LIMIT, PANE, TITLE, TREE_STALE_MS, UNDO_MS } from '../lib/constants'
+import { ARCHIVE_LIMIT, BOARD_TOOL, GIT_CAP, LIVE_LIMIT, PANE, REPOS_CLOSED_MS, TITLE, TREE_STALE_MS, UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
 import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
@@ -33,6 +33,7 @@ export function startSources(value: string) {
   home = value
   published = ''
   publishedAt = 0
+  reposAt = -Infinity
   flight = undefined
   isQueued = false
   seenTrees.clear()
@@ -73,7 +74,7 @@ async function refreshTranscript($: EngineInterface) {
     const used = [...message.toolUses].reverse().find(one => one.tool === BOARD_TOOL && !one.isError)
     const next = used ? boardFromJson(used.input, 'tool') : message.text.includes('🕐 **Tick') ? boardFromChat(message.text) : null
     if (next) {
-      claim()
+      claim($)
       await saveBoard($, () => next)
       return
     }
@@ -339,11 +340,17 @@ export async function isWorker($: EngineInterface) {
   return roleOf().role === 'worker' && !(await isMaster($))
 }
 
+let reposAt = -Infinity
+
 async function scan($: EngineInterface, isForced: boolean) {
   isForced && (await setRefreshing($, true))
   try {
     await refreshLive($, isForced)
-    await refreshRepos($, undefined, isForced)
+    const at = await $.clock.now()
+    if (isForced || at - reposAt >= REPOS_CLOSED_MS || (await isPaneOpen($))) {
+      reposAt = at
+      await refreshRepos($, undefined, isForced)
+    }
     await republishBoard($)
   } finally {
     isForced && (await setRefreshing($, false))
@@ -374,7 +381,7 @@ export async function refreshAll($: EngineInterface, isForced = false) {
 
 export async function markMaster($: EngineInterface) {
   await unstop($)
-  claim()
+  claim($)
   const at = await $.clock.now()
   await saveBoard($, prev => prev ?? { sessions: [], needsYou: [], repos: [], source: 'tool', since: at, at })
 }

@@ -3,7 +3,6 @@ const FLOOR = 10
 const GLOW_MIN = 16
 const GLOW_SHARE = 0.3
 const STILL = 0.35
-const SWEEP = '2.4s'
 
 const LIGHT = '--track:rgba(31,30,29,0.10);--grey:#87867F;--green:#3F7A35;--red:#C2413B'
 const DARK = '--track:rgba(250,249,245,0.12);--grey:#9C9A92;--green:#7BC46A;--red:#F06A60'
@@ -33,8 +32,7 @@ export function strip({ width, overall, tone, isSliding }: BarInput) {
     (fill > 0 ? `<path d="${capsule(0, fill)}" style="fill:var(--${tone})"/>` : '') +
     (fill > 0 && isSliding
       ? `<defs><linearGradient id="k"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient><clipPath id="c"><path d="${capsule(0, fill)}"/></clipPath></defs>` +
-        `<g clip-path="url(#c)"><rect class="m" x="0" y="0" width="${n(glow)}" height="${HEIGHT}" fill="url(#k)"><animateTransform attributeName="transform" type="translate" from="${n(-glow)} 0" to="${n(fill)} 0" dur="${SWEEP}" calcMode="linear" repeatCount="indefinite"/></rect>` +
-        `<rect class="s" x="${n(fill * STILL)}" y="0" width="${n(glow)}" height="${HEIGHT}" fill="url(#k)"/></g>`
+        `<g clip-path="url(#c)"><rect x="${n(fill * STILL)}" y="0" width="${n(glow)}" height="${HEIGHT}" fill="url(#k)"/></g>`
       : '')
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="${HEIGHT}" viewBox="0 0 ${room} ${HEIGHT}" preserveAspectRatio="none"><style>svg{${LIGHT}}@media (prefers-color-scheme: dark){svg{${DARK}}}.s{display:none}@media (prefers-reduced-motion: reduce){.m{display:none}.s{display:inline}}</style>${body}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="${HEIGHT}" viewBox="0 0 ${room} ${HEIGHT}" preserveAspectRatio="none"><style>svg{${LIGHT}}@media (prefers-color-scheme: dark){svg{${DARK}}}</style>${body}</svg>`
 }

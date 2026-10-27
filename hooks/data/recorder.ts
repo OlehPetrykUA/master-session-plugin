@@ -8,6 +8,7 @@ import { FRESH_MS, REPORTS_SPEC, REPORTS_TOOL, REPORT_SPEC, REPORT_TOOL, applyIn
 import type { Report } from './contract'
 import type { AgentRecord, ReportAgent, ReportRun, Role, SessionState } from '../../types'
 import { MAIN, beginCall, capOf, dropLoop, endCall, hostOf, isShown, isSlow, resetRunning, runOf, runningOf } from './running'
+import { syncTimers } from './timers'
 import { hasBoardFile, parentFromBoards, readBoard, readReport, readReports, writeReport } from './status'
 
 type Held = { text: string; tool: string; state: SessionState; needsYou?: string; by?: string }
@@ -47,8 +48,9 @@ export const isActive = () => isClaimed || role.role === 'worker'
 
 export const isOff = () => isStopped
 
-export const claim = () => {
+export function claim($: EngineInterface) {
   isClaimed = true
+  syncTimers($)
 }
 
 export const inPlan = () => isPlan
@@ -276,6 +278,7 @@ async function detect($: EngineInterface) {
 
 async function adopt($: EngineInterface, next: Role) {
   role = next
+  syncTimers($)
   await saveRole($, next)
   if (!next.parent) {
     await $.tool.register(REPORTS_SPEC)
@@ -303,7 +306,7 @@ async function resume($: EngineInterface) {
     return
   }
   const saved = await getRole($)
-  if (await getBoard($)) claim()
+  if (await getBoard($)) claim($)
   if (saved.role) {
     await adopt($, saved)
     detecting = Promise.resolve()
@@ -488,6 +491,7 @@ export async function startRecorder($: EngineInterface) {
   written = ''
   resetRunning()
   await resume($).catch(() => undefined)
+  syncTimers($)
 }
 
 export async function halt($: EngineInterface) {
@@ -495,6 +499,7 @@ export async function halt($: EngineInterface) {
   current = undefined
   isClaimed = false
   isStopped = true
+  syncTimers($)
   detecting = Promise.resolve()
   await saveRole($, NO_ROLE)
   await saveStopped($, true)
