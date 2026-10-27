@@ -151,9 +151,8 @@ function waitingOnOf(children: readonly AgentRecord[]) {
 
 function askedOf(ask: AgentAsk | string | undefined, who: string, where: string) {
   const text = typeof ask === 'string' ? ask : ask?.text
-  const tool = /^Allow ([^:\s]+)/.exec(text ?? '')?.[1]
-  const question = tool ? '' : clean(text)
-  return [`Needs you: ${who} ${tool ? `asks to use ${tool}` : question ? `asks “${question}”` : 'is waiting for your answer'}`, `Answer in ${where}`]
+  const tool = /^Allow ([A-Za-z0-9_.-]+)(?::|$)/.exec(text ?? '')?.[1]
+  return [`Needs you: ${who} ${tool ? `asks to use ${tool}` : 'is waiting for your answer'}`, `Answer in ${where}`]
 }
 
 function sessionParts(item: Extract<RowItem, { kind: 'session' }>, context: Context, home: string): string[] {
@@ -233,7 +232,8 @@ function archivedParts(item: Extract<RowItem, { kind: 'archived' }>, context: Co
 
 export function statusSentenceOf(item: RowItem, context: Context, home: string): Sentence {
   const parts = item.kind === 'session' ? sessionParts(item, context, home) : item.kind === 'workflow' ? runParts(item, context) : item.kind === 'archived' ? archivedParts(item, context) : agentParts(item, context, home)
+  const raised = item.kind === 'session' && !!item.row.board?.risk
   const risk = item.kind === 'session' ? clean(item.row.board?.risk) : ''
   const body = parts.filter(Boolean).map(stop).join('. ')
-  return { text: `${body}${risk ? `; risk: ${stop(risk)}` : ''}.`, isAlert: item.status === 'needs' || item.status === 'failed' || !!risk }
+  return { text: `${body}${risk ? `; risk: ${stop(risk)}` : raised ? '; it reported a risk' : ''}.`, isAlert: item.status === 'needs' || item.status === 'failed' || raised }
 }

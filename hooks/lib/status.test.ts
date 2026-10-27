@@ -128,6 +128,7 @@ test('taskOf gives the done text, pending, nothing after a give-up, and nothing 
   expect(taskOf(session('working'), ctx())).toBeUndefined()
   expect(taskOf(session('working'), ctx({ tasks: { s1: { state: 'done' } } }))).toBeUndefined()
   expect(taskOf(session('working', {}, { isOwn: false }), ctx({ tasks: { s1: { state: 'pending' } } }))).toBeUndefined()
+  expect(taskOf(session('working'), ctx({ tasks: { s1: { state: 'done', text: 'npm run build && deploy' } } }))).toBeUndefined()
   expect(taskOf(subagent('working', { task: { state: 'done', text: 'Map it.' } }), ctx())).toEqual({ text: 'Map it.' })
   expect(taskOf(subagent('working', { task: { state: 'pending' } }), ctx())).toBe('pending')
   expect(taskOf(subagent('working'), ctx())).toBeUndefined()
@@ -149,7 +150,14 @@ test('R4 session: needs you answers in its chat, the Open chat hint only for a s
   expect(text(subagent('needs', { asking: { text: 'Allow Bash', since: AT } }))).toBe('Needs you: it asks to use Bash. Answer in this chat.')
   expect(text(inRun('needs', runOf([wagent()]), wagent({ asking: { text: 'Allow Bash', since: AT } })))).toBe('Needs you: it asks to use Bash. Answer in this chat.')
   expect(text(session('needs', ask, { isOwn: false }))).toBe('Needs you: it asks to use Bash. Answer in its chat.')
-  expect(text(session('needs', { needsYou: 'Approve the settings.json edit' }))).toBe('Needs you: it asks “Approve the settings.json edit”. Answer in its chat (Open chat on the top row).')
+  expect(text(session('needs', { needsYou: 'Approve the settings.json edit' }))).toBe('Needs you: it is waiting for your answer. Answer in its chat (Open chat on the top row).')
+  expect(text(session('needs', { needsYou: 'Allow mcp__x__y: ~/p' }))).toBe('Needs you: it asks to use mcp__x__y. Answer in its chat (Open chat on the top row).')
+  for (const question of ['Allow the push to master?', 'Should I make it two lines?']) {
+    const shown = text(session('needs', { needsYou: question }))
+    expect(shown).toBe('Needs you: it is waiting for your answer. Answer in its chat (Open chat on the top row).')
+    expect(shown).not.toContain('push')
+    expect(shown).not.toContain('lines')
+  }
   expect(text(session('needs', { needsYou: 'npm run build && deploy' }))).toBe('Needs you: it is waiting for your answer. Answer in its chat (Open chat on the top row).')
 })
 
@@ -213,7 +221,8 @@ test('R4 session: verified, merged, work to keep, done text and not verified', (
 
 test('R4 session: a risk ends the sentence on a red-tint ground, a risk carrying command text is left out', () => {
   expect(statusSentenceOf(session('verified', { sha: 'abc1234', risk: 'key handling unproven on old shells' }), ctx(), HOME)).toEqual({ text: 'Verified at abc1234 and waiting for the merge; risk: key handling unproven on old shells.', isAlert: true })
-  expect(statusSentenceOf(session('working', { risk: 'rm -rf the cache' }), ctx(), HOME)).toEqual({ text: 'Running.', isAlert: false })
+  expect(statusSentenceOf(session('working', { risk: 'rm -rf the cache' }), ctx(), HOME)).toEqual({ text: 'Running; it reported a risk.', isAlert: true })
+  expect(statusSentenceOf(session('working', { risk: 'Make sure the migration runs first' }), ctx(), HOME)).toEqual({ text: 'Running; it reported a risk.', isAlert: true })
   expect(statusSentenceOf(session('working'), ctx(), HOME).isAlert).toBe(false)
 })
 
@@ -226,7 +235,7 @@ test('R4 subagent and workflow agent: running, waiting on a child, needs you, do
   expect(text(subagent('waiting'), ctx({ agents: [child] }))).toBe('Waiting for its subagent “token-finder” to finish: Find where tokens are read.')
   const here = ctx({ rows: [PARENT] })
   expect(text(subagent('needs', { asking: { text: `Allow Bash: ${SECRET}`, since: AT }, parentSessionId: 'p1' }), here)).toBe('Needs you: it asks to use Bash. Answer in Implementer · Env task’s chat.')
-  expect(text(subagent('needs', { asking: { text: 'Which branch?', since: AT } }), here)).toBe('Needs you: it asks “Which branch?”. Answer in this chat.')
+  expect(text(subagent('needs', { asking: { text: 'Which branch?', since: AT } }), here)).toBe('Needs you: it is waiting for your answer. Answer in this chat.')
   const run = runOf([wagent()], { parentSessionId: 'p1' })
   expect(text(inRun('needs', run, wagent({ asking: { text: 'Allow Read: /x', since: AT } })), here)).toBe('Needs you: it asks to use Read. Answer in Implementer · Env task’s chat.')
   const done = { startedAt: AT - 125_000, endedAt: AT, result: 'Found 12 calls.\nignored second line', tokens: 9400 }
@@ -276,7 +285,7 @@ test('activityWordsOf gives at most 3 lines, newest first, drops command lines a
 })
 
 test('isCommandText catches operators, flags, assignments and program words, and passes plain sentences', () => {
-  for (const command of ['a && b', 'a || b', 'ls | wc', 'a; b', 'x > y', 'echo $(date)', 'a `b`', 'tsc -p .', 'run --all', 'TOKEN=abc go', 'git status', 'npm test', 'sudo reboot', 'export A', 'ran npm run build: ok', 'ran npm run build', 'Run git status && ls', 'deploy --token abc', SECRET]) expect([command, isCommandText(command)]).toEqual([command, true])
+  for (const command of ['a && b', 'a || b', 'ls | wc', 'a; b', 'x > y', 'echo $(date)', 'a `b`', 'tsc -p .', 'run --all', 'TOKEN=abc go', 'git status', 'npm test', 'sudo reboot', 'export A', 'ran npm run build: ok', 'ran npm run build', 'Run git status && ls', 'deploy --token abc', 'Make it', 'Python script', SECRET]) expect([command, isCommandText(command)]).toEqual([command, true])
   for (const plain of ['Approve the plan', 'Map the imports before planning', 'merged to main', 'claude plugin test', 'Found 12 calls.', 'Static analysis: game and sys.path', 'Waiting for the review to finish']) expect([plain, isCommandText(plain)]).toEqual([plain, false])
 })
 
