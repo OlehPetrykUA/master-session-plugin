@@ -1,4 +1,5 @@
 import type { BandView } from '../../lib/band'
+import { ELAPSED_GAP, ELAPSED_ICON } from '../../lib/band'
 import { across, tall } from '../../lib/layout'
 import { BAR, BUTTON, CHECK, PERCENT, PILL } from '../../theme/band'
 import { glyph } from '../../theme/icons'
@@ -11,10 +12,14 @@ import { BandButton } from './BandButton'
 
 export type BandProps = { view: BandView }
 
+const NOW_ICON = 12
+
+const LINE_ONE = 20
+
 export function Band(ui: Ui, props: BandProps) {
   const { Box, Text, Svg } = ui
   const { view } = props
-  const { asker, isAllDone, parts, alt, action, showCounts, pillText } = view
+  const { asker, isAllDone, parts, alt, action, showCounts, pillText, now } = view
   const icon = (name: IconName, size: number, tone: Tone, weight = 1.9, alt: string = name) => <Svg source={glyph(name, size, tone, weight)} alt={alt} width={size} height={size} />
   const kind = asker ? 'primary' : 'tint'
   const lead = asker ? (
@@ -48,13 +53,49 @@ export function Band(ui: Ui, props: BandProps) {
       </Text>
     </Box>
   ) : null
+  const bar = (
+    <Box key={`bar-${view.barWidth}-${view.isRunning ? 'run' : 'still'}`} flexDirection="column" alignItems="stretch" flexGrow={1} flexShrink={1} width={0} minWidth={0}>
+      <Svg source={strip({ width: view.barWidth, overall: view.overall, tone: view.tone, isSliding: view.isRunning })} alt={alt} height={6} />
+    </Box>
+  )
+  const line = now ? (
+    <Box flexDirection="row" alignItems="center" gap={across(4)} minWidth={0}>
+      {now.icon ? icon(now.icon.name, NOW_ICON, now.kind === 'done' ? 'green' : 'muted', 2.2, now.icon.alt) : null}
+      <Box flexShrink={1} minWidth={0}>
+        <Text size="footnote" color={C.muted} wrap="truncate-end">
+          {now.kind === 'idle' ? (
+            now.head
+          ) : (
+            <Text weight="semibold" color={C.text}>
+              {now.head}
+            </Text>
+          )}
+          {now.tail ? ' · ' : ''}
+          {now.tail ? <Text mono={now.kind === 'running' || undefined}>{now.tail}</Text> : null}
+          {now.more ? ` ${now.more}` : ''}
+        </Text>
+      </Box>
+    </Box>
+  ) : null
+  const elapsed = view.hasElapsed ? (
+    <Box flexDirection="row" alignItems="center" flexShrink={0} gap={across(ELAPSED_GAP)}>
+      {icon('elapsed', ELAPSED_ICON, 'muted', 2)}
+      <Text size="footnote" color={C.muted} tabular>
+        {view.elapsed}
+      </Text>
+    </Box>
+  ) : null
   return (
     <Box flexDirection="row" alignItems="center" gap={across(view.gap)} height={tall(BAR.height)} paddingLeft={across(view.padLeft)} paddingRight={across(view.padRight)} paddingY={0} borderStyle="round" borderColor={C.border} backgroundColor={C.surface}>
       {lead}
-      <Box key={`bar-${view.barWidth}-${view.isRunning ? 'run' : 'still'}`} flexDirection="column" alignItems="stretch" flexGrow={1} flexShrink={1} width={0} minWidth={0}>
-        <Svg source={strip({ width: view.barWidth, overall: view.overall, tone: view.tone, isSliding: view.isRunning })} alt={alt} height={10} />
+      <Box flexDirection="column" flexGrow={1} flexShrink={1} width={0} minWidth={0} justifyContent="center">
+        <Box flexDirection="row" alignItems="center" gap={across(view.gap)} height={tall(LINE_ONE)}>
+          {bar}
+          {counter}
+        </Box>
+        {line}
       </Box>
-      {counter}
+      {elapsed}
       {action ? BandButton(ui, { name: action.name, label: action.label, accessibleName: action.accessibleName, art: icon(action.icon, BUTTON.icon, KINDS[kind].tone, 1.9, action.accessibleName), onPress: action.press, kind, width: view.actionWidth, isIconOnly: action.isIconOnly }) : null}
     </Box>
   )

@@ -44,7 +44,7 @@ const bandTexts = async ($: Engine) => {
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   const texts = await textsOf(ui)
   await ui.unmount()
-  return texts.map(one => one.replace(/[  ]/g, '').trim())
+  return texts.map(one => one.replace(/[  ]/g, '').trim()).filter(one => /^(\d+%|\d+\/\d+|\d+)$/.test(one))
 }
 
 const lastPlan = (writes: string[]) => (JSON.parse(writes.at(-1) ?? '{}') as { board?: { plan?: PlanPiece[] } }).board?.plan
@@ -103,7 +103,7 @@ test('AC26 /master-session:stop takes the plan with the board: the band draws no
   })
   const run = await master($, on, { plan: PLAN, sessions: [{ id: 'local_setup', name: 'setup-ui-redo', state: 'waiting' }] })
   const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect(await altsOf(band)).toContain('Master session: 50 percent, 1 of 3 done')
+  expect((await altsOf(band)).some(one => String(one).startsWith('Master session: 50 percent, 1 of 3 done.'))).toBe(true)
   await $.command.run(typed(STOP, 'force'))
   await run.clock.settle()
   expect(await altsOf(band)).toEqual([])

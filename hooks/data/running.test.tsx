@@ -632,7 +632,7 @@ async function shapeOf(ui: Mounted, band: Ui) {
   }
 }
 
-test('AC27: no band Text or alt changes with the commands, and AC28: no chip, tile or row group changes and the band draws no working count', async ($, on) => {
+test('AC27: no band Text or alt carries the command text (the tool name may show), and AC28: no chip, tile or row group changes and the band draws no working count', async ($, on) => {
   const child = workChild(workReport({ running: undefined }))
   const run = await master($, on, ['a1'], child, WORK_BOARD)
   await run.clock.advance(FILE_MS)
@@ -644,7 +644,7 @@ test('AC27: no band Text or alt changes with the commands, and AC28: no chip, ti
   await run.clock.advance(FILE_MS)
   expect(await lineOf(ui, 'local_work')).toContain('Bash')
   const after = await shapeOf(ui, band)
-  expect(after.band).toEqual(before.band)
+  expect(JSON.stringify(after.band)).not.toMatch(/npm|silent/)
   expect(after.chips).toEqual(before.chips)
   expect(after.groups).toEqual(before.groups)
   expect(after.alts.filter(alt => /^(Sessions|Needs you|Subagents|Workflows|Commits|Tests|Duration|Git) /.test(String(alt)))).toEqual(before.alts.filter(alt => /^(Sessions|Needs you|Subagents|Workflows|Commits|Tests|Duration|Git) /.test(String(alt))))

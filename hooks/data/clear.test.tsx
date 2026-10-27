@@ -471,10 +471,10 @@ test('AC26 the band drops the archived sessions and keeps the hidden subagent an
   const board = boardOf(fin('local_a'), fin('local_b'), fin('local_c'))
   const child: Child = { git: gitOf(DIRTY), sessions: [live('local_a'), live('local_b'), live('local_c', { cwd: CLEAN })] }
   const { pane, band, clock } = await bandAndPane($, on, board, child, true)
-  expect(await alt(band)).toBe('Master session: all 5 done')
+  expect(await alt(band)).toMatch(/^Master session: all 5 done\./)
   await click(pane, 'hit-clear-done')
   await clock.settle()
-  expect(await alt(band)).toBe('Master session: all 3 done')
+  expect(await alt(band)).toMatch(/^Master session: all 3 done\./)
   expect(await chip(pane, 'archived')).toBe(2)
   await pane.unmount()
   await band.unmount()
@@ -482,11 +482,11 @@ test('AC26 the band drops the archived sessions and keeps the hidden subagent an
 
 test('AC27 the band reads 75 then 62 percent and the working and waiting chips do not move', async ($, on) => {
   const { pane, band, clock } = await bandAndPane($, on, boardOf(WORKER, fin('local_a')), { sessions: [live('local_w', { isRunning: true }), live('local_a')] }, true, false)
-  expect(await alt(band)).toBe('Master session: 75 percent, 2 of 3 done')
+  expect(await alt(band)).toMatch(/^Master session: 75 percent, 2 of 3 done\./)
   expect([await chip(pane, 'working'), await chip(pane, 'waiting')]).toEqual([1, 0])
   await click(pane, 'hit-clear-done')
   await clock.settle()
-  expect(await alt(band)).toMatch(/^Master session: 62 percent, \d of \d done$/)
+  expect(await alt(band)).toMatch(/^Master session: 62 percent, \d of \d done\./)
   expect([await chip(pane, 'working'), await chip(pane, 'waiting')]).toEqual([1, 0])
   await pane.unmount()
   await band.unmount()
@@ -494,7 +494,7 @@ test('AC27 the band reads 75 then 62 percent and the working and waiting chips d
 
 test('AC28 one clean done session and nothing else leaves the band empty', async ($, on) => {
   const { pane, band, clock } = await bandAndPane($, on, boardOf(fin('local_a')), { sessions: [live('local_a')] }, false)
-  expect(await alt(band)).toBe('Master session: all 1 done')
+  expect(await alt(band)).toMatch(/^Master session: all 1 done\./)
   await click(pane, 'hit-clear-done')
   await clock.settle()
   expect(await band.findAll({ type: 'Svg' })).toEqual([])
@@ -518,7 +518,7 @@ test('AC30 after a clear the band count is finished/units and the pane chips sti
   const { pane, band, clock } = await bandAndPane($, on, boardOf(WORKER, waiting, fin('local_a')), { sessions: [live('local_w', { isRunning: true }), live('local_q', { isRunning: true }), live('local_a')] }, true)
   await click(pane, 'hit-clear-done')
   await clock.settle()
-  expect(await alt(band)).toMatch(/^Master session: \d+ percent, \d+ of \d+ done$/)
+  expect(await alt(band)).toMatch(/^Master session: \d+ percent, \d+ of \d+ done\./)
   expect([await chip(pane, 'working'), await chip(pane, 'waiting')]).toEqual([1, 1])
   await pane.unmount()
   await band.unmount()

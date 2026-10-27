@@ -1,4 +1,4 @@
-const HEIGHT = 10
+const HEIGHT = 6
 const FLOOR = 10
 const GLOW_MIN = 16
 const GLOW_SHARE = 0.3

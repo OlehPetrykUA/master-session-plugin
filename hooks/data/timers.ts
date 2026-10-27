@@ -6,6 +6,7 @@ import { elapsedOfItem, lineOf, openIdOf, runAgentsOf } from '../lib/list'
 import type { RowItem } from '../lib/list'
 import { paneViewOf } from '../lib/view'
 import { refreshAgents } from './agents'
+import { bandStale, forgetBand } from './band'
 import { skipWhileBusy } from './flight'
 import { refreshNarrative } from './narrative'
 import { paneData } from './pane'
@@ -23,6 +24,7 @@ export const setColumns = (value: number) => {
 
 export const resetLabels = () => {
   lastLabels = ''
+  forgetBand()
 }
 
 async function tickTimes($: EngineInterface) {
@@ -35,8 +37,9 @@ async function tickTimes($: EngineInterface) {
     const line = lineOf(item, view.context)
     return [elapsedOfItem(item, data.at), line.cmdElapsed ? `${line.text}~${line.cmdElapsed}` : '', openIdOf(item, data.open) ? runningTimeOf(item, data.at) : ''].join('~')
   }
+  const isBand = await bandStale($)
   const labels = [...shown.map(labelOf), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age, view.narrative?.text].join('|')
-  if (labels === lastLabels) return
+  if (labels === lastLabels && !isBand) return
   lastLabels = labels
   $.ui.invalidate('ui.render')
 }
@@ -77,7 +80,10 @@ export function syncTimers($: EngineInterface) {
       LIVE_MS,
       skipWhileBusy(async () => {
         await filesOf($)
-        if (await isMaster($)) await refreshAll($)
+        if (await isMaster($)) {
+          await refreshAll($)
+          if (await bandStale($)) $.ui.invalidate('ui.render')
+        }
         syncTimers($)
       }),
     )

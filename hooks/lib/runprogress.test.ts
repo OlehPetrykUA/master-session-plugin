@@ -52,7 +52,7 @@ const viewOf = (plan: PlanPiece[] | undefined, options: Options = {}) => {
   return bandViewOf(options.columns ?? 100, board, progress, false, counts, { board: () => undefined, chat: () => undefined }, live)
 }
 
-const fillOf = (source: string, tone: string) => Number(source.match(new RegExp(`<path d="M[\\d.]+,0h([\\d.]+)a[^"]*" style="fill:var\\(--${tone}\\)"`))?.[1]) + 10
+const fillOf = (source: string, tone: string) => Number(source.match(new RegExp(`<path d="M[\\d.]+,0h([\\d.]+)a[^"]*" style="fill:var\\(--${tone}\\)"`))?.[1]) + 6
 
 const stripOf = (view: ReturnType<typeof viewOf>) => strip({ width: view.barWidth, overall: view.overall, tone: view.tone, isSliding: view.isRunning })
 
@@ -99,7 +99,7 @@ test('AC7 two done and one dropped with a unit idle read 100%, the dropped piece
 
 test('AC38 a plan with a queued piece and every unit finished reads All N done, N the units, with no percent', () => {
   const view = viewOf([piece('A', 'done'), piece('B', 'queued')], { sessions: [sessionOf('local_a', 'done'), sessionOf('local_b', 'done')], running: [] })
-  expect([view.isAllDone, countsText(view.parts), view.alt, view.hasPercent]).toEqual([true, 'All 2 done', 'Master session: all 2 done', false])
+  expect([view.isAllDone, countsText(view.parts), view.alt, view.hasPercent]).toEqual([true, '', expect.stringMatching(/^Master session: all 2 done\./), false])
 })
 
 test('AC36 seven working sessions with no steps and two subagents read 0% and 0/9, with no counts words', () => {
@@ -125,7 +125,7 @@ test('AC9 a piece moving to done never lowers the percent', () => {
 test('AC10 a plan of one done reads 100%, and a queued piece added next reads 50% and 1/2', () => {
   expect(viewOf([piece('A', 'done')]).percent).toBe(100)
   const view = viewOf([piece('A', 'done'), piece('B', 'queued')], { sessions: ONE_RUNNING })
-  expect([view.percent, countsText(view.parts), view.alt]).toEqual([50, '1/2', 'Master session: 50 percent, 1 of 2 done'])
+  expect([view.percent, countsText(view.parts), view.alt]).toEqual([50, '1/2', expect.stringMatching(/^Master session: 50 percent, 1 of 2 done\./)])
 })
 
 test('AC11 a FAIL sends a verifying piece back to working: the count stays 2 and the percent goes from 45 to 25', () => {
@@ -157,7 +157,7 @@ test('AC14 the count after the percent is done/total: the AC1 plan reads 3/7 in 
 })
 
 test('AC15 the accessible text holds the percent and the piece count', () => {
-  expect(viewOf(WORKED, { agents: [subagent('qa')] }).alt).toBe('Master session: 62 percent, 3 of 7 done')
+  expect(viewOf(WORKED, { agents: [subagent('qa')] }).alt).toMatch(/^Master session: 62 percent, 3 of 7 done\./)
 })
 
 test('AC16 a unit asking the user shows the pill and Open chat, with no percent and no count', () => {
@@ -175,7 +175,7 @@ const TODAY = [sessionOf('local_a', 'waiting', 'step 4 of 5 — x'), sessionOf('
 
 test('without a plan the band computes as today: 80% and 1/4', () => {
   const view = viewOf(undefined, { sessions: TODAY })
-  expect([view.percent, countsText(view.parts), view.alt]).toEqual([80, '1/4', 'Master session: 80 percent, 1 of 4 done'])
+  expect([view.percent, countsText(view.parts), view.alt]).toEqual([80, '1/4', expect.stringMatching(/^Master session: 80 percent, 1 of 4 done\./)])
 })
 
 test('AC19 an empty plan and a plan of only dropped pieces compute as today', () => {
