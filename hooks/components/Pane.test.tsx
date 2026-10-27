@@ -579,3 +579,18 @@ test('a board session whose id equals a subagent id is no row and no Sessions ti
   const after = await tile()
   expect([before, after]).toEqual([2, 1])
 })
+
+test('AC26 and R8: the terminal archived row reads its row line, then Unarchive, and Open only for a session this master started; an open one draws its card', async ($, on) => {
+  await started($, on, BOARD, { sessions: [{ sessionId: 'local_other', name: 'other', title: 'Other', cwd: '/', isRunning: false, isArchived: true, lastActivityAt: '1970-01-01T00:50:00.000Z' }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'filter-archived' })
+  expect([!!(await ui.find({ key: 'unarchive-local_old' })), !!(await ui.find({ key: 'archived-open-local_old' }))]).toEqual([true, true])
+  expect([!!(await ui.find({ key: 'unarchive-local_other' })), !!(await ui.find({ key: 'archived-open-local_other' }))]).toEqual([true, false])
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Validator ›', 'archived']))
+  await ui.press({ key: 'row-open-local_other' })
+  expect(await ui.find({ key: 'detail-local_other' })).toBeDefined()
+  expect(await ui.find({ key: 'archived-open-local_other' })).toBeUndefined()
+  expect(await ui.find({ key: 'unarchive-local_other' })).toBeDefined()
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Archived: ', 'Status: ']))
+  await ui.unmount()
+})

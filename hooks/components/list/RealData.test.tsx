@@ -3,7 +3,7 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord, Board } from '../../../types'
 
-import { across, bodyWidthOf, textWidth } from '../../lib/layout'
+import { across, textWidth } from '../../lib/layout'
 import { foldPath, relativeOf, rowsOf } from '../../lib/list'
 import { rowsOf as sessionRowsOf } from '../../lib/rows'
 import { isFailed, testsOf } from '../../lib/totals'

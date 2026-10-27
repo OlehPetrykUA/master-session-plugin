@@ -34,8 +34,6 @@ async function agentsOf($: Engine) {
   return agents
 }
 
-const hhmm = (ms: number) => `${String(new Date(ms).getHours()).padStart(2, '0')}:${String(new Date(ms).getMinutes()).padStart(2, '0')}`
-
 const gates = new Map<string, () => void>()
 
 const counts = { list: 0 }
@@ -77,7 +75,11 @@ async function hold($: Engine, run: Run, input: Record<string, unknown>) {
 
 type Mounted = Awaited<ReturnType<Engine['ui']['mount']>>
 
-const lineOf = async (ui: Mounted, id: string, scope = 'row') => [await labelOf(ui, `${scope}-${id}-text`), await labelOf(ui, `${scope}-${id}-cmd-dot`), await labelOf(ui, `${scope}-${id}-cmd-elapsed`)].join(' ')
+const runningOf = async (ui: Mounted) => (await textsOf(ui)).map(String).find(text => /^Running/.test(text))
+
+const sentenceOf = async (ui: Mounted, pattern: RegExp) => (await textsOf(ui)).map(String).find(text => pattern.test(text))
+
+const lineTwoOf = (ui: Mounted, id: string, scope = 'row') => labelOf(ui, `${scope}-${id}-line`)
 
 const has = async (ui: Mounted, word: string) => (await textsOf(ui)).some(text => String(text).includes(word))
 
@@ -150,123 +152,147 @@ const invalidations = (on: On) => {
 
 warmUp()
 
-test('AC1: a subagent holding Bash reads "Bash · 1s" on line 2 as three Texts after one tick', async ($, on) => {
+test('AC1: a collapsed subagent row holding Bash reads "Validator › running" on line 2 and nothing of the tool or the command', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, BASH)
   const ui = await pane($)
   await run.clock.advance(TICK_MS)
-  expect(await lineOf(ui, 'a1')).toBe('Bash · 1s')
-  expect(await has(ui, '--silent')).toBe(false)
-  expect(await has(ui, 'npm test')).toBe(false)
+  expect(await lineTwoOf(ui, 'a1')).toBe('Validator ›running')
+  for (const word of ['Bash', '--silent', 'npm test']) expect(await has(ui, word)).toBe(false)
   await end()
   await ui.unmount()
 })
 
-test('AC2: when the call ends the sub-line reads "running" again and no Text holds the command', async ($, on) => {
+test('AC15: an open subagent card holding Bash reads "Running a Bash command for 1s." in its Status, and no part of the command is drawn', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, BASH)
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
+  const ui = await pane($)
+  await run.clock.advance(TICK_MS)
+  expect(await runningOf(ui)).toBe('Running a Bash command for 1s.')
+  expect(await ui.find({ key: 'running-a1' })).toBeUndefined()
+  expect([await has(ui, '--silent'), await has(ui, 'npm test')]).toEqual([false, false])
+  await end()
+  await ui.unmount()
+})
+
+test('AC2: when the call ends the Status reads "Running for Ns." again and no Text holds the command', async ($, on) => {
+  const run = await master($, on)
+  const { end } = await hold($, run, BASH)
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
   await run.clock.advance(TICK_MS)
   await end()
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-text')).toBe('running')
-  expect(await labelOf(ui, 'row-a1-cmd-dot')).toBe('')
+  expect(await runningOf(ui)).toMatch(/^Running for \d+s\.$/)
   expect(await has(ui, 'npm test')).toBe(false)
   await ui.unmount()
 })
 
-test('AC2: a call whose hook fails clears the command at once', async ($, on) => {
+test('AC2: a call whose hook fails clears the tool at once', async ($, on) => {
   const run = await master($, on)
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
   await $.tool.call({ tool_use_id: 'toolu_boom', tool: 'Bash', command: 'boom', agentId: 'a1' } as unknown as Input).catch(() => undefined)
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-text')).toBe('running')
+  expect(await runningOf(ui)).toMatch(/^Running for \d+s\.$/)
   expect(await has(ui, 'boom')).toBe(false)
   await ui.unmount()
 })
 
-test('AC3: a Read of a file under home reads "Read · ~/Work/app/x.ts · 0s" with the home folder drawn as ~', async ($, on) => {
+test('AC16: a Read of a file under home reads "Running Read on ~/Work/app/x.ts for 0s." with the home folder drawn as ~', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, { tool: 'Read', file_path: '/home/me/Work/app/x.ts', agentId: 'a1' })
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
-  expect(await lineOf(ui, 'a1')).toBe('Read · ~/Work/app/x.ts · 0s')
+  expect(await runningOf(ui)).toBe('Running Read on ~/Work/app/x.ts for 0s.')
   await end()
   await ui.unmount()
 })
 
-test('AC3: a WebFetch reads its host only', async ($, on) => {
+test('AC15: a WebFetch reads its host only', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, { tool: 'WebFetch', url: 'https://api.x.dev/v1?token=wf3secret', agentId: 'a1' })
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
-  expect(await lineOf(ui, 'a1')).toBe('WebFetch · api.x.dev · 0s')
+  expect(await runningOf(ui)).toBe('Running WebFetch on api.x.dev for 0s.')
   expect(await has(ui, 'wf3secret')).toBe(false)
   await end()
   await ui.unmount()
 })
 
-test('AC4: workflow agents show their own tools in the opened run card and the run row line is the same as without them', async ($, on) => {
+test('AC4: workflow agents show their own tools in their opened card and the run row line is the same as without them', async ($, on) => {
   const run = await master($, on, ['w0', 'w1'])
   await $.agent.spawn({ ...SPAWN, description: 'scan a', subagentType: 'workflow-subagent', workflow: { runId: 'r1', agentIndex: 0 } })
   await $.agent.spawn({ ...SPAWN, description: 'scan b', subagentType: 'workflow-subagent', workflow: { runId: 'r1', agentIndex: 1 } })
   await $.tool.call({ tool: OPEN, expand: 'r1' })
   const quiet = await pane($)
-  const before = await labelOf(quiet, 'top-r1-text')
+  const before = await lineTwoOf(quiet, 'r1', 'top')
   await quiet.unmount()
   const first = await hold($, run, { tool: 'Bash', command: 'ls -la /tmp', agentId: 'w0' })
   const second = await hold($, run, { tool: 'Grep', pattern: 'TODO', agentId: 'w1' })
-  const ui = await pane($)
-  expect(await lineOf(ui, 'w0')).toBe('Bash · 0s')
-  expect(await lineOf(ui, 'w1')).toBe('Grep · 0s')
-  expect([await has(ui, '/tmp'), await has(ui, 'TODO')]).toEqual([false, false])
-  expect(await labelOf(ui, 'top-r1-text')).toBe(before)
-  expect(before).toBe('scan b')
+  await $.tool.call({ tool: OPEN, expand: 'w0' })
+  const one = await pane($)
+  expect(await sentenceOf(one, /^Running a Bash command/)).toBe('Running a Bash command for 0s.')
+  expect(await lineTwoOf(one, 'r1', 'top')).toBe(before)
+  await one.unmount()
+  await $.tool.call({ tool: OPEN, expand: 'w1' })
+  const two = await pane($)
+  expect(await sentenceOf(two, /^Running Grep/)).toBe('Running Grep for 0s.')
+  expect([await has(two, '/tmp'), await has(two, 'TODO')]).toEqual([false, false])
+  expect(before).toBe('Validator ›running')
   await first.end()
   await second.end()
-  await ui.unmount()
+  await two.unmount()
 })
 
-test('AC5: overlapping calls show the newest still running, then the older one, then "running"', async ($, on) => {
+test('AC5: overlapping calls show the newest still running, then the older one, then "Running for Ns."', async ($, on) => {
   const run = await master($, on)
   const bash = await hold($, run, { tool: 'Bash', command: 'sleep 5', agentId: 'a1' })
   await run.clock.advance(1_000)
   const read = await hold($, run, { tool: 'Read', file_path: '/home/me/x.ts', agentId: 'a1' })
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-text')).toBe('Read · ~/x.ts')
+  expect(await runningOf(ui)).toMatch(/^Running Read on ~\/x\.ts for \d+s\.$/)
   await read.end()
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-text')).toBe('Bash')
+  expect(await runningOf(ui)).toMatch(/^Running a Bash command for \d+s\.$/)
   await bash.end()
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-text')).toBe('running')
+  expect(await runningOf(ui)).toMatch(/^Running for \d+s\.$/)
   await ui.unmount()
 })
 
-test('AC6: turn.complete for the loop before the call ends takes the agent out of Working and leaves no command in the pane', async ($, on) => {
+test('AC6: turn.complete for the loop before the call ends takes the agent out of Working and leaves no tool in the pane', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, BASH)
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-text')).toBe('Bash')
+  expect(await runningOf(ui)).toBe('Running a Bash command for 1s.')
   await $.turn.complete({ answer: 'done', durationMs: 5, isAborted: false, turnId: 't1', agentId: 'a1', reason: 'answer' })
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-cmd-elapsed')).toBe('')
+  expect(await runningOf(ui)).toBeUndefined()
+  expect(await sentenceOf(ui, /^Done in /)).toBeDefined()
+  expect(await has(ui, 'Bash')).toBe(false)
   await end()
   await ui.unmount()
 })
 
-test('AC7: after a hot reload the sub-line reads "running" until the loop makes its next call', async ($, on) => {
+test('AC7: after a hot reload the Status reads "Running for Ns." until the loop makes its next call', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, BASH)
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-text')).toBe('Bash')
+  expect(await runningOf(ui)).toMatch(/^Running a Bash command/)
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-text')).toBe('running')
+  expect(await runningOf(ui)).toMatch(/^Running for \d+s\.$/)
   const next = await hold($, run, { tool: 'Bash', command: 'ls', agentId: 'a1' })
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-text')).toBe('Bash')
+  expect(await runningOf(ui)).toMatch(/^Running a Bash command/)
   await next.end()
   await end()
   await ui.unmount()
@@ -282,73 +308,70 @@ test('AC8: the master’s own main loop is never shown', async ($, on) => {
   await ui.unmount()
 })
 
-test('AC9: Agent, Workflow, AskUserQuestion and the mod’s own tools are not shown as commands, and a question shows the needs-you ask', async ($, on) => {
+test('AC9: Agent, Workflow and the mod’s own tools are not shown as tools, and a question gives the needs-you sentence without the question', async ($, on) => {
   const run = await master($, on)
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
   const calls = [{ tool: 'Agent', description: 'x', prompt: 'x', subagent_type: 'Explore' }, { tool: 'Workflow', script: 'export const meta = { phases: [] }' }, { tool: OPEN }]
   for (const call of calls) {
     const held = await hold($, run, { ...call, agentId: 'a1' })
     await run.clock.advance(TICK_MS)
-    expect([call.tool, await labelOf(ui, 'row-a1-cmd-elapsed')]).toEqual([call.tool, ''])
+    expect([call.tool, await runningOf(ui)]).toEqual([call.tool, expect.stringMatching(/^Running for \d+s\.$/)])
     await held.end()
   }
   const asking = await hold($, run, { tool: 'AskUserQuestion', questions: [{ question: 'Which branch?' }], agentId: 'a1' })
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'row-a1-cmd-elapsed')).toBe('')
-  expect(await has(ui, 'Which branch?')).toBe(true)
+  expect(await runningOf(ui)).toBeUndefined()
+  expect(await has(ui, 'Which branch?')).toBe(false)
+  expect(await textsOf(ui)).toContain('Needs you: it is waiting for your answer. Answer in this chat.')
   await asking.end()
   await ui.unmount()
 })
 
-test('AC10: the opened card holds a Running block with the tool and "since HH:MM · 1s", no command', async ($, on) => {
+test('AC10: the opened card has no Running block: the Status holds the tool and its span, no command', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, BASH)
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
   await run.clock.advance(TICK_MS)
-  expect(await ui.find({ key: 'running-a1' })).toBeDefined()
-  expect((await textsOf(ui)).map(String)).toContain('Bash')
-  expect(await ui.find({ key: 'running-a1-text' })).toBeUndefined()
+  expect(await ui.find({ key: 'running-a1' })).toBeUndefined()
+  expect(await ui.find({ key: 'running-a1-since' })).toBeUndefined()
+  expect(await runningOf(ui)).toBe('Running a Bash command for 1s.')
   expect(await has(ui, '--silent')).toBe(false)
-  expect(await labelOf(ui, 'running-a1-since')).toBe(`since ${hhmm(NOW)} · 1s`)
   await end()
   await ui.unmount()
 })
 
-test('AC11: a chain reads just "Bash" on the row and in the card', async ($, on) => {
+test('AC11: a chain reads just "a Bash command" in the card', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, { tool: 'Bash', command: 'cd /srv && git fetch origin && git rebase origin/main && bun test', agentId: 'a1' })
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
-  expect(await ui.find({ key: 'running-a1-text' })).toBeUndefined()
-  expect(await labelOf(ui, 'top-a1-text')).toBe('Bash')
+  expect(await runningOf(ui)).toBe('Running a Bash command for 0s.')
   expect([await has(ui, 'fetch'), await has(ui, 'rebase')]).toEqual([false, false])
   await end()
   await ui.unmount()
 })
 
-test('AC40: an array assignment reads just "Bash" on the row and in the card, and neither its secret nor mysql shows', async ($, on) => {
+test('AC40: an array assignment reads just "a Bash command" in the card, and neither its secret nor mysql shows', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, { tool: 'Bash', command: 'ARGS=(--password X40) && mysql "${ARGS[@]}"', agentId: 'a1' })
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
-  expect(await lineOf(ui, 'a1', 'top')).toBe('Bash · 0s')
-  expect(await ui.find({ key: 'running-a1-text' })).toBeUndefined()
-  expect((await textsOf(ui)).map(String)).toContain('Bash')
+  expect(await runningOf(ui)).toBe('Running a Bash command for 0s.')
   expect([await has(ui, 'mysql'), await has(ui, 'X40')]).toEqual([false, false])
   await end()
   await ui.unmount()
 })
 
-test('AC13: a running agent with no call has no Running block, "running" on its sub-line and no placeholder', async ($, on) => {
+test('AC13: a running agent with no call has no Running block and "Running for Ns." in its Status, no placeholder', async ($, on) => {
   const run = await master($, on)
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
   await run.clock.advance(TICK_MS)
   expect(await ui.find({ key: 'running-a1' })).toBeUndefined()
-  expect(await labelOf(ui, 'top-a1-text')).toBe('running')
-  expect(await labelOf(ui, 'top-a1-cmd-dot')).toBe('')
-  expect(await has(ui, 'Running')).toBe(false)
+  expect(await lineTwoOf(ui, 'a1', 'top')).toBe('Validator ›running')
+  expect(await runningOf(ui)).toMatch(/^Running for \d+s\.$/)
   await ui.unmount()
 })
 
@@ -423,24 +446,30 @@ test('AC16: a worker’s subagent Bash writes running on its report agent once a
   expect(mine().length).toBe(before + 2)
 })
 
-test('AC17: a Working worker row reads "Bash · 17s" from its report and keeps its step count', async ($, on) => {
+test('AC17: a Working worker row keeps its step count and reads "Validator › running"; its open card reads the tool from its report', async ($, on) => {
   const run = await started($, on, WORK_BOARD, workChild(workReport()))
   const ui = await pane($)
   await run.clock.advance(FILE_MS)
-  expect(await lineOf(ui, 'local_work')).toBe('Bash · 17s')
+  expect(await lineTwoOf(ui, 'local_work')).toBe('Validator ›running')
   expect(await altsOf(ui)).toContain('2 of 4')
+  expect(await has(ui, 'Bash')).toBe(false)
   await ui.unmount()
+  await $.tool.call({ tool: OPEN, expand: 'local_work' })
+  const open = await pane($)
+  expect(await runningOf(open)).toBe('Running a Bash command for 17s, step 2 of 4: build.')
+  await open.unmount()
 })
 
-test('AC18: when the report is rewritten without running the sub-line reads the step label again', async ($, on) => {
+test('AC18: when the report is rewritten without running the Status reads the step label again', async ($, on) => {
   const child = workChild(workReport())
   const run = await started($, on, WORK_BOARD, child)
+  await $.tool.call({ tool: OPEN, expand: 'local_work' })
   const ui = await pane($)
   await run.clock.advance(FILE_MS)
-  expect(await labelOf(ui, 'row-local_work-text')).toBe('Bash')
+  expect(await runningOf(ui)).toMatch(/^Running a Bash command/)
   child.files = { ...child.files, [reportPath(HOME, 'local_work')]: workReport({ seq: 2, running: undefined }) }
   await run.clock.advance(FILE_MS)
-  expect(await labelOf(ui, 'row-local_work-text')).toBe('build')
+  expect(await runningOf(ui)).toBe('Running: build.')
   await ui.unmount()
 })
 
@@ -460,21 +489,23 @@ test('AC19: a worker whose report says run.isRunning is false shows no command',
   await ui.unmount()
 })
 
-test('AC20: a worker’s report agent shows its own command and its elapsed', async ($, on) => {
+test('AC20: a worker’s report agent reads its own tool and span in its open card', async ($, on) => {
   const agent = { id: 'b1', type: 'general-purpose', description: 'Check one', state: 'running', startedAt: NOW - 20_000, running: { tool: 'Bash', since: NOW - 2_000 } }
   const run = await started($, on, WORK_BOARD, workChild(workReport({ running: undefined, agents: [agent] })))
-  const ui = await pane($)
   await run.clock.advance(FILE_MS)
-  expect(await lineOf(ui, 'b1')).toBe('Bash · 7s')
+  await $.tool.call({ tool: OPEN, expand: 'b1' })
+  const ui = await pane($)
+  expect(await runningOf(ui)).toBe('Running a Bash command for 7s.')
   await ui.unmount()
 })
 
-test('AC21: a worker that needs you shows the ask and not its command', async ($, on) => {
+test('AC21: a worker that needs you says it waits for an answer, not what it asks and not its command', async ($, on) => {
   const run = await started($, on, WORK_BOARD, workChild(workReport({ state: 'needs-you', needsYou: 'Approve the push', modelAt: NOW })))
   await run.clock.advance(FILE_MS)
   await $.tool.call({ tool: OPEN, expand: 'local_work' })
   const ui = await pane($)
-  expect(await has(ui, 'Approve the push')).toBe(true)
+  expect(await has(ui, 'Approve the push')).toBe(false)
+  expect(await sentenceOf(ui, /^Needs you: it is waiting for your answer\. Answer in its chat/)).toBeDefined()
   expect(await has(ui, 'npm test')).toBe(false)
   expect(await ui.find({ key: 'running-local_work' })).toBeUndefined()
   await ui.unmount()
@@ -487,7 +518,7 @@ test('AC23: a master’s card, pane and agents state never hold the secrets of a
   const ui = await pane($)
   await run.clock.advance(TICK_MS)
   expect(await ui.find({ key: 'running-a1-text' })).toBeUndefined()
-  expect(await labelOf(ui, 'top-a1-text')).toBe('Bash')
+  expect(await runningOf(ui)).toBe('Running a Bash command for 1s.')
   const body = await bodyOf(ui)
   const state = JSON.stringify(await agentsOf($))
   expect(['curl', 'abc123', 'k123', 'api.x.dev'].flatMap(word => [body.includes(word), state.includes(word)])).toEqual([false, false, false, false, false, false, false, false])
@@ -507,18 +538,21 @@ test('AC23: a worker’s written reports never hold the secrets of its held comm
 test('AC37: a WebSearch reads its tool name only', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, { tool: 'WebSearch', query: 'bun docs api_key=k37', agentId: 'a1' })
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
-  expect(await lineOf(ui, 'a1')).toBe('WebSearch · 0s')
+  expect(await runningOf(ui)).toBe('Running WebSearch for 0s.')
   expect(await has(ui, 'k37')).toBe(false)
   await end()
   await ui.unmount()
 })
 
-test('AC39: a permission request for a command puts only "Allow Bash" in the pane and the band', { plugins: [PROBE] }, async ($, on) => {
+test('AC39: a permission request for a command puts only the tool name in the pane card and "Allow Bash" in the band', { plugins: [PROBE] }, async ($, on) => {
   await master($, on)
   await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'mysql -p hunter2' }, agent_id: 'a1' } as never)
+  await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
-  expect(await has(ui, 'Allow Bash')).toBe(true)
+  expect(await textsOf(ui)).toContain('Needs you: it asks to use Bash. Answer in this chat.')
+  expect(await has(ui, 'Allow Bash')).toBe(false)
   const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
   const bandBody = JSON.stringify([await textsOf(band), await altsOf(band)])
   expect([await has(ui, 'mysql'), await has(ui, 'hunter2'), JSON.stringify(await agentsOf($)).includes('hunter2'), bandBody.includes('hunter2')]).toEqual([false, false, false, false])
@@ -530,14 +564,17 @@ test('AC38: for every credential command, the master’s pane, card and ask hold
   const run = await master($, on)
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
+  const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
   for (const [, command, secrets] of CREDENTIALS) {
     const held = await hold($, run, { tool: 'Bash', command, agentId: 'a1' })
     await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command }, agent_id: 'a1' } as never)
-    const all = JSON.stringify([await textsOf(ui), await altsOf(ui)])
+    const all = JSON.stringify([await textsOf(ui), await altsOf(ui), await textsOf(terminal)])
     expect(await ui.find({ key: 'running-a1-text' })).toBeUndefined()
     expect(secrets.filter(secret => all.includes(secret))).toEqual([])
+    expect(await sentenceOf(ui, /^Needs you: it asks to use Bash\. Answer in this chat\.$/)).toBeDefined()
     await held.end()
   }
+  await terminal.unmount()
   await ui.unmount()
 })
 
@@ -642,7 +679,7 @@ test('AC27: no band Text or alt carries the command text (the tool name may show
   const held = await hold($, run, BASH)
   child.files = { ...child.files, [reportPath(HOME, 'local_work')]: workReport({ seq: 2 }) }
   await run.clock.advance(FILE_MS)
-  expect(await lineOf(ui, 'local_work')).toContain('Bash')
+  expect(await lineTwoOf(ui, 'local_work')).toBe('Validator ›running')
   const after = await shapeOf(ui, band)
   expect(JSON.stringify(after.band)).not.toMatch(/npm|silent/)
   expect(after.chips).toEqual(before.chips)
@@ -675,47 +712,57 @@ test('AC29: the board file and the reports tool answer carry no running key and 
   await held.end()
 })
 
-test('AC30: on the terminal the row tail reads "Bash · 1s" (one Text per row, the three pieces joined)', async ($, on) => {
+test('AC30: on the terminal the closed row tail reads the model and elapsed only: no tool, no command', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, BASH)
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await run.clock.advance(TICK_MS)
-  expect((await textsOf(ui)).map(String).some(text => text.includes('Bash · 1s'))).toBe(true)
+  const texts = (await textsOf(ui)).map(String)
+  expect(texts.some(text => text.includes('Bash') || text.includes('npm'))).toBe(false)
+  expect(texts).toEqual(expect.arrayContaining(['Validator ›', 'running']))
   await end()
   await ui.unmount()
 })
 
-test('AC31: on the terminal the opened detail holds one line "Running · Bash · since HH:MM"', async ($, on) => {
+test('AC31 and AC29: on the terminal the opened detail holds the Status line, identical to the desktop sentence', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, BASH)
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const desktop = await pane($)
   await run.clock.advance(TICK_MS)
-  expect(await labelOf(ui, 'running-a1')).toBe(`Running · Bash · since ${hhmm(NOW)}`)
+  const texts = (await textsOf(ui)).map(String)
+  expect(texts[texts.indexOf('Status: ') + 1]).toBe('Running a Bash command for 1s.')
+  expect(await runningOf(desktop)).toBe(texts[texts.indexOf('Status: ') + 1])
+  expect(texts.some(text => text.includes('npm') || text.includes('--silent'))).toBe(false)
   await end()
+  await desktop.unmount()
   await ui.unmount()
 })
 
-test('AC34: under 340 px the sub-line drops the row’s own elapsed while a command shows and brings it back when the call ends', async ($, on) => {
+test('AC34: under 340 px the elapsed stays on line 1 and the Status reads the same while a tool shows and after it ends', async ($, on) => {
   const run = await master($, on)
   const { end } = await hold($, run, BASH)
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($, { bodyColumns: 40 })
   await run.clock.advance(TICK_MS)
-  expect(await lineOf(ui, 'a1', 'top')).toBe('Bash · 1s')
+  expect(await runningOf(ui)).toBe('Running a Bash command for 1s.')
+  expect(await ui.find({ key: 'top-a1-elapsed-box' })).toBeDefined()
   expect(await ui.find({ key: 'top-a1-elapsed-narrow' })).toBeUndefined()
   expect(await labelOf(ui, 'time-a1')).toContain('running 1s')
   await end()
   await run.clock.advance(TICK_MS)
-  expect(await ui.find({ key: 'top-a1-elapsed-narrow' })).toBeDefined()
+  expect(await ui.find({ key: 'top-a1-elapsed-box' })).toBeDefined()
+  expect(await runningOf(ui)).toMatch(/^Running for \d+s\.$/)
   await ui.unmount()
 })
 
-test('AC33: the tick redraws once per second while the command shows seconds, once a minute at minutes, and once when the call ends', async ($, on) => {
+test('AC33: the tick redraws once per second while the open card’s sentence shows seconds, and the sentence moves to minutes and back to "Running for" when the call ends', async ($, on) => {
   const all: Record<string, unknown> = {
     agents: [{ id: 'a1', type: 'Explore', description: 'Find callers', prompt: 'go', task: { state: 'done', text: 'Finds callers.' }, state: 'running', startedAt: NOW - 120_000 }],
     workflows: [],
     live: { self: SELF, title: '', sessions: [], error: '', at: NOW - 600_000 },
+    expanded: 'a1',
   }
   on('state.get', async (_, e, next) => {
     const real = (await next(e)) as { value: { value: unknown; version: number } }
@@ -729,19 +776,13 @@ test('AC33: the tick redraws once per second while the command shows seconds, on
   for (const second of [2, 3, 4, 5]) {
     const before = drawn.count
     await run.clock.advance(TICK_MS)
-    expect([await lineOf(ui, 'a1'), drawn.count - before]).toEqual([`Bash · ${second}s`, 1])
+    expect([await runningOf(ui), drawn.count - before]).toEqual([`Running a Bash command for ${second}s.`, 1])
   }
   await run.clock.advance(61_000)
-  expect(await lineOf(ui, 'a1')).toBe('Bash · 1m')
-  const quiet = drawn.count
-  await run.clock.advance(5 * TICK_MS)
-  expect(drawn.count - quiet).toBe(0)
+  expect(await runningOf(ui)).toBe('Running a Bash command for 1m.')
   await end()
-  const ended = drawn.count
   await run.clock.advance(TICK_MS)
-  expect([drawn.count - ended, await labelOf(ui, 'row-a1-text')]).toEqual([1, 'running'])
-  await run.clock.advance(5 * TICK_MS)
-  expect(drawn.count - ended).toBe(1)
+  expect(await runningOf(ui)).toMatch(/^Running for \d+m\.$/)
   await ui.unmount()
 })
 
@@ -799,19 +840,21 @@ test('tick: the same agent with its card closed redraws not at all past a minute
 
 const keysOf = async (ui: Mounted) => (await ui.findAll({ type: 'Box' })).map(box => box.key ?? '').filter(Boolean)
 
-test('D3: the Running block comes first on an agent card, above Task, and on a session card above Now and Next', async ($, on) => {
+test('D3: the Status block follows the Name block on an agent card and a session card, with no Running block anywhere', async ($, on) => {
   const run = await master($, on, ['a1'], workChild(workReport()), WORK_BOARD)
   const { end } = await hold($, run, BASH)
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
   const agent = await keysOf(ui)
-  expect(agent.indexOf('running-a1')).toBeGreaterThan(-1)
-  expect(agent.indexOf('running-a1')).toBeLessThan(agent.indexOf('task-a1'))
+  expect(agent.indexOf('name-a1')).toBeGreaterThan(-1)
+  expect(agent.indexOf('status-a1')).toBeGreaterThan(agent.indexOf('name-a1'))
+  expect(agent.some(key => key.startsWith('running-'))).toBe(false)
   await $.tool.call({ tool: OPEN, expand: 'local_work' })
   await run.clock.advance(FILE_MS)
   const session = await keysOf(ui)
-  expect(session.indexOf('running-local_work')).toBeGreaterThan(-1)
-  expect(session.indexOf('running-local_work')).toBeLessThan(session.indexOf('pair-now-local_work'))
+  expect(session.indexOf('status-local_work')).toBeGreaterThan(session.indexOf('name-local_work'))
+  expect(session.indexOf('status-local_work')).toBeLessThan(session.indexOf('pair-now-local_work'))
+  expect(session.some(key => key.startsWith('running-'))).toBe(false)
   await end()
   await ui.unmount()
 })
@@ -864,18 +907,22 @@ test('AC14: a report write that failed is retried by the next call, whatever its
   await held.end()
 })
 
-test('AC41: a seeded 400-character running.text of a WebFetch is cut on the master’s read-back, and a Bash text is dropped', async ($, on) => {
+test('AC41: a seeded 400-character running.text of a WebFetch that is neither a path nor a URL gives "a WebFetch command" and is drawn nowhere', async ($, on) => {
   const run = await started($, on, WORK_BOARD, workChild(workReport({ running: { tool: 'WebFetch', text: 'x'.repeat(400), since: NOW - 12_000 } })))
+  await $.tool.call({ tool: OPEN, expand: 'local_work' })
   const ui = await pane($)
   await run.clock.advance(FILE_MS)
-  expect(await labelOf(ui, 'row-local_work-text')).toBe(`WebFetch · ${'x'.repeat(160)}…`)
+  expect(await runningOf(ui)).toBe('Running a WebFetch command for 17s, step 2 of 4: build.')
+  expect(await has(ui, 'xxxx')).toBe(false)
   await ui.unmount()
 })
 
 test('AC41: a seeded Bash text in a report is never read back', async ($, on) => {
   const run = await started($, on, WORK_BOARD, workChild(workReport({ running: { tool: 'Bash', text: 'mysql Xk9wq2Lm', since: NOW - 12_000 } })))
+  await $.tool.call({ tool: OPEN, expand: 'local_work' })
   const ui = await pane($)
   await run.clock.advance(FILE_MS)
-  expect(await lineOf(ui, 'local_work')).toBe('Bash · 17s')
+  expect(await runningOf(ui)).toBe('Running a Bash command for 17s, step 2 of 4: build.')
+  expect(await has(ui, 'Xk9wq2Lm')).toBe(false)
   await ui.unmount()
 })

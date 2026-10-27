@@ -159,7 +159,7 @@ const WITH_SESSION = { ...BOARD, sessions: [...BOARD.sessions, { id: 'local_abc1
 
 async function master($: Engine, on: On, session?: string) {
   loops(on, { session })
-  return started($, on, WITH_SESSION)
+  return started($, on, WITH_SESSION, { sessions: [{ sessionId: 'local_abc123', name: 'row-model', title: 'Row model', cwd: HOME, isRunning: true, isArchived: false, lastActivityAt: '1970-01-01T00:59:00.000Z', startedBy: SELF }] })
 }
 
 const pane = ($: Engine, surface: 'desktop' | 'terminal' = 'desktop', columns = 60) => $.ui.mount({ ...PANE, surface, props: { ...PANE.props, bodyColumns: columns } } as never)
@@ -170,13 +170,13 @@ const open = async ($: Engine, id: string) => void (await $.tool.call({ tool: OP
 
 const textsIn = (node: unknown): string[] => (typeof node === 'string' ? [node] : Array.isArray(node) ? node.flatMap(textsIn) : node && typeof node === 'object' ? textsIn((node as { children?: unknown }).children) : [])
 
-const titleOf = async (ui: Awaited<ReturnType<typeof pane>>, id: string) => textsIn((await ui.find({ key: `task-title-${id}` }))?.children).join(' ')
+const titleOf = async (ui: Awaited<ReturnType<typeof pane>>, id: string) => (textsIn((await ui.find({ key: `name-${id}` }))?.children)[1] ?? '').replace(/^.*? · /, '')
 
 const orderOf = async (ui: Awaited<ReturnType<typeof pane>>, key: string) => ((await ui.find({ key }))?.children ?? []).map(one => String((one as { props?: { key?: string }; type?: string }).props?.key ?? (one as { type?: string }).type))
 
 const plainOf = async (ui: Awaited<ReturnType<typeof pane>>, id: string) => {
-  const found = await ui.find({ key: `task-plain-${id}` })
-  return found ? textsIn(found.children).join('') : undefined
+  const found = await ui.find({ key: `task-${id}` })
+  return found ? textsIn(found.children).slice(1).join('') : undefined
 }
 
 const SENTENCES = (count: number) => Array.from({ length: count }, () => 'Adds a small label with the model name to every row of the pane list so each row shows which model it runs on.').join(' ')
@@ -237,18 +237,19 @@ test('AC4: six workflow agents at once keep at most two requests open, and relea
   expect((await atomsOf($)).agents.map(one => one.task?.state)).toEqual(Array(6).fill('done'))
 })
 
-test('AC5: while the call is held the card shows the short name in semibold and Describing… muted', async ($, on) => {
+test('AC10: while the call is held the Name block shows the whole name in semibold and the Task block says Describing… muted, with no title line', async ($, on) => {
   const held = holding(on)
   const run = await master($, on)
   await spawn($)
   await run.clock.settle()
   const ui = await pane($)
   await open($, 'a1')
-  const title = await ui.find({ key: 'task-title-a1' })
-  const plain = await ui.find({ key: 'task-plain-a1' })
-  expect(textsIn(title?.children).join(' ')).toBe('Row model')
+  const title = await ui.find({ key: 'name-a1' })
+  const plain = await ui.find({ key: 'task-a1' })
+  expect(await titleOf(ui, 'a1')).toBe('Row model')
   expect(JSON.stringify(title?.children)).toContain('"weight":"semibold"')
-  expect(textsIn(plain?.children).join('')).toBe('Describing…')
+  expect(await ui.find({ key: 'task-title-a1' })).toBeUndefined()
+  expect(textsIn(plain?.children).slice(1).join('')).toBe('Describing…')
   expect(JSON.stringify(plain?.children)).toContain(`"color":"${C.muted}"`)
   held.release()
   await ui.unmount()
@@ -278,7 +279,7 @@ test('AC7: at 47 columns a 420 character reply shows whole, never ending with �
   await run.clock.settle()
   const ui = await pane($, 'desktop', 47)
   await open($, 'a1')
-  const texts = textsIn((await ui.find({ key: 'task-plain-a1' }))?.children)
+  const texts = textsIn((await ui.find({ key: 'task-a1' }))?.children).slice(1)
   expect(texts.join('')).toBe(reply)
   expect(reply.length).toBe(420)
   expect(texts.some(one => one.endsWith('…'))).toBe(false)
@@ -297,9 +298,7 @@ test('AC8: a Workflow call describes from its meta description, phases and scrip
   expect(await titleOf(ui, 'wf_1')).toBe('row-model')
   expect(await plainOf(ui, 'wf_1')).toBe(T)
   const keys = await orderOf(ui, 'body-wf_1')
-  expect(keys.indexOf('Svg')).toBeGreaterThan(-1)
-  expect(keys.indexOf('task-wf_1')).toBeGreaterThan(keys.indexOf('Svg'))
-  expect(keys.indexOf('agents-wf_1')).toBeGreaterThan(keys.indexOf('task-wf_1'))
+  expect(keys.slice(0, 5)).toEqual(['name-wf_1', 'task-wf_1', 'status-wf_1', 'phases-wf_1', 'agents-wf_1'])
   await ui.unmount()
 })
 
@@ -328,7 +327,7 @@ test('AC10: a start_session call describes the new session from its prompt and t
   expect(await titleOf(ui, 'local_abc123')).toBe('Row model')
   expect(await plainOf(ui, 'local_abc123')).toBe(T)
   const keys = await orderOf(ui, 'body-local_abc123')
-  expect(keys.indexOf('task-local_abc123')).toBeGreaterThan(-1)
+  expect(keys.slice(0, 3)).toEqual(['name-local_abc123', 'task-local_abc123', 'status-local_abc123'])
   expect(keys.indexOf('pair-now-local_abc123')).toBeGreaterThan(keys.indexOf('task-local_abc123'))
   await ui.unmount()
 })
@@ -344,8 +343,8 @@ test('AC11: api-error, empty-reply, aborted and the 30 s timeout all leave the s
   const ui = await pane($)
   for (const id of ['a1', 'a2', 'a3', 'a4']) {
     await open($, id)
-    expect(await ui.find({ key: `task-title-${id}` })).toBeDefined()
-    expect(await ui.find({ key: `task-plain-${id}` })).toBeUndefined()
+    expect(await ui.find({ key: `name-${id}` })).toBeDefined()
+    expect(await ui.find({ key: `task-${id}` })).toBeUndefined()
   }
   expect((await textsOf(ui)).includes('Describing…')).toBe(false)
   await ui.unmount()
@@ -360,11 +359,11 @@ test('AC12: a hot reload while the call is held shows the short name only and ma
   await run.clock.settle()
   const ui = await pane($)
   await open($, 'a1')
-  expect(await ui.find({ key: 'task-title-a1' })).toBeDefined()
-  expect(await ui.find({ key: 'task-plain-a1' })).toBeUndefined()
+  expect(await ui.find({ key: 'name-a1' })).toBeDefined()
+  expect(await ui.find({ key: 'task-a1' })).toBeUndefined()
   held.release()
   await run.clock.settle()
-  expect(await ui.find({ key: 'task-plain-a1' })).toBeUndefined()
+  expect(await ui.find({ key: 'task-a1' })).toBeUndefined()
   expect(held.seen.length).toBe(1)
   await ui.unmount()
 })
@@ -398,8 +397,8 @@ test('AC14: no call for a session start_session did not start, an agent only age
   expect(seen.length).toBe(0)
   const ui = await pane($)
   await open($, 'local_env')
-  expect(await ui.find({ key: 'task-title-local_env' })).toBeDefined()
-  expect(await ui.find({ key: 'task-plain-local_env' })).toBeUndefined()
+  expect(await ui.find({ key: 'name-local_env' })).toBeDefined()
+  expect(await ui.find({ key: 'task-local_env' })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -412,8 +411,8 @@ test('AC14: an agent only agent.list knows gets no call and its card shows the s
   expect(seen.length).toBe(0)
   const ui = await pane($)
   await open($, 'zz')
-  expect(await ui.find({ key: 'task-title-zz' })).toBeDefined()
-  expect(await ui.find({ key: 'task-plain-zz' })).toBeUndefined()
+  expect(await ui.find({ key: 'name-zz' })).toBeDefined()
+  expect(await ui.find({ key: 'task-zz' })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -430,7 +429,7 @@ test('AC15: a plain chat makes no model call for three spawns, a Workflow and a 
   expect(seen.length).toBe(0)
   const ui = await pane($)
   await open($, 'a1')
-  expect(await ui.find({ key: 'task-plain-a1' })).toBeUndefined()
+  expect(await ui.find({ key: 'task-a1' })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -587,7 +586,7 @@ test('AC23: plain names such as Row.tsx and pane-header pass the guard', async (
   await ui.unmount()
 })
 
-test('AC24: the terminal card holds Task: Row model, then the text, and no prompt line', async ($, on) => {
+test('AC24: the terminal card holds the Task label, then the text alone, and no prompt line', async ($, on) => {
   stub(on, () => say(T))
   const run = await master($, on)
   await spawn($)
@@ -595,24 +594,24 @@ test('AC24: the terminal card holds Task: Row model, then the text, and no promp
   const ui = await pane($, 'terminal')
   await open($, 'a1')
   const texts = (await textsOf(ui)).map(String)
-  const at = texts.indexOf('Task: Row model')
+  const at = texts.indexOf('Task: ')
   expect(at).toBeGreaterThan(-1)
   expect(texts[at + 1]).toBe(T)
   expect(texts.some(one => one.includes('You are the Implementer'))).toBe(false)
   await ui.unmount()
 })
 
-test('AC25: the terminal workflow and session cards hold Task: <short name> then their reply', async ($, on) => {
+test('AC25: the terminal workflow and session cards hold the Task label then their reply', async ($, on) => {
   stub(on, () => say(T))
   const run = await master($, on)
   await $.tool.call({ tool: 'Workflow', script: SCRIPT })
   await $.tool.call({ tool: START, title: 'Row model', prompt: P } as never)
   await run.clock.settle()
   const ui = await pane($, 'terminal')
-  for (const [id, name] of [['wf_1', 'row-model'], ['local_abc123', 'Row model']] as const) {
+  for (const id of ['wf_1', 'local_abc123']) {
     await open($, id)
     const texts = (await textsOf(ui)).map(String)
-    const at = texts.indexOf(`Task: ${name}`)
+    const at = texts.indexOf('Task: ')
     expect([at > -1, texts[at + 1]]).toEqual([true, T])
   }
   await ui.unmount()
@@ -642,7 +641,7 @@ test('AC26: no precomputed height leaves the Task rows out: an open card has non
   const context = (task?: TaskText): Context => ({ at: NOW, trees: [], sessions: [], agents: [agent(task)], rows: rowsOf(null, liveOf()) })
   const heights = [undefined, { state: 'pending' as const }, { state: 'done' as const, text: SENTENCES(3).slice(0, 420) }].map(task => {
     const [item] = itemsOf([], [agent(task)], [])
-    return rowFitOf(item!, context(task), { width: 47 * 8, isNarrow: true, home: '/h' }).height
+    return rowFitOf(item!, context(task), { width: 47 * 8, isNarrow: true }).height
   })
   expect(new Set(heights).size).toBe(1)
 })
@@ -672,7 +671,7 @@ test('AC28: a workflow agent whose prompt is the hidden-script placeholder gets 
   const ui = await pane($)
   await open($, 'w1')
   expect(await titleOf(ui, 'w1')).toBe('hidden one')
-  expect(await ui.find({ key: 'task-plain-w1' })).toBeUndefined()
+  expect(await ui.find({ key: 'task-w1' })).toBeUndefined()
   await ui.unmount()
   expect(PLACEHOLDER).toBe('(withheld: this workflow run does not share its script)')
 })
@@ -833,7 +832,7 @@ test('a copied strict reply stays rejected when the secret is a plain word next 
     expect(seen.length - before).toBe(0)
     const ui = await pane($)
     await open($, `a${index + 1}`)
-    expect(await ui.find({ key: `task-plain-a${index + 1}` })).toBeUndefined()
+    expect(await ui.find({ key: `task-a${index + 1}` })).toBeUndefined()
     expect(secretsIn(JSON.stringify(await textsOf(ui)), [secret])).toEqual([])
     await ui.unmount()
   }
@@ -850,7 +849,7 @@ test('a plain secret next to an id-shaped word is never stored or drawn, even wh
     expect(seen.length - before).toBe(0)
     const ui = await pane($)
     await open($, `a${index + 1}`)
-    expect(await ui.find({ key: `task-plain-a${index + 1}` })).toBeUndefined()
+    expect(await ui.find({ key: `task-a${index + 1}` })).toBeUndefined()
     expect(secretsIn(JSON.stringify([await textsOf(ui), await altsOf(ui)]), ['hunter'])).toEqual([])
     await ui.unmount()
   }

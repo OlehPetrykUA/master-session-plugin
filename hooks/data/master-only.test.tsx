@@ -187,7 +187,8 @@ test('a real master with a briefed worker still scans, draws its band and shows 
   expect((await altsOf(band)).join()).toContain('needs you')
   await band.unmount()
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect(await textsOf(ui)).toContain('Allow Bash: rm -rf build')
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Validator ›', 'needs you']))
+  expect(await textsOf(ui)).not.toContain('Allow Bash: rm -rf build')
   await ui.unmount()
 })
 
@@ -253,7 +254,8 @@ test('a master that reloads keeps reading its workers: a report written afterwar
   await run.clock.advance(15_000)
   expect(writes).toContain(`${HOME}/.claude/state/master-session/boards/${SELF}.json`)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect(await textsOf(ui)).toContain('Allow Bash: rm -rf build')
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Validator ›', 'needs you']))
+  expect(await textsOf(ui)).not.toContain('Allow Bash: rm -rf build')
   await ui.unmount()
 })
 

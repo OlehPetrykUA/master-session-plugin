@@ -822,3 +822,122 @@ test('the terminal session card lists tests like the desktop pills: failed first
   expect(line).toBe('Tests: ✗ tsc · failed · ✗ archive.test.ts · failed · ✓ plugin test · 228 pass · ✓ lint')
   await ui.unmount()
 })
+
+function seededAgents(on: On, agents: readonly object[]) {
+  on('state.get', async (_, e, next) => {
+    const real = (await next(e)) as { value: { value: unknown; version: number } }
+    return (e.key === 'agents' ? { value: { ...real.value, value: agents } } : real) as never
+  })
+}
+
+const NOW_MS = 3_600_000
+
+const BLOCK_KEYS = /^(name|task|status|pair-now|activity|tests|commits|files|git|pair-model-time|pair-time|pair-archived-git|phases|agents|actions|started|part-of|archived-actions|unarchive-ask)-(?!pills)/
+
+const REMOVED_KEYS = /^(callout|running|permission-pill|result|info|place|run|tree)-/
+
+test('AC9: a session card shows Name, Status, Now and Next, Activity, Tests, Commits, Files, Git, Model and Time, then the actions, in that order and with no removed block', async ($, on) => {
+  const session = { ...BOARD.sessions[1], tests: ['tsc · exit 0'], commits: ['abc1234 add the row'], files: [`${WORKTREE}/hooks/lib/band.ts`], activity: ['committed abc1234 · 2m'], risk: 'it may lose work' }
+  await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], session] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_setup')
+  const keys = await keysOf(ui)
+  const order = keys.filter(key => BLOCK_KEYS.test(key) && key.endsWith('local_setup'))
+  expect(order).toEqual(['name-local_setup', 'status-local_setup', 'pair-now-local_setup', 'activity-local_setup', 'tests-local_setup', 'commits-local_setup', 'files-local_setup', 'git-local_setup', 'pair-model-time-local_setup', 'actions-local_setup'])
+  expect(keys.filter(key => REMOVED_KEYS.test(key) && key.endsWith('local_setup'))).toEqual([])
+  expect(keys).not.toContain('risk-local_setup')
+  await ui.unmount()
+})
+
+test('AC8: a subagent card shows Name, Status, Model and Time, then Started by, in that order with no removed block', async ($, on) => {
+  seededAgents(on, [{ id: 'q1', type: 'master-session:qa-verifier', description: 'Verify the gate', state: 'done', startedAt: NOW_MS -60_000, endedAt: NOW_MS -1_000, result: 'passed', task: { state: 'done', text: 'Runs the gate on the ready commit.' } }])
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-q1')
+  const keys = await keysOf(ui)
+  expect(keys.filter(key => BLOCK_KEYS.test(key) && key.endsWith('q1'))).toEqual(['name-q1', 'task-q1', 'status-q1', 'pair-model-time-q1', 'started-q1'])
+  expect(keys.filter(key => REMOVED_KEYS.test(key) || key.startsWith('now-') || key.startsWith('result-'))).toEqual([])
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Runs the gate on the ready commit.', 'Done in 59s: passed.']))
+  await ui.unmount()
+})
+
+test('AC12: an Architect waiting on one running child of its own reads who it waits for and why, from the child’s Task, never its prompt; the child’s row reads Architect › running', async ($, on) => {
+  seededAgents(on, [
+    { id: 'arch', type: 'master-session:architect', description: 'Plan the module map', prompt: 'Read everything and plan.', state: 'running', startedAt: NOW_MS -120_000 },
+    { id: 'k1', type: 'Explore', description: 'Static analysis', prompt: 'SECRET PROMPT read every file', state: 'running', startedAt: NOW_MS -60_000, parentAgentId: 'arch', task: { state: 'done', text: 'Maps the imports before planning. It lists every caller.' } },
+  ])
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await textsOf(ui)).toEqual(expect.arrayContaining(['Architect ›', 'waiting']))
+  await click(ui, 'hit-row-arch')
+  const texts = await textsOf(ui)
+  expect(texts).toContain('Waiting for its subagent “Static analysis” to finish: Maps the imports before planning.')
+  expect(texts.some(text => text.includes('SECRET PROMPT'))).toBe(false)
+  expect(texts).not.toContain('Plan the module map ›')
+  await ui.unmount()
+  const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const lines = await textsOf(terminal)
+  expect(lines).toContain('Waiting for its subagent “Static analysis” to finish: Maps the imports before planning.')
+  expect(lines).toContain('Validator › waiting · 2m')
+  await terminal.unmount()
+})
+
+test('AC20: a failed subagent shows Failed after its duration on the red tint; a reason with command text is dropped, none says it stopped without an answer', async ($, on) => {
+  seededAgents(on, [
+    { id: 'f1', type: 'Explore', description: 'Check one', state: 'failed', startedAt: NOW_MS -60_000, endedAt: NOW_MS -20_000, result: 'The folder is empty.\nsecond line' },
+    { id: 'f2', type: 'Explore', description: 'Check two', state: 'failed', startedAt: NOW_MS -60_000, endedAt: NOW_MS -20_000, result: 'git push --force failed' },
+    { id: 'f3', type: 'Explore', description: 'Check three', state: 'failed', startedAt: NOW_MS -60_000, endedAt: NOW_MS -20_000 },
+  ])
+  await started($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const sentence = async (id: string) => {
+    await click(ui, `hit-row-${id}`)
+    const found = (await textsOf(ui)).find(text => String(text).startsWith('Failed after'))
+    const ground = (await ui.find({ key: `status-${id}` }))?.props.backgroundColor
+    await click(ui, `hit-top-${id}`)
+    return [found, ground]
+  }
+  expect(await sentence('f1')).toEqual(['Failed after 40s: The folder is empty.', C.redTint])
+  expect(await sentence('f2')).toEqual(['Failed after 40s.', C.redTint])
+  expect(await sentence('f3')).toEqual(['Failed after 40s; it stopped without an answer.', C.redTint])
+  await ui.unmount()
+})
+
+test('AC22 and AC23: a run with no agent yet reads Starting and No agents started yet.; a run whose agent failed names it and how many finished, on the red tint', async ($, on) => {
+  on('agent.list', () => ({ value: [] }))
+  on('agent.spawn', (_, e) => ({ model: 'claude-haiku-5-5', agentId: e.workflow ? `w${e.workflow.agentIndex}` : e.description }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('tool.call', { tool: 'Workflow' }, () => ({ result: { status: 'async_launched' as const, taskId: 'wi5', runId: 'wf_7', workflowName: 'review-changes', summary: 'Review the branch' }, text: 'launched' }))
+  await started($, on)
+  await $.tool.call({ tool: 'Workflow', script: "export const meta = { name: 'review-changes', phases: [{ title: 'Review' }] }" })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-wf_7')
+  const starting = await textsOf(ui)
+  expect(starting).toEqual(expect.arrayContaining(['Starting: no agent has started yet.', 'No agents started yet.']))
+  await click(ui, 'hit-top-wf_7')
+  const step = (index: number, description: string) => $.agent.spawn({ ...SPAWN, description, subagentType: 'workflow-subagent', model: 'haiku', background: false, workflow: { runId: 'wf_7', agentIndex: index } })
+  await step(1, 'review:bugs')
+  await step(2, 'verify:band.ts')
+  await $.turn.complete({ answer: 'ok', durationMs: 5, isAborted: false, turnId: 'u1', agentId: 'w1', reason: 'answer' })
+  await $.turn.complete({ answer: 'the band file is missing', durationMs: 5, isAborted: false, turnId: 'u2', agentId: 'w2', reason: 'error' })
+  await click(ui, 'hit-row-wf_7')
+  const failed = (await textsOf(ui)).find(text => String(text).startsWith('Failed: '))
+  expect(failed).toBe('Failed: verify:band.ts threw “the band file is missing”; 1 of 2 agents finished.')
+  expect((await ui.find({ key: 'status-wf_7' }))?.props.backgroundColor).toBe(C.redTint)
+  await ui.unmount()
+})
+
+test('AC26: Open shows on the session card and the archived card only for a session this master started', async ($, on) => {
+  await started($, on, BOARD, { sessions: [{ sessionId: 'local_other', name: 'other', title: 'Other', cwd: '/', isRunning: false, isArchived: true, lastActivityAt: '1970-01-01T00:50:00.000Z' }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-chip-archived')
+  await click(ui, 'hit-row-local_old')
+  expect(await hitsOf(ui)).toContain('hit-archived-open-local_old')
+  await click(ui, 'hit-top-local_old')
+  await click(ui, 'hit-row-local_other')
+  expect(await hitsOf(ui)).toContain('hit-unarchive-local_other')
+  expect(await hitsOf(ui)).not.toContain('hit-archived-open-local_other')
+  const card = await textsOf(ui)
+  expect(card.some(text => /^session other · archived$/.test(String(text)))).toBe(true)
+  await ui.unmount()
+})

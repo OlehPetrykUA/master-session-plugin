@@ -10,7 +10,7 @@ import { AGENT_SHOWN_MS } from './constants'
 import { compactOf } from './format'
 import { textWidth } from './layout'
 import type { Face } from './layout'
-import { activityOf, elapsedOf, titleOf } from './rows'
+import { elapsedOf, titleOf } from './rows'
 import type { Row } from './rows'
 import type { RunSummary } from './totals'
 
