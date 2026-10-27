@@ -39,6 +39,7 @@ rule() {
   if grep -qF -- "$3" "$root/$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi
 }
 
+rule 'start: argument-hint is only the task' skills/start/SKILL.md "argument-hint: '<task>'"
 rule 'designer: single source of truth' skills/designer/SKILL.md 'single source of truth'
 rule 'designer: untouched' skills/designer/SKILL.md 'untouched'
 rule 'designer: fold' skills/designer/SKILL.md 'fold'

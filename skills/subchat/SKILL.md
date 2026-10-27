@@ -9,7 +9,7 @@ argument-hint: '<task> [persona]'
 
 Invoked with: `$ARGUMENTS`. The text is the task. A last word naming a persona from [personas.md](../start/personas.md) picks it; the default is `implementer`.
 
-This runs inside a validator session. If `/master-session:start` hasn't run in this session yet, become the validator first: read `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` and do its section 1 with no settings, then continue here.
+This runs inside a validator session. If `/master-session:start` hasn't run in this session yet, become the validator first: read `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` and do its section 1, then continue here.
 
 Use it only for pieces that [Execution shape](../start/shape.md#execution-shape) rule 3 gives a worker session; anything else is a subagent (rule 5).
 

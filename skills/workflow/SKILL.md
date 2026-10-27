@@ -9,7 +9,7 @@ argument-hint: '<task>'
 
 Invoked with: `$ARGUMENTS`, the task. Typing this command is the user's request for one workflow for this task, not for later ones ([When a workflow may run](#when-a-workflow-may-run)).
 
-This runs inside a validator session. If `/master-session:start` hasn't run in this session yet, become the validator first: read `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` and do its section 1 with no settings, then continue here.
+This runs inside a validator session. If `/master-session:start` hasn't run in this session yet, become the validator first: read `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` and do its section 1, then continue here.
 
 1. Load the `workflow-authoring` skill. Scout inline only what the plan needs: the files, the sha, the work list.
 2. Keep the fleet small: a few agents and a single verify vote per finding, unless the user's words ask for more. Before calling `Workflow`, write the count line ([start](../start/SKILL.md#2-brief-the-worker), Count and waits) and announce it in one line: its name, `Workflow: ~N agents` and the phases.

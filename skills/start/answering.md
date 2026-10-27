@@ -16,4 +16,4 @@ A worker asking for a "go", an approval or what next gets a direct instruction q
 - A new worker session starts with `permission_mode: "auto"`; its brief lists every self-modifying edit up front, quoting the user, so auto mode sees the intent at once.
 - Never raise `permissionMode` unless the user asks; lower a raised mode back to auto after the work.
 - **Still denied:** a call denied after your instruction is 🔴. Give the user the exact sentence to type in that worker's chat, or the exact allow rule. A relayed approval doesn't lift it; never move the work to another session.
-- **Needs the user:** an AskUserQuestion or permission prompt in a worker's chat: say which chat and what to answer (`PushNotification` if away).
+- **Needs the user:** an AskUserQuestion or permission prompt in a worker's chat: say which chat and what to answer (with a `PushNotification`).

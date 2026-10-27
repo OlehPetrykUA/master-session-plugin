@@ -62,16 +62,13 @@ copilot plugin install master-session@master-session
 
 | Command | What it does |
 |---|---|
-| `/master-session:start [task] [settings]` | Turns the current session into the validator. |
+| `/master-session:start <task>` | Turns the current session into the validator. |
 | `/master-session:subchat <task> [persona]` | Starts a worker session, a side chat, for the task (persona `implementer` by default) and watches it in the loop. |
 | `/master-session:subagent <persona> <task>` | Runs a persona as a background subagent for a short check, then relays its result. |
 | `/master-session:workflow <task>` | Writes and runs a workflow for the task with persona agents, announcing the agent count first. |
 | `/master-session:info [ask]` | Opens the status pane; `ask` asks every running worker for a fresh report. |
 
-`subchat`, `subagent` and `workflow` make the session the validator first if `/master-session:start` hasn't run yet. Settings for `/master-session:start`, in any order:
-- `new "<task>"` starts a fresh worker for that task; `worker <name>` attaches an existing session.
-- `every 5m` sets the heartbeat (default 3 minutes while a worker session runs, 15 with only subagents); `away` finishes everything inside the briefs without waiting; `quiet` or `verbose`.
-- `tick now`, `status`, `stop`, `archive-done`.
+`subchat`, `subagent` and `workflow` make the session the validator first if `/master-session:start` hasn't run yet. Type `/master-session:start <task>`; the master decides the heartbeat, the board and the workers.
 
 Workers need nothing installed beyond this plugin: their brief loads the `master-session:worker` skill and their persona's skill, and they report through the status tool.
 

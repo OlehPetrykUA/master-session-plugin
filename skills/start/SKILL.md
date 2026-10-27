@@ -2,7 +2,7 @@
 name: start
 description: Validator mode. This session stops doing work itself, hands every change to a worker (a persona subagent, or a worker session where Execution shape says), watches it in a /loop, verifies what it delivers, answers its questions and gives the user short summaries. Use ONLY when the user types /master-session:start.
 disable-model-invocation: true
-argument-hint: '[every Nm] [away] [quiet|verbose] [worker <name>] [new "<task>"] [tick now|status|stop|archive-done]'
+argument-hint: '<task>'
 ---
 
 # Master session
@@ -11,13 +11,8 @@ This session becomes the validator: workers do the work; the validator plans, si
 
 ## Arguments
 
-Invoked with: `$ARGUMENTS`, free-form words. Record the settings in the ledger and loop args; a tick gets none. Running `/master-session:start <words>` again changes a live run.
-- `every <N>m`: heartbeat in minutes, overriding section 3's default; 1m to 60m (`ScheduleWakeup` clamps to 60–3600 s).
-- `away`: finish everything inside the briefs without waiting, archive verified-and-captured workers, `PushNotification` on every 🔴 and at the end. Implies `quiet`.
-- `quiet` posts only 🔴 lines and the final board; `verbose` (default) the full board per tick with news.
-- `worker <name|local_id>`: attach an existing session, repeatable. `new "<task>"`: start a fresh worker.
-- `tick now`: one tick, reading `mcp__master-session__reports`; it messages no one. `status`: post the board, then continue. `stop`: stop the loop, post the final board. `archive-done`: archive verified-and-captured workers.
-- Other text is the task. [`subchat`](../subchat/SKILL.md), [`subagent`](../subagent/SKILL.md) and [`workflow`](../workflow/SKILL.md) drive a live run too.
+Invoked with: `$ARGUMENTS`, the task in the user's own words. There are no options: you decide the heartbeat (section 3), what each tick posts, notifications, which workers run and when to archive. Running `/master-session:start <words>` again during a run adds that work to it.
+- [`subchat`](../subchat/SKILL.md), [`subagent`](../subagent/SKILL.md) and [`workflow`](../workflow/SKILL.md) drive a live run too. Board on demand is `/master-session:info`; ending a run is `/master-session:stop`.
 
 ## 1. Start
 
@@ -92,7 +87,7 @@ Reuse, handover, retirement and drift: read [shape.md](shape.md#worker-lifetime)
 
 ## 3. The loop
 
-**Heartbeat.** While any worker of this validator is open, a heartbeat stays armed (`ScheduleWakeup`, or the `/loop` skill), re-armed every tick, stopped only at Done, on `stop` or on a pause. 3m (2 to 5 min) while a worker session runs, since a session can sit at a prompt and send nothing; 15m (10 to 30 min) with only subagents, since each completion wakes you. `every` overrides. For a session the user named, SendMessage with `notify_when_idle: true` (one-shot). Start it once: Skill `loop`, args `master-session tick for <workers> [<settings>]: read ${CLAUDE_SKILL_DIR}/SKILL.md sections 3 to 6, ${CLAUDE_SKILL_DIR}/answering.md and ${CLAUDE_SKILL_DIR}/shape.md, and the ledger note <permalink>, then do one tick`.
+**Heartbeat.** While any worker of this validator is open, a heartbeat stays armed (`ScheduleWakeup`, or the `/loop` skill), re-armed every tick, stopped only at Done, on `/master-session:stop` or on a pause. 3m (2 to 5 min) while a worker session runs, since a session can sit at a prompt and send nothing; 15m (10 to 30 min) with only subagents, since each completion wakes you. For a session the user named, SendMessage with `notify_when_idle: true` (one-shot). Start it once: Skill `loop`, args `master-session tick for <workers>: read ${CLAUDE_SKILL_DIR}/SKILL.md sections 3 to 6, ${CLAUDE_SKILL_DIR}/answering.md and ${CLAUDE_SKILL_DIR}/shape.md, and the ledger note <permalink>, then do one tick`.
 
 **Pause and resume.** On pause, each running subagent gets `TaskStop` and nothing else: a message would resume it. Each worker session gets `stop_session`, then one `PAUSE` (commit work in progress, stop every Monitor and background job, end the turn), since its Monitors can wake it. Record each piece's pending step and its worktree's `git status --short` in the ledger and stop the loop; nothing runs until resume. On resume, a fresh agent per paused subagent piece, briefed to review the uncommitted diff and finish from the pending step; each session one `RESUME` with its pending step; re-arm the loop.
 
@@ -109,8 +104,8 @@ On every wake, do one tick:
    - A verdict is a claim, never proof; an uncited finding goes back to its author. Gate: [qa-verifier](../qa-verifier/SKILL.md); severity: [Verdict rules](../reviewer/SKILL.md#verdict-rules).
 3. Merge. The sha that merges has had one full gate: after an all-`=` rebase, or a recheck by the Code reviewer alone, run the Checker gate inline first (as for T0); it counts as the one suite-runner. Then `git -C <live repo> merge --ff-only <sha>`. Not a fast-forward: a session rebases itself, a subagent gets `rebase onto <master sha>, rerun Your checks, report ready <new sha>`. A merged sha retires its worker.
 4. Fix round: one SendMessage per worker per round bundling every Blocking finding with evidence and fix, logged in the ledger. Nits go to the ledger backlog. Never resend; an ignored message may be a permission-mode hold. At most 2 fix rounds per piece: still blocking after round 2, no third fix message; cut scope to what passes, re-brief a fresh agent, or ask the user, and log which.
-5. Stall (sessions only): a worker at a permission prompt or AskUserQuestion can't message you. A roster note saying `(needs the user)`, or `lastActivityAt` frozen for 2 ticks with no job running, means tell the user which chat and what to answer (`PushNotification` if away).
-6. Tell the user. `verbose`: a tick with news posts the status board; `quiet`: only its 🔴 lines. The final summary uses the full board. No change: `Tick HH:MM · no change · next HH:MM`.
+5. Stall (sessions only): a worker at a permission prompt or AskUserQuestion can't message you. A roster note saying `(needs the user)`, or `lastActivityAt` frozen for 2 ticks with no job running, means tell the user which chat and what to answer (with a `PushNotification`).
+6. Tell the user. A tick with news posts the status board; a tick with a 🔴 also sends a `PushNotification`, since the user may follow from another device. The final summary uses the full board. No change: `Tick HH:MM · no change · next HH:MM`.
    - **Status pane:** when the skill prompt carries "Status pane: on" or the tool exists (load it with ToolSearch `select:mcp__master-session__board`), publish every board through `mcp__master-session__board` instead of the chat board, and post in chat only 🔴 lines and the final summary board. Its schema lists the fields. `plan[]`: every piece of the whole run, written from the ledger on every board call, queued ones included: `name`, `state` (queued, working, verifying, done, dropped), `progress` ("step N of M — label", for a working piece). A piece is a deliverable of any shape (worker session, subagent, workflow); helpers (QA verifier, Code reviewer, Researcher checks) are not pieces. A fix round after a FAIL adds no piece; work the user adds mid-run adds one. Mark abandoned work dropped, never delete it. The band's percent and count read it; without it the band counts what it sees now. `narrative`: up to four short plain sentences for the user, at most 500 characters, in this order: what the run is for and what it is mostly on now; what is done (count and latest pieces); what comes next, in the plan's queued order; what needs them (or "Nothing needs you."). Describe the work, not worker names or ids; no markdown, tables, links or emoji. Write it fresh each board call; leave it out and the pane hides it. Between board calls the mod refreshes it (at most once a minute); your next board call's narrative replaces that. It goes to the pane only. Mapping: 📍 → `progress`, 🌿 → `git`, 🔍 → `verified`, ⏱ → `time`.
    - **Without the mod:** post the chat board as [board.md](board.md) shows.
 7. Re-arm `ScheduleWakeup` at the heartbeat (`noop: true` when nothing changed). Wake on a branch move with a `Monitor` on `git rev-parse <branch>`, or on a job's end with a background `until grep -qE '<done|fail>' <log>; do sleep 5; done`.
@@ -127,7 +122,7 @@ Worker permission mode, denied calls and prompts that need the user: read [answe
 
 - Ledger: one note per run (notes or memory tool, or a markdown file) with each piece as `name (local_id | agentId)`: tier, shape, persona, owned files, dependencies, state, fix round, verified and merged sha, open findings; plus the count lines and the nit backlog. Update it on every change; re-read it every tick and after compaction.
 - No silent drops: a finding stays until fixed, rejected with a reason or deferred by the user.
-- Archive only ledger workers whose result is merged and captured (the user's standing OK, or `archive-done`); else list as done and ask. Never archive this session or delete one.
+- Archive only ledger workers whose result is merged and captured (the user's standing OK); else list as done and ask. Never archive this session or delete one.
 - Workers remove their own worktrees, branches and scratch. Before flagging one, check who holds it (`lsof +D <path>`).
 - Done: every piece merged and verified, every repo clean, `git worktree list` shows none of this run's worktrees; an unmerged session branch goes to the user as one `git branch -D` line. Then stop the loop (`ScheduleWakeup` `stop: true`), post the final board and one `PushNotification`.
 
