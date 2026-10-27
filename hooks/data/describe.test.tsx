@@ -15,7 +15,7 @@ import { C } from '../theme/tokens'
 import { CREDENTIALS } from '../testing/credentials'
 import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, childOf, liveOf, started, textsOf, altsOf, warmUp, world } from '../testing/world'
 import type { Child } from '../testing/world'
-import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, isUnsafe, normalized } from './describe'
+import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, hasCue, isUnsafe, normalized } from './describe'
 import { reportPath } from './status'
 
 const NOW = 3_600_000
@@ -42,7 +42,7 @@ const brief = (command = 'Run the type check at the end.', extra = '') =>
     'Mission: build one deliverable from the brief in its own worktree.',
     'Inputs: the brief and the worker skill.',
     'Output: report updates, then the ready line.',
-    'Gate: the commands in the brief pass.',
+    'Gate: the commands in the brief succeed.',
     'Must not: touch the live folder.',
     'Rule 7: keep the change small.',
     'Rule 8: keep the change small.',
@@ -510,9 +510,13 @@ test('AC19: for every credential row a copied prompt is rejected twice, the seco
   for (const [index, [, command, secrets]] of CREDENTIALS.entries()) {
     await spawn($, { description: `row ${index}`, prompt: brief(command) })
     await run.clock.settle()
-    expect(seen.length - before).toBe(2)
-    expect(String(seen.at(-1)?.system)).toContain(STRICT)
-    expect(String(seen.at(-2)?.system)).not.toContain(STRICT)
+    if (hasCue(command)) {
+      expect(seen.length - before).toBe(0)
+    } else {
+      expect(seen.length - before).toBe(2)
+      expect(String(seen.at(-1)?.system)).toContain(STRICT)
+      expect(String(seen.at(-2)?.system)).not.toContain(STRICT)
+    }
     before = seen.length
     await open($, `a${index + 1}`)
     expect(secretsIn(JSON.stringify([await textsOf(ui), await altsOf(ui)]), secrets)).toEqual([])
@@ -529,7 +533,7 @@ test('AC20: the same rows through a Workflow script and a start_session prompt s
     await $.tool.call({ tool: 'Workflow', script: `${SCRIPT}\n${command}` })
     await $.tool.call({ tool: START, title: 'Row model', prompt: brief(command) } as never)
     await run.clock.settle()
-    expect(seen.length - before).toBe(4)
+    expect(seen.length - before).toBe(hasCue(command) ? 0 : 4)
     const atoms = await atomsOf($)
     expect(secretsIn(JSON.stringify(atoms.tasks) + JSON.stringify(atoms.workflows.map(one => one.task)), secrets)).toEqual([])
   }
@@ -824,8 +828,7 @@ test('a copied strict reply stays rejected when the secret is a plain word next 
     const before = seen.length
     await spawn($, { description: `plain ${index}`, prompt: brief(command) })
     await run.clock.settle()
-    expect(seen.length - before).toBe(2)
-    expect(String(seen.at(-1)?.prompt)).toContain(secret)
+    expect(seen.length - before).toBe(0)
     const ui = await pane($)
     await open($, `a${index + 1}`)
     expect(await ui.find({ key: `task-plain-a${index + 1}` })).toBeUndefined()
@@ -842,7 +845,7 @@ test('a plain secret next to an id-shaped word is never stored or drawn, even wh
     const before = seen.length
     await spawn($, { description: `ids ${index}`, prompt })
     await run.clock.settle()
-    expect(seen.length - before).toBe(2)
+    expect(seen.length - before).toBe(0)
     const ui = await pane($)
     await open($, `a${index + 1}`)
     expect(await ui.find({ key: `task-plain-a${index + 1}` })).toBeUndefined()
@@ -850,6 +853,43 @@ test('a plain secret next to an id-shaped word is never stored or drawn, even wh
     await ui.unmount()
   }
   expect((await atomsOf($)).agents.map(one => one.task)).toEqual([{ state: 'failed' }, { state: 'failed' }])
+})
+
+test('a letters-only secret in a paraphrased reply: a source with a credential cue makes no model call and is stored failed', { plugins: [PROBE] }, async ($, on) => {
+  const { seen } = stub(on, () => say('Signs in with the password hunter and reports back.'))
+  const run = await master($, on)
+  await spawn($, { description: 'login', prompt: 'Sign in with the password hunter and report back.' })
+  await run.clock.settle()
+  expect(seen.length).toBe(0)
+  const ui = await pane($)
+  await open($, 'a1')
+  expect(secretsIn(JSON.stringify([await textsOf(ui), await altsOf(ui)]), ['hunter'])).toEqual([])
+  await ui.unmount()
+  expect((await atomsOf($)).agents.map(one => one.task)).toEqual([{ state: 'failed' }])
+})
+
+test('each credential cue word stops the call, for a prompt and for a workflow script', async ($, on) => {
+  const { seen } = stub(on, () => say(T))
+  const run = await master($, on)
+  const cues = ['password', 'passwd', 'pwd', 'passphrase', 'pass', 'token', 'secret', 'apikey', 'api key', 'api_key', 'access key', 'private key', 'credential', 'credentials', 'auth', 'authorization', 'bearer', 'PASSWORD', 'Token', 'run x -p value', '--password', '--token', 'DB_PASS=x', 'GITHUB_TOKEN=x']
+  for (const [index, cue] of cues.entries()) {
+    await spawn($, { description: `cue ${index}`, prompt: `Build the band now line with ${cue} included.` })
+    await $.tool.call({ tool: 'Workflow', script: `${SCRIPT}\n// ${cue}` })
+    await run.clock.settle()
+  }
+  expect(seen.length).toBe(0)
+})
+
+test('a normal prompt still gets a call, and passes, passing, authored and tokenize are no cue', async ($, on) => {
+  const { seen } = stub(on, () => say(T))
+  const run = await master($, on)
+  const prompts = ['Build the band now line.', 'Make the tests passes quickly.', 'Keep the tests passing.', 'The file was authored by hand.', 'Then tokenize the words.']
+  for (const [index, prompt] of prompts.entries()) {
+    const before = seen.length
+    await spawn($, { description: `plain ${index}`, prompt })
+    await run.clock.settle()
+    expect(seen.length - before).toBe(1)
+  }
 })
 
 test('two spawn events for one agent id at once make one call', async ($, on) => {

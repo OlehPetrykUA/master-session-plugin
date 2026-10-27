@@ -79,7 +79,12 @@ async function store($: EngineInterface, target: Target, task: TaskText | undefi
   $.ui.invalidate('ui.render')
 }
 
-async function run($: EngineInterface, job: Job) {
+const CUE = /password|passwd|passphrase|apikey|(?<![a-z0-9])(?:pwd|pass|tokens?|secrets?|api[ _]?keys?|access[ _]keys?|private[ _]keys?|credentials?|auth|authorization|bearer)(?![a-z0-9])|(?:^|\s)-p/i
+
+export const hasCue = (text: string) => CUE.test(text)
+
+async function run($: EngineInterface, job: Job): Promise<Outcome> {
+  if (hasCue(job.source) || hasCue(job.name)) return { ok: false, isGuard: false }
   const first = await attempt($, job, false)
   return first.ok || !first.isGuard ? first : attempt($, job, true)
 }
