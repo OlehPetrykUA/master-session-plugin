@@ -84,7 +84,7 @@ export const BOARD_SCHEMA = {
     narrative: {
       type: 'string',
       description:
-        'two to four plain sentences for the user, at most 500 characters: what is happening, what comes next, what needs them (or "Nothing needs you."). Worker names, not ids; no markdown. Write it fresh on every call; it shows in the pane only',
+        'up to four short plain sentences for the user, at most 500 characters, in this order: what the run is for and what it is mostly on now; what is done (count and latest pieces); what comes next, in the plan\'s queued order; what needs them (or "Nothing needs you."). Describe the work, not short worker names or ids; no markdown. Write it fresh on every call; it shows in the pane only',
     },
   },
   required: ['sessions'],

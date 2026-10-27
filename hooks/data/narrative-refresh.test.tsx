@@ -10,7 +10,8 @@ import type { Ui } from '../testing/world'
 warmUp()
 
 const OLD = 'Two workers are running. env-e2e-test needs you to approve a settings edit. Nothing else is pending.'
-const FRESH = 'env-e2e-test is waiting on you for the settings edit while a docs lookup runs. Next: commit once approved. Approve the settings edit.'
+const MASTER = 'The run is mostly on the sound milestone. Two pieces are done. Nothing needs you.'
+const FRESH ='env-e2e-test is waiting on you for the settings edit while a docs lookup runs. Next: commit once approved. Approve the settings edit.'
 const USAGE = { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
 const FAILED = { isAnswered: false as const, reason: 'api-error' as const, status: 500, error: 'server_error' as const, usage: USAGE }
 
@@ -58,10 +59,45 @@ test('a state change rewrites the narrative with one haiku call and the age rest
   const [one] = run.asked
   expect([one?.model, one?.effort, one?.maxTokens, one?.timeoutMs]).toEqual(['haiku', 'low', 220, 20_000])
   expect(one?.prompt).toContain(OLD)
-  expect(one?.prompt).toContain('env-e2e-test')
+  expect(one?.prompt).toContain('Test and validate local agent environment')
   expect(one?.prompt).toContain('Docs lookup')
   expect(await shown(ui)).toEqual({ text: FRESH, age: 'written just now' })
   await ui.unmount()
+})
+
+test('the prompt carries the plan and the master narrative, never haiku text or short names', async ($, on) => {
+  const asked = model(on)
+  const plan = [
+    { name: 'Sound milestone', state: 'working' as const, progress: 'step 2 of 5 — mixer' },
+    { name: 'Movie playback', state: 'queued' as const },
+  ]
+  const run = await started($, on, { ...BOARD, plan, narrative: MASTER })
+  await run.clock.advance(TICK_MS)
+  await spawn($, 'first')
+  await run.clock.advance(TICK_MS)
+  await spawn($, 'second')
+  await run.clock.advance(60_000)
+  expect(asked).toHaveLength(2)
+  for (const one of asked) {
+    expect(one.prompt).toContain(MASTER)
+    expect(one.prompt).not.toContain(FRESH)
+    expect(one.prompt).toContain('Sound milestone')
+    expect(one.prompt).toContain('Movie playback')
+    expect(one.prompt).toContain('step 2 of 5 — mixer')
+    expect(one.prompt).not.toContain('env-e2e-test')
+    expect(one.prompt).not.toContain('setup-ui-redo')
+  }
+})
+
+test('the rules name the order and forbid short names', async ($, on) => {
+  const run = await master($, on)
+  await spawn($, 'Docs lookup')
+  await run.clock.advance(TICK_MS)
+  const system = String(run.asked[0]?.system)
+  const at = ['(1) What the run is for', '(2) What is done', '(3) What comes next', '(4) What needs the user'].map(one => system.indexOf(one))
+  expect(at.every(one => one >= 0)).toBe(true)
+  expect([...at].sort((a, b) => a - b)).toEqual(at)
+  expect(system).toContain('never by short worker names')
 })
 
 test('no change makes no call', async ($, on) => {
