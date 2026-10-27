@@ -12,6 +12,7 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
   expect(answer).toEqual({ result: 'Board updated: 2 sessions in the pane and the band. Post only 🔴 needs-you lines in chat.' })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await hitsOf(ui)).toEqual([
+    'hit-processes-toggle',
     'hit-chip-all',
     'hit-chip-needs-you',
     'hit-chip-working',
