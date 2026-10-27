@@ -7,7 +7,7 @@ import type { Status } from '../theme/icons'
 import type { WorkflowAgent } from './agents'
 import { stepOf } from './board'
 import { compactOf } from './format'
-import { MASTER, ageOf, askOf, displayNameOf, isStartedBy, nameText, oneLine, parentsOf, sessionOfAgent, spanOf, tildeOf } from './list'
+import { MASTER, ageOf, displayNameOf, isStartedBy, nameText, oneLine, parentsOf, sessionOfAgent, spanOf, tildeOf } from './list'
 import type { Context, ListItem, RowItem } from './list'
 import { locate } from './git'
 import { activityOf, whereOf } from './rows'
@@ -44,7 +44,9 @@ const FLAG = /(^|\s)--?[A-Za-z]/
 
 const ASSIGN = /(^|\s)[A-Za-z_][A-Za-z0-9_]*=/
 
-export const isCommandText = (text: string) => OPERATOR.test(text) || FLAG.test(text) || ASSIGN.test(text) || PROGRAMS.has(text.trim().split(/\s+/)[0] ?? '')
+const wordOf = (token: string) => token.replace(/^[^\w]+|[^\w]+$/g, '').toLowerCase()
+
+export const isCommandText = (text: string) => OPERATOR.test(text) || FLAG.test(text) || ASSIGN.test(text) || text.split(/\s+/).some(token => PROGRAMS.has(wordOf(token)))
 
 const SHELL = ['Bash', 'BashOutput', 'KillShell', 'PowerShell']
 
@@ -82,7 +84,7 @@ export function nameIdentOf(item: RowItem, context: Context): { full: string; id
   return { full, ident: `subagent ${item.agent.type}` }
 }
 
-const taskTextOf = (task: TaskText | undefined) => (task?.state === 'pending' ? 'pending' : task?.state === 'done' && task.text ? { text: task.text } : undefined)
+const taskTextOf = (task: TaskText | undefined) => (task?.state === 'pending' ? 'pending' : task?.state === 'done' && task.text && clean(task.text) ? { text: task.text } : undefined)
 
 export function taskOf(item: RowItem, context: Context): { text: string } | 'pending' | undefined {
   if (item.kind === 'session') return item.isOwn ? taskTextOf(context.tasks?.[item.id]) : undefined
@@ -99,13 +101,14 @@ export function activityWordsOf(row: Row): ReturnType<typeof activityOf> {
     const cut = line.lastIndexOf(' · ')
     const text = cut > 0 ? line.slice(0, cut) : line
     const tail = cut > 0 ? line.slice(cut) : ''
-    const shown = SHELL_EVENT.exec(text)?.[0] ?? text
-    return isCommandText(shown) ? [] : [`${shown}${tail}`]
+    const shell = SHELL_EVENT.exec(text)?.[0]
+    const shown = shell ?? text
+    return !shell && isCommandText(shown) ? [] : [`${shown}${tail}`]
   })
   return activityOf({ ...row, board: { ...row.board, activity } })
 }
 
-const URL_HOST = /^[a-z][a-z0-9+.-]*:\/\/([^/\s?#:]+)/i
+const hostOf = (text: string) => (/\s/.test(text) || !URL.canParse(text) ? '' : new URL(text).hostname)
 
 const BARE_HOST = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i
 
@@ -117,8 +120,7 @@ function foldOf(path: string) {
 function placeOf(running: Running, home: string) {
   const text = (running.text ?? '').trim()
   if (!text || SHELL.includes(running.tool)) return ''
-  const host = URL_HOST.exec(text)?.[1]
-  if (host) return host
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) return hostOf(text)
   if (/\s/.test(text) || isCommandText(text)) return ''
   if (/^(\/|~\/|\.\/)/.test(text)) return foldOf(tildeOf(text, home))
   return BARE_HOST.test(text) ? text : ''
@@ -133,17 +135,15 @@ function liveOf(running: Running, at: number, home: string, step = '') {
 
 const listed = (names: readonly string[]) => (names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
 
-const checksOf = (tests: readonly string[]) => listed(
-    pillsOf(tests)
-      .filter(pill => !pill.isFailed && !OPERATOR.test(pill.name))
-      .map(pill => pill.name)
-      .reverse(),
-  )
+const checksOf = (tests: readonly string[]) => {
+  const count = pillsOf(tests).filter(pill => !pill.isFailed).length
+  return count ? `${count} ${count === 1 ? 'check' : 'checks'} passed` : ''
+}
 
 const chatOf = (row: Row | undefined) => (row ? `${nameText(displayNameOf(sessionItemOf(row)))}’s chat` : 'this chat')
 
 function waitingOnOf(children: readonly AgentRecord[]) {
-  const named = children.map(child => `“${displayNameOf({ kind: 'subagent', id: child.id, group: 'working', status: 'working', agent: child }).task || child.type}”`)
+  const named = children.map(child => `“${clean(displayNameOf({ kind: 'subagent', id: child.id, group: 'working', status: 'working', agent: child }).task) || clean(child.type) || 'subagent'}”`)
   if (named.length > 1) return `Waiting for its ${named.length} subagents ${listed(named)} to finish`
   const why = children[0]?.task?.state === 'done' ? clean(firstSentenceOf(children[0].task.text)) : ''
   return `Waiting for its subagent ${named[0]} to finish${why ? `: ${why}` : ''}`
@@ -151,7 +151,7 @@ function waitingOnOf(children: readonly AgentRecord[]) {
 
 function askedOf(ask: AgentAsk | string | undefined, who: string, where: string) {
   const text = typeof ask === 'string' ? ask : ask?.text
-  const tool = askOf(text)?.tool
+  const tool = /^Allow ([^:\s]+)/.exec(text ?? '')?.[1]
   const question = tool ? '' : clean(text)
   return [`Needs you: ${who} ${tool ? `asks to use ${tool}` : question ? `asks “${question}”` : 'is waiting for your answer'}`, `Answer in ${where}`]
 }
@@ -170,7 +170,7 @@ function sessionParts(item: Extract<RowItem, { kind: 'session' }>, context: Cont
   if (item.status === 'ready') {
     const branch = whereOf(row, context.trees)?.tree.branch
     const checks = checksOf(board?.tests ?? [])
-    return [`Waiting for QA: ready at ${board?.sha ?? 'its last commit'}${branch ? ` on ${branch}` : ''}${checks ? `; the gate passed ${checks}` : ''}`]
+    return [`Waiting for QA: ready at ${board?.sha ?? 'its last commit'}${branch ? ` on ${branch}` : ''}${checks ? `; ${checks}` : ''}`]
   }
   if (item.status === 'idle') {
     const last = activityWordsOf(row)[0]?.text
