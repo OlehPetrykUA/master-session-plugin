@@ -253,7 +253,7 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
   const countsWidth = countsWidthOf(parts)
   const showCounts = (isAllDone ? !isNarrow : width >= PERCENT_BELOW) && parts.length > 0 && around(leadWidth, countsWidth) >= BAR_MIN
   const barWidth = Math.max(BAR_MIN, Math.round(around(leadWidth, showCounts ? countsWidth : 0)))
-  return { units, asker, isAllDone, isRunning, hasPercent, overall, percent, tone, parts, showCounts, alt, action, actionWidth, padLeft, padRight, gap, barWidth, pillText, leadWidth, countsWidth: showCounts ? countsWidth : 0 }
+  return { units, asker, isAllDone, isRunning, hasPercent, overall, percent, tone, parts, showCounts, alt, action, actionWidth, padLeft, padRight, gap, barWidth, pillText }
 }
 
 export type BandView = ReturnType<typeof bandViewOf>

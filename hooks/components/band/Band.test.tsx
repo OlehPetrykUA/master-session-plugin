@@ -914,7 +914,7 @@ const barProps = (view: ReturnType<typeof viewOf>['view']): Record<string, unkno
 test('the bar frame is sized to the bar and keyed by width and run state: stable across a percent-only change, new when the band stops running', () => {
   const first = viewOf(WORKING, IDLE)
   const bar = barProps(first.view)
-  expect(bar?.width).toBe(first.view.barWidth)
+  expect(bar?.width).toBeUndefined()
   expect(bar?.key).toBe(`bar-${first.view.barWidth}-run`)
   const moved = viewOf(WORKING.map(one => (one.id === 'local_b' ? { ...one, progress: 'step 4 of 5 — pane' } : one)), IDLE)
   expect(moved.view.overall).not.toBe(first.view.overall)
@@ -935,7 +935,7 @@ test('the first agent started with the pane closed draws the bar on the band’s
   expect(String(drawn?.props.alt)).not.toBe(before)
   expect(String(drawn?.props.alt)).toContain('1 of 5 done')
   expect(String(drawn?.props.source)).toContain('animateTransform')
-  expect(drawn?.props.width).toBe(await barWidthOf(ui))
+  expect(drawn?.props.width).toBeUndefined()
   expect((await ui.findAll({ type: 'Box' })).map(one => one.key).filter(one => one?.startsWith('bar-'))).toEqual([`bar-${await barWidthOf(ui)}-run`])
   await ui.unmount()
   const fresh = await mount($)
@@ -948,22 +948,27 @@ const crowd = (total: number, finished: number): BoardSession[] =>
 
 for (const [finished = 0, total = 0] of [[3, 7], [23, 31]]) {
   for (const px of [300, 600, 900]) {
-    test(`${finished}/${total} at ${px} px: lead, bar, count and gaps add up to the band width, and the bar box is the bar`, () => {
+    test(`${finished}/${total} at ${px} px: the bar box grows into its slot and the svg has no width, only a stretching viewBox`, () => {
       const { view } = viewOf(crowd(total, finished), { agents: [], workflows: [], at: 0 }, columnsFor(px))
-      const width = columnsFor(px) * CH - 16
-      const items = [view.leadWidth, view.barWidth, view.countsWidth, view.actionWidth].filter(Boolean)
-      const row = view.padLeft + view.padRight + 2 + items.reduce((sum, one) => sum + one, 0) + (items.length - 1) * view.gap
-      expect(Math.abs(row - width)).toBeLessThanOrEqual(2)
       const boxes: Record<string, unknown>[] = []
+      const svgs: Record<string, unknown>[] = []
       const Box = (props: Record<string, unknown>) => {
         boxes.push(props)
         return props.children ?? null
       }
+      const Svg = (props: Record<string, unknown>) => {
+        svgs.push(props)
+        return null
+      }
       const stub = (props: Record<string, unknown>) => props.children ?? null
-      Band({ Box, Text: stub, Button: stub, Svg: stub } as unknown as Parameters<typeof Band>[0], { view })
+      Band({ Box, Text: stub, Button: stub, Svg } as unknown as Parameters<typeof Band>[0], { view })
       const bar = boxes.find(one => String(one.key).startsWith('bar-'))
-      expect([bar?.width, bar?.flexGrow]).toEqual([across(view.barWidth), undefined])
-      if (view.showCounts) expect(boxes.some(one => one.width === across(view.countsWidth))).toBe(true)
+      expect([bar?.flexGrow, bar?.flexShrink, bar?.width, bar?.minWidth]).toEqual([1, 1, 0, 0])
+      const drawn = svgs.find(one => one.isInteractive === true)
+      expect(drawn?.width).toBeUndefined()
+      const source = String(drawn?.source)
+      expect(source).toContain('width="4096"')
+      expect(source).toContain(`viewBox="0 0 ${view.barWidth} 10" preserveAspectRatio="none"`)
     })
   }
 }

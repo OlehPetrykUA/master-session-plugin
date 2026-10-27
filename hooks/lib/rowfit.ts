@@ -39,7 +39,7 @@ export function rowFitOf(item: RowItem, context: Context, input: RowFitInput) {
   const nameLines = input.isInCard
     ? Math.max(rowsOf(oneLine(name.persona), column - modelWidth, 14, 12, { isBold: true }).length, name.task ? rowsOf(oneLine(name.task), column - modelWidth - personaWidth, 14, 12).length : 1)
     : 1
-  const wrapped = (Math.max(1, nameLines) - 1) * LH
+  const wrapped = (nameLines - 1) * LH
   const height = wrapped + (isNeeds ? Math.max(ROW, 2 + 16 + 20 + 2 + (line.chain ? 16 + 2 + askPx : askPx)) : ROW)
   return { name, line, model, isNeeds, elapsed, steps, where, dirty, git, isChatIcon, isPersonaCut: !input.isInCard && personaWidth + modelWidth > column, ask, height }
 }

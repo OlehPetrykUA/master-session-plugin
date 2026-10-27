@@ -21,7 +21,6 @@ const agent = (id: string, name: string): AgentRecord => ({ id, type: 'master-se
 warmUp()
 
 test('an open card wraps the full name and task and its hit covers the wrapped top; a collapsed row still truncates', async ($, on) => {
-  expect(LONG.length).toBeGreaterThanOrEqual(120)
   seeded(on, [agent('long', LONG), agent('short', 'short task')])
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
