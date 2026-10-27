@@ -19,6 +19,7 @@ export type WorkflowRun = {
   name: string
   description: string
   taskId?: string
+  parentSessionId?: string
   task?: TaskText
   phases: string[]
   state: AgentState
@@ -52,6 +53,7 @@ export function workflowRunsOf(all: readonly AgentRecord[], records: readonly Wo
       name: record?.name || id,
       description: record?.description ?? '',
       taskId: record?.taskId,
+      parentSessionId: record?.parentSessionId,
       task: record?.task,
       phases: record?.phases ?? [],
       state: isRunning ? 'running' : counts.failed ? 'failed' : 'done',
