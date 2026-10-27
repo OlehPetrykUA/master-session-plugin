@@ -120,7 +120,7 @@ const iconsOf = async (ui: Found) => (await ui.findAll({ type: 'Svg' })).filter(
 
 const percentIn = async (ui: Found) => (await textsOf(ui)).find(one => /^\d+%$/.test(one))
 
-const countsIn = async (ui: Found) => (await ui.findAll({ type: 'Text' })).find(one => one.props.color === 'inactive' && /^(\d+\/\d+|All \d+ done)$/.test(one.text))
+const countsIn = async (ui: Found) => (await ui.findAll({ type: 'Text' })).find(one => /^(\d+\/\d+|All \d+ done)$/.test(one.text))
 
 const scopesOf = async (ui: Found) => (await faceOf(ui)).map(one => one.key)
 
