@@ -158,14 +158,14 @@ export async function describeSpawn($: EngineInterface, e: AgentSpawnInput, out:
 
 export async function recordWorkflow($: EngineInterface, e: { tool_use_id: string; script?: string }, result: unknown) {
   const now = await $.clock.now()
-  const path = textOf(launchOf(result).scriptPath)
+  const launch = launchOf(result)
+  const path = textOf(launch.scriptPath)
+  const id = launch.status === 'async_launched' ? textOf(launch.runId) : undefined
   const script = e.script ?? (path ? await $.fs.read(path).catch(() => '') : '')
   const phases = phasesOf(script)
-  await saveWorkflows($, workflows => launched(workflows, e.tool_use_id, result, phases, now))
+  await saveWorkflows($, workflows => launched(workflows, e.tool_use_id, launch, phases, now))
   await syncAgents($)
-  const launch = launchOf(result)
-  const id = launch.status === 'async_launched' ? textOf(launch.runId) : undefined
-  const source = workflowSource(descriptionOf(script) || textOf(launch.summary) || '', phases, script)
+  const source = workflowSource(descriptionOf(script), phases, script)
   if (id) await describe($, { target: { type: 'run', id }, kind: 'workflow', name: textOf(launch.workflowName) ?? id, source })
 }
 

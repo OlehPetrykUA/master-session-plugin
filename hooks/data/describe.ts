@@ -39,16 +39,20 @@ const hasLooseQuote = (word: string) => [...word].some((char, index) => char ===
 
 const stripped = (word: string) => word.replace(/^\(/, '').replace(/[.,;:!?)]$/, '')
 
+const core = (word: string) => word.replace(/^[^\p{L}\p{N}-]+|[^\p{L}\p{N}]+$/gu, '')
+
+const isShaped = (word: string, source: string) => !!word && source.includes(word) && (WORD_BAD.test(word) || word.startsWith('-') || hasLooseQuote(word))
+
 export const isUnsafe = (reply: string, source: string) =>
   reply
     .split(' ')
-    .map(stripped)
-    .some(word => !!word && source.includes(word) && (WORD_BAD.test(word) || word.startsWith('-') || hasLooseQuote(word)))
+    .some(word => isShaped(stripped(word), source) || isShaped(core(word), source))
 
-export function cleaned(reply: string) {
-  const text = reply.replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ').trim()
-  return text.length > STORED_MAX ? `${text.slice(0, STORED_MAX)}…` : text
-}
+export const normalized = (reply: string) => reply.replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ').trim()
+
+export const capped = (text: string) => (text.length > STORED_MAX ? `${text.slice(0, STORED_MAX)}…` : text)
+
+export const cleaned = (reply: string) => capped(normalized(reply))
 
 const promptOf = (job: Job) => `Kind: ${job.kind}\nShort name: ${job.name}\n\nThe task as it was given:\n${job.source}`
 
@@ -58,9 +62,9 @@ async function attempt($: EngineInterface, job: Job, isStrict: boolean): Promise
     .catch(() => undefined)
   const result = await Promise.race([asked, $.clock.sleep(TIMEOUT_MS).then(() => undefined)])
   if (!result?.isAnswered) return { ok: false, isGuard: false }
-  const text = cleaned(result.text)
+  const text = normalized(result.text)
   if (!text) return { ok: false, isGuard: false }
-  return isUnsafe(text, job.source) ? { ok: false, isGuard: true } : { ok: true, text }
+  return isUnsafe(text, job.source) ? { ok: false, isGuard: true } : { ok: true, text: capped(text) }
 }
 
 const taskOf = (outcome: Outcome): TaskText | undefined => (outcome.ok ? { state: 'done', text: outcome.text } : undefined)

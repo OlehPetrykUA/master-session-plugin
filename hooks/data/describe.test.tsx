@@ -15,7 +15,7 @@ import { C } from '../theme/tokens'
 import { CREDENTIALS } from '../testing/credentials'
 import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, childOf, liveOf, started, textsOf, altsOf, warmUp, world } from '../testing/world'
 import type { Child } from '../testing/world'
-import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, isUnsafe } from './describe'
+import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, isUnsafe, normalized } from './describe'
 import { reportPath } from './status'
 
 const NOW = 3_600_000
@@ -541,19 +541,23 @@ const GUARDED = /[\d`\\=:@$";|&<>{}[\]'-]/
 
 test('AC21: a reply that names the row’s secrets is never stored', { plugins: [PROBE], timeoutMs: 120_000 }, async ($, on) => {
   let secrets: readonly string[] = []
-  stub(on, () => say(`It uses ${secrets.join(' and ')} to finish.`))
+  let wrap = (secret: string) => secret
+  stub(on, () => say(`It uses ${secrets.map(wrap).join(' and ')} to finish.`))
   const run = await master($, on)
   let count = 0
-  for (const [, command, row] of CREDENTIALS) {
-    if (!row.every(secret => secret.split(' ').some(word => GUARDED.test(word)))) continue
-    secrets = row
-    count += 1
-    await spawn($, { description: `row ${count}`, prompt: brief(command) })
-    await run.clock.settle()
-    const stored = (await atomsOf($)).agents.map(one => one.task?.text ?? '').join('\n')
-    expect(secretsIn(stored, row)).toEqual([])
+  for (const wrapper of [(secret: string) => secret, (secret: string) => `"${secret}"`, (secret: string) => `«${secret}»`]) {
+    wrap = wrapper
+    for (const [, command, row] of CREDENTIALS) {
+      if (!row.every(secret => secret.split(' ').some(word => GUARDED.test(word)))) continue
+      secrets = row
+      count += 1
+      await spawn($, { description: `row ${count}`, prompt: brief(command) })
+      await run.clock.settle()
+      const stored = (await atomsOf($)).agents.map(one => one.task?.text ?? '').join('\n')
+      expect(secretsIn(stored, row)).toEqual([])
+    }
   }
-  expect(count).toBeGreaterThan(80)
+  expect(count).toBeGreaterThan(240)
 })
 
 test('AC22: a worker’s report writes hold none of the rows’ secrets', { timeoutMs: 120_000 }, async ($, on) => {
@@ -691,6 +695,13 @@ test('the guard and the cleaning: words in the source with a digit, a leading da
   expect(cleaned('  a\u0007 b\n\n\tc  ')).toBe('a b c')
 })
 
+test('a secret in quotes, brackets or guillemets is still caught, and one cut by the 600 character cap is caught before the cut', () => {
+  for (const reply of ['It uses "pw02" to finish.', 'It uses (pw02).', 'It uses «pw02».', 'It uses “pw02”.', "It uses 'pw02'."]) expect(isUnsafe(cleaned(reply), 'mysql -u root -p pw02 db')).toBe(true)
+  const long = `${'x'.repeat(590)} sk-tok32abcdefghijklmnop`
+  expect(cleaned(long)).not.toContain('sk-tok32abcdefghijklmnop')
+  expect(isUnsafe(normalized(long), 'export KEY=sk-tok32abcdefghijklmnop')).toBe(true)
+})
+
 test('a worker’s start_session makes no call: side chats are the master’s', async ($, on) => {
   const { seen } = stub(on, () => say(T))
   const { run } = await worker($, on)
@@ -709,4 +720,20 @@ test('a resume keeps the stored prompt and task, and makes no new call', { plugi
   const [agent] = (await atomsOf($)).agents
   expect(seen.length).toBe(1)
   expect([agent?.prompt, agent?.task]).toEqual([P.slice(0, 20), { state: 'done', text: T }])
+})
+
+test('a secret that would fall across the 600 character cap is rejected, not stored cut', { plugins: [PROBE] }, async ($, on) => {
+  stub(on, () => say(`${'x'.repeat(597)} sk-tok32abcdefghijklmnop`))
+  const run = await master($, on)
+  await spawn($, { prompt: brief('export KEY=sk-tok32abcdefghijklmnop') })
+  await run.clock.settle()
+  expect((await atomsOf($)).agents[0]?.task).toBeUndefined()
+})
+
+test('a workflow whose script cannot be read gets no call even when the launch carries a summary', async ($, on) => {
+  const { seen } = stub(on, () => say(T))
+  const run = await master($, on)
+  await $.tool.call({ tool: 'Workflow', scriptPath: '/missing/run.js' } as never)
+  await run.clock.settle()
+  expect(seen.length).toBe(0)
 })
