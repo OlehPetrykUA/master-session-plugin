@@ -502,7 +502,7 @@ test('AC18: the master’s workflow record for a worker’s run holds the report
 
 const secretsIn = (all: string, secrets: readonly string[]) => secrets.filter(secret => all.includes(secret))
 
-const CUED_ROWS = new Set([1, 2, 3, 4, 7, 8, 9, 11, 12, 16, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 38, 39, 41, 42, 44, 45, 46, 47, 52, 57, 72, 75, 81, 84, 85])
+const CUED_ROWS = new Set([...Array.from({ length: 48 }, (_, index) => index + 1), 52, 57, 64, 66, 72, 75, 81, 84, 85])
 
 test('AC19: for every credential row a copied prompt is rejected twice, the second call strict, and no text is stored or drawn', { plugins: [PROBE], timeoutMs: 120_000 }, async ($, on) => {
   const { seen } = stub(on, request => say(String(request.prompt)))
@@ -873,7 +873,7 @@ test('a letters-only secret in a paraphrased reply: a source with a credential c
 test('each credential cue word stops the call, for a prompt and for a workflow script', async ($, on) => {
   const { seen } = stub(on, () => say(T))
   const run = await master($, on)
-  const cues = ['password', 'passwd', 'pwd', 'passphrase', 'apikey', 'api key', 'api_key', 'api-key', 'access key', 'private key', 'bearer', 'PASSWORD', 'PGPASSWORD=x', 'token: x', 'SECRET=x', 'auth: x', 'key=x', 'Authorization: x', 'MY_KEY=x', 'DB_PASS', 'GITHUB_TOKEN', '--token x', '--pass x', '--secret x', '--auth x', '--password', 'run x -pvalue','redis-cli -a pw', 'curl -u me:pw', 'git clone https://me:pw@host', 'psql postgres://app:pw@db', `curl -d '{"token":"hunter"}' x`, '{"client_secret":"hunter"}', '{"auth" : "hunter"}', "clientSecret: 'hunter'", 'accessToken=hunter', '//r/:_authToken=hunter', "secretAccessKey: 'hunter'", 'PW=hunter', '--from-literal=pw=hunter', 'identified by x', 'ghp_abc', 'gho_abc', 'github_pat_abc', 'glpat-abc', 'xoxb-abc', 'sk-abc', 'AKIAabc', 'ASIAabc', 'hvs.abc', 'npm_abc', '-phunter', '"-phunter"', 'mysql -p hunter', 'mariadb -P hunter', 'mysqldump -p hunter', 'sshpass -p hunter', 'sqlcmd -P hunter']
+  const cues = ['password', 'passwd', 'pwd', 'passphrase', 'apikey', 'api key', 'api_key', 'api-key', 'access key', 'private key', 'bearer', 'PASSWORD', 'PGPASSWORD=x', 'token: x', 'SECRET=x', 'auth: x', 'key=x', 'Authorization: x', 'MY_KEY=x', 'DB_PASS', 'GITHUB_TOKEN', '--token x', '--pass x', '--secret x', '--auth x', '--password', 'run x -pvalue','redis-cli -a pw', 'curl -u me:pw', 'git clone https://me:pw@host', 'psql postgres://app:pw@db', `curl -d '{"token":"hunter"}' x`, '{"client_secret":"hunter"}', '{"auth" : "hunter"}', "clientSecret: 'hunter'", 'accessToken=hunter', '//r/:_authToken=hunter', "secretAccessKey: 'hunter'", 'PW=hunter', '--from-literal=pw=hunter', 'identified by x', 'ghp_abc', 'gho_abc', 'github_pat_abc', 'glpat-abc', 'xoxb-abc', 'sk-abc', 'AKIAabc', 'ASIAabc', 'hvs.abc', 'npm_abc', '-phunter', '"-phunter"', 'mysql -p hunter', 'mariadb -P hunter', 'mysqldump -p hunter', 'sshpass -p hunter', 'sqlcmd -P hunter', 'docker login -u me -p hunter registry', 'podman login -p hunter quay.io', 'az login -u me -p hunter', 'mongosh -u u -p hunter', 'ssh-keygen -p -P old -N new -f k', 'curl -X POST https://hooks.slack.com/services/T/B/hunter', 'git push https://hunter@github.com/o/r.git main', 'gh secret set NAME --body hunter', 'vault login hunter', 'echo hunter | sudo -S x', 'ARGS=(--token hunter)']
   for (const [index, cue] of cues.entries()) {
     await spawn($, { description: `cue ${index}`, prompt: `Build the band now line with ${cue} included.` })
     await $.tool.call({ tool: 'Workflow', script: `${SCRIPT}\n// ${cue}` })

@@ -89,13 +89,16 @@ const CUES = [
   /[a-z](?:Pass|Pw|Tokens?|Secrets?|Auth|Key|Credentials?)["']?\s*[:=]\s*\S/,
   new RegExp(`[A-Z0-9_]*(?:${ENV})[A-Z0-9_]*=`),
   new RegExp(`(?<![A-Z0-9_])(?:[A-Z0-9]+_(?:${ENV})|(?:${ENV})_[A-Z0-9_]+)(?![A-Z0-9_])`),
-  new RegExp(`(?:^|\\s)--(?:${WEAK})(?![a-z0-9])`, 'i'),
+  new RegExp(`(?<![a-z0-9-])--(?:${WEAK})(?![a-z0-9])`, 'i'),
   /(?<![A-Za-z0-9])(?:gh[pousr]_|github_pat_|glpat-|xox[abpr]-|sk-|AKIA|ASIA|hvs\.|npm_)[A-Za-z0-9]/,
   /(?:^|[\s"'])-p[a-z0-9]/i,
-  /\b(?:mysql|mysqldump|mariadb|sshpass|sqlcmd)\b[^\n]*?\s-p\s+\S/i,
+  /\b(?:mysql|mysqldump|mariadb|sshpass|sqlcmd|mongosh?|ssh-keygen|(?:docker|podman|az)\s+login)\b[^\n]*?\s-p\s+\S/i,
   /\bredis-cli\b[^\n]*?\s-a\s+\S/,
   /(?:^|\s)-u\s*[^\s:]+:\S/,
-  /:\/\/[^\s/:@]+:[^\s/@]+@/,
+  /:\/\/[^\s/@]+@/,
+  /hooks\.slack\.com\/services\//i,
+  /\bgh\s+secret\b|\bvault\s+login\s+\S/i,
+  /\|\s*sudo\s+-S\b/,
 ]
 
 export const hasCue = (text: string) => CUES.some(cue => cue.test(text))
