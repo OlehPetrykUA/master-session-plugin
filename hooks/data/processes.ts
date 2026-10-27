@@ -105,7 +105,7 @@ async function contextOf($: EngineInterface, masterPid: number): Promise<ProcCon
   }
   for (const repo of repos) for (const tree of repo.worktrees) if (!tree.isMain) add(tree.path, '')
   const paths: RunPath[] = [...owned].map(([path, owner]) => ({ path, owner }))
-  return { home, masterPid, paths, repos: repos.map(repo => repo.path.split('/').filter(Boolean).at(-1) ?? '').filter(Boolean) }
+  return { home, masterPid, paths, trees: repos.flatMap(repo => repo.worktrees.filter(tree => !tree.isMain).map(tree => tree.path.replace(/\/+$/, ''))) }
 }
 
 async function readOnce($: EngineInterface) {

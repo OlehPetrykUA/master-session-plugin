@@ -12,7 +12,7 @@ const K10 = `${HOME}/.claude/worktrees/wt-app-k10`
 
 const row = (one: ReturnType<typeof proc>): Proc => ({ pid: one.pid, ppid: one.ppid, lstart: one.lstart ?? LSTART, cpu: one.cpu ?? 0, rss: one.rss ?? 1024, etime: etimeOf(one.etime ?? '00:10'), ucomm: one.ucomm })
 
-const CONTEXT: ProcContext = { home: HOME, masterPid: 100, repos: ['app'], paths: [{ path: K1, owner: 'local_k1' }, { path: K10, owner: 'local_k10' }] }
+const CONTEXT: ProcContext = { home: HOME, masterPid: 100, trees: [K1, K10], paths: [{ path: K1, owner: 'local_k1' }, { path: K10, owner: 'local_k10' }] }
 
 test('AC8: cpu, memory and elapsed formats', () => {
   expect([cpuText(12.4), cpuText(230)]).toEqual(['12%', '230%'])
@@ -47,10 +47,12 @@ test('AC31: a left-behind worktree needs the board’s repo name followed by a d
   expect([at(`${HOME}/Work/app`), at(`${HOME}/.claude/worktrees/wt-other-k1`), at(`${HOME}/.claude/worktrees/wt-apple-k1`), at('/tmp'), at(`${HOME}/.claude/worktrees`)]).toEqual(['', '', '', '', ''])
 })
 
-test('a worktree of a longer board repo name is not owned by the shorter one', () => {
-  const cwd = `${HOME}/.claude/worktrees/wt-app-web-k1`
-  expect(worktreeOf(cwd, { home: HOME, repos: ['app', 'app-web'] })).toBe('wt-app-web-k1')
-  expect(worktreeOf(cwd, { home: HOME, repos: ['app'] })).toBe('')
+test('a worktree is owned only when a board repo lists its exact path', () => {
+  const web = `${HOME}/.claude/worktrees/wt-app-web-k1`
+  const feature = `${HOME}/.claude/worktrees/wt-app-feature-x`
+  expect(worktreeOf(`${web}/src`, { trees: [K1, web] })).toBe('wt-app-web-k1')
+  expect(worktreeOf(web, { trees: [K1] })).toBe('')
+  expect(worktreeOf(`${feature}/a`, { trees: [K1, feature] })).toBe('wt-app-feature-x')
 })
 
 test('AC9: rows sort by CPU, then longest elapsed, then pid', () => {

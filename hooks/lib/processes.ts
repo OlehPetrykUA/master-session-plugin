@@ -12,7 +12,7 @@ export type Proc = { pid: number; ppid: number; lstart: string; cpu: number; rss
 
 export type RunPath = { path: string; owner: string }
 
-export type ProcContext = { home: string; masterPid: number; paths: readonly RunPath[]; repos: readonly string[] }
+export type ProcContext = { home: string; masterPid: number; paths: readonly RunPath[]; trees: readonly string[] }
 
 export type Shown = { pid: number; lstart: string; ucomm: string; owner: string; cpu: number; rss: number; etime: number; canStop: boolean; group: 'run' | 'left'; worktree: string }
 
@@ -79,12 +79,11 @@ export function ownerPathOf(cwd: string | undefined, paths: readonly RunPath[]) 
   return best
 }
 
-export function worktreeOf(cwd: string | undefined, context: Pick<ProcContext, 'home' | 'repos'>) {
-  const root = `${context.home}/.claude/worktrees/`
-  if (!cwd || !context.home || !cwd.startsWith(root)) return ''
-  const name = cwd.slice(root.length).split('/')[0] ?? ''
-  const repo = [...context.repos].sort((left, right) => right.length - left.length).find(one => name.startsWith(`wt-${one}-`))
-  return repo && !name.slice(`wt-${repo}-`.length).includes('-') ? name : ''
+export function worktreeOf(cwd: string | undefined, context: Pick<ProcContext, 'trees'>) {
+  if (!cwd) return ''
+  let best = ''
+  for (const tree of context.trees) if (isUnder(cwd, tree) && tree.length > best.length) best = tree
+  return best.split('/').filter(Boolean).at(-1) ?? ''
 }
 
 export function chainOf(table: ReadonlyMap<number, Proc>, pid: number) {
