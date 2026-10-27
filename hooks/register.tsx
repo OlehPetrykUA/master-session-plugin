@@ -53,6 +53,8 @@ async function scrollToRow($: EngineInterface, row: number) {
   await $.ui.scroll({ in: PANE, to: 'start', block: 'start' }).catch(() => undefined)
 }
 
+const toggleBoard = async ($: EngineInterface) => ((await isPaneOpen($)) ? void (await $.ui.close({ id: PANE })) : void (await openPane($)))
+
 const wake = async ($: EngineInterface) => {
   await engage($)
   await republishBoard($).catch(() => undefined)
@@ -265,7 +267,7 @@ export const register: Register = on => {
   on('ui.message', { element: /^band-hit-/ }, async ($, event, next) => {
     const action = bandAction(event.element)
     if (!action || typeof (event.data as { press?: unknown } | undefined)?.press !== 'string') return next(event)
-    await (action === 'board' ? openPane($) : openAsking($))
+    await (action === 'board' ? toggleBoard($) : openAsking($))
     return {}
   })
 
@@ -274,7 +276,7 @@ export const register: Register = on => {
     if (event.props.hasSurvey) return next(event)
     const bandColumns = event.props.bodyColumns || 100
     const view = await bandData($, bandColumns, {
-      board: () => void openPane($),
+      board: () => void toggleBoard($),
       chat: (id, name) => void openSession($, id, name),
     })
     if (!view) return next(event)
@@ -296,7 +298,7 @@ export const register: Register = on => {
     const Client = e.surface === 'desktop' && 'Client' in table && !hasFaults() ? table.Client : undefined
     columns = e.props.bodyColumns || 48
     setColumns(columns)
-    startOpenTimers($)
+    syncTimers($)
     if (e.surface !== 'terminal') shown = { offset: e.props.scroll?.offset ?? 0, renders: shown.renders + 1 }
     const offset = e.surface === 'terminal' ? 0 : (e.props.scroll?.offset ?? 0)
     const data = await paneData($, columns, offset, e.props.scroll?.bodyRows ?? 0, offset === aimedRow)

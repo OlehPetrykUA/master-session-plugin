@@ -56,8 +56,13 @@ async function band($: Engine, on: On, sessions: BoardSession[], isPaneOpen = fa
     const inner = rest[0] as McpHook
     return register(event, (context: unknown, call: { tool: string }) => (call.tool === 'list_sessions' ? text(linked) : inner(context, call)))
   }
+  const closed: string[] = []
+  on('ui.close', (_, e) => {
+    closed.push(e.id)
+    return { value: undefined }
+  })
   const run = await started($, scoped as unknown as On, publish(sessions))
-  return { ...run, open: (value: boolean) => (isOpen = value), hide: () => (isHidden = true) }
+  return { ...run, closed, open: (value: boolean) => (isOpen = value), hide: () => (isHidden = true) }
 }
 
 const mount = ($: Engine, bodyColumns = 100) => $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns } })
@@ -440,12 +445,58 @@ test('all done: the check, the full green bar with no slider, "All N done" count
   run.open(true)
   await click(ui, 'band-hit-board', 2, 1)
   await run.clock.settle()
-  expect(run.opened).toEqual(['master-session'])
+  expect(run.opened).toEqual([])
+  expect(run.closed).toEqual(['master-session'])
   expect((await textsOf(ui)).includes('Open board')).toBe(false)
+  expect((await textsOf(ui)).includes('Hide board')).toBe(true)
   await ui.unmount()
 })
 
-test('exactly one Open board while the pane is closed, restyled in place on hover, never a second face; none while the pane is open', async ($, on) => {
+test('with the pane open the one button reads Hide board and a press closes the pane and opens nothing',async ($, on) => {
+  const run = await band($, on, WORKING, true)
+  const ui = await mount($)
+  expect((await textsOf(ui)).filter(one => one === 'Hide board')).toHaveLength(1)
+  expect((await textsOf(ui)).filter(one => one === 'Open board')).toHaveLength(0)
+  expect(await iconsOf(ui)).toContain('Hide board')
+  await click(ui, 'band-hit-board', 1, 1)
+  await run.clock.settle()
+  expect(run.closed).toEqual(['master-session'])
+  expect(run.opened).toEqual([])
+  await ui.unmount()
+})
+
+test('a Pane draw still in flight when the pane closes does not restart the open timers', async ($, on) => {
+  const run = await band($, on, WORKING, true)
+  const first = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const ui = await mount($)
+  await run.clock.settle()
+  await click(ui, 'band-hit-board', 1, 1)
+  await run.clock.settle()
+  expect(run.closed).toEqual(['master-session'])
+  run.open(false)
+  await first.unmount()
+  const late = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await run.clock.settle()
+  const before = run.reads.count
+  await run.clock.advance(10_000)
+  await run.clock.settle()
+  expect(run.reads.count).toBe(before)
+  await late.unmount()
+  await ui.unmount()
+})
+
+test('with the pane closed the board button reads Open board and a press opens it and closes nothing',async ($, on) => {
+  const shut = await band($, on, WORKING)
+  const again = await mount($)
+  expect((await textsOf(again)).filter(one => one === 'Open board')).toHaveLength(1)
+  await click(again, 'band-hit-board', 1, 1)
+  await shut.clock.settle()
+  expect(shut.opened).toEqual(['master-session'])
+  expect(shut.closed).toEqual([])
+  await again.unmount()
+})
+
+test('exactly one board button, restyled in place on hover, never a second face: Open board while the pane is closed, Hide board while it is open', async ($, on) => {
   const run = await band($, on, WORKING)
   const ui = await mount($)
   expect(await scopesOf(ui)).toEqual(['face-band-board'])
@@ -464,9 +515,10 @@ test('exactly one Open board while the pane is closed, restyled in place on hove
   run.open(true)
   await click(ui, 'band-hit-board', 1, 1)
   await run.clock.settle()
-  expect(await scopesOf(ui)).toEqual([])
-  expect(await hitsOf(ui)).toEqual([])
+  expect(await scopesOf(ui)).toEqual(['face-band-board'])
+  expect(await hitsOf(ui)).toHaveLength(1)
   expect((await textsOf(ui)).filter(one => one === 'Open board')).toHaveLength(0)
+  expect((await textsOf(ui)).filter(one => one === 'Hide board')).toHaveLength(1)
   await ui.unmount()
 })
 
@@ -474,6 +526,7 @@ test('a listed pane that the person hid is not open: Open board shows again', as
   const run = await band($, on, WORKING, true)
   const ui = await mount($)
   expect((await textsOf(ui)).filter(one => one === 'Open board')).toHaveLength(0)
+  expect((await textsOf(ui)).filter(one => one === 'Hide board')).toHaveLength(1)
   await ui.unmount()
   run.hide()
   const hidden = await mount($)
@@ -552,15 +605,14 @@ test('a pill truncated to fit leaves the row inside the band width', () => {
   }
 })
 
-test('the bar takes the room the button leaves: with the pane open it grows by the button and its gap, and follows bodyColumns', async ($, on) => {
+test('the bar takes the room the button leaves: with the pane open the Hide board button keeps the bar within the label width difference, and follows bodyColumns', async ($, on) => {
   const run = await band($, on, WORKING)
   const ui = await mount($)
   const closed = await barWidthOf(ui)
-  const faceWidth = Number((await ui.find({ key: 'face-band-board' }))?.props.width) * CH
   run.open(true)
   await click(ui, 'band-hit-board', 1, 1)
   await run.clock.settle()
-  expect(Math.abs((await barWidthOf(ui)) - (closed + faceWidth + 12))).toBeLessThanOrEqual(10)
+  expect(Math.abs((await barWidthOf(ui)) - closed)).toBeLessThanOrEqual(10)
   await ui.unmount()
   const at100 = await mount($, 100)
   const wide = await barWidthOf(at100)
@@ -584,6 +636,17 @@ test('terminal: one bar of block characters, the percent, the counts with their 
   expect((await ui.findAll({ type: 'Text' })).filter(one => /^[█░]+$/.test(one.text))).toHaveLength(1)
   await ui.press({ key: 'band-board' })
   expect(opened).toEqual(['master-session'])
+  await ui.unmount()
+})
+
+test('terminal: with the pane open the button reads Hide board and a press closes the pane', async ($, on) => {
+  const run = await band($, on, WORKING, true)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await buttonsOf(ui)).toEqual([['band-board', 'Hide board']])
+  await ui.press({ key: 'band-board' })
+  await run.clock.settle()
+  expect(run.closed).toEqual(['master-session'])
+  expect(run.opened).toEqual([])
   await ui.unmount()
 })
 

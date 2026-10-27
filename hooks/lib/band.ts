@@ -258,7 +258,7 @@ export function bandNowOf(items: readonly ListItem[], running: Runs, context: Pa
   }
 }
 
-export const bandSignatureOf = (view: BandView) => [view.summary, view.tone, view.isRunning, view.action?.name ?? ''].join('|')
+export const bandSignatureOf = (view: BandView) => [view.summary, view.tone, view.isRunning, view.action?.accessibleName ?? ''].join('|')
 
 export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live: Live, trees: readonly Repo[] = [], running: Runs = {}) {
   const width = columns * CH - 16
@@ -299,9 +299,7 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
     ? chat
       ? { name: 'chat' as const, label: CHAT_LABEL, accessibleName: CHAT_LABEL, icon: 'chat' as const, isIconOnly: isNarrow, press: () => act.chat(chat.id, chat.name) }
       : undefined
-    : isPaneOpen
-      ? undefined
-      : { name: 'board' as const, label: isNarrow ? 'Board' : 'Open board', accessibleName: 'Open board', icon: 'panel' as const, isIconOnly: false, press: act.board }
+    : { name: 'board' as const, label: isNarrow ? 'Board' : isPaneOpen ? 'Hide board' : 'Open board', accessibleName: isPaneOpen ? 'Hide board' : 'Open board', icon: 'panel' as const, isIconOnly: false, press: act.board }
   const actionWidth = action ? (action.isIconOnly ? BUTTON.height : 2 + BUTTON.left + BUTTON.icon + BUTTON.gap + widthOf(action.label, { isBold: true }) + BUTTON.right) : 0
   const padLeft = asker ? 8 : isNarrow ? 12 : 16
   const padRight = action ? (isNarrow ? 6 : 8) : isNarrow ? 12 : 16
