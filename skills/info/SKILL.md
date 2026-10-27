@@ -9,6 +9,4 @@ The master-session status mod answers this command: it opens the status pane, an
 
 Then say in one line whether the loop is on (`CronList` lists it). A run that is active with no loop armed is a bug: arm it now as section 3 of `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` says.
 
-## In Copilot CLI
-
-Copilot has no status mod and no loop. Post the board as [board.md](../start/board.md) shows, then say in one line that Copilot runs no loop, so the board updates when the user writes.
+Copilot CLI: [copilot.md](../start/copilot.md#info).

@@ -13,10 +13,17 @@ This runs inside a validator session. If `/master-session:start` hasn't run in t
 
 Use it only for pieces that [Execution shape](../start/SKILL.md#2-brief-the-worker) rule 3 gives a worker session; anything else is a subagent (rule 5).
 
-1. Brief and start the worker exactly as [section 2 of the start skill](../start/SKILL.md#2-brief-the-worker) says: the plan, the persona, `title` and `name`, the brief format with its start condition and clean-up, `start_session` and the ledger note. The user typed the command, so `initiation` is `"user_asked"`, and it starts in this turn: the app refuses `start_session` on a later turn that a message, a Monitor or the loop began.
+1. Plan and brief the worker as [section 2 of the start skill](../start/SKILL.md#2-brief-the-worker) says, then start it as Session start below. The user typed the command, so it starts in this turn.
 2. Right after, arm [the loop](../start/SKILL.md#3-the-loop) if none is armed (`CronList` shows none), with section 3's `/loop` args, and say so in one line. A loop that is already armed picks the worker up from the ledger.
-3. Tell the user in one line: the worker as `name (local_id)`, its persona and its Done when.
+3. Tell the user in one line: the worker as `name (local_id)`, its persona and its Your checks.
 
-## In Copilot CLI
+## Session start
 
-Copilot can't start a session or arm a loop. Write the brief as step 1 says, give it to the user to paste into a session they open with `/new` (or `/fork` to keep this chat), and list the worker by the name they give it. It reports in its own chat; check on it whenever the user writes. `${CLAUDE_PLUGIN_ROOT}` is this plugin's folder, two levels up from this file.
+The validator reads this section by path whenever it starts a worker session.
+- Call `start_session` with `title` and `name` (start section 2, Names), `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: true`, a `background` of 80+ characters, `permission_mode: "auto"` (start section 5) and the whole brief, whose first line is `You are a worker session of master session <validator local_id>. Load the master-session:worker and master-session:<persona> skills first.`
+- Start it only in the user's own turn: the app refuses `start_session` on a turn that a worker's message, a Monitor or the loop began, so a later tick can't add a session. On any other turn, tell the user in one line and start it on their next one (an `own_initiative` card is only for work you noticed yourself).
+- If `start_session` fails or is refused, tell the user in one line and start it on their next turn; when the failure is lasting (for example over Remote Control), also say it can't start here.
+- Never downgrade such a piece to a subagent.
+- A session's brief holds its whole run: never send it go, rebase or merged messages; SendMessage only for a follow-up on its own deliverable.
+
+Copilot CLI: [copilot.md](../start/copilot.md#subchat).

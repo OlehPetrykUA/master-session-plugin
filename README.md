@@ -1,6 +1,6 @@
 # Master session
 
-A Claude Code plugin that turns one session into a **validator** for a team of worker sessions. The validator plans the work, briefs a worker session per piece, watches them, answers their questions, verifies every `ready <sha>` in a clean worktree and merges it fast-forward only. You get a live status board instead of a scrolling chat.
+A Claude Code plugin that turns one session into a **validator** for a team of workers. The validator plans the work, sizes each piece into a tier, starts only the agents the tier and the machine allow, answers their questions, verifies every `ready <sha>` with the checkers its tier names and merges it fast-forward only. You get a live status board instead of a scrolling chat.
 
 <p align="center"><img src="docs/screenshots/pane-dark.png" width="380" alt="The status pane in the dark theme: run totals, filter chips, and worker sessions, subagents and a workflow run grouped into Needs you, Working, Waiting and Done"></p>
 
@@ -8,7 +8,7 @@ A Claude Code plugin that turns one session into a **validator** for a team of w
 
 | Part | What it does |
 |---|---|
-| Skill `start` | `/master-session:start`, the validator protocol: roles, briefs, the tick loop, verification, permissions, the ledger. Ships `personas.md` (the persona index) and `board.md` (the chat board when the pane isn't available). |
+| Skill `start` | `/master-session:start`, the validator protocol: work tiers, the agent count line, briefs, the tick loop, checkers by tier, permissions, the ledger. Ships `personas.md` (the persona index), `board.md` (the chat board when the pane isn't available) and `copilot.md` (every Copilot CLI note). |
 | Skills `subchat`, `subagent`, `workflow` | `/master-session:subchat`, `/master-session:subagent` and `/master-session:workflow`: start a worker session, a persona subagent or a workflow of persona agents from the validator. |
 | Skill `worker` | The protocol every worker session follows: its own worktree, the report tool, talking to the validator, the `ready <sha>` gate. |
 | Status mod | `/master-session:info` opens it: a pane beside the chat with one row per worker (state, progress, git, tests, commits) under run-total tiles, a band above the prompt, archive and unarchive, and **Ask for updates** (shown once workers are listed). Workers report through the `mcp__master-session__report` tool; the mod also records their commits, test runs, edits and waits by itself. |
@@ -56,11 +56,7 @@ copilot plugin marketplace add <path to your clone>
 copilot plugin install master-session@master-session
 ```
 
-`copilot plugin list` shows it under "Live Plugins". The skills keep their own names (`start`, `subchat`, `worker`, the personas), and the agents are `master-session:<persona>`. `start`, `info`, `subchat`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them.
-
-Copilot has no session tools, report tool, status mod or loop. Each skill's "In Copilot CLI" section says what to do instead: the user opens worker sessions and relays their reports, personas run through the `task` tool with a Copilot model id (Copilot rejects the agents' `sonnet` and `opus`), and the board goes in chat. The agents carry `reasoning-effort` for Copilot beside `effort` for Claude Code.
-
-Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do.
+`copilot plugin list` shows it under "Live Plugins". The skills keep their own names (`start`, `subchat`, `worker`, the personas), and the agents are `master-session:<persona>`. What Copilot does instead of the session tools, report tool, status mod and loop: [skills/start/copilot.md](skills/start/copilot.md).
 
 ## Usage
 
@@ -74,7 +70,7 @@ Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder mar
 
 `subchat`, `subagent` and `workflow` make the session the validator first if `/master-session:start` hasn't run yet. Settings for `/master-session:start`, in any order:
 - `new "<task>"` starts a fresh worker for that task; `worker <name>` attaches an existing session.
-- `every 5m` sets the heartbeat (default 2 minutes); `away` finishes everything inside the briefs without waiting; `quiet` or `verbose`.
+- `every 5m` sets the heartbeat (default 3 minutes while a worker session runs, 15 with only subagents); `away` finishes everything inside the briefs without waiting; `quiet` or `verbose`.
 - `tick now`, `status`, `stop`, `archive-done`.
 
 Workers need nothing installed beyond this plugin: their brief loads the `master-session:worker` skill and their persona's skill, and they report through the status tool.
@@ -94,19 +90,19 @@ The ledger, one note per run with every worker, its state and open findings, goe
 
 ## Personas
 
-Each persona is a skill, `master-session:<persona>`, and an agent of the same name that keeps the model, effort and tool limits listed in [personas.md](skills/start/personas.md). The code reviewer, QA verifier, design checker and researcher can't edit files.
+Each persona is a skill, `master-session:<persona>`, and an agent of the same name whose frontmatter keeps its default model, effort and tool limits ([personas.md](skills/start/personas.md)). The validator stages only the personas a piece's tier needs. The code reviewer, QA verifier, design checker and researcher can't edit files.
 
 | Persona | What it does |
 |---|---|
 | `implementer` | Builds one deliverable from a brief in its own worktree and reports `ready <sha>`. |
 | `refactorer` | Moves, renames or splits code without changing behaviour. |
-| `reviewer` | The Code reviewer, a peer of the QA verifier: reads a `ready <sha>` against its brief, the spec, the user's words and code quality, ending in PASS or FAIL. |
-| `qa-verifier` | Owns the verification of a ready sha: gate, tests, mutations and live checks in a clean detached worktree, (UI) Design checker as its own subagent, live screenshot when given a window id; returns one PASS or FAIL with bundled findings. |
-| `design-checker` | Compares the built UI with the approved design. |
+| `reviewer` | The Code reviewer for risk-flagged pieces, beside the QA verifier: reads a `ready <sha>` against its brief, the spec, the user's words and code quality, ending in PASS or FAIL. Its checklist and verdict rules also drive the combined checker. |
+| `qa-verifier` | Owns the verification of a ready sha in a clean detached worktree: the one full gate, tests and mutations, the review checklist in combined mode (the single checker for most pieces), rechecks after a fix, and live checks when given a window id. |
+| `design-checker` | Compares a readable render of the built UI with the approved design. |
 | `researcher` | Answers one question from published docs, citing each claim. |
 | `spec-writer` | Writes the feature's spec in the project's Claude Doc, one tab per feature, with testable acceptance criteria, before design and build. |
 | `architect` | For features spanning several modules or workers: turns the approved spec into a technical design in its tab (module map, interfaces, one piece per worker, order, risks, test proofs); read-only on code. |
-| `designer` | Edits the project's canonical design artboards in place (a new one only for a new component or state), in light and dark, for the user to approve before any UI code. |
+| `designer` | A fresh subagent per design pass that edits the project's canonical design artboards in place (a new one only for a new component or state), in light and dark, for the user to approve before any UI code. |
 
 Start a session as a persona. Claude Code's default system prompt is kept, and the plugin's SessionStart hook loads the persona's skill, plus the worker skill for the implementer and refactorer:
 

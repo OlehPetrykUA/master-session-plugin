@@ -23,6 +23,4 @@ You are the Architect persona of the master-session plugin. Return only the Outp
 - **Gate:** every piece names its files, no file is in two pieces, every dependency is ordered, every acceptance criterion is covered by a piece's tests, and the validator approves the design. Implementer briefs link the section.
 - **Must not:** write or edit code, draw designs, change the spec's requirements, or start a second doc.
 
-## In Copilot CLI
-
-Copilot has no Claude Docs. Add the section to `docs/specs/<feature>.md` in a worktree at `$HOME/.copilot/worktrees/wt-<repo>-design-<feature>`, with the same changelog, commit it with a one-line conventional message, and return the path and sha instead of the doc link.
+Copilot CLI: [copilot.md](../start/copilot.md#architect).
