@@ -48,23 +48,23 @@ async function hold($: Engine, run: Awaited<ReturnType<typeof master>>, input: R
   }
 }
 
-test('no command text in the band: for every credential command the line shows the tool name only, on the desktop and in the terminal', { timeoutMs: 30_000 }, async ($, on) => {
+test('AC49 no persona, task, tool or command text in the band: for every credential command the band shows none of it, on the desktop and in the terminal', { timeoutMs: 30_000 }, async ($, on) => {
   const run = await master($, on)
   for (const surface of ['desktop', 'terminal'] as const) {
     for (const [, command, secrets] of CREDENTIALS.filter((_, index) => surface === 'desktop' || index % 4 === 0)) {
       const end = await hold($, run, { tool: 'Bash', command, agentId: 'a1' })
       const ui = await $.ui.mount({ ...BAND, surface })
       const all = JSON.stringify([await textsOf(ui), await altsOf(ui)])
-      expect(all).toContain('Bash')
       expect(all).not.toContain(command)
       expect(secrets.filter(secret => all.includes(secret))).toEqual([])
+      for (const word of ['Bash', 'Implementer', 'Row details', 'Find callers', 'Explore', 'more', 'Nothing running', 'waiting']) expect(all).not.toContain(word)
       await ui.unmount()
       await end()
     }
   }
 })
 
-test('with the pane closed the band redraws on a data change at the next live check, and not again while nothing it shows changes', async ($, on) => {
+test('AC62 and AC32 a tool call never redraws the band; the minute rolling over redraws it once, at the next live check', async ($, on) => {
   const invalidated = { count: 0 }
   on('ui.invalidate', (_, e, next) => {
     if (e.event === 'ui.render') invalidated.count += 1
@@ -73,17 +73,21 @@ test('with the pane closed the band redraws on a data change at the next live ch
   const run = await master($, on)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   expect((await textsOf(ui)).some(one => String(one).includes('Bash'))).toBe(false)
+  const minutes = async () => Number((await textsOf(ui)).map(one => String(one).trim()).find(one => /^\d+m$/.test(one))?.slice(0, -1))
+  const seen = async () => ({ count: invalidated.count, minutes: await minutes() })
   await run.clock.advance(LIVE_MS)
-  const quiet = invalidated.count
+  const quiet = await seen()
   const end = await hold($, run, { tool: 'Bash', command: 'npm test --silent', agentId: 'a1' })
   await run.clock.advance(LIVE_MS)
-  expect(invalidated.count).toBe(quiet + 1)
-  expect((await textsOf(ui)).some(one => String(one).includes('· Bash'))).toBe(true)
-  await run.clock.advance(LIVE_MS * 4)
-  expect(invalidated.count).toBe(quiet + 1)
+  const during = await seen()
+  expect(during.count - quiet.count).toBe(during.minutes - quiet.minutes)
+  expect((await textsOf(ui)).some(one => String(one).includes('Bash'))).toBe(false)
   await end()
   await run.clock.advance(LIVE_MS)
-  expect(invalidated.count).toBe(quiet + 2)
-  expect((await textsOf(ui)).some(one => String(one).includes('· Bash'))).toBe(false)
+  const after = await seen()
+  expect(after.count - during.count).toBe(after.minutes - during.minutes)
+  await run.clock.advance(60_000)
+  const rolled = await seen()
+  expect([rolled.count - after.count, rolled.minutes - after.minutes]).toEqual([1, 1])
   await ui.unmount()
 })

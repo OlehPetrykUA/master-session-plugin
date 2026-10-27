@@ -49,15 +49,76 @@ const bandTexts = async ($: Engine) => {
 
 const lastPlan = (writes: string[]) => (JSON.parse(writes.at(-1) ?? '{}') as { board?: { plan?: PlanPiece[] } }).board?.plan
 
-test('AC20 a board call with a plan, then one without: from the second call the band computes as today', async ($, on) => {
+const bare = (plan: PlanPiece[] | undefined) => plan?.map(({ since, ...rest }) => rest)
+
+test('T1 a board call with a plan, then one without: the stored plan and the band stay', async ($, on) => {
   const run = await master($, on)
   const planned = await bandTexts($)
   expect(planned).toEqual(['50%', '1/3', '1', '3'])
-  await call($, {})
+  const answer = await call($, {})
   await run.clock.settle()
-  const plain = await bandTexts($)
-  expect(plain).not.toEqual(planned)
-  expect(plain).toEqual(['20%', '0/2', '0', '2'])
+  expect(answer.deny).toBeUndefined()
+  expect(await bandTexts($)).toEqual(planned)
+  expect(bare(lastPlan(run.writes))).toEqual(PLAN)
+})
+
+test('T1 and T2 a call that lists two pieces keeps the rest, and the reply names the kept pieces and the plan growing', async ($, on) => {
+  const run = await master($, on)
+  const answer = await call($, { plan: [{ name: 'Build', state: 'verifying' }, { name: 'Ship', state: 'queued' }] })
+  await run.clock.settle()
+  expect(answer.result).toContain('Kept: Spec, Check, Old.')
+  expect(answer.result).toContain('Plan grew 3 → 4.')
+  expect(bare(lastPlan(run.writes))?.map(one => `${one.name}:${one.state}`)).toEqual(['Spec:done', 'Build:verifying', 'Check:queued', 'Old:dropped', 'Ship:queued'])
+  expect(await bandTexts($)).toEqual(['43%', '1/4', '1', '4'])
+})
+
+test('T6 moving a verifying piece back to working is accepted and the reply warns', async ($, on) => {
+  const run = await master($, on, { plan: [{ name: 'A', state: 'verifying' }, { name: 'B', state: 'queued' }] })
+  const answer = await call($, { plan: [{ name: 'A', state: 'working', progress: 'step 1 of 2 — x' }] })
+  await run.clock.settle()
+  expect(answer.deny).toBeUndefined()
+  expect(answer.result).toContain('Moved back to working: A.')
+})
+
+test('T9 a merged plan past 100 pieces not dropped is refused naming the cap of 100, and saves nothing', async ($, on) => {
+  const full = Array.from({ length: 50 }, (_, index) => ({ name: `P${index}`, state: 'queued' }))
+  const run = await master($, on, { plan: full })
+  expect((await call($, { plan: Array.from({ length: 50 }, (_, index) => ({ name: `Q${index}`, state: 'queued' })) })).deny).toBeUndefined()
+  const writes = run.writes.length
+  const answer = await call($, { plan: [{ name: 'one more', state: 'queued' }] })
+  await run.clock.settle()
+  expect(String(answer.deny)).toContain('cap is 100')
+  expect(run.writes.length).toBe(writes)
+})
+
+test('the run window restarts when the first plan arrives on a board that had none', async ($, on) => {
+  const run = await master($, on, {})
+  await run.clock.advance(5 * MIN)
+  await call($, { plan: PLAN })
+  await run.clock.settle()
+  const first = JSON.parse(run.writes.at(-1) ?? '{}') as { board?: { since?: number } }
+  await run.clock.advance(5 * MIN)
+  await call($, { plan: [{ name: 'More', state: 'queued' }] })
+  await run.clock.settle()
+  const next = JSON.parse(run.writes.at(-1) ?? '{}') as { board?: { since?: number } }
+  expect(first.board?.since).toBeGreaterThanOrEqual(5 * MIN)
+  expect(next.board?.since).toBe(first.board?.since)
+})
+
+test('a run name starts a new window: a new run resets the plan and the elapsed, the same run keeps both', async ($, on) => {
+  const run = await master($, on, { plan: PLAN, run: 'one' })
+  await run.clock.advance(5 * MIN)
+  await call($, { plan: [{ name: 'Extra', state: 'queued' }], run: 'one' })
+  await run.clock.settle()
+  const kept = JSON.parse(run.writes.at(-1) ?? '{}') as { board?: { plan?: PlanPiece[]; since?: number; run?: string } }
+  expect([kept.board?.plan?.length, kept.board?.run]).toEqual([5, 'one'])
+  const first = kept.board?.since
+  await run.clock.advance(5 * MIN)
+  await call($, { plan: [{ name: 'Fresh', state: 'queued' }], run: 'two' })
+  await run.clock.settle()
+  const next = JSON.parse(run.writes.at(-1) ?? '{}') as { board?: { plan?: PlanPiece[]; since?: number; run?: string } }
+  expect(bare(next.board?.plan)).toEqual([{ name: 'Fresh', state: 'queued' }])
+  expect(next.board?.since).toBeGreaterThan(first ?? Infinity)
 })
 
 test('AC22 a hot reload with no new board call shows the same percent and piece count', async ($, on) => {
@@ -71,7 +132,8 @@ test('AC22 a hot reload with no new board call shows the same percent and piece 
 
 test('AC23 the board file holds the plan, with the progress of a working piece, and reading it back returns the same plan', async ($, on) => {
   const { writes } = await master($, on)
-  expect(lastPlan(writes)).toEqual(PLAN)
+  expect(bare(lastPlan(writes))).toEqual(PLAN)
+  expect(lastPlan(writes)?.every(one => typeof one.since === 'number')).toBe(true)
   const files: Record<string, string> = {}
   const io = { fs: { write: async (path: string, text: string) => void (files[path] = text), read: async (path: string) => files[path] ?? '', stat: async (path: string) => ({ kind: 'file' as const, size: (files[path] ?? '').length, mtimeMs: 1, isLink: false }) } } as unknown as Parameters<typeof readBoard>[0]
   await writeBoard(io, HOME, { at: 10 * MIN, masterId: SELF, board: { sessions: [], needsYou: [], repos: [], source: 'tool', plan: PLAN } })
@@ -80,11 +142,10 @@ test('AC23 the board file holds the plan, with the progress of a working piece, 
 
 test('AC24 two board calls that differ only in the plan, a minute apart: the file holds the second plan', async ($, on) => {
   const { writes, clock } = await master($, on)
-  const next = [...PLAN, { name: 'Ship', state: 'queued' as const }]
   await clock.advance(MIN)
-  await call($, { plan: next })
+  await call($, { plan: [{ name: 'Ship', state: 'queued' }] })
   await clock.settle()
-  expect(lastPlan(writes)).toEqual(next)
+  expect(bare(lastPlan(writes))).toEqual([...PLAN, { name: 'Ship', state: 'queued' }])
 })
 
 test('AC25 a board file with a plan older than 30 minutes with no board call since reads as no board', async () => {
@@ -138,7 +199,7 @@ test('AC30 a plan entry with a 120 character name is accepted and stored as its 
   const answer = await call($, { plan: [{ name: 'x'.repeat(120), state: 'queued' }] })
   await run.clock.settle()
   expect(answer.deny).toBeUndefined()
-  expect(lastPlan(run.writes)?.[0]?.name).toBe(`${'x'.repeat(80)}…`)
+  expect(lastPlan(run.writes)?.at(-1)?.name).toBe(`${'x'.repeat(80)}…`)
 })
 
 test('AC34 two entries named Skill text are refused naming Skill text, and the band and the board file stay unchanged', async ($, on) => {

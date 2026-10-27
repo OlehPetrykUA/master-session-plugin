@@ -38,10 +38,13 @@ export type BoardSession = {
 
 export type PlanState = 'queued' | 'working' | 'verifying' | 'done' | 'dropped'
 
-export type PlanPiece = { name: string; state: PlanState; progress?: string }
+export type PlanTier = 'T0' | 'T1' | 'T2' | 'T3' | 'doc'
+
+export type PlanPiece = { name: string; state: PlanState; progress?: string; tier?: PlanTier; since?: number }
 
 export type Board = {
   tick?: string
+  run?: string
   sessions: BoardSession[]
   plan?: PlanPiece[]
   needsYou: string[]
@@ -196,7 +199,7 @@ declare module 'claude-code' {
     'mcp__ccd_session__start_session': { prompt?: string; title?: string }
     'mcp__master-session__open': {}
     'mcp__master-session__reports': {}
-    'mcp__master-session__board': Pick<Board, 'tick' | 'testsPassed' | 'testsNote' | 'plan'> & { sessions: BoardSession[]; needsYou?: string[]; repos?: string[] }
+    'mcp__master-session__board': Pick<Board, 'tick' | 'run' | 'testsPassed' | 'testsNote' | 'plan'> & { sessions: BoardSession[]; needsYou?: string[]; repos?: string[] }
     'mcp__master-session__report': {
       state?: SessionState
       progress?: string

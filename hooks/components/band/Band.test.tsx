@@ -2,12 +2,13 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine, FoundElement } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import type { AgentRecord, Board, BoardSession, Live, Repo, WorkflowRecord } from '../../../types'
+import type { AgentRecord, Board, BoardSession, Live, PlanPiece, Repo, WorkflowRecord } from '../../../types'
 
-import { BAR_MIN, PILL_WIDTH, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, overallOf, percentOf } from '../../lib/band'
+import { BAR_MIN, PILL_WIDTH, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, countsWidthOf, overallOf, percentOf } from '../../lib/band'
 import type { AgentCounts } from '../../lib/band'
 import { CH, across, tall, widthOf } from '../../lib/layout'
 import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, started, text, warmUp, world } from '../../testing/world'
+import { PERCENT } from '../../theme/band'
 import { glowOf, strip } from '../../theme/strip'
 import { C } from '../../theme/tokens'
 import { guardSvg } from '../guard'
@@ -314,16 +315,16 @@ test('the user’s case: every session done and 2 subagents running reads 66% an
   await crew.subagent('docs')
   await crew.subagent('review')
   const ui = await mount($)
-  expect(await textsOf(ui)).toEqual(['66%', '4/6', '4', '6', 'Agent · docs +1 more', 'Agent · docs', '<1m', 'Open board'])
+  expect(await textsOf(ui)).toEqual(['66%', '4/6', '4', '6', '<1m', 'Open board'])
   const source = String((await stripOf(ui))?.props.source)
   expect(source).toContain('linearGradient')
   expect(source).toContain('fill:var(--green)')
-  expect((await stripOf(ui))?.props.alt).toBe('Master session: 66 percent, 4 of 6 done. Now Agent · docs, and 1 more running. <1m elapsed.')
+  expect((await stripOf(ui))?.props.alt).toBe('Master session: 66 percent, 4 of 6 done. <1m elapsed.')
   await crew.finish('docs')
   await crew.finish('review')
   await ui.unmount()
   const done = await mount($)
-  expect((await textsOf(done)).slice(1, 2)).toEqual(['All 6 done'])
+  expect((await textsOf(done)).slice(0, 1)).toEqual(['All 6 done'])
   expect((await textsOf(done)).includes('Open board')).toBe(true)
   expect(String((await stripOf(done))?.props.source)).not.toContain('linearGradient')
   await done.unmount()
@@ -364,9 +365,9 @@ test('working, pane closed: percent, one bar with the slider, uniform counts, an
   const { opened } = await band($, on, WORKING)
   const ui = await mount($)
   const bar = await stripOf(ui)
-  expect(bar?.props.alt).toBe('Master session: 80 percent, 1 of 4 done. Now Session · mod-ui, and 1 more running. <1m elapsed.')
+  expect(bar?.props.alt).toBe('Master session: 80 percent, 1 of 4 done. <1m elapsed.')
   expect(bar?.props.isInteractive).toBeUndefined()
-  expect(await textsOf(ui)).toEqual(['80%', '1/4', '1', '4', 'Session · mod-ui +1 more', 'Session · mod-ui', '<1m', 'Open board'])
+  expect(await textsOf(ui)).toEqual(['80%', '1/4', '1', '4', '<1m', 'Open board'])
   expect(await buttonsOf(ui)).toEqual([])
   const [hit] = await hitsOf(ui)
   const columns = (hit?.[2] as { columns: number }).columns
@@ -396,7 +397,7 @@ test('counts: done/total, numbers 600 C.text tabular and the slash C.muted, with
   expect(found.text).toBe('1/7')
   expect(found.parent).toEqual(['inactive', undefined])
   expect(found.numbers).toEqual(['1', '7'].map(value => [value, 'text', 'semibold', true]))
-  expect((await stripOf(all))?.props.alt).toBe('Master session: 45 percent, 1 of 7 done. Now Workflow · review-changes, and 4 more running. <1m elapsed.')
+  expect((await stripOf(all))?.props.alt).toBe('Master session: 45 percent, 1 of 7 done. <1m elapsed.')
   const colors = (await all.findAll({ type: 'Text' })).filter(one => one.text !== 'Open board' && !/%$/.test(one.text)).map(one => one.props.color)
   expect(new Set(colors)).toEqual(new Set(['inactive', 'text']))
   await all.unmount()
@@ -427,8 +428,8 @@ test('needs you: the pill first, then the red bar, then Open chat; no percent an
   await ui.unmount()
   const narrow = await mount($, columnsFor(330))
   expect(await textsOf(narrow)).toEqual(['Session needs you'])
-  expect(await iconsOf(narrow)).toEqual(['session', 'Open chat'])
-  expect((await hitsOf(narrow)).map(one => one[0])).toEqual(['band-hit-chat'])
+  expect(await iconsOf(narrow)).toEqual(['session'])
+  expect(await hitsOf(narrow)).toEqual([])
   await narrow.unmount()
 })
 
@@ -436,11 +437,11 @@ test('all done: the check, the full green bar with no slider, "All N done" count
   const run = await band($, on, DONE)
   const ui = await mount($)
   const bar = await stripOf(ui)
-  expect(bar?.props.alt).toBe('Master session: all 4 done. Latest unmerged · git state unknown · setup-ui-redo. <1m elapsed.')
+  expect(bar?.props.alt).toBe('Master session: all 4 done. <1m elapsed.')
   expect(String(bar?.props.source)).toContain('fill:var(--green)')
   expect(String(bar?.props.source)).not.toContain('animate')
-  expect(await textsOf(ui)).toEqual(['All 4 done · unmerged · git state unknown · setup-ui-redo', 'All 4 done', 'unmerged · git state unknown · setup-ui-redo', '<1m', 'Open board'])
-  expect(await iconsOf(ui)).toEqual(['check', 'all done', 'elapsed', 'Open board'])
+  expect(await textsOf(ui)).toEqual(['All 4 done', '<1m', 'Open board'])
+  expect(await iconsOf(ui)).toEqual(['check', 'elapsed', 'Open board'])
   expect(await percentIn(ui)).toBeUndefined()
   run.open(true)
   await click(ui, 'band-hit-board', 2, 1)
@@ -510,7 +511,7 @@ test('exactly one board button, restyled in place on hover, never a second face:
   const boxes = await ui.findAll({ type: 'Box' })
   expect(boxes.filter(one => one.props.position === 'absolute').map(one => one.key ?? '')).toEqual([''])
   expect((await textsOf(ui)).filter(one => one === 'Open board')).toHaveLength(1)
-  expect((await ui.findAll({ type: 'Svg' })).length).toBe(4)
+  expect((await ui.findAll({ type: 'Svg' })).length).toBe(3)
   expect(await hitsOf(ui)).toHaveLength(1)
   run.open(true)
   await click(ui, 'band-hit-board', 1, 1)
@@ -563,12 +564,12 @@ const WIDTHS = [
   { px: 598, counts: true, percent: true, board: 'Board' },
   { px: 400, counts: true, percent: true, board: 'Board' },
   { px: 342, counts: true, percent: true, board: 'Board' },
-  { px: 330, counts: false, percent: false, board: 'Board' },
-  { px: 200, counts: false, percent: false, board: 'Board' },
+  { px: 330, counts: false, percent: false, board: '' },
+  { px: 200, counts: false, percent: false, board: '' },
 ] as const
 
 for (const point of WIDTHS) {
-  test(`${point.px} px: ${point.counts ? 'counts' : 'no counts'}, ${point.percent ? 'the percent' : 'no percent'}, the bar always at 48 or more, the button ${point.board}`, async ($, on) => {
+  test(`${point.px} px: ${point.counts ? 'counts and the elapsed' : 'no counts, no elapsed'}, ${point.percent ? 'the percent' : 'no percent'}, the bar always at 48 or more, the button ${point.board || 'icon only'}`, async ($, on) => {
     const crew = crewOf($, on)
     await band($, on, WORKING)
     await crew.subagent('docs')
@@ -578,7 +579,15 @@ for (const point of WIDTHS) {
     expect([view.showCounts, view.hasPercent]).toEqual([point.counts, point.percent])
     expect(!!(await countsIn(ui))).toBe(point.counts)
     expect(!!(await percentIn(ui))).toBe(point.percent)
-    expect((await textsOf(ui)).at(-1)).toBe(point.board)
+    const texts = await textsOf(ui)
+    expect(texts.includes('<1m')).toBe(point.counts)
+    if (point.board) expect(texts.at(-1)).toBe(point.board)
+    else {
+      expect(texts.some(one => /board/i.test(one))).toBe(false)
+      expect(await iconsOf(ui)).toEqual(['Open board'])
+      expect(view.action?.isIconOnly).toBe(true)
+      expect(view.actionHeight).toBe(24)
+    }
     expect(await barWidthOf(ui)).toBeGreaterThanOrEqual(BAR_MIN)
     await ui.unmount()
   })
@@ -592,7 +601,8 @@ test('narrow needs you and all done keep the bar at 48 or more: the pill truncat
     expect([done.barWidth >= BAR_MIN, done.isAllDone, done.showCounts]).toEqual([true, true, false])
   }
   const tight = viewOf(NEEDS, IDLE, columnsFor(300)).view
-  expect([tight.barWidth, tight.action?.isIconOnly, tight.actionWidth, tight.pillText.endsWith('…') || tight.pillText === 'Session needs you']).toEqual([expect.any(Number), true, 32, true])
+  expect([tight.barWidth, tight.action, tight.actionWidth, tight.pillText.endsWith('…') || tight.pillText === 'Session needs you']).toEqual([expect.any(Number), undefined, 0, true])
+  expect(viewOf(NEEDS, IDLE, columnsFor(400)).view.action).toEqual(expect.objectContaining({ name: 'chat', isIconOnly: true, label: 'Open chat' }))
 })
 
 test('a pill truncated to fit leaves the row inside the band width', () => {
@@ -629,7 +639,7 @@ test('terminal: one bar of block characters, the percent, the counts with their 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const texts = await textsOf(ui)
   expect(texts.slice(0, 2)).toEqual(['64%', expect.stringMatching(/^█+░*$/)])
-  expect(texts.slice(2)).toEqual(['1/5', '1', '5', '<1m', 'Agent · docs +2 more'])
+  expect(texts.slice(2)).toEqual(['1/5', '1', '5', '◷ <1m'])
   expect((await ui.findAll({ type: 'Text' })).filter(one => /^\d+$/.test(one.text)).every(one => one.props.weight === 'semibold')).toBe(true)
   expect((await ui.findAll({ type: 'Text' })).find(one => one.text === '1/5')?.props.dimColor).toBe(true)
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
@@ -661,9 +671,9 @@ test('terminal: all done is the check and a full bar with "All N done" only when
   await crew.finish('docs')
   const done = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const texts = await textsOf(done)
-  expect(texts[0]).toBe('✓')
+  expect(texts[0]).toBe('✓ All 5 done')
   expect(texts[1]).toMatch(/^█+$/)
-  expect(texts.slice(2)).toEqual(['<1m', 'All 5 done · done · ok · docs'])
+  expect(texts.slice(2)).toEqual(['◷ <1m'])
   await done.unmount()
   await $.tool.call({ tool: BOARD_TOOL, ...publish(NEEDS) })
   const needs = await $.ui.mount({ ...BAND, surface: 'terminal' })
@@ -684,19 +694,19 @@ test('with no worker sessions, running subagents still show the band: 0%, the su
   await crew.subagent('docs')
   await crew.subagent('review')
   const ui = await mount($)
-  expect(await textsOf(ui)).toEqual(['0%', '0/2', '0', '2', 'Agent · docs +1 more', 'Agent · docs', '<1m', 'Open board'])
+  expect(await textsOf(ui)).toEqual(['0%', '0/2', '0', '2', '<1m', 'Open board'])
   expect(String((await stripOf(ui))?.props.source)).toContain('linearGradient')
   await ui.unmount()
 })
 
-test('geometry: bar 56 with gap 12, percent 36, pill 34 with 0 12 0 8, check 18, button 32 with gap 4, the bar Svg 6 high', async ($, on) => {
+test('geometry: one row 48 high with gap 12, percent 36, pill 34 with 0 12 0 8, check 18, button 32 with gap 4, the bar Svg 6 high', async ($, on) => {
   await band($, on, WORKING)
   const ui = await mount($)
   const bar = (await ui.findAll({ type: 'Box' })).find(box => box.props.borderStyle === 'round' && box.props.backgroundColor === C.surface)
-  expect([bar?.props.height, bar?.props.gap, bar?.props.paddingLeft, bar?.props.paddingRight]).toEqual([tall(56), across(12), across(16), across(8)])
+  expect([bar?.props.height, bar?.props.gap, bar?.props.paddingLeft, bar?.props.paddingRight]).toEqual([tall(48), across(12), across(16), across(8)])
   expect((await ui.findAll({ type: 'Box' })).some(box => box.props.width === across(36) && JSON.stringify(box.children).includes('80%'))).toBe(true)
   expect((await stripOf(ui))?.props.height).toBe(6)
-  expect((await ui.findAll({ type: 'Box' })).find(box => box.props.flexDirection === 'column' && box.props.justifyContent === 'center' && box.props.flexGrow === 1)?.props.gap).toBe(tall(4))
+  expect((await ui.findAll({ type: 'Box' })).filter(box => box.props.flexDirection === 'column' && box.props.justifyContent === 'center' && box.props.flexGrow === 1)).toEqual([])
   expect((await ui.find({ key: 'face-band-board' }))?.props.height).toBe(tall(32))
   await ui.unmount()
   await $.tool.call({ tool: BOARD_TOOL, ...publish(NEEDS) })
@@ -764,7 +774,7 @@ test('a workflow with no agents stops drawing the band after 120 s, as the pane 
   const { clock } = await band($, on, [])
   await crew.workflow(0)
   const before = await mount($)
-  expect(await textsOf(before)).toEqual(['0%', '0/1', '0', '1', 'Workflow · review-changes', 'Workflow · review-changes', '<1m', 'Open board'])
+  expect(await textsOf(before)).toEqual(['0%', '0/1', '0', '1', '<1m', 'Open board'])
   await before.unmount()
   await clock.advance(121_000)
   await clock.settle()
@@ -793,8 +803,8 @@ test('subagents that finished stay in the percent: 2 of 3 done read 66% now and 
 test('the band draws every linked worker on a stale board and leaves the archived one out: 2 of 4 published gives 4 units, and the pane draws the same 4 rows', async ($, on) => {
   await band($, on, WORKING.slice(0, 2), false, WORKING.map((one, index) => linkedOf(one.id, one.name, index !== 3)).concat(linkedOf('local_z', 'gone', false, true)))
   const ui = await mount($)
-  expect(await textsOf(ui)).toEqual(['35%', '0/4', '0', '4', 'Session · mod-ui +1 more', 'Session · mod-ui', '50m', 'Open board'])
-  expect((await stripOf(ui))?.props.alt).toBe('Master session: 35 percent, 0 of 4 done. Now Session · mod-ui, and 1 more running. 50m elapsed.')
+  expect(await textsOf(ui)).toEqual(['35%', '0/4', '0', '4', '50m', 'Open board'])
+  expect((await stripOf(ui))?.props.alt).toBe('Master session: 35 percent, 0 of 4 done. 50m elapsed.')
   await ui.unmount()
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const rows = (await pane.findAll({ type: 'Box' })).flatMap(box => box.key?.match(/^row-(local_\w+)$/)?.slice(1) ?? [])
@@ -1058,3 +1068,120 @@ for (const [finished = 0, total = 0] of [[3, 7], [23, 31]]) {
     })
   }
 }
+
+const MIN = 60_000
+
+const piece = (name: string, state: PlanPiece['state'], progress?: string): PlanPiece => ({ name, state, ...(progress ? { progress } : {}) })
+
+const SEVEN = [piece('a', 'done'), piece('b', 'done'), piece('c', 'done'), piece('d', 'working', 'step 1 of 2 — x'), piece('e', 'working', 'step 1 of 2 — x'), piece('f', 'queued'), piece('g', 'queued')]
+
+const ALL_SEVEN = SEVEN.map(one => piece(one.name, 'done'))
+
+const RUNNING = { agents: [agentOf('s1', 'running')], workflows: [] as WorkflowRecord[] }
+
+const planView = (px: number, options: { isPaneOpen?: boolean; minutes?: number; sessions?: BoardSession[]; plan?: PlanPiece[]; crew?: Pick<AgentCounts, 'agents' | 'workflows'> } = {}) => {
+  const sessions = options.sessions ?? WORKING
+  const current: Board = { ...boardOf(sessions), plan: options.plan ?? SEVEN, since: 0 }
+  const live = liveOf([], sessions)
+  const progress = bandProgressWith(current, live, { ...(options.crew ?? RUNNING), at: 0 })
+  if (!progress) throw new Error('no band')
+  const crew = { ...(options.crew ?? RUNNING), at: (options.minutes ?? 48) * MIN }
+  return bandViewOf(columnsFor(px), current, progress, !!options.isPaneOpen, crew, NO_ACT, live)
+}
+
+const SPENT = ['Implementer', 'Row details', 'QA verifier', 'Read', 'Bash', 'rowfit', 'more', 'working', 'waiting', 'Nothing running']
+
+test('AC48 and AC49 the band is one row: 57%, the bar, 3/7, 48m, Open board, and nothing about what runs', async ($, on) => {
+  const crew = crewOf($, on)
+  const run = await band($, on, WORKING)
+  await $.tool.call({ tool: BOARD_TOOL, ...publish(WORKING), plan: SEVEN })
+  await crew.subagent('docs')
+  await run.clock.advance(48 * MIN)
+  const ui = await mount($)
+  const texts = await textsOf(ui)
+  expect(texts).toEqual(['57%', '3/7', '3', '7', '48m', 'Open board'])
+  const all = JSON.stringify([texts, await iconsOf(ui), (await stripOf(ui))?.props.alt])
+  for (const word of SPENT) expect(all).not.toContain(word)
+  const boxes = await ui.findAll({ type: 'Box' })
+  expect(boxes.filter(one => one.props.flexDirection === 'column' && !String(one.key).startsWith('bar-'))).toEqual([])
+  expect((await stripOf(ui))?.props.alt).toBe('Master session: 57 percent, 3 of 7 done. 48m elapsed.')
+  await ui.unmount()
+})
+
+test('AC50 the bar takes the room between the percent and the count: only its length changes between 760 and 600 px', () => {
+  const rowOf = (px: number) => {
+    const view = planView(px)
+    const row = view.padLeft + view.padRight + 2 + PERCENT + countsWidthOf(view.parts) + view.elapsedWidth + view.actionWidth + 4 * view.gap + view.barWidth
+    return { row, width: columnsFor(px) * CH - 16, bar: view.barWidth, label: view.action?.label }
+  }
+  const wide = rowOf(760)
+  const edge = rowOf(606)
+  expect([Math.abs(wide.row - wide.width) <= 1, Math.abs(edge.row - edge.width) <= 1, wide.label, edge.label]).toEqual([true, true, 'Open board', 'Open board'])
+  expect(wide.bar).toBeGreaterThan(edge.bar)
+})
+
+test('AC51 AC52 and AC63 with the pane open the button reads Hide board, Board below 600 px keeps the elapsed, and the accessible name stays whole', () => {
+  const open = planView(760, { isPaneOpen: true })
+  expect([open.action?.label, open.action?.accessibleName, open.percent, countsText(open.parts), open.elapsed]).toEqual(['Hide board', 'Hide board', 57, '3/7', '48m'])
+  const mid = planView(390)
+  expect([mid.action?.label, mid.action?.accessibleName, mid.hasElapsed, mid.showCounts, mid.hasPercent]).toEqual(['Board', 'Open board', true, true, true])
+  const midOpen = planView(390, { isPaneOpen: true })
+  expect([midOpen.action?.label, midOpen.action?.accessibleName]).toEqual(['Board', 'Hide board'])
+  const edge = planView(342)
+  expect([edge.hasElapsed, edge.action?.isIconOnly]).toEqual([true, false])
+})
+
+test('AC53 and AC54 below 340 px the bar and an icon-only board button, or the pill and the bar when someone asks', () => {
+  const small = planView(300)
+  expect([small.hasPercent, small.showCounts, small.hasElapsed, small.hasAllDone, small.action?.name, small.action?.isIconOnly, small.action?.accessibleName, small.actionHeight, small.barWidth >= BAR_MIN]).toEqual([false, false, false, false, 'board', true, 'Open board', 24, true])
+  expect(planView(300, { isPaneOpen: true }).action?.accessibleName).toBe('Hide board')
+  const asking = planView(300, { sessions: NEEDS })
+  expect([asking.pillText, asking.action, asking.hasElapsed, asking.showCounts, asking.tone]).toEqual(['Session needs you', undefined, false, false, 'red'])
+})
+
+test('AC56 idle: nothing runs and the plan is not done reads 57% 3/7, a grey still bar, 48m and Open board, with no running or waiting words', () => {
+  const sessions = WORKING.map(one => ({ ...one, state: 'waiting' as const }))
+  const idle = planView(760, { sessions, crew: { agents: [], workflows: [] } })
+  expect([idle.percent, countsText(idle.parts), idle.tone, idle.isRunning, idle.elapsed, idle.action?.label, idle.alt]).toEqual([57, '3/7', 'grey', false, '48m', 'Open board', 'Master session: 57 percent, 3 of 7 done. 48m elapsed.'])
+  expect(strip({ width: idle.barWidth, overall: idle.overall, tone: idle.tone, isSliding: idle.isRunning })).not.toContain('linearGradient')
+})
+
+test('AC57 all done: the check, All 7 done, 1h 38m and Open board, with no 7/7 and no latest event', () => {
+  const done = planView(760, { sessions: DONE, plan: ALL_SEVEN, minutes: 98, crew: { agents: [], workflows: [] } })
+  expect([done.hasAllDone, done.allDone, done.parts, done.showCounts, done.elapsed, done.action?.label, done.alt, done.percent]).toEqual([true, 'All 7 done', [], false, '1h 38m', 'Open board', 'Master session: all 7 done. 1h 38m elapsed.', 100])
+  const small = planView(300, { sessions: DONE, plan: ALL_SEVEN, minutes: 98, crew: { agents: [], workflows: [] } })
+  expect([small.hasAllDone, small.action?.isIconOnly]).toEqual([false, true])
+})
+
+test('AC61 the accessible text is the same at 760, 390 and 300 px', () => {
+  const alts = [760, 390, 300].map(px => planView(px).alt)
+  expect(new Set(alts)).toEqual(new Set(['Master session: 57 percent, 3 of 7 done. 48m elapsed.']))
+})
+
+test('AC59 the terminal draws one row: 57%, the bar, 3/7, ◷ 48m and Open board', async ($, on) => {
+  const crew = crewOf($, on)
+  const run = await band($, on, WORKING)
+  await $.tool.call({ tool: BOARD_TOOL, ...publish(WORKING), plan: SEVEN })
+  await crew.subagent('docs')
+  await run.clock.advance(48 * MIN)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await textsOf(ui)).toEqual(['57%', expect.stringMatching(/^█+░+$/), '3/7', '3', '7', '◷ 48m'])
+  expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
+  expect((await ui.findAll({ type: 'Box' })).filter(one => one.props.flexDirection === 'column')).toEqual([])
+  await ui.unmount()
+})
+
+test('AC60 the terminal below 340 px draws the bar and the board glyph, and with an ask the pill and the bar', async ($, on) => {
+  const run = await band($, on, WORKING)
+  await $.tool.call({ tool: BOARD_TOOL, ...publish(WORKING), plan: SEVEN })
+  const small = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: columnsFor(300) } })
+  expect(await textsOf(small)).toEqual([expect.stringMatching(/^█+░+$/)])
+  expect(await buttonsOf(small)).toEqual([['band-board', '◫']])
+  await small.unmount()
+  await $.tool.call({ tool: BOARD_TOOL, ...publish(NEEDS), plan: SEVEN })
+  await run.clock.settle()
+  const asking = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: columnsFor(300) } })
+  expect(await textsOf(asking)).toEqual([expect.stringMatching(/^● Session needs you/), expect.stringMatching(/^[█░]+$/)])
+  expect(await buttonsOf(asking)).toEqual([])
+  await asking.unmount()
+})

@@ -2,8 +2,7 @@ import type { EngineInterface } from 'claude-code'
 
 import { agentCountsOf, bandProgressWith, bandSignatureOf, bandViewOf } from '../lib/band'
 import type { BandView } from '../lib/band'
-import { getAgents, getLive, getReports, getRepos, getWorkflows } from '../state/atoms'
-import { runningViewOf } from './running'
+import { getAgents, getLive, getRepos, getWorkflows } from '../state/atoms'
 import { boardOf, isPaneOpen } from './sources'
 
 type Actions = Parameters<typeof bandViewOf>[5]
@@ -14,7 +13,7 @@ export async function bandData($: EngineInterface, columns: number, act: Actions
   const live = await getLive($)
   const progress = bandProgressWith(current, live, agents)
   if (!progress) return undefined
-  return bandViewOf(columns, current, progress, await isPaneOpen($), agents, act, live, await getRepos($), runningViewOf(await getReports($), live))
+  return bandViewOf(columns, current, progress, await isPaneOpen($), agents, act, live, await getRepos($))
 }
 
 const WIDE = 120

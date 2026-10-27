@@ -29,13 +29,13 @@ import { resetLabels, setColumns, startOpenTimers, stopOpenTimers, stopTimers, s
 import { resetProcesses } from './data/processes'
 import { stopMode } from './data/stop'
 import { bandAction } from './lib/band'
-import { boardFromJson, planOf } from './lib/board'
-import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, INFO, NOT_MASTER, OPENED, OPEN_SCHEMA, PANE, SCROLL_SCHEMA, SECTIONS, SKILL, STOP } from './lib/constants'
+import { boardFromJson, mergePlan, planNoteOf, planOf } from './lib/board'
+import { AIM_MS, BOARD_SCHEMA, LANDING_MS, BOARD_TOOL, INFO, NOT_MASTER, OPENED, OPEN_SCHEMA, PANE, PLAN_LIMIT, SCROLL_SCHEMA, SECTIONS, SKILL, STOP } from './lib/constants'
 import { messageOf } from './lib/format'
 import { openIdOf } from './lib/list'
 import { scrollMessage, scrollRowOf } from './lib/sections'
 import { paneViewOf, pinOf, sectionsOf } from './lib/view'
-import { saveBoard, setExpanded, setFilter, setNarrativeOpen } from './state/atoms'
+import { getBoard, saveBoard, setExpanded, setFilter, setNarrativeOpen } from './state/atoms'
 
 let columns = 0
 let pending: { row: number; at: number } | undefined
@@ -191,16 +191,26 @@ export const register: Register = on => {
     const next = boardFromJson(e, 'tool')
     const sent = Array.isArray(e.sessions) ? e.sessions.length : 0
     if (!next || next.sessions.length < sent) return { deny: 'The board needs a sessions array whose items carry id and state.' }
+    const at = await $.clock.now()
+    const before = await getBoard($)
+    const isNewRun = !before || next.run !== before.run
+    const merged = mergePlan(isNewRun ? undefined : before?.plan, next.plan, at)
+    if (merged.now > PLAN_LIMIT) return { deny: `The board was refused and nothing was saved: the merged plan would hold ${merged.now} pieces not dropped: the cap is ${PLAN_LIMIT}.` }
     claim($)
     void engage($)
-    const at = await $.clock.now()
-    await saveBoard($, prev => ({ ...next, since: prev?.since ?? at, at }))
+    await saveBoard($, prev => ({
+      ...next,
+      plan: merged.plan.length ? merged.plan : undefined,
+      since: !prev || isNewRun || (!prev.plan?.length && merged.plan.length) ? at : (prev.since ?? at),
+      at,
+    }))
     await republishBoard($).catch(() => undefined)
     void refreshAll($, !inPlan()).catch(() => undefined)
     const surfaces = await $.session.surfaces()
+    const note = planNoteOf(merged)
     return {
       result: surfaces.length
-        ? `Board updated: ${next.sessions.length} sessions in the pane and the band. Post only 🔴 needs-you lines in chat.`
+        ? `Board updated: ${next.sessions.length} sessions in the pane and the band.${note ? ` ${note}` : ''} Post only 🔴 needs-you lines in chat.`
         : 'Board updated, but no surface is attached to draw it: post the board in chat.',
     }
   }).catch(() => ({ deny: 'The board could not be published: post it in chat.' }))

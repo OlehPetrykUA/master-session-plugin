@@ -1,4 +1,4 @@
-export const BAR = { height: 56, gap: 12 } as const
+export const BAR = { height: 48, gap: 12 } as const
 
 export const PERCENT = 36
 

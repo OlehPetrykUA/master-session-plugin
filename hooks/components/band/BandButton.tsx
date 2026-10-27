@@ -8,7 +8,7 @@ import { C, KINDS, LABEL_COLOR } from '../../theme/tokens'
 import type { Kind } from '../../theme/tokens'
 import type { Ui } from '../types'
 
-export type BandButtonProps = { name: BandAction; label: string; accessibleName: string; art: RenderElement; onPress: () => void; kind: Kind; width: number; isIconOnly?: boolean }
+export type BandButtonProps = { name: BandAction; label: string; accessibleName: string; art: RenderElement; onPress: () => void; kind: Kind; width: number; isIconOnly?: boolean; height?: number }
 
 export function BandButton(ui: Ui, props: BandButtonProps) {
   const { Box, Text, Button, Client } = ui
@@ -20,7 +20,7 @@ export function BandButton(ui: Ui, props: BandButtonProps) {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 0,
-    height: tall(BUTTON.height),
+    height: tall(props.height ?? BUTTON.height),
     paddingX: 0,
     paddingY: 0,
     borderStyle: 'round',
@@ -31,7 +31,7 @@ export function BandButton(ui: Ui, props: BandButtonProps) {
   if (Client) {
     const hit = `${HIT}${name}`
     const cols = Math.ceil(props.width / CH)
-    const rows = Math.ceil(BUTTON.height / LH)
+    const rows = Math.ceil((props.height ?? BUTTON.height) / LH)
     return (
       <Box key={`face-${key}`} {...shape} justifyContent={props.isIconOnly ? 'center' : undefined} paddingLeft={props.isIconOnly ? 0 : across(BUTTON.left)} gap={across(BUTTON.gap)} width={across(props.width)}>
         {art}

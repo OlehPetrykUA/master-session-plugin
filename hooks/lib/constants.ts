@@ -23,6 +23,8 @@ export const NARRATIVE_STALE_MS = 900_000
 export const NARRATIVE_CAP = 500
 export const PLAN_NAME_CAP = 80
 export const PLAN_STATES = ['queued', 'working', 'verifying', 'done', 'dropped'] as const
+export const PLAN_LIMIT = 100
+export const PLAN_TIERS = ['T0', 'T1', 'T2', 'T3', 'doc'] as const
 export const NARRATIVE_ROWS = 3
 export const NARRATIVE_MAX_ROWS = 40
 export const OPENED = 'Master session pane opened.'
@@ -34,6 +36,7 @@ export const BOARD_SCHEMA = {
   type: 'object',
   properties: {
     tick: { type: 'string', description: 'HH:MM of this tick' },
+    run: { type: 'string', description: 'a short name of this run; a new name starts a new run window and plan' },
     sessions: {
       type: 'array',
       items: {
@@ -70,13 +73,14 @@ export const BOARD_SCHEMA = {
     testsNote: { type: 'string', description: 'e.g. "smoke 398 · hooks 128"' },
     plan: {
       type: 'array',
-      description: `every piece of the whole run, queued ones included, written from the ledger on every call; helpers (QA verifier, Code reviewer, Researcher checks) are not pieces. At most ${LIVE_LIMIT} pieces, names unique. The band's percent measures it`,
+      description: `every piece of the whole run, queued ones included; helpers (QA verifier, Code reviewer, Researcher checks) are not pieces. A piece left out of a call is kept, so mark abandoned work dropped, never omit it. At most ${LIVE_LIMIT} pieces per call and ${PLAN_LIMIT} not dropped in all, names unique. The band's percent measures it`,
       items: {
         type: 'object',
         properties: {
           name: { type: 'string', description: `the piece, unique in the plan, at most ${PLAN_NAME_CAP} characters` },
           state: { type: 'string', enum: [...PLAN_STATES] },
           progress: { type: 'string', description: 'step N of M — label, for a working piece' },
+          tier: { type: 'string', enum: [...PLAN_TIERS], description: "the piece's tier; it sets the piece's weight in the percent" },
         },
         required: ['name', 'state'],
       },

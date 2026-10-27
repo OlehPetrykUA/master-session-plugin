@@ -4,8 +4,8 @@ import type { AgentRecord, Board, BoardSession, Live, PlanPiece, PlanState } fro
 
 import { bandProgressWith, bandViewOf, countsText } from './band'
 import type { AgentCounts } from './band'
-import { boardFromChat, boardFromJson, planOf } from './board'
-import { BOARD_SCHEMA } from './constants'
+import { boardFromChat, boardFromJson, mergePlan, planNoteOf, planOf } from './board'
+import { BOARD_SCHEMA, PLAN_LIMIT } from './constants'
 import { CH } from './layout'
 import { strip } from '../theme/strip'
 
@@ -15,16 +15,20 @@ const IDLE: AgentCounts = { agents: [], workflows: [], at: 0 }
 
 const columnsFor = (width: number) => Math.ceil((width + 16) / CH)
 
-const piece = (name: string, state: PlanState, progress?: string): PlanPiece => ({ name, state, ...(progress ? { progress } : {}) })
+const MIN = 60_000
+
+const AT = 100 * MIN
+
+const piece = (name: string, state: PlanState, progress?: string, extra: Pick<PlanPiece, 'tier' | 'since'> = {}): PlanPiece => ({ name, state, ...(progress ? { progress } : {}), ...extra })
 
 const WORKED: PlanPiece[] = [
-  piece('Spec', 'done'),
-  piece('Design', 'done'),
-  piece('Band build', 'done'),
-  piece('Contract parser', 'verifying'),
-  piece('Skill text', 'working', 'step 2 of 4 — text'),
-  piece('File persistence', 'working'),
-  piece('Live check', 'queued'),
+  piece('Spec', 'done', undefined, { tier: 'doc' }),
+  piece('Design', 'done', undefined, { tier: 'doc' }),
+  piece('Band build', 'done', undefined, { tier: 'T3' }),
+  piece('Contract parser', 'verifying', undefined, { tier: 'T1' }),
+  piece('Skill text', 'working', 'step 2 of 4 — text', { tier: 'T0' }),
+  piece('File persistence', 'working', undefined, { tier: 'T1', since: AT - 12 * MIN }),
+  piece('Live check', 'queued', undefined, { tier: 'T2' }),
   piece('Pane plan list', 'dropped'),
 ]
 
@@ -40,13 +44,13 @@ const liveOf = (sessions: BoardSession[], archived: string[] = [], running: stri
 
 const subagent = (id: string): AgentRecord => ({ id, type: 'general-purpose', description: id, state: 'running', startedAt: 1 })
 
-type Options = { sessions?: BoardSession[]; archived?: string[]; running?: string[]; agents?: AgentRecord[]; columns?: number }
+type Options = { sessions?: BoardSession[]; archived?: string[]; running?: string[]; agents?: AgentRecord[]; columns?: number; at?: number }
 
 const viewOf = (plan: PlanPiece[] | undefined, options: Options = {}) => {
   const sessions = options.sessions ?? []
   const board: Board = { sessions, needsYou: [], repos: [], source: 'tool', ...(plan ? { plan } : {}) }
   const live = liveOf(sessions, options.archived, options.running)
-  const counts: AgentCounts = { agents: options.agents ?? [], workflows: [], at: 0 }
+  const counts: AgentCounts = { agents: options.agents ?? [], workflows: [], at: options.at ?? AT }
   const progress = bandProgressWith(board, live, counts)
   if (!progress) throw new Error('no band')
   return bandViewOf(options.columns ?? 100, board, progress, false, counts, { board: () => undefined, chat: () => undefined }, live)
@@ -58,11 +62,11 @@ const stripOf = (view: ReturnType<typeof viewOf>) => strip({ width: view.barWidt
 
 const ONE_RUNNING = [sessionOf('local_a', 'working')]
 
-test('AC1 the worked example reads 62% and the fill is 4.4 of 7 of the track', () => {
+test('AC39 the tiered worked example reads 62% 3/7 and the fill is 149.5 of 240 of the track', () => {
   const view = viewOf(WORKED, { agents: [subagent('qa')] })
   expect([view.percent, view.isRunning, view.tone]).toEqual([62, true, 'green'])
-  expect(Math.abs(view.overall - 4.4 / 7)).toBeLessThan(1e-9)
-  expect(Math.abs(fillOf(stripOf(view), 'green') - (4.4 / 7) * view.barWidth)).toBeLessThan(1)
+  expect(Math.abs(view.overall - 149.5 / 240)).toBeLessThan(1e-9)
+  expect(Math.abs(fillOf(stripOf(view), 'green') - (149.5 / 240) * view.barWidth)).toBeLessThan(1)
   expect(countsText(view.parts)).toBe('3/7')
 })
 
@@ -88,18 +92,19 @@ test('AC5 one working piece with no progress reads 0% with at least a 16 px fill
   expect(source).toContain('linearGradient')
 })
 
-test('AC6 one verifying piece reads 90%', () => {
-  expect(viewOf([piece('A', 'verifying')], { sessions: ONE_RUNNING }).percent).toBe(90)
+test('AC40 one verifying piece reads 75%', () => {
+  expect(viewOf([piece('A', 'verifying')], { sessions: ONE_RUNNING }).percent).toBe(75)
 })
 
-test('AC7 two done and one dropped with a unit idle read 100%, the dropped piece not counted, on a grey fill and 2/2', () => {
+test('AC43 two done and one dropped, one session waiting, nobody asking, nothing running read All 2 done', () => {
   const view = viewOf([piece('A', 'done'), piece('B', 'done'), piece('C', 'dropped')], { sessions: [sessionOf('local_a', 'waiting')], running: [] })
-  expect([view.isAllDone, countsText(view.parts), view.percent, view.tone]).toEqual([false, '2/2', 100, 'grey'])
+  expect([view.isAllDone, view.hasAllDone, view.allDone, countsText(view.parts), view.percent, view.tone]).toEqual([true, true, 'All 2 done', '', 100, 'green'])
+  expect(view.alt).toMatch(/^Master session: all 2 done\. /)
 })
 
-test('AC38 a plan with a queued piece and every unit finished reads All N done, N the units, with no percent', () => {
+test('T7 a plan of one done and one queued with every unit finished reads 50% 1/2 on a grey bar, with no all-done', () => {
   const view = viewOf([piece('A', 'done'), piece('B', 'queued')], { sessions: [sessionOf('local_a', 'done'), sessionOf('local_b', 'done')], running: [] })
-  expect([view.isAllDone, countsText(view.parts), view.alt, view.hasPercent]).toEqual([true, '', expect.stringMatching(/^Master session: all 2 done\./), false])
+  expect([view.isAllDone, view.percent, countsText(view.parts), view.tone, view.hasPercent]).toEqual([false, 50, '1/2', 'grey', true])
 })
 
 test('AC36 seven working sessions with no steps and two subagents read 0% and 0/9, with no counts words', () => {
@@ -109,9 +114,10 @@ test('AC36 seven working sessions with no steps and two subagents read 0% and 0/
   expect(countsText(view.parts)).not.toMatch(/working|waiting|subagent|workflow/)
 })
 
-test('AC8 nine done and one verifying read 99%, never 100%', () => {
+test('AC41 nine done and one verifying, no tiers, read 97% 9/10, never 100%', () => {
   const plan = [...Array.from({ length: 9 }, (_, index) => piece(`D${index}`, 'done')), piece('V', 'verifying')]
-  expect(viewOf(plan, { sessions: ONE_RUNNING }).percent).toBe(99)
+  const view = viewOf(plan, { sessions: ONE_RUNNING })
+  expect([view.percent, countsText(view.parts)]).toEqual([97, '9/10'])
 })
 
 test('AC9 a piece moving to done never lowers the percent', () => {
@@ -128,18 +134,19 @@ test('AC10 a plan of one done reads 100%, and a queued piece added next reads 50
   expect([view.percent, countsText(view.parts), view.alt]).toEqual([50, '1/2', expect.stringMatching(/^Master session: 50 percent, 1 of 2 done\./)])
 })
 
-test('AC11 a FAIL sends a verifying piece back to working: the count stays 2 and the percent goes from 45 to 25', () => {
-  const before = viewOf([piece('A', 'verifying'), piece('B', 'queued')], { sessions: ONE_RUNNING })
-  const after = viewOf([piece('A', 'working', 'step 1 of 2 — x'), piece('B', 'queued')], { sessions: ONE_RUNNING })
-  expect([before.percent, after.percent, countsText(before.parts).split('/')[1], countsText(after.parts).split('/')[1]]).toEqual([45, 25, '2', '2'])
+test('T6 a verifying piece stays at 75 over 2 through a fix round, and moving it back to working is accepted with a warning in the reply', () => {
+  const view = viewOf([piece('A', 'verifying'), piece('B', 'queued')], { sessions: ONE_RUNNING })
+  expect([view.percent, countsText(view.parts)]).toEqual([37, '0/2'])
+  const back = mergePlan([piece('A', 'verifying', undefined, { since: 1 }), piece('B', 'queued', undefined, { since: 1 })], [piece('A', 'working', 'step 1 of 2 — x')], AT)
+  expect(back.back).toEqual(['A'])
+  expect(planNoteOf(back)).toContain('Moved back to working: A.')
+  expect(back.plan.find(one => one.name === 'A')).toMatchObject({ state: 'working', since: AT })
 })
 
-test('AC12 every piece done while a subagent runs reads 100% on a green full fill with the slider and no all-done check', () => {
-  const view = viewOf([piece('A', 'done'), piece('B', 'done')], { agents: [subagent('s')] })
-  expect([view.percent, view.tone, view.isAllDone, view.isRunning, view.hasPercent]).toEqual([100, 'green', false, true, true])
-  const source = stripOf(view)
-  expect(fillOf(source, 'green')).toBe(view.barWidth)
-  expect(source).toContain('linearGradient')
+test('T8 every piece done while a subagent runs reads 99% 3/3 on a green bar with the slider and no all-done check', () => {
+  const view = viewOf([piece('A', 'done'), piece('B', 'done'), piece('C', 'done')], { agents: [subagent('s')] })
+  expect([view.percent, countsText(view.parts), view.tone, view.isAllDone, view.isRunning, view.hasPercent]).toEqual([99, '3/3', 'green', false, true, true])
+  expect(stripOf(view)).toContain('linearGradient')
 })
 
 test('AC13 archiving done sessions changes nothing when a plan is present', () => {
@@ -216,10 +223,79 @@ test('AC30 a 120 character name is stored as its first 80 characters and an elli
   expect(planOf([{ name, state: 'queued' }]).plan?.[0]?.name).toBe(`${'n'.repeat(80)}…`)
 })
 
-test('AC33 a piece working at step 4 of 4 reads 85%, then verifying 90%', () => {
+test('AC42 a piece working at step 4 of 4 reads 70%, then verifying 75%: moving to verifying never lowers the percent', () => {
   const working = viewOf([piece('A', 'working', 'step 4 of 4 — x')], { sessions: ONE_RUNNING }).percent
   const verifying = viewOf([piece('A', 'verifying')], { sessions: ONE_RUNNING }).percent
-  expect([working, verifying]).toEqual([85, 90])
+  expect([working, verifying]).toEqual([70, 75])
+})
+
+test('T4 weights: a done T3 and a queued T0 read 85%, the same plan with no tiers 50%', () => {
+  expect(viewOf([piece('A', 'done', undefined, { tier: 'T3' }), piece('B', 'queued', undefined, { tier: 'T0' })]).percent).toBe(85)
+  expect(viewOf([piece('A', 'done'), piece('B', 'queued')], { sessions: ONE_RUNNING }).percent).toBe(50)
+})
+
+test('T5 a T1 piece working with no progress is worth minutes over its 30 minute timebox, capped at 0.5, and a given progress wins', () => {
+  const at = (minutes: number, progress?: string) => viewOf([piece('A', 'working', progress, { tier: 'T1', since: AT - minutes * MIN })], { sessions: ONE_RUNNING }).percent
+  expect([at(6), at(20), at(60), at(6, 'step 1 of 4 — x')]).toEqual([20, 50, 50, 25])
+})
+
+test('an untiered piece is timed against 30 minutes', () => {
+  expect(viewOf([piece('A', 'working', undefined, { since: AT - 15 * MIN })], { sessions: ONE_RUNNING }).percent).toBe(50)
+})
+
+test('T1 a call merges into the stored plan by name; a call with no plan keeps it', () => {
+  const first = mergePlan(undefined, [piece('A', 'done'), piece('B', 'working'), piece('C', 'queued')], 10)
+  const second = mergePlan(first.plan, [piece('B', 'verifying'), piece('D', 'queued')], 20)
+  expect(second.plan.map(one => `${one.name}:${one.state}`)).toEqual(['A:done', 'B:verifying', 'C:queued', 'D:queued'])
+  expect(second.plan.map(one => one.since)).toEqual([10, 20, 10, 20])
+  expect(mergePlan(second.plan, undefined, 30).plan).toEqual(second.plan)
+  expect(countsText(viewOf(second.plan, { sessions: ONE_RUNNING }).parts)).toBe('1/4')
+})
+
+test('T2 the reply names C as kept and the plan growing 3 to 4', () => {
+  const first = mergePlan(undefined, [piece('A', 'done'), piece('B', 'working'), piece('C', 'queued')], 10)
+  const second = mergePlan(first.plan, [piece('B', 'verifying'), piece('D', 'queued')], 20)
+  expect([second.kept, second.back, planNoteOf(second)]).toEqual([['A', 'C'], [], 'Kept: A, C. Plan grew 3 → 4.'])
+})
+
+test('T3 a collapse replay: a call that lists only one done piece never drops done below 5 or the total below 8', () => {
+  const stored = [...['a', 'b', 'c', 'd', 'e'].map(name => piece(name, 'done')), ...['f', 'g', 'h'].map(name => piece(name, 'queued'))]
+  const merged = mergePlan(stored, [piece('Fixes merged', 'done')], 50)
+  expect(countsText(viewOf(merged.plan, { sessions: ONE_RUNNING }).parts)).toBe('6/9')
+})
+
+test('a piece keeps its since while its state holds, and takes the call time when the state changes', () => {
+  const first = mergePlan(undefined, [piece('A', 'working')], 10)
+  expect(mergePlan(first.plan, [piece('A', 'working', 'step 1 of 2 — x')], 99).plan[0]?.since).toBe(10)
+  expect(mergePlan(first.plan, [piece('A', 'verifying')], 99).plan[0]?.since).toBe(99)
+})
+
+test('AC44 a tier outside T0 T1 T2 T3 doc is refused naming plan, and the schema lists the optional tier', () => {
+  const tier = BOARD_SCHEMA.properties.plan.items.properties.tier
+  expect([tier.enum, BOARD_SCHEMA.properties.plan.items.required]).toEqual([['T0', 'T1', 'T2', 'T3', 'doc'], ['name', 'state']])
+  const answer = planOf([{ name: 'A', state: 'queued', tier: 'T4' }])
+  expect(answer.error).toContain('plan')
+  expect(answer.plan).toBeUndefined()
+  expect(planOf([{ name: 'A', state: 'queued', tier: 'T2' }]).plan).toEqual([piece('A', 'queued', undefined, { tier: 'T2' })])
+})
+
+test('T9 a stored plan of 100 not dropped pieces plus one more counts 101, past the cap of 100; dropped pieces do not count', () => {
+  const stored = Array.from({ length: 100 }, (_, index) => piece(`P${index}`, 'queued'))
+  expect(mergePlan(stored, [piece('extra', 'queued')], 5).now).toBe(101)
+  expect(mergePlan(stored, [piece('extra', 'dropped')], 5).now).toBe(100)
+  expect(PLAN_LIMIT).toBe(100)
+})
+
+test('T10 a stored piece keeps its since through a reload of the board, so a T1 piece working for 6 minutes is worth 20%', () => {
+  const stored = mergePlan(undefined, [piece('A', 'working', undefined, { tier: 'T1' })], AT - 6 * MIN).plan
+  const reloaded = boardFromJson(JSON.parse(JSON.stringify({ sessions: [], plan: stored })), 'file')
+  expect(reloaded?.plan).toEqual(stored)
+  expect(viewOf(reloaded?.plan, { sessions: ONE_RUNNING }).percent).toBe(20)
+})
+
+test('a board carries run through the parser', () => {
+  expect(boardFromJson({ sessions: [], run: ' band ' }, 'tool')?.run).toBe('band')
+  expect(boardFromJson({ sessions: [] }, 'tool')?.run).toBeUndefined()
 })
 
 test('AC34 two pieces named Skill text are refused naming Skill text', () => {

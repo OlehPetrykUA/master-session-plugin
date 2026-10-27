@@ -1,4 +1,4 @@
-import { LIVE_LIMIT, NARRATIVE_CAP, PLAN_NAME_CAP, PLAN_STATES } from './constants'
+import { LIVE_LIMIT, NARRATIVE_CAP, PLAN_NAME_CAP, PLAN_STATES, PLAN_TIERS } from './constants'
 import type { Board, BoardSession, Live, PlanPiece, PlanState, SessionState, Step } from '../../types'
 
 export const ORDER: readonly SessionState[] = ['needs-you', 'waiting', 'working', 'done']
@@ -71,10 +71,31 @@ export function planOf(value: unknown): { plan?: PlanPiece[]; error?: string } {
     seen.add(cut)
     const progress = textOf(piece.progress)
     if (state === 'working' && progress && !parseStep(progress)) return { error: `plan piece "${cut}": progress must read "step N of M — label", with M above 0 and N at most M` }
-    plan.push({ name: cut, state, ...(state === 'working' && progress ? { progress } : {}) })
+    const tier = PLAN_TIERS.find(one => one === piece.tier)
+    if (piece.tier !== undefined && piece.tier !== null && !tier) return { error: `plan piece "${cut}": tier must be one of ${PLAN_TIERS.join(', ')}` }
+    const since = typeof piece.since === 'number' && Number.isFinite(piece.since) ? piece.since : undefined
+    plan.push({ name: cut, state, ...(state === 'working' && progress ? { progress } : {}), ...(tier ? { tier } : {}), ...(since === undefined ? {} : { since }) })
   }
   return { plan }
 }
+
+const countedOf = (plan: readonly PlanPiece[] | undefined) => (plan ?? []).filter(one => one.state !== 'dropped').length
+
+export function mergePlan(prev: readonly PlanPiece[] | undefined, next: readonly PlanPiece[] | undefined, at: number) {
+  const stored = new Map((prev ?? []).map(one => [one.name, one]))
+  for (const one of next ?? []) {
+    const old = stored.get(one.name)
+    stored.set(one.name, { ...one, since: old && old.state === one.state && old.since !== undefined ? old.since : at })
+  }
+  const plan = [...stored.values()]
+  const named = new Set((next ?? []).map(one => one.name))
+  const back = (next ?? []).filter(one => one.state === 'working' && stored.has(one.name) && (prev ?? []).some(old => old.name === one.name && old.state === 'verifying')).map(one => one.name)
+  const kept = (prev ?? []).filter(one => !named.has(one.name)).map(one => one.name)
+  return { plan, kept, back, was: countedOf(prev), now: countedOf(plan) }
+}
+
+export const planNoteOf = ({ kept, back, was, now }: Pick<ReturnType<typeof mergePlan>, 'kept' | 'back' | 'was' | 'now'>) =>
+  [kept.length ? `Kept: ${kept.join(', ')}.` : '', back.length ? `Moved back to working: ${back.join(', ')}.` : '', now > was ? `Plan grew ${was} → ${now}.` : ''].filter(Boolean).join(' ')
 
 export function boardFromJson(raw: unknown, source: Board['source'] = 'file'): Board | null {
   if (!raw || typeof raw !== 'object') return null
@@ -94,6 +115,7 @@ export function boardFromJson(raw: unknown, source: Board['source'] = 'file'): B
   const passed = typeof data.testsPassed === 'number' && Number.isFinite(data.testsPassed) ? data.testsPassed : undefined
   return {
     tick: textOf(data.tick),
+    run: textOf(data.run),
     sessions,
     plan: plan?.length ? plan : undefined,
     needsYou: stringsOf(data.needsYou),
