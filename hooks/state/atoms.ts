@@ -24,6 +24,7 @@ const narrativeNote = atom({ plugin: 'master-session', key: 'narrativeNote' } as
 const isPlan = atom({ plugin: 'master-session', key: 'isPlan' } as const, false)
 const tasks = atom({ plugin: 'master-session', key: 'tasks' } as const, {})
 const stopped = atom({ plugin: 'master-session', key: 'stopped' } as const, false)
+const isProcessesOpen = atom({ plugin: 'master-session', key: 'isProcessesOpen' } as const, false)
 
 const isSame = (one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other)
 
@@ -205,4 +206,12 @@ export function getTasks($: EngineInterface) {
 export async function saveTasks($: EngineInterface, change: (value: Record<string, TaskText>) => Record<string, TaskText>) {
   const before = await read($, tasks)
   if (!isSame(change(before), before)) await update($, tasks, change)
+}
+
+export function getProcessesOpen($: EngineInterface) {
+  return read($, isProcessesOpen)
+}
+
+export function setProcessesOpen($: EngineInterface, change: (value: boolean) => boolean) {
+  return update($, isProcessesOpen, change)
 }

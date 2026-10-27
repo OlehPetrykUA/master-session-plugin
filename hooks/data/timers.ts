@@ -10,6 +10,7 @@ import { bandStale, forgetBand } from './band'
 import { skipWhileBusy } from './flight'
 import { refreshNarrative } from './narrative'
 import { paneData } from './pane'
+import { readProcesses, stoppingLabelOf } from './processes'
 import { isActive, isOff } from './recorder'
 import { isMaster, isPaneOpen, refreshAll, refreshReports } from './sources'
 
@@ -38,7 +39,7 @@ async function tickTimes($: EngineInterface) {
     return [elapsedOfItem(item, data.at), line.cmdElapsed ? `${line.text}~${line.cmdElapsed}` : '', openIdOf(item, data.open) ? runningTimeOf(item, data.at) : ''].join('~')
   }
   const isBand = await bandStale($)
-  const labels = [...shown.map(labelOf), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age, view.narrative?.text].join('|')
+  const labels = [...shown.map(labelOf), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age, view.narrative?.text, stoppingLabelOf(data.at)].join('|')
   if (labels === lastLabels && !isBand) return
   lastLabels = labels
   $.ui.invalidate('ui.render')
@@ -70,7 +71,17 @@ export function stopTimers() {
 
 export function startOpenTimers($: EngineInterface) {
   if (whileOpen.length || !isActive() || isOff()) return
-  whileOpen = [$.clock.every(TICK_MS, skipWhileBusy(() => tickTimes($))), $.clock.every(FILE_MS, skipWhileBusy(() => filesOf($)))]
+  whileOpen = [
+    $.clock.every(TICK_MS, skipWhileBusy(() => tickTimes($))),
+    $.clock.every(
+      FILE_MS,
+      skipWhileBusy(async () => {
+        await filesOf($)
+        await readProcesses($)
+      }),
+    ),
+  ]
+  void readProcesses($).catch(() => undefined)
 }
 
 export function syncTimers($: EngineInterface) {

@@ -26,6 +26,7 @@ import { describeSession, describeSpawn, recordAgentEnd, recordSpawn, recordWork
 import { settleTasks } from './data/describe'
 import { briefed, claim, engage, inPlan, isOff, recordTurnEnd, recorder, startRecorder, unstop } from './data/recorder'
 import { resetLabels, setColumns, startOpenTimers, stopOpenTimers, stopTimers, syncTimers } from './data/timers'
+import { resetProcesses } from './data/processes'
 import { stopMode } from './data/stop'
 import { bandAction } from './lib/band'
 import { boardFromJson, planOf } from './lib/board'
@@ -67,6 +68,7 @@ export const register: Register = on => {
     const started = await next(e)
     stopTimers()
     startSources(String((await $.env.get('HOME')) ?? ''))
+    resetProcesses()
     resetLabels()
     await setNarrativeOpen($, () => false)
     await startRecorder($)

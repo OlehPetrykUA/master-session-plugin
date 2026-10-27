@@ -7,6 +7,7 @@ import { modelWordOf } from '../lib/rowfit'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
 import { TERMINAL_COLOR } from '../theme/tokens'
 import { clearOf } from './clear'
+import { TextProcesses } from './TextProcesses'
 import { TextSessionDetail, TextSubagentDetail, TextWorkflowDetail, colorOf } from './detail/TextDetail'
 import type { PaneData, TextUi } from './types'
 import { UnarchiveConfirm } from './UnarchiveConfirm'
@@ -143,6 +144,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
         <Text>{blocks.slice(0, 4).join(' · ')}</Text>
         <Text dimColor>{blocks.slice(4).join(' · ')}</Text>
       </Box>
+      {view.processes ? TextProcesses(ui, { view: view.processes, actions }) : null}
       <Box key="section-chips" flexDirection="row" flexWrap="wrap" gap="xs">
         {view.chips.map(chip => (
           <Button key={`filter-${chip.id}`} variant={data.chosen === chip.id ? 'primary' : undefined} label={`${chip.label} ${chip.count}`} onPress={() => actions.filter(chip.id)} />

@@ -26,7 +26,7 @@ export const PLAN_STATES = ['queued', 'working', 'verifying', 'done', 'dropped']
 export const NARRATIVE_ROWS = 3
 export const NARRATIVE_MAX_ROWS = 40
 export const OPENED = 'Master session pane opened.'
-export const SECTIONS = ['section-header', 'section-narrative', 'section-summary', 'section-chips', 'section-list', 'section-expanded', 'section-archived'] as const
+export const SECTIONS = ['section-header', 'section-narrative', 'section-summary', 'section-processes', 'section-chips', 'section-list', 'section-expanded', 'section-archived'] as const
 
 const LIST = { type: 'array', items: { type: 'string' } }
 

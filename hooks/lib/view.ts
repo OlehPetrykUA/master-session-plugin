@@ -8,8 +8,9 @@ import { compactOf, shortOf, updatedOf } from './format'
 import { CH, LH, bodyWidthOf, liftOf } from './layout'
 import { familyOf } from './rows'
 import { NARRATIVE_MAX_ROWS, NARRATIVE_ROWS, NARRATIVE_STALE_MS } from './constants'
-import { ARCHIVED_PEEK, CHAT_LABEL, ageOf, blocksOf, chatTargetOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf, rowsOf } from './list'
+import { ARCHIVED_PEEK, CHAT_LABEL, ageOf, blocksOf, chatTargetOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf, rowsOf, shortNameOf } from './list'
 import type { Context } from './list'
+import { processesPxOf, processesViewOf } from './processes'
 import { rowFitOf } from './rowfit'
 import { NARROW_PX, ROW, contentHeightOf, dotExtraOf, headerRowsOf, sectionTopsOf, tileInnerOf } from './sections'
 import type { SectionInput } from './sections'
@@ -75,6 +76,7 @@ export function paneViewOf(data: PaneData) {
     chips,
     status: statusOf(data, isDone),
     narrative: narrativeOf(data),
+    processes: data.processes ? processesViewOf(data.processes, Object.fromEntries(items.flatMap(item => (item.kind === 'session' ? [[item.row.id, shortNameOf(item)]] : [])))) : undefined,
     blocks: blocksOf(isDone ? { ...data.totals, duration: { ...data.totals.duration, ms: (data.board?.at ?? data.at) - data.totals.duration.since } } : data.totals, data.rows.length > 0 || items.length > 0, isDone ? data.board?.tick || clockOf(data.at) : undefined),
     perRow: isNarrow ? 3 : 4,
     hasMore: data.chosen === 'all' && data.archiveView === 'open' && data.archived.length > ARCHIVED_PEEK,
@@ -104,6 +106,7 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
     narrativeRows: view.narrative?.rows.length ?? 0,
     hasNarrativeMore: view.narrative?.hasMore ?? false,
     blockRows: Math.ceil(view.blocks.length / view.perRow),
+    processesPx: view.processes ? processesPxOf(view.processes, data.columns) : 0,
     blockExtra: dotExtraOf(view.blocks.find(block => block.key === 'sessions'), tileInnerOf(bodyWidthOf(data.columns), view.perRow)),
     chips: view.chips.map(chip => ({ label: chip.label, count: chip.count, hasMark: !!markWidthOf(chip), markWidth: markWidthOf(chip) })),
     groups: view.groups

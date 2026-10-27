@@ -2,7 +2,7 @@ import { CH, LH, bodyWidthOf, faceWidth, textWidth, widthOf } from './layout'
 import { rowsOf, shownDots } from './list'
 import type { Block } from './list'
 
-export type SectionKey = 'section-header' | 'section-narrative' | 'section-summary' | 'section-chips' | 'section-list' | 'section-expanded' | 'section-archived'
+export type SectionKey = 'section-header' | 'section-narrative' | 'section-summary' | 'section-processes' | 'section-chips' | 'section-list' | 'section-expanded' | 'section-archived'
 
 export type ChipSize = { label: string; count: number; hasMark: boolean; markWidth: number }
 
@@ -19,6 +19,7 @@ export type SectionInput = {
   hasNarrativeMore: boolean
   blockRows: number
   blockExtra: number
+  processesPx?: number
   chips: readonly ChipSize[]
   groups: readonly GroupSize[]
   hasMore: boolean
@@ -92,6 +93,10 @@ export function sectionTopsOf(input: SectionInput) {
   }
   tops['section-summary'] = top
   top += 12 + input.blockRows * BLOCK + (input.blockRows - 1) * 8 + input.blockExtra
+  if (input.processesPx) {
+    tops['section-processes'] = top
+    top += input.processesPx
+  }
   tops['section-chips'] = top
   const lines = linesOf(input.chips.map(chipWidthOf), bodyWidthOf(input.columns), 8)
   top += 12 + lines * 32 + (lines - 1) * 8

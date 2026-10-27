@@ -233,6 +233,7 @@ declare module 'claude-code' {
       role: Role
       isPlan: boolean
       stopped: boolean
+      isProcessesOpen: boolean
       tasks: Record<string, TaskText>
     }
   }

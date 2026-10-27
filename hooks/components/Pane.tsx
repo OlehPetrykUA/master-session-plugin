@@ -8,6 +8,7 @@ import { Icon } from './Icon'
 import { List } from './list/List'
 import { Narrative } from './Narrative'
 import { Summary } from './list/Summary'
+import { Processes } from './Processes'
 import { RepoChips } from './RepoChips'
 import type { PaneData, Ui } from './types'
 
@@ -19,6 +20,7 @@ export function Pane(ui: Ui, data: PaneData, view = paneViewOf(data), pin = pinO
       <Box key="header-space" height={headerRows} />
       {view.narrative ? Narrative(ui, { narrative: view.narrative, onToggle: data.actions.narrative }) : null}
       {Summary(ui, { blocks: view.blocks, perRow: view.perRow, width: bodyWidthOf(data.columns) })}
+      {view.processes ? Processes(ui, { view: view.processes, columns: data.columns, actions: data.actions }) : null}
       {FilterChips(ui, { chips: view.chips, chosen: data.chosen, onFilter: data.actions.filter })}
       {List(ui, data, view)}
       <Box key="header-pin" position="absolute" top={0} left={0} right={0} height={tall(lift) + headerRows} flexDirection="column" paddingTop={down(lift)}>

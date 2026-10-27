@@ -205,6 +205,8 @@ export function world(on: On, child: Child = {}) {
   })
   const gits: string[][] = []
   on('process.run', async (_, e) => {
+    const faked = child.proc?.(e.argv)
+    if (faked) return faked
     gits.push([...e.argv])
     await slowly('git', child.slowMs?.git)
     const [, , , cwd, verb] = e.argv
@@ -279,7 +281,7 @@ export const MASTER = 'local_master'
 
 export const MASTER_TITLE = 'Orbit Agents Toolkit Validator'
 
-export type Child = { isBare?: boolean; parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; listText?: string; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean; isPlaced?: boolean; surfaces?: readonly ('desktop' | 'terminal')[]; archiveError?: string; unarchiveError?: string; stuck?: boolean; isLookupDown?: boolean }
+export type Child = { proc?: (argv: readonly string[]) => { value: { exitCode: number; stdout: string; stderr: string; isStdoutTruncated: boolean; isStderrTruncated: boolean } } | undefined; isBare?: boolean; parent?: string; origin?: string; isDetached?: boolean; files?: Record<string, string>; sessions?: readonly Record<string, unknown>[]; listError?: () => string | undefined; listText?: string; git?: Record<string, string>; slowMs?: { git?: number; list?: number }; isPaneOpen?: boolean; isPaneHidden?: boolean; isPlaced?: boolean; surfaces?: readonly ('desktop' | 'terminal')[]; archiveError?: string; unarchiveError?: string; stuck?: boolean; isLookupDown?: boolean }
 
 export function childOf(at: number, board: unknown = BOARD): Child {
   const file = JSON.stringify({ v: 1, kind: 'board', at, masterId: MASTER, board })

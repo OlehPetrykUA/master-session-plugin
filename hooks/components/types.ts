@@ -2,6 +2,7 @@ import type { BoxProps, ButtonProps, ClientProps, ElementConstructor, SvgProps, 
 
 import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Repo, Running, SessionState, TaskText, Undone, WorkflowRecord } from '../../types'
 
+import type { ProcState } from '../lib/processes'
 import type { Row } from '../lib/rows'
 import type { RunSummary } from '../lib/totals'
 
@@ -28,6 +29,10 @@ export type Actions = {
   open: (id: string, name: string) => void
   ask: () => void
   narrative: () => void
+  processes: () => void
+  askStop: (key: string) => void
+  cancelStop: () => void
+  stopProcess: (target: { pid: number; lstart: string; ucomm: string; group: 'run' | 'left' }) => void
 }
 
 export type PaneData = {
@@ -51,6 +56,7 @@ export type PaneData = {
   isClearing: boolean
   isRefreshing: boolean
   isNarrativeOpen: boolean
+  processes: ProcState | null
   at: number
   home: string
   columns: number
