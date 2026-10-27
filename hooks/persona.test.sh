@@ -29,7 +29,8 @@ has() {
 }
 
 has 'AC31 step 6 lists plan[]' '`plan[]`: every piece of the whole run, written from the ledger on every board call, queued ones included'
-has 'AC31 step 6 lists name, the five states and progress' '`name`, `state` (queued, working, verifying, done, dropped), `progress` ("step N of M — label"'
+has 'AC31 step 6 lists name, the five states and progress' '`name`, `state` (queued, working, verifying, done, dropped), `tier` (T0 to T3, or `doc`), `progress` ("step N of M — label"'
+has 'step 6 lists run' '`run`: a short name for this run, the same on every board call of the run'
 has 'AC32 step 6 says a piece is a deliverable of any shape' 'A piece is a deliverable of any shape'
 has 'AC32 step 6 says helpers are not pieces' 'helpers (QA verifier, Code reviewer, Researcher checks) are not pieces'
 has 'AC32 step 6 says a fix round adds no piece' 'A fix round after a FAIL adds no piece'
@@ -51,6 +52,9 @@ rule 'start: one full gate' skills/start/SKILL.md 'has had one full gate'
 rule 'start: Your checks' skills/start/SKILL.md '## Your checks'
 rule 'start: Checker gate' skills/start/SKILL.md '## Checker gate'
 rule 'start: tick reads answering.md and shape.md' skills/start/SKILL.md 'answering.md and ${CLAUDE_SKILL_DIR}/shape.md'
+rule 'start: tick reads the whole skill' skills/start/SKILL.md 'read the whole ${CLAUDE_SKILL_DIR}/SKILL.md'
+rule 'subchat: argument-hint is only the task' skills/subchat/SKILL.md "argument-hint: '<task>'"
+rule 'subagent: argument-hint is only the task' skills/subagent/SKILL.md "argument-hint: '<task>'"
 rule 'qa-verifier: full suite never rerun' skills/qa-verifier/SKILL.md 'never rerun it'
 
 tmp=$(mktemp -d)
@@ -58,6 +62,6 @@ trap 'rm -r "$tmp"' EXIT
 odd="$tmp/a&b|c\\d"
 mkdir "$odd"
 ln -s "$root/skills" "$odd/skills"
-check 'a root with &, | and \ is printed as is' '{"agent_type":"master-session:qa-verifier"}' "(\`$odd/skills/start/SKILL.md\` section 3" "$odd"
+check 'a root with &, | and \ is printed as is' '{"agent_type":"master-session:reviewer"}' "(\`$odd/skills/start/SKILL.md\` section 3" "$odd"
 
 exit $fail

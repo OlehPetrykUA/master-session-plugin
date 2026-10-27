@@ -1,6 +1,6 @@
 # In Copilot CLI
 
-Copilot CLI loads this plugin too, without `start_session`, SendMessage, the report tool, the status mod, `/loop`, `ScheduleWakeup`, `Workflow` or Claude Docs. It leaves `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` as written: read them as the plugin folder (two levels up from any skill file) and that skill's folder. Every skill links its section here.
+Copilot CLI loads this plugin too, without `start_session`, SendMessage, the report tool, the status mod, `/loop`, `ScheduleWakeup`, `Workflow`, Claude Docs or Artifacts (the design canvas). It leaves `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` as written: read them as the plugin folder (two levels up from any skill file) and that skill's folder. The skills that need a Copilot change link their section here.
 
 Persona subagents everywhere: the `task` tool with `agent_type: "master-session:<persona>"` and `model` set to a Copilot model id, such as this session's own. Copilot rejects the agents' `sonnet` and `opus`, and its error lists the ids. `/tasks` shows them. The agents carry `reasoning-effort` for Copilot beside `effort` for Claude Code.
 
@@ -41,6 +41,10 @@ Copilot has no Claude Docs. Write the spec to `docs/specs/<feature>.md` in a wor
 
 Copilot has no Claude Docs. Add the section to `docs/specs/<feature>.md` in a worktree at `$HOME/.copilot/worktrees/wt-<repo>-design-<feature>`, with the same changelog, commit it with a one-line conventional message, and return the path and sha instead of the doc link.
 
+## designer
+
+Copilot has no Artifacts, so no design canvas, and the Design checker has no canvas to compare with. Stop the T3 piece at the design step and ask the user to run the Designer pass in Claude Code; never draw the design in a file instead.
+
 ## Install
 
-Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do. `start`, `info`, `subchat`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them.
+Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do. `start`, `info`, `stop`, `subchat`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them. `stop force` and `info ask` need the status mod, so they do nothing here.

@@ -10,7 +10,7 @@ You are a worker (child) session. The master session that briefed you is your pa
 
 ## As a background subagent
 If your brief starts `You are a background subagent`, the rules below hold with these changes:
-- Make a detached worktree first, `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-<name>" master`, and name its path in every call: your working directory resets to the parent's checkout. You leave no branch to delete.
+- Make a detached worktree first, unless your brief names one to continue in: `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-<name>" master`, and name its path in every call: your working directory resets to the parent's checkout. You leave no branch to delete.
 - Your final message is your report, blockers included (`STATUS: BLOCKED` with the exact call and the denial text). No `SendMessage` to the parent, and no start, rebase or clean-up Monitors.
 - You can't ask the user. End your turn early only with `STATUS: WAITING <job>`.
 - The parent resumes you by ID for fixes, rebases and the worktree removal.

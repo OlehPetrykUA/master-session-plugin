@@ -1,6 +1,6 @@
 # Master session
 
-A Claude Code plugin that turns one session into a **validator** for a team of workers. The validator plans the work, sizes each piece into a tier, starts only the agents the tier and the machine allow, answers their questions, verifies every `ready <sha>` with the checkers its tier names and merges it fast-forward only. You get a live status board instead of a scrolling chat.
+A Claude Code plugin that turns one session into a **validator** for a team of workers. The validator plans the work, sizes each piece into a tier, starts only the agents the tier and the count line allow, answers their questions, verifies every `ready <sha>` with the checkers its tier names and merges it fast-forward only. You get a live status board instead of a scrolling chat.
 
 <p align="center"><img src="docs/screenshots/pane-dark.png" width="380" alt="The status pane in the dark theme: run totals, filter chips, and worker sessions, subagents and a workflow run grouped into Needs you, Working, Waiting and Done"></p>
 
@@ -8,7 +8,7 @@ A Claude Code plugin that turns one session into a **validator** for a team of w
 
 | Part | What it does |
 |---|---|
-| Skill `start` | `/master-session:start`, the validator protocol: work tiers, the agent count line, briefs, the tick loop, checkers by tier, permissions, the ledger. Ships `personas.md` (the persona index), `board.md` (the chat board when the pane isn't available) and `copilot.md` (every Copilot CLI note). |
+| Skill `start` | `/master-session:start`, the validator protocol: work tiers, the agent count line, briefs, the tick loop, checkers by tier, permissions, the ledger. Ships `personas.md` (the persona index), `shape.md` (execution shape, worker lifetime, pause and resume, names), `answering.md` (answering workers and permissions), `board.md` (the chat board when the pane isn't available) and `copilot.md` (the Copilot CLI notes). |
 | Skills `subchat`, `subagent`, `workflow` | `/master-session:subchat`, `/master-session:subagent` and `/master-session:workflow`: start a worker session, a persona subagent or a workflow of persona agents from the validator. |
 | Skill `worker` | The protocol every worker session follows: its own worktree, the report tool, talking to the validator, the `ready <sha>` gate. |
 | Status mod | `/master-session:info` opens it: a pane beside the chat with one row per worker (state, progress, git, tests, commits) under run-total tiles, a band above the prompt, archive and unarchive, and **Ask for updates** (shown once workers are listed). Workers report through the `mcp__master-session__report` tool; the mod also records their commits, test runs, edits and waits by itself. |
@@ -63,10 +63,11 @@ copilot plugin install master-session@master-session
 | Command | What it does |
 |---|---|
 | `/master-session:start <task>` | Turns the current session into the validator. |
-| `/master-session:subchat <task> [persona]` | Starts a worker session, a side chat, for the task (persona `implementer` by default) and watches it in the loop. |
-| `/master-session:subagent <persona> <task>` | Runs a persona as a background subagent for a short check, then relays its result. |
+| `/master-session:subchat <task>` | Starts a worker session, a side chat, for the task (the master picks the persona) and watches it in the loop. |
+| `/master-session:subagent <task>` | Runs a persona the master picks as a background subagent for a short check, then relays its result. |
 | `/master-session:workflow <task>` | Writes and runs a workflow for the task with persona agents, announcing the agent count first. |
 | `/master-session:info [ask]` | Opens the status pane; `ask` asks every running worker for a fresh report. |
+| `/master-session:stop [force]` | Ends the run: the session stops being a master session or a worker, and the pane and band go. With workers still running it refuses unless `force`. |
 
 `subchat`, `subagent` and `workflow` make the session the validator first if `/master-session:start` hasn't run yet. Type `/master-session:start <task>`; the master decides the heartbeat, the board and the workers.
 
@@ -87,7 +88,7 @@ The ledger, one note per run with every worker, its state and open findings, goe
 
 ## Personas
 
-Each persona is a skill, `master-session:<persona>`, and an agent of the same name whose frontmatter keeps its default model, effort and tool limits ([personas.md](skills/start/personas.md)). The validator stages only the personas a piece's tier needs. The code reviewer, QA verifier, design checker and researcher can't edit files.
+Each persona is a skill, `master-session:<persona>`, and an agent of the same name whose frontmatter keeps its default model, effort and tool limits ([personas.md](skills/start/personas.md)). The validator stages only the personas a piece's tier needs. The code reviewer, QA verifier, design checker, researcher and architect can't edit files.
 
 | Persona | What it does |
 |---|---|
