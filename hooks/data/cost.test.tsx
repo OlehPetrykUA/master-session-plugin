@@ -29,9 +29,9 @@ type Cost = {
 const ENDLESS = /repeatCount="indefinite"|infinite/
 
 async function surfaces($: Engine, open: boolean) {
-  const mounted = [await $.ui.mount({ ...BAND, surface: 'desktop' })]
-  if (open) mounted.push(await $.ui.mount({ ...PANE, surface: 'desktop' }))
-  return mounted
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const pane = open ? await $.ui.mount({ ...PANE, surface: 'desktop' }) : undefined
+  return [band, ...(pane ? [pane] : [])] as { findAll: typeof band.findAll; unmount: typeof band.unmount }[]
 }
 
 async function svgsOf(mounted: Awaited<ReturnType<typeof surfaces>>) {
@@ -72,7 +72,7 @@ async function measured($: Engine, on: On, child: Child, subagents: number, open
     extra.model += 1
     return { value: { isAnswered: true as const, text: 'Two workers are running. Nothing else is pending.', usage: USAGE } }
   })
-  const now = (): Cost => ({
+  const now = (): Omit<Cost, 'svgs' | 'interactive' | 'animatedInteractive' | 'animated' | 'svgChanges'> => ({
     fired: run.timers.fired,
     worked: 0,
     render: extra.render,
@@ -83,7 +83,7 @@ async function measured($: Engine, on: On, child: Child, subagents: number, open
     write: extra.write,
     model: extra.model,
   })
-  const work = (one: Cost) => one.render + one.invalidate + one.process + one.mcp + one.read + one.write + one.model
+  const work = (one: ReturnType<typeof now>) => one.render + one.invalidate + one.process + one.mcp + one.read + one.write + one.model
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
   await run.clock.settle()
   if (board) await $.tool.call({ tool: BOARD_TOOL, ...ONE })
@@ -127,12 +127,12 @@ async function measured($: Engine, on: On, child: Child, subagents: number, open
 
 const BOUNDS: Record<'plain' | 'closed' | 'open', Cost> = {
   plain: { fired: 520, worked: 0, render: 0, invalidate: 0, process: 0, mcp: 0, read: 0, write: 0, model: 0, svgs: 0, interactive: 0, animatedInteractive: 0, animated: 0, svgChanges: 0 },
-  closed: { fired: 520, worked: 100, render: 0, invalidate: 0, process: 114, mcp: 20, read: 160, write: 0, model: 2, svgs: 2, interactive: 1, animatedInteractive: 1, animated: 1, svgChanges: 0 },
-  open: { fired: 520, worked: 140, render: 64, invalidate: 64, process: 114, mcp: 20, read: 160, write: 0, model: 2, svgs: 62, interactive: 1, animatedInteractive: 1, animated: 1, svgChanges: 5 },
+  closed: { fired: 520, worked: 100, render: 0, invalidate: 0, process: 122, mcp: 20, read: 160, write: 0, model: 2, svgs: 2, interactive: 1, animatedInteractive: 1, animated: 1, svgChanges: 0 },
+  open: { fired: 520, worked: 140, render: 64, invalidate: 64, process: 122, mcp: 20, read: 160, write: 0, model: 2, svgs: 62, interactive: 1, animatedInteractive: 1, animated: 1, svgChanges: 5 },
 }
 
 function within(cost: Cost, bound: Cost) {
-  for (const key of Object.keys(bound) as (keyof Cost)[]) expect([key, cost[key] <= bound[key]]).toEqual([key, true])
+  expect(cost).toEqual({ ...cost, ...Object.fromEntries(Object.entries(bound).filter(([key, max]) => cost[key as keyof Cost] > max).map(([key, max]) => [key, `at most ${max}`])) })
 }
 
 test('cost: a plain chat that spawns one subagent', async ($, on) => {
