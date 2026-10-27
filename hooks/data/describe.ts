@@ -30,6 +30,7 @@ type Outcome = { ok: true; text: string } | { ok: false; isGuard: boolean }
 let queue: { job: Job; at: number }[] = []
 let active = 0
 let epoch = 0
+let tried = new Set<string>()
 
 const WORD_BAD = /[\d`\\=:@$";|&<>{}[\]]/
 
@@ -48,17 +49,19 @@ export const isUnsafe = (reply: string, source: string) =>
     .split(' ')
     .some(word => isShaped(stripped(word), source) || isShaped(core(word), source))
 
+export const masked = (source: string) => source.replace(/\S+/g, word => (isShaped(word, source) ? 'it' : word))
+
 export const normalized = (reply: string) => reply.replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ').trim()
 
 export const capped = (text: string) => (text.length > STORED_MAX ? `${text.slice(0, STORED_MAX)}…` : text)
 
 export const cleaned = (reply: string) => capped(normalized(reply))
 
-const promptOf = (job: Job) => `Kind: ${job.kind}\nShort name: ${job.name}\n\nThe task as it was given:\n${job.source}`
+const promptOf = (job: Job, source: string) => `Kind: ${job.kind}\nShort name: ${job.name}\n\nThe task as it was given:\n${source}`
 
 async function attempt($: EngineInterface, job: Job, isStrict: boolean): Promise<Outcome> {
   const asked = $.model
-    .complete({ model: MODEL, effort: 'low', maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, system: isStrict ? `${INSTRUCTION} ${STRICT}` : INSTRUCTION, prompt: promptOf(job) })
+    .complete({ model: MODEL, effort: 'low', maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, system: isStrict ? `${INSTRUCTION} ${STRICT}` : INSTRUCTION, prompt: promptOf(job, isStrict ? masked(job.source) : job.source) })
     .catch(() => undefined)
   const result = await Promise.race([asked, $.clock.sleep(TIMEOUT_MS).then(() => undefined)])
   if (!result?.isAnswered) return { ok: false, isGuard: false }
@@ -116,7 +119,8 @@ async function isFresh($: EngineInterface, target: Target) {
 export const isMasterRole = () => isActive() && roleOf().role !== 'worker'
 
 export async function describe($: EngineInterface, job: Job) {
-  if (!isActive() || !job.source.trim() || !(await isFresh($, job.target))) return
+  if (!isActive() || !job.source.trim() || (job.target.type === 'agent' && tried.has(job.target.id)) || !(await isFresh($, job.target))) return
+  if (job.target.type === 'agent') tried.add(job.target.id)
   await pending($, job.target)
   queue.push({ job, at: epoch })
   pump($)
@@ -126,6 +130,7 @@ export async function settleTasks($: EngineInterface) {
   epoch += 1
   queue = []
   active = 0
+  tried = new Set()
   const drop = <T extends { task?: TaskText }>(items: T[]) => items.map(one => (one.task?.state === 'pending' ? { ...one, task: undefined } : one))
   await saveAgents($, agents => drop(agents))
   await saveWorkflows($, runs => drop(runs))

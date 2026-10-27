@@ -10,7 +10,7 @@ import type { SectionInput } from '../lib/sections'
 import { itemsOf } from '../lib/list'
 import type { Context } from '../lib/list'
 import { rowsOf } from '../lib/rows'
-import { TICK_MS } from '../lib/constants'
+import { FILE_MS, TICK_MS } from '../lib/constants'
 import { C } from '../theme/tokens'
 import { CREDENTIALS } from '../testing/credentials'
 import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, childOf, liveOf, started, textsOf, altsOf, warmUp, world } from '../testing/world'
@@ -503,11 +503,13 @@ test('AC18: the master’s workflow record for a worker’s run holds the report
 const secretsIn = (all: string, secrets: readonly string[]) => secrets.filter(secret => all.includes(secret))
 
 test('AC19: for every credential row a copied prompt is rejected twice, the second call strict, and no text is stored or drawn', { plugins: [PROBE], timeoutMs: 120_000 }, async ($, on) => {
-  const { seen } = stub(on, request => say(String(request.prompt)))
+  let leaked = ''
+  const { seen } = stub(on, request => say(`${String(request.prompt)} ${leaked}`))
   const run = await master($, on)
   const ui = await pane($)
   let before = 0
   for (const [index, [, command, secrets]] of CREDENTIALS.entries()) {
+    leaked = command
     await spawn($, { description: `row ${index}`, prompt: brief(command) })
     await run.clock.settle()
     expect(seen.length - before).toBe(2)
@@ -523,9 +525,11 @@ test('AC19: for every credential row a copied prompt is rejected twice, the seco
 })
 
 test('AC20: the same rows through a Workflow script and a start_session prompt store nothing', { plugins: [PROBE], timeoutMs: 120_000 }, async ($, on) => {
-  const { seen } = stub(on, request => say(String(request.prompt)))
+  let leaked = ''
+  const { seen } = stub(on, request => say(`${String(request.prompt)} ${leaked}`))
   const run = await master($, on)
   for (const [, command, secrets] of CREDENTIALS) {
+    leaked = command
     const before = seen.length
     await $.tool.call({ tool: 'Workflow', script: `${SCRIPT}\n${command}` })
     await $.tool.call({ tool: START, title: 'Row model', prompt: brief(command) } as never)
@@ -736,4 +740,96 @@ test('a workflow whose script cannot be read gets no call even when the launch c
   await $.tool.call({ tool: 'Workflow', scriptPath: '/missing/run.js' } as never)
   await run.clock.settle()
   expect(seen.length).toBe(0)
+})
+
+test('a subagent spawned by another subagent gets its own call and task', async ($, on) => {
+  const { seen } = stub(on, () => say(T))
+  const run = await master($, on)
+  await spawn($, { description: 'Parent design' })
+  await spawn($, { description: 'Static analysis', parentAgentId: 'a1' })
+  await run.clock.settle()
+  expect(seen.length).toBe(2)
+  const ui = await pane($)
+  await open($, 'a2')
+  expect(await plainOf(ui, 'a2')).toBe(T)
+  await ui.unmount()
+})
+
+test('an agent spawned before the chat became a master is described once when it does, and ticks add no more', async ($, on) => {
+  const { seen } = stub(on, () => say(T))
+  loops(on)
+  const run = world(on)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.settle()
+  await spawn($, { description: 'Early design' })
+  await run.clock.settle()
+  expect(seen.length).toBe(0)
+  await $.tool.call({ tool: BOARD_TOOL, ...WITH_SESSION })
+  await run.clock.advance(FILE_MS)
+  await run.clock.settle()
+  expect(seen.length).toBe(1)
+  const ui = await pane($)
+  await open($, 'a1')
+  expect(await plainOf(ui, 'a1')).toBe(T)
+  await ui.unmount()
+  await run.clock.advance(FILE_MS * 6)
+  await run.clock.settle()
+  expect(seen.length).toBe(1)
+})
+
+test('after a hot reload an agent whose call was dropped is described once more, and ticks add no more', async ($, on) => {
+  const held = holding(on)
+  const run = await master($, on)
+  await spawn($)
+  await run.clock.settle()
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.settle()
+  await run.clock.advance(FILE_MS * 4)
+  await run.clock.settle()
+  expect(held.seen.length).toBe(2)
+  held.release()
+  held.release()
+  await run.clock.settle()
+  const ui = await pane($)
+  await open($, 'a1')
+  expect(await plainOf(ui, 'a1')).toBe(T)
+  await ui.unmount()
+  await run.clock.advance(FILE_MS * 4)
+  expect(held.seen.length).toBe(2)
+})
+
+test('an agent whose call failed is not described again by later ticks', async ($, on) => {
+  const { seen } = stub(on, () => API_ERROR)
+  const run = await master($, on)
+  await spawn($)
+  await run.clock.settle()
+  await run.clock.advance(FILE_MS * 6)
+  await run.clock.settle()
+  expect(seen.length).toBe(1)
+})
+
+test('a resumed agent that has a task is not described again by ticks', async ($, on) => {
+  const { seen } = stub(on, () => say(T))
+  const run = await master($, on)
+  await spawn($)
+  await run.clock.settle()
+  await $.agent.spawn({ ...SPAWN, description: 'Row model', subagentType: 'master-session:implementer', prompt: 'rebase onto main', resume: { agentId: 'a1' } } as never)
+  await run.clock.advance(FILE_MS * 4)
+  await run.clock.settle()
+  expect(seen.length).toBe(1)
+})
+
+test('when the first reply is guard-rejected, the strict retry sees the source without its identifiers and its reply is stored', async ($, on) => {
+  const { seen } = stub(on, (_, nth) => say(nth === 1 ? 'Writes the design for M8 and P1.' : T))
+  const run = await master($, on)
+  await spawn($, { prompt: 'Write the design for M8 and P1, then report back.' })
+  await run.clock.settle()
+  expect(seen.length).toBe(2)
+  expect(String(seen[0]?.prompt)).toContain('M8')
+  expect(String(seen[1]?.prompt)).not.toContain('M8')
+  expect(String(seen[1]?.prompt)).not.toContain('P1')
+  const ui = await pane($)
+  await open($, 'a1')
+  expect(await plainOf(ui, 'a1')).toBe(T)
+  await ui.unmount()
 })

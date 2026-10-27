@@ -713,7 +713,7 @@ test('AC34: under 340 px the sub-line drops the row’s own elapsed while a comm
 
 test('AC33: the tick redraws once per second while the command shows seconds, once a minute at minutes, and once when the call ends', async ($, on) => {
   const all: Record<string, unknown> = {
-    agents: [{ id: 'a1', type: 'Explore', description: 'Find callers', prompt: 'go', state: 'running', startedAt: NOW - 120_000 }],
+    agents: [{ id: 'a1', type: 'Explore', description: 'Find callers', prompt: 'go', task: { state: 'done', text: 'Finds callers.' }, state: 'running', startedAt: NOW - 120_000 }],
     workflows: [],
     live: { self: SELF, title: '', sessions: [], error: '', at: NOW - 600_000 },
   }

@@ -2,7 +2,7 @@ import type { AgentInfo, AgentSpawnInput, AgentSpawnResult, AgentStatus, EngineI
 
 import type { AgentRecord, AgentState, WorkflowRecord } from '../../types'
 
-import { saveAgents, saveWorkflows } from '../state/atoms'
+import { getAgents, saveAgents, saveWorkflows } from '../state/atoms'
 import { PLACEHOLDER, SOURCE_MAX, describe, isMasterRole } from './describe'
 import { syncAgents } from './recorder'
 
@@ -156,6 +156,13 @@ export async function describeSpawn($: EngineInterface, e: AgentSpawnInput, out:
   await describe($, { target: { type: 'agent', id }, kind: e.workflow?.runId ? 'workflow agent' : 'subagent', name: e.description, source })
 }
 
+export async function describeMissing($: EngineInterface) {
+  for (const one of await getAgents($)) {
+    if (one.task || one.parentSessionId || !one.prompt || one.prompt === PLACEHOLDER || !one.description) continue
+    await describe($, { target: { type: 'agent', id: one.id }, kind: one.run ? 'workflow agent' : 'subagent', name: one.description, source: one.prompt })
+  }
+}
+
 export async function recordWorkflow($: EngineInterface, e: { tool_use_id: string; script?: string }, result: unknown) {
   const now = await $.clock.now()
   const launch = launchOf(result)
@@ -174,6 +181,7 @@ export async function refreshAgents($: EngineInterface) {
   const now = await $.clock.now()
   await saveAgents($, agents => listed(agents, infos, now))
   await syncAgents($)
+  await describeMissing($)
 }
 
 const SESSION_ID = /local_[A-Za-z0-9][A-Za-z0-9_-]*/
