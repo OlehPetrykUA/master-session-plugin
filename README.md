@@ -102,7 +102,7 @@ Each persona is a skill, `master-session:<persona>`, and an agent of the same na
 | `researcher` | Answers one question from published docs, citing each claim. |
 | `spec-writer` | Writes the feature's spec in the project's Claude Doc, one tab per feature, with testable acceptance criteria, before design and build. |
 | `architect` | For features spanning several modules or workers: turns the approved spec into a technical design in its tab (module map, interfaces, one piece per worker, order, risks, test proofs); read-only on code. |
-| `designer` | A fresh subagent per design pass that edits the project's canonical design artboards in place (a new one only for a new component or state), in light and dark, for the user to approve before any UI code. |
+| `designer` | A fresh subagent per design pass that edits the project's canonical design artboards, the single source of truth for visuals, in place (a new one only for a new component or state), in light and dark, for the user to approve before any UI code. |
 
 Start a session as a persona. Claude Code's default system prompt is kept, and the plugin's SessionStart hook loads the persona's skill, plus the worker skill for the implementer and refactorer:
 
