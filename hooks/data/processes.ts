@@ -54,7 +54,7 @@ export function resetProcesses() {
 }
 
 function run($: EngineInterface, argv: readonly string[]) {
-  return $.process.run(argv, { timeoutMs: PROC_TIMEOUT_MS })
+  return $.process.run(argv, { timeoutMs: PROC_TIMEOUT_MS, env: { LC_ALL: 'C' } })
 }
 
 const firstLine = (text: string) => text.trim().split('\n')[0] ?? ''
@@ -185,8 +185,12 @@ function noteOf($: EngineInterface, key: string, text: string) {
 async function killOf($: EngineInterface, signal: 'TERM' | 'KILL', pids: readonly number[]) {
   const safe = [...new Set(pids)].filter(isPid).sort((left, right) => left - right)
   if (!safe.length) return ''
-  const ran = await run($, ['kill', '-s', signal, ...safe.map(String)]).catch((error: unknown) => ({ exitCode: 1, stdout: '', stderr: failure(error) }))
-  return ran.exitCode === 0 ? '' : firstLine(ran.stderr) || `kill exited with ${ran.exitCode}`
+  try {
+    const ran = await run($, ['kill', '-s', signal, ...safe.map(String)])
+    return ran.stderr.split('\n').find(line => /Operation not permitted/.test(line))?.trim() ?? ''
+  } catch (error) {
+    return failure(error)
+  }
 }
 
 async function attempt($: EngineInterface, target: StopTarget, key: string) {

@@ -398,6 +398,31 @@ test('AC25: kill exiting 1 reads Could not stop node with the first stderr line,
   await ui.unmount()
 })
 
+test('a descendant gone before kill (No such process, exit 1) still reaches Stopping and the KILL step', async ($, on) => {
+  const { fake, run, ui } = await boot($, on)
+  fake.state.killExit = 1
+  fake.state.killErr = 'kill: 531: No such process'
+  fake.state.survivesTerm = new Set([530])
+  await stopRow(fake, run, ui, 530)
+  await click(ui, 'hit-process-yes-530')
+  await run.clock.settle()
+  expect(await all(ui)).toContain('Stopping 0s')
+  expect(await all(ui)).not.toContain('Could not stop')
+  await run.clock.advance(5_000)
+  expect(fake.kills.map(one => `${one.signal} ${one.pids.join(' ')}`)).toEqual(['TERM 530 531', 'KILL 530'])
+  await ui.unmount()
+})
+
+test('every ps, lsof, sysctl and kill run gets LC_ALL=C', async ($, on) => {
+  const { fake, run, ui } = await boot($, on)
+  await stopRow(fake, run, ui, 530)
+  await click(ui, 'hit-process-yes-530')
+  await run.clock.settle()
+  expect(fake.envs.length).toBeGreaterThan(3)
+  expect(fake.envs.every(env => env?.LC_ALL === 'C')).toBe(true)
+  await ui.unmount()
+})
+
 test('AC37: after Could not stop, Stop opens the same confirm as a first Stop', async ($, on) => {
   const { fake, run, ui } = await boot($, on)
   fake.state.killExit = 1

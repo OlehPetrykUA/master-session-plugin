@@ -42,10 +42,12 @@ export function fakeProcesses(procs: FakeProc[], options: { shellParent?: number
   const kills: { signal: string; pids: string[] }[] = []
   const lines = () => state.procs.map(one => `${String(one.pid).padStart(5)} ${String(one.ppid).padStart(5)} ${one.lstart ?? LSTART} ${String(one.cpu ?? 0)} ${one.rss ?? 1024} ${one.etime ?? '00:10'} ${one.ucomm}`).join('\n')
   const out = (stdout: string, exitCode = 0, stderr = '') => ({ value: { exitCode, stdout, stderr, isStdoutTruncated: false, isStderrTruncated: false } })
-  const handle = (argv: readonly string[]) => {
+  const envs: (Record<string, string> | undefined)[] = []
+  const handle = (argv: readonly string[], env?: Record<string, string>) => {
     const [cmd = '', ...args] = argv
     if (!['ps', 'lsof', 'sysctl', '/bin/sh', 'kill', 'id'].includes(cmd)) return undefined
     calls.push([...argv])
+    if (cmd !== 'id' && cmd !== '/bin/sh') envs.push(env)
     if (cmd === 'id') return out(`${501}\n`)
     if (cmd === '/bin/sh') return out(`${state.shellParent}\n`)
     if (cmd === 'sysctl') return out(state.load)
@@ -58,11 +60,11 @@ export function fakeProcesses(procs: FakeProc[], options: { shellParent?: number
     const signal = args[1] ?? ''
     const pids = args.slice(2)
     kills.push({ signal, pids })
-    if (state.killExit) return out('', state.killExit, state.killErr)
+    if (state.killExit && state.killErr.includes('Operation not permitted')) return out('', state.killExit, state.killErr)
     const stays = signal === 'KILL' ? state.survivesKill : state.survivesTerm
     state.procs = state.procs.filter(one => !pids.includes(String(one.pid)) || stays.has(one.pid))
-    return out('')
+    return out('', state.killExit, state.killErr)
   }
   const argvs = (cmd: string) => calls.filter(one => one[0] === cmd)
-  return { calls, state, kills, argvs, handle }
+  return { calls, envs, state, kills, argvs, handle }
 }

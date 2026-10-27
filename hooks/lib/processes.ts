@@ -83,7 +83,8 @@ export function worktreeOf(cwd: string | undefined, context: Pick<ProcContext, '
   const root = `${context.home}/.claude/worktrees/`
   if (!cwd || !context.home || !cwd.startsWith(root)) return ''
   const name = cwd.slice(root.length).split('/')[0] ?? ''
-  return context.repos.some(repo => name.startsWith(`wt-${repo}-`)) ? name : ''
+  const repo = [...context.repos].sort((left, right) => right.length - left.length).find(one => name.startsWith(`wt-${one}-`))
+  return repo && !name.slice(`wt-${repo}-`.length).includes('-') ? name : ''
 }
 
 export function chainOf(table: ReadonlyMap<number, Proc>, pid: number) {

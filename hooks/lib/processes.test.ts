@@ -47,6 +47,12 @@ test('AC31: a left-behind worktree needs the board’s repo name followed by a d
   expect([at(`${HOME}/Work/app`), at(`${HOME}/.claude/worktrees/wt-other-k1`), at(`${HOME}/.claude/worktrees/wt-apple-k1`), at('/tmp'), at(`${HOME}/.claude/worktrees`)]).toEqual(['', '', '', '', ''])
 })
 
+test('a worktree of a longer board repo name is not owned by the shorter one', () => {
+  const cwd = `${HOME}/.claude/worktrees/wt-app-web-k1`
+  expect(worktreeOf(cwd, { home: HOME, repos: ['app', 'app-web'] })).toBe('wt-app-web-k1')
+  expect(worktreeOf(cwd, { home: HOME, repos: ['app'] })).toBe('')
+})
+
 test('AC9: rows sort by CPU, then longest elapsed, then pid', () => {
   const table = [
     row(proc(100, 10, 'claude')),
