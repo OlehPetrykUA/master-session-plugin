@@ -432,7 +432,7 @@ test('needs you: the pill first, then the red bar, then Open chat; no percent an
   await narrow.unmount()
 })
 
-test('all done: the check, the full green bar with no slider, "All N done" counting every unit, and Open board hidden while the pane is open', async ($, on) => {
+test('all done: the check, the full green bar with no slider, "All N done" counting every unit, and the button reads Hide board while the pane is open', async ($, on) => {
   const run = await band($, on, DONE)
   const ui = await mount($)
   const bar = await stripOf(ui)
