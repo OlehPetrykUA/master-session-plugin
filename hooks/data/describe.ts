@@ -79,9 +79,23 @@ async function store($: EngineInterface, target: Target, task: TaskText | undefi
   $.ui.invalidate('ui.render')
 }
 
-const CUE = /password|passwd|passphrase|apikey|(?<![a-z0-9])(?:pwd|pass|tokens?|secrets?|api[ _]?keys?|access[ _]keys?|private[ _]keys?|credentials?|auth|authorization|bearer)(?![a-z0-9])|(?:^|\s)-p/i
+const WEAK = 'pass|tokens?|secrets?|auth|authorization|credentials?|key'
 
-export const hasCue = (text: string) => CUE.test(text)
+const ENV = 'PASS|TOKEN|SECRET|KEY|AUTH'
+
+const CUES = [
+  /password|passwd|passphrase|pwd|apikey|api[ _-]key|private[ _-]key|access[ _-]key|bearer/i,
+  new RegExp(`(?<![a-z0-9])(?:${WEAK})\\s*[:=]\\s*\\S`, 'i'),
+  new RegExp(`[A-Z0-9_]*(?:${ENV})[A-Z0-9_]*=`),
+  new RegExp(`(?<![A-Z0-9_])(?:[A-Z0-9]+_(?:${ENV})|(?:${ENV})_[A-Z0-9_]+)(?![A-Z0-9_])`),
+  new RegExp(`(?:^|\\s)--(?:${WEAK})`, 'i'),
+  /(?:^|\s)-p\s*\S/i,
+  /(?:^|\s)-a\s+\S/,
+  /(?:^|\s)-u\s*[^\s:]+:\S/,
+  /:\/\/[^\s/:@]+:[^\s/@]+@/,
+]
+
+export const hasCue = (text: string) => CUES.some(cue => cue.test(text))
 
 async function run($: EngineInterface, job: Job): Promise<Outcome> {
   if (hasCue(job.source) || hasCue(job.name)) return { ok: false, isGuard: false }

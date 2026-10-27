@@ -42,7 +42,7 @@ const brief = (command = 'Run the type check at the end.', extra = '') =>
     'Mission: build one deliverable from the brief in its own worktree.',
     'Inputs: the brief and the worker skill.',
     'Output: report updates, then the ready line.',
-    'Gate: the commands in the brief succeed.',
+    'Gate: the commands in the brief pass.',
     'Must not: touch the live folder.',
     'Rule 7: keep the change small.',
     'Rule 8: keep the change small.',
@@ -871,7 +871,7 @@ test('a letters-only secret in a paraphrased reply: a source with a credential c
 test('each credential cue word stops the call, for a prompt and for a workflow script', async ($, on) => {
   const { seen } = stub(on, () => say(T))
   const run = await master($, on)
-  const cues = ['password', 'passwd', 'pwd', 'passphrase', 'pass', 'token', 'secret', 'apikey', 'api key', 'api_key', 'access key', 'private key', 'credential', 'credentials', 'auth', 'authorization', 'bearer', 'PASSWORD', 'Token', 'run x -p value', '--password', '--token', 'DB_PASS=x', 'GITHUB_TOKEN=x']
+  const cues = ['password', 'passwd', 'pwd', 'passphrase', 'apikey', 'api key', 'api_key', 'api-key', 'access key', 'private key', 'bearer', 'PASSWORD', 'PGPASSWORD=x', 'token: x', 'SECRET=x', 'auth: x', 'key=x', 'Authorization: x', 'MY_KEY=x', 'DB_PASS', 'GITHUB_TOKEN', '--token x', '--pass x', '--secret x', '--auth x', '--password', 'run x -p value', 'run x -pvalue', 'run x -P value', 'redis-cli -a pw', 'curl -u me:pw', 'git clone https://me:pw@host', 'psql postgres://app:pw@db']
   for (const [index, cue] of cues.entries()) {
     await spawn($, { description: `cue ${index}`, prompt: `Build the band now line with ${cue} included.` })
     await $.tool.call({ tool: 'Workflow', script: `${SCRIPT}\n// ${cue}` })
@@ -883,7 +883,7 @@ test('each credential cue word stops the call, for a prompt and for a workflow s
 test('a normal prompt still gets a call, and passes, passing, authored and tokenize are no cue', async ($, on) => {
   const { seen } = stub(on, () => say(T))
   const run = await master($, on)
-  const prompts = ['Build the band now line.', 'Make the tests passes quickly.', 'Keep the tests passing.', 'The file was authored by hand.', 'Then tokenize the words.']
+  const prompts = ['Build the band now line.', 'Make the tests passes quickly.', 'Keep the tests passing.', 'The file was authored by hand.', 'Then tokenize the words.', 'Make sure no secret is ever shown.', 'Keep the token cost low.', 'Report when your checks pass.', 'Fix the auth flow.', 'Mention the key point.']
   for (const [index, prompt] of prompts.entries()) {
     const before = seen.length
     await spawn($, { description: `plain ${index}`, prompt })
