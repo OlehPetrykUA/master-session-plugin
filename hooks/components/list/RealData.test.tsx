@@ -54,59 +54,51 @@ test('paths: relative to the worktree, else ~, middle folders fold until they fi
   expect(foldPath('hooks/lib/archive.ts', 300)).toBe('hooks/lib/archive.ts')
 })
 
-test('a risk is an amber callout under Now and Next, clamped to 3 rows, never on the row', async ($, on) => {
+test('AC18: a risk is the end of the Status sentence on the red tint, whole and wrapped, never on the row and in no block of its own', async ($, on) => {
   const risk = 'Archive can lose work until this lands: 2 commits exist only on archive-guard, and Archive all would remove its worktree. '.repeat(3)
   await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], risk }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(textsIn((await ui.find({ key: 'row-local_setup' }))?.children).join(' ')).not.toContain('Archive can lose')
   await click(ui, 'hit-row-local_setup')
-  const callout = await ui.find({ key: 'callout-risk-local_setup' })
-  expect(callout?.props.backgroundColor).toBe(C.amberTint)
-  expect(callout?.text).toContain('RISK')
-  const rows = (await ui.find({ key: 'callout-risk-local_setup-rows-0' }))?.children ?? []
-  expect(rows.length).toBe(3)
-  expect(JSON.stringify(rows.at(-1))).toContain('…')
+  expect((await ui.find({ key: 'status-local_setup' }))?.props.backgroundColor).toBe(C.redTint)
+  const sentence = (await ui.findAll({ type: 'Text' })).find(one => String(one.text).includes('; risk: Archive can lose work until this lands'))
+  expect(sentence?.props.wrap).toBe('wrap')
+  expect(String(sentence?.text)).not.toContain('…')
   const keys = (await ui.findAll({ type: 'Box' })).map(box => box.key ?? '')
-  expect(keys.indexOf('pair-now-local_setup')).toBeLessThan(keys.indexOf('callout-risk-local_setup'))
-  expect(keys).not.toContain('risk-local_setup')
+  expect(keys.indexOf('status-local_setup')).toBeLessThan(keys.indexOf('pair-now-local_setup'))
+  expect(keys.some(key => key.startsWith('callout-') || key === 'risk-local_setup')).toBe(false)
   await ui.unmount()
 })
 
-test('a session asking "Allow Bash: …" leads its card with a Permission callout: the command in mono, home as ~, at most 6 rows', async ($, on) => {
+test('AC13, AC14 and AC30: a session asking "Allow Bash: …" says it asks to use Bash and where to answer; the command is drawn nowhere, no Permission callout', async ($, on) => {
   await started($, on, { ...BOARD, sessions: [{ ...BOARD.sessions[0], needsYou: `Allow Bash: ${COMMAND}` }, BOARD.sessions[1]] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
-  const question = (await ui.findAll({ type: 'Text' })).filter(one => one.props.color === C.red && one.props.wrap === 'truncate-end').map(one => String(one.text))
-  expect(question.length).toBe(2)
-  expect(question.join(' ')).toContain('~/.claude')
-  expect(question.join(' ')).not.toContain(HOME)
+  expect((await textsOf(ui)).some(text => text.includes('~/.claude') || text.includes('npm run'))).toBe(false)
   await click(ui, 'hit-row-local_env')
-  const callout = await ui.find({ key: 'callout-permission-local_env' })
-  expect(callout?.text).toContain('PERMISSIONAllow Bash')
-  expect(callout?.text).toContain('the whole command is in its chat')
-  const command = (await ui.findAll({ type: 'Text' })).filter(one => one.props.mono === true && one.props.wrap === 'truncate-end' && String(one.text ?? '').length > 0)
-  const rows = (await ui.find({ key: 'callout-permission-local_env-rows-1' }))?.children ?? []
-  expect(rows.length).toBe(6)
-  expect(JSON.stringify(rows[0])).toContain('cd ~/.claude/worktrees/')
-  expect(JSON.stringify(rows.at(-1))).toContain('…')
-  expect(command.length).toBeGreaterThan(0)
+  const texts = await textsOf(ui)
+  expect(texts).toContain('Needs you: it asks to use Bash. Answer in its chat (Open chat on the top row).')
+  expect(JSON.stringify(texts)).not.toContain('worktrees/wt-master-session-plugin-rows-v3')
   const keys = (await ui.findAll({ type: 'Box' })).map(box => box.key ?? '')
-  expect(keys.indexOf('callout-permission-local_env')).toBeLessThan(keys.indexOf('pair-now-local_env'))
+  expect(keys.some(key => key.startsWith('callout-'))).toBe(false)
+  expect((await ui.find({ key: 'status-local_env' }))?.props.backgroundColor).toBe(C.redTint)
   await ui.unmount()
 })
 
-test('a subagent asking for Bash: Permission callout, a Now block, the description in 2 rows and no prompt', async ($, on) => {
+test('AC13: a subagent asking for Bash names the tool and the chat to answer in; its Name block holds the whole description and no prompt is drawn', async ($, on) => {
   seeded(on, [
     { id: 'q1', type: 'master-session:qa-verifier', description: 'Verify rows-v3 at 48187ca in a clean detached worktree, then compare every changed board with the v3 canvas and report each mismatch', prompt: PROMPT, state: 'running', startedAt: 3_540_000, parentSessionId: 'local_setup', asking: { text: `Allow Bash: ${COMMAND}`, since: 3_560_000 } },
   ])
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-q1')
-  expect((await ui.find({ key: 'callout-q1-rows-1' }))?.children?.length).toBe(6)
-  expect((await ui.find({ key: 'task-title-q1' }))?.children?.length).toBe(2)
+  expect(await ui.find({ key: 'callout-q1-rows-1' })).toBeUndefined()
+  expect(await ui.find({ key: 'task-title-q1' })).toBeUndefined()
   expect(await ui.find({ key: 'task-prompt-q1' })).toBeUndefined()
   const texts = await textsOf(ui)
   expect(texts.some(text => text.includes('-line prompt'))).toBe(false)
-  expect(texts).toEqual(expect.arrayContaining(['Waiting for your answer', 'Bash · asked 40s ago']))
+  expect(texts).toContain('Needs you: it asks to use Bash. Answer in Session · Redo toolkit setup UI’s chat.')
+  expect(texts.some(text => text.startsWith('QA verifier · Verify rows-v3 at 48187ca in a clean detached worktree, then compare every changed board'))).toBe(true)
+  expect(JSON.stringify(texts)).not.toContain('npm run build')
   await ui.unmount()
 })
 
@@ -123,8 +115,8 @@ test('a needs row whose task cannot show 12 characters beside the Open chat labe
     return found
   }
   expect(await at(70)).toEqual({ chat: 'label', shrink: 0, hasTask: true })
-  expect(await at(42)).toEqual({ chat: 'icon', shrink: 0, hasTask: true })
-  expect(await at(41)).toEqual({ chat: 'icon', shrink: 1, hasTask: false })
+  expect(await at(48)).toEqual({ chat: 'icon', shrink: 0, hasTask: true })
+  expect(await at(46)).toEqual({ chat: 'icon', shrink: 1, hasTask: false })
   expect(await at(30)).toEqual({ chat: 'icon', shrink: 1, hasTask: false })
 })
 
@@ -203,7 +195,7 @@ test('tests pills: a failed run is a red pill with the failed glyph and “· fa
   await ui.unmount()
 })
 
-test('a subagent with a name shows it as its task in its row and in the chain of the agents it started; its Task block keeps the description', async ($, on) => {
+test('a subagent with a name shows it as its task in its row, in its Name block and in the chain of the agents it started', async ($, on) => {
   seeded(on, [
     { id: 'q1', name: 'rows-v3 48187ca', type: 'master-session:qa-verifier', description: 'Verify rows-v3 at 48187ca in a clean detached worktree', state: 'running', startedAt: 3_540_000, parentSessionId: 'local_setup' },
     { id: 'r1', type: 'master-session:reviewer', description: 'Review the diff', state: 'running', startedAt: 3_550_000, parentSessionId: 'local_setup', parentAgentId: 'q1' },
@@ -213,8 +205,10 @@ test('a subagent with a name shows it as its task in its row and in the chain of
   expect(textsIn((await ui.find({ key: 'row-q1' }))?.children)).toContain('rows-v3 48187ca')
   await click(ui, 'hit-row-r1')
   expect((await textsOf(ui)).some(text => text.includes('QA verifier · rows-v3 48187ca'))).toBe(true)
+  await click(ui, 'hit-top-r1')
   await click(ui, 'hit-row-q1')
-  expect(textsIn((await ui.find({ key: 'task-title-q1' }))?.children).join(' ')).toContain('Verify rows-v3 at 48187ca')
+  expect(await ui.find({ key: 'task-title-q1' })).toBeUndefined()
+  expect((await textsOf(ui)).filter(text => text === 'QA verifier · rows-v3 48187ca').length).toBe(1)
   await ui.unmount()
 })
 
@@ -234,20 +228,20 @@ test('the header wraps a long status line and grows; offline shows I.offline mut
   await ui.unmount()
 })
 
-test('L8 at 53 columns with real glyph widths: "Designer · band diff" keeps the Open chat label, and a Validator prompt "Allow Read outside the project: ~/.agents/RULES.md?" takes 2 whole rows', async ($, on) => {
+test('L8 at 58 columns with real glyph widths: "Designer · band diff" keeps the Open chat label, and a Validator subagent that asks reads "Validator › needs you" with no question', async ($, on) => {
   seeded(on, [
     { id: 'c1', name: 'canvas v3 check', type: 'master-session:reviewer', description: 'Check the canvas', state: 'running', startedAt: 3_570_000, asking: { text: 'Allow Read outside the project: ~/.agents/RULES.md?', since: 3_590_000 } },
   ])
   await started($, on, { ...BOARD, sessions: [{ id: 'local_b1', name: 'b1', title: 'band diff', persona: 'Designer', state: 'needs-you', needsYou: 'Allow Bash: rm -rf dist?' }] }, { sessions: [{ sessionId: 'local_b1', name: 'b1', title: '', cwd: '/', isRunning: false, isArchived: false, lastActivityAt: AT, startedBy: SELF }] })
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 53 } })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 58 } })
   expect((await ui.find({ key: 'face-chat-local_b1' }))?.props.width).not.toBe(across(32))
   expect(textsIn((await ui.find({ key: 'row-local_b1' }))?.children)).toEqual(expect.arrayContaining(['Designer', 'band diff']))
   expect(await hitsOf(ui)).not.toContain('hit-chat-c1')
-  const rows = (await ui.find({ key: 'row-c1-ask-rows' }))?.children ?? []
-  const texts = rows.map(row => textsIn(row).at(-1))
-  expect(texts).toEqual(['Allow Read outside the project:', '~/.agents/RULES.md?'])
+  expect(await ui.find({ key: 'row-c1-ask-rows' })).toBeUndefined()
+  expect(await textsOf(ui)).not.toContain('Allow Read outside the project: ~/.agents/RULES.md?')
+  expect(textsIn((await ui.find({ key: 'row-c1' }))?.children)).toEqual(expect.arrayContaining(['Validator ›', 'needs you']))
   await ui.unmount()
-  const tight = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 52 } })
+  const tight = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 57 } })
   expect((await tight.find({ key: 'face-chat-local_b1' }))?.props.width).toBe(across(32))
   await tight.unmount()
 })
@@ -311,26 +305,15 @@ test('rows break at spaces first, then after a slash in a path; never after a hy
   expect([second.includes('-'), isFull(second, path.slice(path.indexOf(second) + second.length), 100)]).toEqual([true, true])
 })
 
-test('tabular digits: the elapsed time is measured at 0.64 em per digit as it renders, so the ask beside it stays inside its real column', async ($, on) => {
+test('tabular digits: the elapsed time is measured at 0.64 em per digit as it renders, and sits on line 1 as a tabular Text that is never cut', async ($, on) => {
   expect(textWidth('11m', 12)).toBeGreaterThanOrEqual(25.81)
-  seeded(on, [
-    { id: 't1', name: 'band diff', type: 'master-session:reviewer', description: 'Review', state: 'running', startedAt: 2_940_000, asking: { text: 'Allow Bash: bun install && bun run build && bun test?', since: 3_590_000 } },
-    { id: 't2', name: 'canvas v3 check', type: 'master-session:reviewer', description: 'Check', state: 'running', startedAt: 3_589_000, asking: { text: 'Allow Read outside the project: ~/.agents/RULES.md?', since: 3_590_000 } },
-  ])
+  seeded(on, [{ id: 't1', name: 'band diff', type: 'master-session:reviewer', description: 'Review', state: 'running', startedAt: 2_940_000, asking: { text: 'Allow Bash: bun install && bun run build && bun test?', since: 3_590_000 } }])
   await started($, on)
-  for (const [bodyColumns, id, elapsed, real] of [[46, 't1', '11m', 25.81], [44, 't2', '11s', 21.52]] as const) {
-    const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
-    expect(textsIn((await ui.find({ key: `row-${id}` }))?.children)).toContain(elapsed)
-    const ask = ASKS.find(one => one.text.startsWith(id === 't1' ? 'Allow Bash: bun' : 'Allow Read')) ?? { text: '', prefixes: [] }
-    const column = bodyWidthOf(bodyColumns) - 88 - (16 + real + 12) - 16
-    const rows = ((await ui.find({ key: `row-${id}-ask-rows` }))?.children ?? []).map(row => String(textsIn(row).at(-1)))
-    let from = 0
-    for (const row of rows) {
-      expect([bodyColumns, row, realOf(ask, row, from) <= column]).toEqual([bodyColumns, row, true])
-      from = ask.text.indexOf(rows[rows.indexOf(row) + 1]?.replace(/…$/, '') ?? '', from + Array.from(row).length)
-    }
-    await ui.unmount()
-  }
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
+  const box = await ui.find({ key: 'row-t1-elapsed-box' })
+  expect([box?.text, box?.props.flexShrink]).toEqual(['11m', 0])
+  expect((await ui.findAll({ type: 'Text' })).find(one => one.text === '11m')?.props.tabular).toBe(true)
+  await ui.unmount()
 })
 
 test('wide glyphs by real width: Æ Œ, Cyrillic, arrows and box drawing, ✓ ★, emoji lines at 12 and 13 px, 400 and 600 — every row, measured in Chrome, fits its room at any width', () => {

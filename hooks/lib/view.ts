@@ -8,11 +8,10 @@ import { compactOf, shortOf, updatedOf } from './format'
 import { CH, LH, bodyWidthOf, liftOf } from './layout'
 import { familyOf } from './rows'
 import { NARRATIVE_MAX_ROWS, NARRATIVE_ROWS, NARRATIVE_STALE_MS } from './constants'
-import { ARCHIVED_PEEK, CHAT_LABEL, ageOf, blocksOf, chatTargetOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf, rowsOf, shortNameOf } from './list'
+import { ARCHIVED_PEEK, ageOf, blocksOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf, rowsOf, shortNameOf } from './list'
 import type { Context } from './list'
 import { processesPxOf, processesViewOf } from './processes'
-import { rowFitOf } from './rowfit'
-import { NARROW_PX, ROW, contentHeightOf, dotExtraOf, headerRowsOf, sectionTopsOf, tileInnerOf } from './sections'
+import { NARROW_PX, contentHeightOf, dotExtraOf, headerRowsOf, sectionTopsOf, tileInnerOf } from './sections'
 import type { SectionInput } from './sections'
 
 export const noticeOf = (error: string) => `Can’t read sessions: ${error}`
@@ -95,7 +94,6 @@ export function headerButtonsOf(data: PaneData, onAsk: () => void, onRefresh: ()
 }
 
 function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
-  const { context } = view
   return {
     columns: data.columns,
     repos: data.trees.map(repo => shortOf(repo.name)),
@@ -113,7 +111,7 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
       .filter(group => group.id === 'archived' || group.items.length)
       .map(group => ({
         rows: group.id === 'archived' ? (group.isOpen ? (data.chosen === 'archived' || data.archiveView === 'all' ? group.archived.length : Math.min(ARCHIVED_PEEK, group.archived.length)) : 0) : group.items.length,
-        extra: group.items.reduce((sum, item) => sum + rowFitOf(item, context, { width: bodyWidthOf(data.columns), isNarrow: view.isNarrow, home: data.home, chat: chatTargetOf(item) ? CHAT_LABEL : undefined }).height - ROW, 0),
+        extra: 0,
         isArchived: group.id === 'archived',
       })),
     hasMore: view.hasMore,

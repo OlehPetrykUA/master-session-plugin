@@ -2,8 +2,9 @@ import type { EngineInterface, Timer } from 'claude-code'
 
 import { runningTimeOf } from '../components/detail/format'
 import { FILE_MS, LIVE_MS, TICK_MS } from '../lib/constants'
-import { elapsedOfItem, lineOf, openIdOf, runAgentsOf } from '../lib/list'
+import { elapsedOfItem, openIdOf, runAgentsOf } from '../lib/list'
 import type { RowItem } from '../lib/list'
+import { statusSentenceOf } from '../lib/status'
 import { paneViewOf } from '../lib/view'
 import { refreshAgents } from './agents'
 import { bandStale, forgetBand } from './band'
@@ -34,10 +35,7 @@ async function tickTimes($: EngineInterface) {
   const data = await paneData($, columns || 48)
   const view = paneViewOf(data)
   const shown = view.groups.flatMap(group => group.items).flatMap(item => (item.kind === 'workflow' && openIdOf(item, data.open) ? [item, ...runAgentsOf(item.run, data.agents)] : [item]))
-  const labelOf = (item: RowItem) => {
-    const line = lineOf(item, view.context)
-    return [elapsedOfItem(item, data.at), line.cmdElapsed ? `${line.text}~${line.cmdElapsed}` : '', openIdOf(item, data.open) ? runningTimeOf(item, data.at) : ''].join('~')
-  }
+  const labelOf = (item: RowItem) => [elapsedOfItem(item, data.at), ...(openIdOf(item, data.open) ? [statusSentenceOf(item, view.context, data.home).text, runningTimeOf(item, data.at)] : [])].join('~')
   const isBand = await bandStale($)
   const labels = [...shown.map(labelOf), view.status.text, view.blocks.find(block => block.key === 'duration')?.value, view.narrative?.age, view.narrative?.text, stoppingLabelOf(data.at)].join('|')
   if (labels === lastLabels && !isBand) return

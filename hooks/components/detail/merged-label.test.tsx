@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { BOARD_TOOL, GIT, HOME, PANE, started, warmUp } from '../../testing/world'
+import { BOARD_TOOL, GIT, HOME, PANE, click, started, warmUp } from '../../testing/world'
 
 const MAIN = `${HOME}/Work/designer-main`
 const TREE = `${HOME}/Work/designer-tree`
@@ -27,7 +27,8 @@ const sessionOf = { sessionId: 'local_designer', name: 'designer', title: 'Desig
 async function merged($: Parameters<typeof started>[0], on: Parameters<typeof started>[1], board: ReturnType<typeof boardOf>, git: Record<string, string>) {
   const { gits } = await started($, on, board, { git, sessions: [{ ...sessionOf, cwd: board.sessions[0]?.cwd }] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  const word = await ui.find({ type: 'Text', text: 'merged to main' })
+  await click(ui, 'hit-row-local_designer')
+  const word = (await ui.findAll({ type: 'Text' })).find(one => String(one.text).startsWith('Done: merged to main'))
   await ui.unmount()
   return { word, gits }
 }

@@ -1,5 +1,4 @@
-import { compactOf, modelOf } from '../../lib/format'
-import { locate } from '../../lib/git'
+import { compactOf } from '../../lib/format'
 import { across, down, faceWidth } from '../../lib/layout'
 import { ageOf, clockOf, displayNameOf, isStartedBy } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
@@ -11,10 +10,10 @@ import { Quiet } from '../Quiet'
 import { Strong } from '../Strong'
 import type { Actions, Ui } from '../types'
 import { Block } from './Block'
-import { ModelValue } from './Model'
+import { Lead } from './Lead'
 import { Pair } from './Pair'
 
-export type ArchivedDetailProps = { item: Extract<RowItem, { kind: 'archived' }>; context: Context; rowProps: RowProps; asking: string; innerWidth: number; actions: Actions }
+export type ArchivedDetailProps = { item: Extract<RowItem, { kind: 'archived' }>; context: Context; rowProps: RowProps; home: string; asking: string; innerWidth: number; actions: Actions }
 
 export const UNARCHIVE_TEXT = 'It comes back in its group with its chat. Its worktree is made again on its next turn.'
 
@@ -27,8 +26,6 @@ export function ArchivedDetail(ui: Ui, props: ArchivedDetailProps) {
   const name = displayNameOf(item)
   const label = one.name || one.title
   const isAsking = props.asking === `unarchive:${id}`
-  const isGone = !locate(one.cwd, context.trees)
-  const model = modelOf(one.model, one.effort)
   const width = props.innerWidth
   const half = (key: string, icon: Parameters<typeof Block>[1]['icon'], text: string, children: Parameters<typeof Block>[1]['children'], gap?: number) => Block(ui, { id: `${key}-${id}`, icon, label: text, isHalf: true, children, gap })
   const cancel = faceWidth('Cancel', 'b40') + 1
@@ -60,24 +57,14 @@ export function ArchivedDetail(ui: Ui, props: ArchivedDetailProps) {
   return Card(ui, {
     ...props.rowProps,
     children: [
+      ...Lead(ui, { item, context, home: props.home }),
       Pair(ui, {
-        id: `pair-last-${id}`,
-        left: half('last', 'now', 'Last', [Strong(ui, { text: board?.done || board?.now || '—', isFull: true }), Quiet(ui, { text: `last turn ${ageOf(at - one.lastActivityAt)}`, isFull: true })]),
-        right: half('time', 'elapsed', 'Time', [
+        id: `pair-archived-git-${id}`,
+        left: half('time', 'elapsed', 'Archived', [
           Strong(ui, { text: `archived ${clockOf(one.lastActivityAt)}`, isFull: true }),
-          one.createdAt === undefined ? null : Quiet(ui, { text: `ran ${compactOf(one.lastActivityAt - one.createdAt)}`, isFull: true }),
+          Quiet(ui, { text: [ageOf(at - one.lastActivityAt), one.createdAt === undefined ? '' : `ran ${compactOf(one.lastActivityAt - one.createdAt)}`].filter(Boolean).join(' · '), isFull: true }),
         ]),
-      }),
-      Block(ui, {
-        id: `place-${id}`,
-        icon: 'branch',
-        label: 'Worktree',
-        children: [Strong(ui, { text: one.cwd.split('/').at(-1) ?? one.cwd, isMono: true, isFull: true }), isGone ? Quiet(ui, { text: 'removed at archive; made again on its next turn', isFull: true }) : null],
-      }),
-      Pair(ui, {
-        id: `pair-git-${id}`,
-        left: half('git', 'git', 'Git', [Strong(ui, { text: board?.git || '—', isFull: true }), board?.sha ? Quiet(ui, { text: board.sha, isFull: true }) : null]),
-        right: half('model', 'modelChip', 'Model', ModelValue(ui, { id, model: one.model, text: model || '—' }), 8),
+        right: half('git', 'git', 'Git', [Strong(ui, { text: board?.git || '—', isFull: true }), board?.sha ? Quiet(ui, { text: board.sha, isFull: true }) : null]),
       }),
       isAsking ? confirm : buttons,
     ],

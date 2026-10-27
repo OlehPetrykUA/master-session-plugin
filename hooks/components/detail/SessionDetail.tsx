@@ -1,9 +1,10 @@
 import { compactOf, modelOf } from '../../lib/format'
-import { across, tall } from '../../lib/layout'
-import { ageOf, askOf, clockOf, foldPath, oneLine, relativeOf, runningOfItem, shortNameOf, tildeOf } from '../../lib/list'
+import { across } from '../../lib/layout'
+import { clockOf, foldPath, oneLine, relativeOf, shortNameOf } from '../../lib/list'
 import type { Context, ListItem } from '../../lib/list'
-import { activityOf, headOf, othersOf, syncOf, whereOf } from '../../lib/rows'
+import { headOf, syncOf, whereOf } from '../../lib/rows'
 import type { Row } from '../../lib/rows'
+import { activityWordsOf } from '../../lib/status'
 import type { IconName } from '../../theme/icons'
 import { C } from '../../theme/tokens'
 import { ActionButton } from '../ActionButton'
@@ -15,13 +16,11 @@ import type { Actions, Ui } from '../types'
 import { Activity } from './Activity'
 import { ArchiveBox } from './ArchiveBox'
 import { Block } from './Block'
-import { Callout } from './Callout'
 import { Commits } from './Commits'
-import { lossesOf } from './losses'
+import { Lead } from './Lead'
+import { lossLineOf, lossesOf } from './losses'
 import { ModelValue } from './Model'
 import { Pair } from './Pair'
-import { RunningBlock } from './RunningBlock'
-import { TaskBlock } from './TaskBlock'
 import { Tests } from './Tests'
 
 export type SessionDetailProps = { item: Extract<ListItem, { kind: 'session' }>; context: Context; rowProps: RowProps; home: string; asking: string; innerWidth: number; actions: Actions }
@@ -60,7 +59,7 @@ function ActionRow(ui: Ui, props: ActionRowProps) {
 }
 
 export function SessionDetail(ui: Ui, props: SessionDetailProps) {
-  const { Box, Text } = ui
+  const { Text } = ui
   const { item, context, home, actions } = props
   const { row } = item
   const { trees, at } = context
@@ -68,93 +67,26 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
   const now = row.live
   const found = whereOf(row, trees)
   const where = found?.tree
-  const others = othersOf(row, where, trees, home)
   const model = modelOf(now?.model, now?.effort)
-  const activity = activityOf(row)
+  const activity = activityWordsOf(row)
   const files = facts?.files ?? []
   const losses = lossesOf(row, trees, context.sessions)
   const idle = now ? at - now.lastActivityAt : 0
   const half = (label: string, icon: IconName, children: Parameters<typeof Block>[1]['children'], id: string, gap?: number) => Block(ui, { id: `${id}-${row.id}`, icon, label, children, isHalf: true, gap })
-  const base = found?.repo.base ?? 'main'
-  const ask = item.status === 'needs' ? askOf(facts?.needsYou) : undefined
-  const asked = facts?.reportAt ? `asked ${ageOf(at - facts.reportAt)}` : ''
-  const permission = ask
-    ? Callout(ui, {
-        id: `permission-${row.id}`,
-        status: 'needs',
-        icon: 'permission',
-        label: 'Permission',
-        width: props.innerWidth,
-        lines: [
-          { text: `Allow ${ask.tool}`, isStrong: true },
-          { text: tildeOf(ask.rest, home), isStrong: false, isMono: true, rows: 6 },
-          { text: [asked, 'the whole command is in its chat'].filter(Boolean).join(' · '), isStrong: false },
-        ],
-      })
-    : null
-  const risk = facts?.risk ? Callout(ui, { id: `risk-${row.id}`, status: 'unmerged', icon: 'blocker', label: 'Risk', width: props.innerWidth, lines: [{ text: facts.risk, isStrong: true, rows: 3 }] }) : null
   const pathRoom = props.innerWidth - 24
-  const callout =
-    item.status === 'ready'
-      ? Callout(ui, { id: row.id, status: 'ready', label: 'Ready for verify', lines: [{ text: [`ready ${facts?.sha ?? ''}`.trim(), where?.branch ? `on ${where.branch}` : ''].filter(Boolean).join(' '), isStrong: true }, ...(facts?.tests?.length ? [{ text: oneLine(`gate: ${facts.tests.join(', ')}`), isStrong: false, isOneLine: true }] : [])] })
-      : item.status === 'verified'
-        ? Callout(ui, { id: row.id, status: 'verified', label: 'Verified', lines: [{ text: facts?.verified ?? '', isStrong: true }, { text: `merge to ${base} pending`, isStrong: false }] })
-        : null
+  const loss = item.status === 'done' ? lossLineOf(row, trees, context.sessions) : ''
   return Card(ui, {
     ...props.rowProps,
     children: [
-      permission,
-      callout,
-      RunningBlock(ui, { id: row.id, run: runningOfItem(item, context), at }),
-      TaskBlock(ui, { id: row.id, name: shortNameOf(item), task: context.tasks?.[row.id], room: props.innerWidth - 24 }),
+      ...Lead(ui, { item, context, home }),
       Pair(ui, {
         id: `pair-now-${row.id}`,
         left: half('Now', 'now', Strong(ui, { text: facts?.now || '—', isFull: true }), 'now'),
         right: half('Next', 'next', Strong(ui, { text: facts?.next || '—', isFull: true }), 'next'),
       }),
-      risk,
       activity.length ? Activity(ui, { id: row.id, activity }) : null,
-      where
-        ? Block(ui, {
-            id: `place-${row.id}`,
-            icon: where.isMain ? 'house' : 'branch',
-            label: where.isMain ? 'Main checkout' : 'Worktree',
-            children: [
-              Strong(ui, { text: where.isMain ? (found?.repo.name.split('/').at(-1) ?? 'main checkout') : (where.path.split('/').at(-1) ?? ''), isMono: true, isFull: true }),
-              Quiet(ui, { text: where.isMain ? [where.branch, where.sha].filter(Boolean).join(' · ') : headOf(where), isMono: true, isFull: true }),
-            ],
-          })
-        : Block(ui, { id: `place-${row.id}`, icon: 'house', label: 'Location', children: Strong(ui, { text: facts?.location ?? '—', isFull: true }) }),
-      ...others.map(tree =>
-        Block(ui, {
-          id: `tree-${row.id}-${tree.path}`,
-          icon: 'branch',
-          label: 'Worktree',
-          children: [Strong(ui, { text: tree.path.split('/').at(-1) ?? '', isMono: true, isFull: true }), Quiet(ui, { text: headOf(tree), isMono: true, isFull: true })],
-        }),
-      ),
-      Pair(ui, {
-        id: `pair-git-${row.id}`,
-        left: half(
-          'Git',
-          'git',
-          where ? [Strong(ui, { text: where.dirty ? `${where.dirty} uncommitted` : 'clean', isFull: true }), Quiet(ui, { text: syncOf(where), isFull: true })] : Strong(ui, { text: facts?.git ?? '—', isFull: true }),
-          'git',
-        ),
-        right: half(
-          'Time',
-          'elapsed',
-          now
-            ? [
-                Strong(ui, { text: now.createdAt !== undefined ? `started ${clockOf(now.createdAt)}` : (facts?.time ?? '—'), isFull: true }),
-                Quiet(ui, { text: now.isRunning ? 'active now' : row.state === 'done' ? `idle ${compactOf(idle)}` : `active ${compactOf(idle)} ago`, isFull: true }),
-              ]
-            : Strong(ui, { text: facts?.time ?? '—', isFull: true }),
-          'time',
-        ),
-      }),
-      facts?.commits?.length ? Commits(ui, { id: row.id, commits: facts.commits }) : null,
       facts?.tests?.length ? Tests(ui, { id: row.id, tests: facts.tests, width: props.innerWidth }) : null,
+      facts?.commits?.length ? Commits(ui, { id: row.id, commits: facts.commits }) : null,
       files.length
         ? Block(ui, {
             id: `files-${row.id}`,
@@ -171,27 +103,33 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
             ],
           })
         : null,
-      now?.permissionMode || model
-        ? Pair(ui, {
-            id: `pair-mode-${row.id}`,
-            left: half(
-              'Permission',
-              'permission',
-              now?.permissionMode ? (
-                <Box key={`permission-pill-${row.id}`} flexDirection="row" alignSelf="flex-start" alignItems="center" height={tall(24)} paddingX={across(8)} paddingY={0} borderStyle="round" borderColor={C.border} backgroundColor={C.surface}>
-                  <Text size="footnote" weight="semibold">
-                    {now.permissionMode}
-                  </Text>
-                </Box>
-              ) : (
-                Strong(ui, { text: '—', isFull: true })
-              ),
-              'permission',
-              8,
-            ),
-            right: half('Model', 'modelChip', ModelValue(ui, { id: row.id, model: now?.model, text: model || '—' }), 'model', 8),
-          })
-        : null,
+      Block(ui, {
+        id: `git-${row.id}`,
+        icon: where && !where.isMain ? 'branch' : 'git',
+        label: 'Git',
+        children: where
+          ? [
+              Strong(ui, { text: where.dirty ? `${where.dirty} uncommitted` : 'clean', isFull: true }),
+              Quiet(ui, { text: loss || syncOf(where), isFull: true }),
+              Quiet(ui, { text: where.isMain ? [where.branch, where.sha].filter(Boolean).join(' · ') : `${where.path.split('/').at(-1) ?? ''} · ${headOf(where)}`, isMono: true, isFull: true }),
+            ]
+          : [Strong(ui, { text: facts?.git ?? '—', isFull: true }), facts?.location ? Quiet(ui, { text: facts.location, isMono: true, isFull: true }) : null],
+      }),
+      Pair(ui, {
+        id: `pair-model-time-${row.id}`,
+        left: half('Model', 'modelChip', ModelValue(ui, { id: row.id, model: now?.model, text: model || '—' }), 'model', 8),
+        right: half(
+          'Time',
+          'elapsed',
+          now
+            ? [
+                Strong(ui, { text: now.createdAt !== undefined ? `started ${clockOf(now.createdAt)}` : (facts?.time ?? '—'), isFull: true }),
+                Quiet(ui, { text: now.isRunning ? 'active now' : row.state === 'done' ? `idle ${compactOf(idle)}` : `active ${compactOf(idle)} ago`, isFull: true }),
+              ]
+            : Strong(ui, { text: facts?.time ?? '—', isFull: true }),
+          'time',
+        ),
+      }),
       ActionRow(ui, { row, canOpen: !!item.isOwn, name: shortNameOf(item), losses, width: props.innerWidth, isAsking: props.asking === `archive:${row.id}`, actions }),
     ],
   })

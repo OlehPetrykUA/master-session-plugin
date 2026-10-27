@@ -1,14 +1,15 @@
 import { TITLE } from '../lib/constants'
 import { shortOf } from '../lib/format'
 import { isRepoClean } from '../lib/git'
-import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, displayNameOf, elapsedOfItem, isStartedBy, lineOf, lineTextOf, nameText, openIdOf, shownArchived, stepsOfItem, undoTextOf } from '../lib/list'
+import { ARCHIVED_PEEK, EMPTY_TEXT, GROUP_LABEL, CHAT_LABEL, archivedItemOf, chatTargetOf, displayNameOf, elapsedOfItem, isStartedBy, nameText, openIdOf, shownArchived, stepsOfItem, undoTextOf } from '../lib/list'
 import type { ListGroup, ListItem, RowItem } from '../lib/list'
 import { modelWordOf } from '../lib/rowfit'
+import { starterOf, stateWordOf } from '../lib/status'
 import { headerButtonsOf, paneViewOf } from '../lib/view'
 import { TERMINAL_COLOR } from '../theme/tokens'
 import { clearOf } from './clear'
 import { TextProcesses } from './TextProcesses'
-import { TextSessionDetail, TextSubagentDetail, TextWorkflowDetail, colorOf } from './detail/TextDetail'
+import { TextArchivedDetail, TextSessionDetail, TextSubagentDetail, TextWorkflowDetail, colorOf, wordColorOf } from './detail/TextDetail'
 import type { PaneData, TextUi } from './types'
 import { UnarchiveConfirm } from './UnarchiveConfirm'
 
@@ -19,9 +20,9 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
 
   const detail = (item: ListItem) => {
     const collapse = () => actions.collapse(openIdOf(item, data.open) ?? item.id)
-    if (item.kind === 'workflow') return TextWorkflowDetail(ui, { item, context, open: data.open, onToggle: actions.toggle, onCollapse: collapse })
-    if (item.kind === 'subagent') return TextSubagentDetail(ui, { item, context, onCollapse: collapse })
-    return TextSessionDetail(ui, { item, context, asking, actions })
+    if (item.kind === 'workflow') return TextWorkflowDetail(ui, { item, context, home: data.home, open: data.open, onToggle: actions.toggle, onCollapse: collapse })
+    if (item.kind === 'subagent') return TextSubagentDetail(ui, { item, context, home: data.home, onCollapse: collapse })
+    return TextSessionDetail(ui, { item, context, home: data.home, asking, actions })
   }
 
   const undone = data.undone
@@ -36,14 +37,19 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
   const line = (item: RowItem) => {
     const steps = stepsOfItem(item)
     const chat = chatTargetOf(item)
-    const isNeeds = item.status === 'needs'
-    const tail = [lineTextOf(lineOf(item, context)), modelWordOf(item), isNeeds ? '' : elapsedOfItem(item, at), steps && !isNeeds ? `${steps.done}/${steps.total}` : ''].filter(Boolean).join(' · ')
+    const tail = [modelWordOf(item), elapsedOfItem(item, at), steps ? `${steps.done}/${steps.total}` : ''].filter(Boolean).join(' · ')
+    const starter = starterOf(item, context)
+    const color = wordColorOf(item)
     return (
       <Box key={`row-${item.id}`} flexDirection="row" gap="sm">
         <Text color={colorOf(item)}>●</Text>
         <Button key={`row-open-${item.id}`} plain label={nameText(displayNameOf(item))} onPress={() => actions.toggle(item.id)} />
-        <Text color={isNeeds ? 'error' : undefined} dimColor={!isNeeds || undefined} wrap="truncate-end">
+        <Text dimColor wrap="truncate-end">
           {tail}
+        </Text>
+        {starter ? <Text dimColor>{`${starter} ›`}</Text> : null}
+        <Text weight="semibold" color={color}>
+          {stateWordOf(item.status).text}
         </Text>
         <Box flexGrow={1} />
         {chat ? <Button key={`chat-${item.id}`} variant="primary" label={CHAT_LABEL} onPress={() => actions.open(chat.id, chat.name)} /> : null}
@@ -57,12 +63,15 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
     const { one } = item
     return (
       <Box key={`archived-${one.id}`} flexDirection="column">
-        <Box flexDirection="row" gap="sm">
-          {line(item)}
-          <Button key={`unarchive-${one.id}`} label="Unarchive" onPress={() => actions.confirm(`unarchive:${one.id}`)} />
-          {isStartedBy(one, context.self) ? <Button key={`archived-open-${one.id}`} label="Open" onPress={() => actions.open(one.id, one.name || one.title)} /> : null}
-        </Box>
-        {data.open.includes(one.id) ? <Text dimColor>{[one.title, one.cwd].filter(Boolean).join(' · ')}</Text> : null}
+        {data.open.includes(one.id) ? (
+          TextArchivedDetail(ui, { item, context, home: data.home, actions, onCollapse: () => actions.collapse(one.id) })
+        ) : (
+          <Box flexDirection="row" gap="sm">
+            {line(item)}
+            <Button key={`unarchive-${one.id}`} label="Unarchive" onPress={() => actions.confirm(`unarchive:${one.id}`)} />
+            {isStartedBy(one, context.self) ? <Button key={`archived-open-${one.id}`} label="Open" onPress={() => actions.open(one.id, one.name || one.title)} /> : null}
+          </Box>
+        )}
         {asking === `unarchive:${one.id}` ? UnarchiveConfirm(ui, { item, actions }) : null}
       </Box>
     )

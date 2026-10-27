@@ -1,125 +1,61 @@
-import { across, tall } from '../../lib/layout'
-import { askOf, clockOf, displayNameOf, nameText, parentsOf, runningOfItem, sessionOfAgent, spanOf, tildeOf } from '../../lib/list'
+import { clockOf, nameText, parentsOf } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
-import { C } from '../../theme/tokens'
-import { Icon } from '../Icon'
+import { modelWordOf } from '../../lib/rowfit'
+import { partOfOf } from '../../lib/status'
 import { Card } from '../list/Card'
 import type { RowProps } from '../list/Row'
-import { modelWordOf } from '../../lib/rowfit'
 import { Quiet } from '../Quiet'
 import { Strong } from '../Strong'
 import type { Ui } from '../types'
 import { Block } from './Block'
-import { Callout } from './Callout'
-import { durationOf, runningTimeOf, tokensOf } from './format'
+import { durationOf, runningTimeOf } from './format'
+import { Lead } from './Lead'
 import { ModelValue } from './Model'
 import { Pair } from './Pair'
-import { RunningBlock } from './RunningBlock'
-import { TaskBlock } from './TaskBlock'
 
-export type SubagentDetailProps = { item: Extract<RowItem, { kind: 'subagent' | 'agent' }>; context: Context; rowProps: RowProps; innerWidth: number }
+export type SubagentDetailProps = { item: Extract<RowItem, { kind: 'subagent' | 'agent' }>; context: Context; rowProps: RowProps; home: string; innerWidth: number }
 
 export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
-  const { Box, Text } = ui
+  const { Text } = ui
   const { item, context } = props
   const agent = item.agent
   const id = item.id
   const at = context.at
   const end = agent.endedAt ?? at
-  const parents = parentsOf(item, context)
-  const parent = item.kind === 'subagent' ? sessionOfAgent(item.agent, context) : undefined
-  const parentName = parent ? nameText(displayNameOf({ kind: 'session', id: parent.id, group: parent.state, status: 'working', row: parent })) : ''
-  const mode = parent?.live?.permissionMode
-  const type = 'type' in agent ? agent.type : ''
   const model = modelWordOf(item)
   const isNeeds = item.status === 'needs'
   const isRunning = agent.state === 'running'
-  const description = item.kind === 'subagent' ? item.agent.description : item.agent.label
-  const how =
-    item.kind === 'agent'
-      ? `workflow agent ${item.agent.index} of ${item.run.counts.total}`
-      : [item.agent.isBackground ? 'background' : 'foreground', parents.length > 1 ? `${parents.length} deep` : ''].filter(Boolean).join(' · ')
-  const chain = parents.map(nameText)
-  const asked = agent.asking ? `asked ${spanOf(agent.asking.since, undefined, at)} ago` : ''
-  const waitsIn = parent ? `the prompt waits in ${parentName}’s chat` : 'the prompt waits in this chat'
-  const ask = askOf(agent.asking?.text)
-  const room = props.innerWidth - 24
   const half = (key: string, icon: Parameters<typeof Block>[1]['icon'], label: string, children: Parameters<typeof Block>[1]['children'], gap?: number) => Block(ui, { id: `${key}-${id}`, icon, label, isHalf: true, children, gap })
-  const started = (
-    <Text key={`started-text-${id}`} wrap="wrap">
-      {chain.map((name, index) => (index === chain.length - 1 ? <Text weight="semibold">{name}</Text> : `${name} › `))}
-    </Text>
-  )
-  const time = isNeeds && agent.asking
-    ? [Strong(ui, { text: `waiting ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
-    : isRunning
-      ? [Strong(ui, { text: `running ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
-      : [Strong(ui, { text: `took ${durationOf(end - agent.startedAt)}`, isFull: true }), Quiet(ui, { text: `${clockOf(agent.startedAt)} – ${clockOf(end)}`, isFull: true })]
-  const modelBlock = half('model', 'modelChip', 'Model', [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), type ? Quiet(ui, { text: type, isMono: true, isFull: true }) : null], 8)
+  const time =
+    isNeeds && agent.asking
+      ? [Strong(ui, { text: `waiting ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
+      : isRunning
+        ? [Strong(ui, { text: `running ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
+        : [Strong(ui, { text: `took ${durationOf(end - agent.startedAt)}`, isFull: true }), Quiet(ui, { text: `${clockOf(agent.startedAt)} – ${clockOf(end)}`, isFull: true })]
+  const chain = item.kind === 'subagent' ? parentsOf(item, context).map(nameText) : []
+  const [part, nth] = item.kind === 'agent' ? partOfOf(item) : ['', '']
   return Card(ui, {
     ...props.rowProps,
     children: [
-      isNeeds && agent.asking
-        ? Callout(ui, {
-            id,
-            status: 'needs',
-            icon: 'permission',
-            label: 'Permission',
-            width: props.innerWidth,
-            lines: [
-              ...(ask ? [{ text: `Allow ${ask.tool}`, isStrong: true }, { text: tildeOf(ask.rest, props.rowProps.home), isStrong: false, isMono: true, rows: 6 }] : [{ text: agent.asking.text, isStrong: true, rows: 3 }]),
-              { text: [asked, waitsIn].filter(Boolean).join(' · '), isStrong: false },
-            ],
-          })
-        : null,
-      item.status === 'failed' ? Callout(ui, { id, status: 'failed', label: 'Failed', lines: [{ text: agent.result || 'stopped', isStrong: true }, { text: `took ${durationOf(end - agent.startedAt)}`, isStrong: false }] }) : null,
-      RunningBlock(ui, { id, run: runningOfItem(item, context), at }),
-      TaskBlock(ui, { id, name: description, task: agent.task, room }),
-      isNeeds && agent.asking
-        ? Block(ui, { id: `now-${id}`, icon: 'working', label: 'Now', children: [Strong(ui, { text: 'Waiting for your answer', isFull: true }), Quiet(ui, { text: [ask?.tool, asked].filter(Boolean).join(' · '), isFull: true })] })
-        : null,
-      item.status === 'done' && (agent.result || agent.tokens)
-        ? Block(ui, {
-            id: `result-${id}`,
-            icon: 'done',
-            label: 'Result',
-            children: [agent.result ? Strong(ui, { text: agent.result, isFull: true }) : null, agent.tokens ? Quiet(ui, { text: tokensOf(agent.tokens), isFull: true }) : null],
-          })
-        : null,
-      mode
-        ? Pair(ui, {
-            id: `pair-mode-${id}`,
-            left: half(
-              'permission',
-              'permission',
-              'Permission',
-              <Box key={`permission-pill-${id}`} flexDirection="row" alignSelf="flex-start" alignItems="center" height={tall(24)} paddingX={across(8)} paddingY={0} borderStyle="round" borderColor={C.border} backgroundColor={C.surface}>
-                <Text size="footnote" weight="semibold">
-                  {mode}
-                </Text>
-              </Box>,
-              8,
-            ),
-            right: modelBlock,
-          })
-        : Block(ui, { id: `model-${id}`, icon: 'modelChip', label: 'Model', gap: 8, children: [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), type ? Quiet(ui, { text: type, isMono: true, isFull: true }) : null] }),
+      ...Lead(ui, { item, context, home: props.home }),
       Pair(ui, {
-        id: `pair-start-${id}`,
-        left: half('started', item.kind === 'agent' ? 'flow' : 'agent', 'Started by', [started, how ? Quiet(ui, { text: how, isFull: true }) : null]),
+        id: `pair-model-time-${id}`,
+        left: half('model', 'modelChip', 'Model', [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), agent.type ? Quiet(ui, { text: agent.type, isMono: true, isFull: true }) : null], 8),
         right: half('time', 'elapsed', 'Time', time),
       }),
-      !parent && isNeeds ? (
-        <Box key={`info-${id}`} flexDirection="row" alignItems="flex-start" gap={across(8)}>
-          <Box flexDirection="row" alignItems="center" height={tall(16)}>
-            {Icon(ui, { id: `info-icon-${id}`, name: 'info', size: 14, tone: 'muted' })}
-          </Box>
-          <Box flexGrow={1} flexShrink={1} minWidth={0}>
-            <Text size="footnote" color={C.muted} wrap="wrap">
-              The prompt is in this chat: answer it here.
-            </Text>
-          </Box>
-        </Box>
-      ) : null,
+      item.kind === 'agent'
+        ? Block(ui, { id: `part-of-${id}`, icon: 'flow', label: 'Part of', children: [Strong(ui, { text: part, isFull: true }), Quiet(ui, { text: nth, isFull: true })] })
+        : Block(ui, {
+            id: `started-${id}`,
+            icon: 'agent',
+            label: 'Started by',
+            children: [
+              <Text key={`started-text-${id}`} wrap="wrap">
+                {chain.map((name, index) => (index === chain.length - 1 ? <Text weight="semibold">{name}</Text> : `${name} › `))}
+              </Text>,
+              Quiet(ui, { text: [item.agent.isBackground ? 'background' : 'foreground', chain.length > 1 ? `${chain.length} deep` : ''].filter(Boolean).join(' · '), isFull: true }),
+            ],
+          }),
     ],
   })
 }

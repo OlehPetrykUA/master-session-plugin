@@ -48,12 +48,12 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       if (item.kind === 'agent' && data.open.includes(item.id)) return actions.toggle(item.run.id)
       return actions.toggle(openIdOf(item, data.open) ?? item.id)
     }
-    const rowProps = { item, context, home: data.home, width: room, isNarrow: view.isNarrow, onOpen, chat: chatOf(item) }
+    const rowProps = { item, context, width: room, isNarrow: view.isNarrow, onOpen, chat: chatOf(item) }
     if (!openIdOf(item, data.open)) return Row(ui, rowProps)
     const innerWidth = room - CARD_INSET
-    if (item.kind === 'workflow') return WorkflowDetail(ui, { item, context, rowProps, innerWidth, agentOf: agent => itemOf(agent, innerWidth - 24) })
-    if (item.kind === 'subagent' || item.kind === 'agent') return SubagentDetail(ui, { item, context, rowProps, innerWidth })
-    if (item.kind === 'archived') return ArchivedDetail(ui, { item, context, rowProps, asking: data.asking, innerWidth, actions })
+    if (item.kind === 'workflow') return WorkflowDetail(ui, { item, context, rowProps, home: data.home, innerWidth, agentOf: agent => itemOf(agent, innerWidth - 24) })
+    if (item.kind === 'subagent' || item.kind === 'agent') return SubagentDetail(ui, { item, context, rowProps, home: data.home, innerWidth })
+    if (item.kind === 'archived') return ArchivedDetail(ui, { item, context, rowProps, home: data.home, asking: data.asking, innerWidth, actions })
     return SessionDetail(ui, { item, context, rowProps, home: data.home, asking: data.asking, innerWidth, actions })
   }
   const items = (group: ListGroup) => {

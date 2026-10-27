@@ -32,7 +32,7 @@ export const isStartedBy = (live: LiveSession | undefined, self: string | undefi
 
 export type Name = { persona: string; task: string }
 
-export type Line = { chain: string; word?: { status: Status; text: string }; text: string; cmdElapsed?: string; isQuestion: boolean }
+export type Line = { word?: { status: Status; text: string }; text: string }
 
 export const GROUPS: readonly SessionState[] = ['needs-you', 'working', 'waiting', 'done']
 
@@ -324,77 +324,31 @@ export function sessionOfAgent(agent: AgentRecord, context: Pick<Context, 'agent
 
 export const chatTargetOf = (item: RowItem): Row | undefined => (item.status === 'needs' && item.kind === 'session' && item.isOwn ? item.row : undefined)
 
-export function chainOf(item: RowItem, context: Context) {
-  if (item.kind !== 'subagent') return ''
-  const names = parentsOf(item, context)
-  const last = names.at(-1)
-  return last ? `${names.length > 1 ? '… › ' : ''}${last.persona} ›` : ''
-}
-
 export function spanOf(startedAt: number, endedAt: number | undefined, at: number) {
   const ms = (endedAt ?? at) - startedAt
   return ms < 60_000 ? `${Math.max(0, Math.floor(ms / 1000))}s` : compactOf(ms)
 }
 
-export const runningOfItem = (item: RowItem, context: Pick<Context, 'running'>) =>
-  item.status === 'working' && (item.kind === 'session' || item.kind === 'subagent' || item.kind === 'agent') ? context.running?.[item.id] : undefined
-
 export const runningTextOf = (run: Running) => [run.tool, run.text].filter(Boolean).join(' · ')
 
-const commandOf = (run: Running | undefined, chain: string, at: number): Line | undefined =>
-  run ? { chain, text: runningTextOf(run), cmdElapsed: spanOf(run.since, undefined, at), isQuestion: false } : undefined
-
-function sessionLineOf(row: Row, status: Status, context: Context, run?: Running): Line {
+function sessionLineOf(row: Row, status: Status, context: Context): Line {
   const board = row.board
   const loss = status === 'done' ? lossLineOf(row, context.trees, context.sessions) : ''
-  const plain = (text: string): Line => ({ chain: '', text, isQuestion: false })
-  const worded = (word: Status, text: string, label = STATUS[word].word): Line => ({ chain: '', word: { status: word, text: label }, text, isQuestion: false })
-  if (status === 'needs') return { chain: '', text: board?.needsYou || 'needs you', isQuestion: true }
+  const worded = (word: Status, text: string, label = STATUS[word].word): Line => ({ word: { status: word, text: label }, text })
   if (loss) return worded('unmerged', loss)
-  if (status === 'working') return commandOf(run, '', context.at) ?? plain(stepOf(board?.progress)?.label || board?.now || 'running')
-  if (status === 'idle') return worded('idle', activityOf(row)[0] ? `last: ${activityOf(row)[0]?.text}` : '')
-  if (status === 'waiting') return worded('waiting', board?.now ?? '')
-  if (status === 'ready') return worded('ready', board?.done || board?.now || board?.sha || '')
   if (status === 'verified') return worded('verified', board?.verified ?? '')
   if (status === 'merged') return worded('merged', board?.sha ?? '', mergedLineOf(row, context.trees))
   return worded('done', board?.done || 'unverified')
 }
 
-function agentLineOf(agent: AgentRecord | WorkflowAgent, status: Status, chain: string, context: Context, run?: Running): Line {
-  const result = firstLine(agent.result)
-  if (status === 'needs') return { chain, text: agent.asking?.text || 'needs you', isQuestion: true }
-  if (status === 'waiting') {
-    const child = context.agents.find(one => one.parentAgentId === agent.id && one.state === 'running')
-    const name = child ? displayNameOf({ kind: 'subagent', id: child.id, group: 'working', status: 'working', agent: child }) : undefined
-    return { chain, word: { status, text: STATUS.waiting.word }, text: name ? `on ${nameText(name)}` : '', isQuestion: false }
-  }
-  if (status === 'working') return commandOf(run, chain, context.at) ?? { chain, text: 'running', isQuestion: false }
-  return { chain, word: { status, text: STATUS[status].word }, text: result, isQuestion: false }
-}
-
-function runLineOf(run: WorkflowRun, status: Status): Line {
-  if (status === 'needs') {
-    const asking = run.agents.find(agent => agent.asking && agent.state === 'running')
-    const persona = asking ? displayNameOf({ kind: 'agent', id: asking.id, group: 'needs-you', status: 'needs', run, agent: asking }).persona : 'An agent'
-    return { chain: '', text: `${persona} asks: ${asking?.asking?.text ?? ''}`, isQuestion: true }
-  }
-  if (status === 'working') return { chain: '', text: [...run.agents].reverse().find(agent => agent.state === 'running')?.label ?? (run.description || 'starting'), isQuestion: false }
-  if (status === 'failed') return { chain: '', word: { status, text: STATUS.failed.word }, text: `${plural(run.counts.failed, 'agent')} failed`, isQuestion: false }
-  return { chain: '', word: { status, text: STATUS.done.word }, text: `${run.counts.done} of ${run.counts.total} agents`, isQuestion: false }
-}
-
-export function lineOf(item: RowItem, context: Context): Line {
-  const run = runningOfItem(item, context)
-  if (item.kind === 'session') return sessionLineOf(item.row, item.status, context, run)
-  if (item.kind === 'workflow') return runLineOf(item.run, item.status)
-  if (item.kind === 'archived') return { chain: '', word: { status: 'archived', text: `archived ${ageOf(context.at - item.one.lastActivityAt)}` }, text: '', isQuestion: false }
-  return agentLineOf(item.agent, item.status, chainOf(item, context), context, run)
+export function lineOf(item: ListItem, context: Context): Line {
+  if (item.kind === 'session') return sessionLineOf(item.row, item.status, context)
+  if (item.kind === 'workflow') return { word: { status: item.status, text: STATUS[item.status].word }, text: item.status === 'failed' ? `${plural(item.run.counts.failed, 'agent')} failed` : `${item.run.counts.done} of ${item.run.counts.total} agents` }
+  return { word: { status: item.status, text: STATUS[item.status].word }, text: firstLine(item.agent.result) }
 }
 
 export const openIdOf = (item: RowItem, open: readonly string[]) =>
   open.includes(item.id) ? item.id : item.kind === 'workflow' ? item.run.agents.find(agent => open.includes(agent.id))?.id : undefined
-
-export const lineTextOf = (line: Line) => oneLine(`${line.chain ? `${line.chain} ` : ''}${[line.word?.text, line.text, line.cmdElapsed].filter(Boolean).join(' · ')}`)
 
 export const shortNameOf = (item: RowItem) => {
   const name = displayNameOf(item)

@@ -20,7 +20,7 @@ const agent = (id: string, name: string): AgentRecord => ({ id, type: 'master-se
 
 warmUp()
 
-test('an open card wraps the full name and task and its hit covers the wrapped top; a collapsed row still truncates', async ($, on) => {
+test('AC7 and AC8: an open card keeps its one-line top, the same 50 px hit for a long and a short name, and its Name block shows the whole name wrapped', async ($, on) => {
   seeded(on, [agent('long', LONG), agent('short', 'short task')])
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
@@ -28,10 +28,12 @@ test('an open card wraps the full name and task and its hit covers the wrapped t
   expect(await wraps()).toEqual([[LONG, 'truncate-end'], ['short task', 'truncate-end']])
   const heights = async (id: string) => (await ui.find({ key: `hit-top-${id}` }))?.props.height as number
   await click(ui, 'hit-row-long')
-  expect((await wraps()).filter(([text]) => text !== 'short task')).toEqual([[LONG, 'wrap']])
+  expect((await wraps()).filter(([text]) => text !== 'short task')).toEqual([[LONG, 'truncate-end']])
+  const full = (await ui.findAll({ type: 'Text' })).find(one => one.text === `Implementer · ${LONG}`)
+  expect(full?.props.wrap).toBe('wrap')
   const long = await heights('long')
   await click(ui, 'hit-top-long')
   await click(ui, 'hit-row-short')
-  expect(long).toBeGreaterThanOrEqual((await heights('short')) + 2)
+  expect([long, await heights('short')]).toEqual([Math.ceil(50 / LH), Math.ceil(50 / LH)])
   await ui.unmount()
 })
