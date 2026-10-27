@@ -234,6 +234,12 @@ export const confirmText = (row: Pick<ProcRow, 'program' | 'pid' | 'owner'>) => 
 
 export const processLineOf = (row: ProcRow) => [row.cpu, row.memory, row.time].join(' · ')
 
+export const padLineOf = (row: ProcRow) => `${row.cpu.padStart(4)}  ${row.memory.padStart(7)}  ${row.time.padStart(6)}`
+
+export const padProgram = (program: string) => program.padEnd(8)
+
+export const PAD_HEAD = ' CPU   Memory    Time'
+
 export const NARROW = 340
 export const STOP_WIDE = 460
 
