@@ -18,7 +18,7 @@ export type Shown = { pid: number; lstart: string; ucomm: string; owner: string;
 
 export type Model = { run: Shown[]; left: Shown[]; tools: Shown[]; engines: Record<number, string>; ancestors: number[] }
 
-export const OWN_CALLS = ['ps', 'lsof', 'sysctl', 'kill', 'id'] as const
+export const OWN_CALLS = ['ps', 'lsof', 'sysctl', 'kill', 'id', 'git'] as const
 
 const LINE = /^\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+[\d:]+\s+\d{4})\s+([\d.]+)\s+(\d+)\s+([\d:.-]+)\s+(.+?)\s*$/
 
@@ -83,11 +83,11 @@ export function ownerPathOf(cwd: string | undefined, paths: readonly RunPath[]) 
 
 export const treesOf = (paths: readonly string[]) => paths.map(path => path.replace(/\/+$/, '')).filter(path => path.startsWith('/') && path.length > 1)
 
-export function worktreeOf(cwd: string | undefined, context: Pick<ProcContext, 'trees' | 'home'>) {
-  const home = context.home.replace(/\/+$/, '')
-  if (!cwd || !home || !cwd.startsWith(`${home}/.claude/worktrees/`)) return ''
+export function worktreeOf(cwd: string | undefined, context: Pick<ProcContext, 'trees'>) {
+  if (!cwd) return ''
   let best = ''
   for (const tree of context.trees) if (isUnder(cwd, tree) && tree.length > best.length) best = tree
+  if (!best.includes('/.claude/worktrees/')) return ''
   return best.split('/').filter(Boolean).at(-1) ?? ''
 }
 
@@ -172,8 +172,11 @@ export function modelOf(table: readonly Proc[], cwds: ReadonlyMap<number, string
       }
     }
   }
-  const tools = (kids.get(context.masterPid) ?? [])
-    .filter(one => engineSet.has(context.masterPid) && !isShell(one) && !engineSet.has(one.pid) && !(OWN_CALLS as readonly string[]).includes(one.ucomm))
+  const toolRoots = engines.flatMap(engine => (kids.get(engine.pid) ?? []).filter(one => !isShell(one) && !engineSet.has(one.pid) && !(OWN_CALLS as readonly string[]).includes(one.ucomm)))
+  const toolSeen = new Set<number>()
+  const tools = toolRoots
+    .flatMap(root => [root, ...descendantsOf(kids, root.pid, one => engineSet.has(one.pid))])
+    .filter(one => !toolSeen.has(one.pid) && !!toolSeen.add(one.pid))
     .map(one => ({ ...shown(one, 'tools', '', ''), canStop: false }))
   const left: Shown[] = []
   for (const root of table.filter(one => one.ppid === 1 && !seen.has(one.pid) && !engineSet.has(one.pid) && !guarded.has(one.pid))) {
@@ -217,8 +220,8 @@ export function processesViewOf(state: ProcState, names: ProcNames): ProcView {
   const group = (id: Shown['group'], list: readonly Shown[]): ProcGroup => ({
     id,
     total: list.length,
-    more: Math.max(0, list.length - PROC_ROWS),
-    rows: list.slice(0, PROC_ROWS).map(one => ({ key: keyOf(one), pid: one.pid, lstart: one.lstart, program: one.ucomm, owner: id === 'tools' ? '' : ownerText(one, names), cpu: cpuText(one.cpu), memory: memText(one.rss), time: timeText(one.etime), canStop: id !== 'tools' && one.canStop, group: id })),
+    more: id === 'tools' ? 0 : Math.max(0, list.length - PROC_ROWS),
+    rows: (id === 'tools' ? list : list.slice(0, PROC_ROWS)).map(one => ({ key: keyOf(one), pid: one.pid, lstart: one.lstart, program: one.ucomm, owner: id === 'tools' ? '' : ownerText(one, names), cpu: cpuText(one.cpu), memory: memText(one.rss), time: timeText(one.etime), canStop: id !== 'tools' && one.canStop, group: id })),
   })
   const groups = state.error ? [] : [group('run', state.run), ...(state.left.length ? [group('left', state.left)] : []), ...(state.tools.length ? [group('tools', state.tools)] : [])]
   const count = groups.filter(one => one.id !== 'tools').reduce((sum, one) => sum + one.total, 0)

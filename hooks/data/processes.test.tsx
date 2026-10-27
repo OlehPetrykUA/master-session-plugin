@@ -87,9 +87,10 @@ test('AC1: the load line reads Mac load with the three averages and the cores', 
   await ui.unmount()
 })
 
-test('AC2, AC3: the rows are 130, 530 and 531, named node, owned by the task short name; engines, shells with children and MCP servers are not rows', async ($, on) => {
+test('AC2, AC3: the rows are 130, 530 and 531, named node, owned by the task short name; engines and shells with children are not rows, and the MCP server shows under Chat tools only', async ($, on) => {
   const { ui, fake } = await boot($, on)
   expect(await shown(ui, 'node')).toBe(3)
+  expect(await toolsOf(ui)).toEqual(['Chat tools', '1', 'node', '0%', '1 MB', '10s'])
   expect(await shown(ui, 'Band strip')).toBe(1)
   expect(await shown(ui, 'Row details')).toBe(2)
   expect(await shown(ui, 'zsh')).toBe(0)
@@ -203,10 +204,7 @@ test('AC14: the section changes nothing else in the pane', async ($, on) => {
   await run.clock.settle()
   expect(await outside(ui)).toEqual(before)
   await ui.unmount()
-  masterOutside = before
 })
-
-let masterOutside: string[] = []
 
 async function workerPane($: Engine, on: On) {
   const fake = fakeProcesses(FIXTURE)
@@ -220,7 +218,7 @@ test('AC14: a worker pane holds none of the section’s texts', async ($, on) =>
   await workerPane($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const texts = await textsOf(ui)
-  expect(masterOutside.length).toBeGreaterThan(3)
+  expect(texts.length).toBeGreaterThan(3)
   for (const one of ['Processes', 'Show', 'Hide', 'Mac load', 'Left behind', 'Chat tools', 'node']) expect(texts).not.toContain(one)
   expect(texts.some(one => /%\s·\s.*MB/.test(one))).toBe(false)
   await ui.unmount()
@@ -552,14 +550,15 @@ test('AC30: 950 and 951 show in a Left behind group under the list, owned by the
 })
 
 test('Chat tools: the master’s MCP and tool servers list read-only after the rows, by CPU, with program, CPU, memory and elapsed and no Stop or owner', async ($, on) => {
-  const { fake, ui } = await boot($, on, { procs: [...FIXTURE, proc(111, 100, 'uv', { cpu: 8, rss: 86016, etime: '02:00' }), proc(112, 100, 'ps')] })
+  const { fake, ui } = await boot($, on, { procs: [...FIXTURE, proc(111, 100, 'uv', { cpu: 8, rss: 86016, etime: '02:00' }), proc(112, 100, 'ps'), proc(113, 100, 'git'), proc(114, 111, 'python', { cpu: 5, rss: 86016, etime: '01:00' })] })
   const tools = await toolsOf(ui)
-  expect(tools).toEqual(['Chat tools', '2', 'uv', '8%', '84 MB', '2m', 'node', '0%', '1 MB', '10s'])
+  expect(tools).toEqual(['Chat tools', '3', 'uv', '8%', '84 MB', '2m', 'python', '5%', '84 MB', '1m', 'node', '0%', '1 MB', '10s'])
+  expect(await ui.find({ key: 'hit-process-stop-114' })).toBeUndefined()
   expect(await section(ui)).not.toContain('Chat tools')
   expect(await ui.find({ key: 'hit-process-stop-110' })).toBeUndefined()
   expect(await ui.find({ key: 'hit-process-stop-111' })).toBeUndefined()
   const keys = await keysOf(ui)
-  expect(keys.indexOf('process-group-tools')).toBeGreaterThan(keys.indexOf('process-group-run'))
+  expect(keys.indexOf('processes-chat-tools')).toBeGreaterThan(keys.indexOf('process-group-run'))
   expect(fake.kills).toEqual([])
   await ui.unmount()
 })
@@ -567,7 +566,7 @@ test('Chat tools: the master’s MCP and tool servers list read-only after the r
 test('Chat tools: with no tool child there is no group', async ($, on) => {
   const { ui } = await boot($, on, { procs: FIXTURE.filter(one => one.pid !== 110) })
   expect(await toolsOf(ui)).toEqual([])
-  expect(await keysOf(ui)).not.toContain('process-group-tools')
+  expect(await keysOf(ui)).not.toContain('processes-chat-tools')
   await ui.unmount()
 })
 

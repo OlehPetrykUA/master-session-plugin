@@ -50,25 +50,31 @@ test('AC31: a left-behind worktree needs the board’s repo name followed by a d
 test('a worktree is owned only when a board repo lists its exact path', () => {
   const web = `${HOME}/.claude/worktrees/wt-app-web-k1`
   const feature = `${HOME}/.claude/worktrees/wt-app-feature-x`
-  expect(worktreeOf(`${web}/src`, { home: HOME, trees: [K1, web] })).toBe('wt-app-web-k1')
-  expect(worktreeOf(web, { home: HOME, trees: [K1] })).toBe('')
-  expect(worktreeOf(`${feature}/a`, { home: HOME, trees: [K1, feature] })).toBe('wt-app-feature-x')
+  expect(worktreeOf(`${web}/src`, { trees: [K1, web] })).toBe('wt-app-web-k1')
+  expect(worktreeOf(web, { trees: [K1] })).toBe('')
+  expect(worktreeOf(`${feature}/a`, { trees: [K1, feature] })).toBe('wt-app-feature-x')
 })
 
 test('R6: a listed worktree outside $HOME/.claude/worktrees/ never owns a process', () => {
   const outside = '/srv/trees/wt-app-x'
-  expect(worktreeOf(`${outside}/web`, { home: HOME, trees: [outside] })).toBe('')
-  expect(worktreeOf(`${K1}/web`, { home: '/other', trees: [K1] })).toBe('')
-  expect(worktreeOf(`${K1}/web`, { home: '', trees: [K1] })).toBe('')
+  expect(worktreeOf(`${outside}/web`, { trees: [outside] })).toBe('')
   const table = [row(proc(100, 10, 'claude')), row(proc(950, 1, 'node'))]
   expect(modelOf(table, new Map([[950, `${outside}/web`]]), { ...CONTEXT, trees: [outside] }).left).toEqual([])
+})
+
+test('a symlinked home still owns: the gate is the /.claude/worktrees/ segment of the listed tree, not $HOME', () => {
+  const real = '/System/Volumes/Data/home/me/.claude/worktrees/wt-app-k1'
+  const context = { ...CONTEXT, trees: [real] }
+  expect(worktreeOf(`${real}/web`, context)).toBe('wt-app-k1')
+  const table = [row(proc(100, 10, 'claude')), row(proc(950, 1, 'node'))]
+  expect(modelOf(table, new Map([[950, `${real}/web`]]), context).left.map(one => one.pid)).toEqual([950])
 })
 
 test('empty and "/" tree paths are dropped before matching', () => {
   expect(treesOf(['', '/', '//', '/a/b/', 'rel', K1])).toEqual(['/a/b', K1])
 })
 
-test('Chat tools: the master’s non-shell children, by CPU, with no Stop; its own calls, shells, engines and other engines’ children are left out', () => {
+test('Chat tools: the master’s non-shell children, by CPU, with no Stop; its own calls, shells and engines are left out', () => {
   const table = [
     row(proc(100, 10, 'claude')),
     row(proc(110, 100, 'node', { cpu: 2 })),
@@ -78,18 +84,38 @@ test('Chat tools: the master’s non-shell children, by CPU, with no Stop; its o
     row(proc(121, 100, 'ps')),
     row(proc(122, 100, 'lsof')),
     row(proc(123, 100, 'sysctl')),
+    row(proc(124, 100, 'git')),
+    row(proc(113, 111, 'python', { cpu: 1 })),
     row(proc(500, 10, 'claude')),
     row(proc(510, 500, 'node', { cpu: 70 })),
     row(proc(520, 100, 'python', { cpu: 2, etime: '05:00' })),
   ]
   const out = modelOf(table, new Map([[500, K1]]), CONTEXT)
-  expect(out.tools.map(one => [one.pid, one.ucomm, one.canStop, one.group])).toEqual([[111, 'uv', false, 'tools'], [520, 'python', false, 'tools'], [110, 'node', false, 'tools']])
+  expect(out.tools.map(one => [one.pid, one.ucomm, one.canStop, one.group])).toEqual([[510, 'node', false, 'tools'], [112, 'node', false, 'tools'], [111, 'uv', false, 'tools'], [520, 'python', false, 'tools'], [110, 'node', false, 'tools'], [113, 'python', false, 'tools']])
+  expect(out.tools.every(one => one.owner === '')).toBe(true)
   const view = processesViewOf({ ...STATE, tools: out.tools }, {})
   expect(view.groups.map(one => one.id)).toEqual(['run', 'tools'])
   expect(view.count).toBe(0)
   expect(view.isEmpty).toBe(true)
-  expect(view.groups[1]?.rows.map(one => [one.program, one.owner, one.canStop])).toEqual([['uv', '', false], ['python', '', false], ['node', '', false]])
+  expect(view.groups[1]?.rows.map(one => [one.program, one.owner, one.canStop])).toEqual([['node', '', false], ['node', '', false], ['uv', '', false], ['python', '', false], ['node', '', false], ['python', '', false]])
   expect(processesViewOf(STATE, {}).groups.map(one => one.id)).toEqual(['run'])
+})
+
+test('Chat tools: a worker engine’s tool servers and their children list too, read-only; the group is not capped', () => {
+  const table = [
+    row(proc(100, 10, 'claude')),
+    row(proc(500, 10, 'claude')),
+    row(proc(520, 500, 'zsh')),
+    row(proc(540, 500, 'uv', { cpu: 30 })),
+    row(proc(541, 540, 'python', { cpu: 20 })),
+    row(proc(542, 500, 'git')),
+    ...Array.from({ length: 14 }, (_, index) => row(proc(600 + index, 100, 'node', { cpu: index }))),
+  ]
+  const out = modelOf(table, new Map([[500, K1]]), CONTEXT)
+  expect(out.tools.slice(0, 2).map(one => [one.pid, one.canStop, one.owner])).toEqual([[540, false, ''], [541, false, '']])
+  expect(out.tools.length).toBe(16)
+  const view = processesViewOf({ ...STATE, tools: out.tools }, {})
+  expect([view.groups[1]?.rows.length, view.groups[1]?.more, view.count]).toEqual([16, 0, 0])
 })
 
 test('AC9: rows sort by CPU, then longest elapsed, then pid', () => {

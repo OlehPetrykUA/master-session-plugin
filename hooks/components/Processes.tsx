@@ -124,7 +124,7 @@ export function Processes(ui: Ui, props: ProcessesProps) {
     )
   }
   const group = (one: ProcGroup, index: number) => (
-    <Box key={`process-group-${one.id}`} flexDirection="column">
+    <Box key={one.id === 'tools' ? 'processes-chat-tools' : `process-group-${one.id}`} flexDirection="column">
       {one.id !== 'run' ? (
         <Box key={`process-${one.id}-head`} flexDirection="column">
           {index ? rule(one.id) : null}
