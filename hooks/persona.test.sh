@@ -49,6 +49,7 @@ rule 'start: running count line' skills/start/SKILL.md 'Count: N running (ready:
 rule 'start: one full gate' skills/start/SKILL.md 'has had one full gate'
 rule 'start: Your checks' skills/start/SKILL.md '## Your checks'
 rule 'start: Checker gate' skills/start/SKILL.md '## Checker gate'
+rule 'start: tick reads answering.md and shape.md' skills/start/SKILL.md 'answering.md and ${CLAUDE_SKILL_DIR}/shape.md'
 rule 'qa-verifier: full suite never rerun' skills/qa-verifier/SKILL.md 'never rerun it'
 
 tmp=$(mktemp -d)
