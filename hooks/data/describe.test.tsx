@@ -15,7 +15,7 @@ import { C } from '../theme/tokens'
 import { CREDENTIALS } from '../testing/credentials'
 import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, childOf, liveOf, started, textsOf, altsOf, warmUp, world } from '../testing/world'
 import type { Child } from '../testing/world'
-import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, hasCue, isUnsafe, normalized } from './describe'
+import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, isUnsafe, normalized } from './describe'
 import { reportPath } from './status'
 
 const NOW = 3_600_000
@@ -502,15 +502,17 @@ test('AC18: the master’s workflow record for a worker’s run holds the report
 
 const secretsIn = (all: string, secrets: readonly string[]) => secrets.filter(secret => all.includes(secret))
 
+const CUED_ROWS = new Set([1, 2, 3, 4, 7, 8, 9, 11, 12, 16, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 38, 39, 41, 42, 44, 45, 46, 47, 52, 57, 72, 75, 81, 84, 85])
+
 test('AC19: for every credential row a copied prompt is rejected twice, the second call strict, and no text is stored or drawn', { plugins: [PROBE], timeoutMs: 120_000 }, async ($, on) => {
   const { seen } = stub(on, request => say(String(request.prompt)))
   const run = await master($, on)
   const ui = await pane($)
   let before = 0
-  for (const [index, [, command, secrets]] of CREDENTIALS.entries()) {
+  for (const [index, [row, command, secrets]] of CREDENTIALS.entries()) {
     await spawn($, { description: `row ${index}`, prompt: brief(command) })
     await run.clock.settle()
-    if (hasCue(command)) {
+    if (CUED_ROWS.has(row)) {
       expect(seen.length - before).toBe(0)
     } else {
       expect(seen.length - before).toBe(2)
@@ -528,12 +530,12 @@ test('AC19: for every credential row a copied prompt is rejected twice, the seco
 test('AC20: the same rows through a Workflow script and a start_session prompt store nothing', { plugins: [PROBE], timeoutMs: 120_000 }, async ($, on) => {
   const { seen } = stub(on, request => say(String(request.prompt)))
   const run = await master($, on)
-  for (const [, command, secrets] of CREDENTIALS) {
+  for (const [row, command, secrets] of CREDENTIALS) {
     const before = seen.length
     await $.tool.call({ tool: 'Workflow', script: `${SCRIPT}\n${command}` })
     await $.tool.call({ tool: START, title: 'Row model', prompt: brief(command) } as never)
     await run.clock.settle()
-    expect(seen.length - before).toBe(hasCue(command) ? 0 : 4)
+    expect(seen.length - before).toBe(CUED_ROWS.has(row) ? 0 : 4)
     const atoms = await atomsOf($)
     expect(secretsIn(JSON.stringify(atoms.tasks) + JSON.stringify(atoms.workflows.map(one => one.task)), secrets)).toEqual([])
   }
@@ -871,7 +873,7 @@ test('a letters-only secret in a paraphrased reply: a source with a credential c
 test('each credential cue word stops the call, for a prompt and for a workflow script', async ($, on) => {
   const { seen } = stub(on, () => say(T))
   const run = await master($, on)
-  const cues = ['password', 'passwd', 'pwd', 'passphrase', 'apikey', 'api key', 'api_key', 'api-key', 'access key', 'private key', 'bearer', 'PASSWORD', 'PGPASSWORD=x', 'token: x', 'SECRET=x', 'auth: x', 'key=x', 'Authorization: x', 'MY_KEY=x', 'DB_PASS', 'GITHUB_TOKEN', '--token x', '--pass x', '--secret x', '--auth x', '--password', 'run x -p value', 'run x -pvalue', 'run x -P value', 'redis-cli -a pw', 'curl -u me:pw', 'git clone https://me:pw@host', 'psql postgres://app:pw@db']
+  const cues = ['password', 'passwd', 'pwd', 'passphrase', 'apikey', 'api key', 'api_key', 'api-key', 'access key', 'private key', 'bearer', 'PASSWORD', 'PGPASSWORD=x', 'token: x', 'SECRET=x', 'auth: x', 'key=x', 'Authorization: x', 'MY_KEY=x', 'DB_PASS', 'GITHUB_TOKEN', '--token x', '--pass x', '--secret x', '--auth x', '--password', 'run x -p value', 'run x -pvalue', 'run x -P value', 'redis-cli -a pw', 'curl -u me:pw', 'git clone https://me:pw@host', 'psql postgres://app:pw@db', `curl -d '{"token":"hunter"}' x`, '{"client_secret":"hunter"}', '{"auth" : "hunter"}', "clientSecret: 'hunter'", 'accessToken=hunter', '//r/:_authToken=hunter', "secretAccessKey: 'hunter'", 'PW=hunter', '--from-literal=pw=hunter', 'identified by x', 'ghp_abc', 'gho_abc', 'github_pat_abc', 'glpat-abc', 'xoxb-abc', 'sk-abc', 'AKIAabc', 'ASIAabc', 'hvs.abc', 'npm_abc', '-phunter', '"-phunter"', 'mysql -p hunter', 'mariadb -P hunter', 'mysqldump -p hunter', 'sshpass -p hunter', 'sqlcmd -P hunter']
   for (const [index, cue] of cues.entries()) {
     await spawn($, { description: `cue ${index}`, prompt: `Build the band now line with ${cue} included.` })
     await $.tool.call({ tool: 'Workflow', script: `${SCRIPT}\n// ${cue}` })
@@ -883,7 +885,7 @@ test('each credential cue word stops the call, for a prompt and for a workflow s
 test('a normal prompt still gets a call, and passes, passing, authored and tokenize are no cue', async ($, on) => {
   const { seen } = stub(on, () => say(T))
   const run = await master($, on)
-  const prompts = ['Build the band now line.', 'Make the tests passes quickly.', 'Keep the tests passing.', 'The file was authored by hand.', 'Then tokenize the words.', 'Make sure no secret is ever shown.', 'Keep the token cost low.', 'Report when your checks pass.', 'Fix the auth flow.', 'Mention the key point.']
+  const prompts = ['Build the band now line.', 'Make the tests passes quickly.', 'Keep the tests passing.', 'The file was authored by hand.', 'Then tokenize the words.', 'Make sure no secret is ever shown.', 'Keep the token cost low.', 'Report when your checks pass.', 'Fix the auth flow.', 'Mention the key point.', 'Run tsc -p . at the end.', 'Run npx tsc -p /x/wt at the end.', 'Run mkdir -p out first.', 'Run docker run -p 8080:80 img.', 'Connect with ssh -p 22 host.', 'Run git add -p now.', 'Run git commit -a -m fix now.', 'Run git log --author me.']
   for (const [index, prompt] of prompts.entries()) {
     const before = seen.length
     await spawn($, { description: `plain ${index}`, prompt })

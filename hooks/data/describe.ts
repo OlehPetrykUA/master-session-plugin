@@ -79,18 +79,21 @@ async function store($: EngineInterface, target: Target, task: TaskText | undefi
   $.ui.invalidate('ui.render')
 }
 
-const WEAK = 'pass|tokens?|secrets?|auth|authorization|credentials?|key'
+const WEAK = 'pass|pw|tokens?|secrets?|auth|authorization|credentials?|key'
 
-const ENV = 'PASS|TOKEN|SECRET|KEY|AUTH'
+const ENV = 'PASS|PW|TOKEN|SECRET|KEY|AUTH'
 
 const CUES = [
-  /password|passwd|passphrase|pwd|apikey|api[ _-]key|private[ _-]key|access[ _-]key|bearer/i,
-  new RegExp(`(?<![a-z0-9])(?:${WEAK})\\s*[:=]\\s*\\S`, 'i'),
+  /password|passwd|passphrase|pwd|apikey|api[ _-]key|private[ _-]key|access[ _-]key|bearer|identified\s+by/i,
+  new RegExp(`(?<![a-z0-9])(?:${WEAK})["']?\\s*[:=]\\s*\\S`, 'i'),
+  /[a-z](?:Pass|Pw|Tokens?|Secrets?|Auth|Key|Credentials?)["']?\s*[:=]\s*\S/,
   new RegExp(`[A-Z0-9_]*(?:${ENV})[A-Z0-9_]*=`),
   new RegExp(`(?<![A-Z0-9_])(?:[A-Z0-9]+_(?:${ENV})|(?:${ENV})_[A-Z0-9_]+)(?![A-Z0-9_])`),
-  new RegExp(`(?:^|\\s)--(?:${WEAK})`, 'i'),
-  /(?:^|\s)-p\s*\S/i,
-  /(?:^|\s)-a\s+\S/,
+  new RegExp(`(?:^|\\s)--(?:${WEAK})(?![a-z0-9])`, 'i'),
+  /(?<![A-Za-z0-9])(?:gh[pousr]_|github_pat_|glpat-|xox[abpr]-|sk-|AKIA|ASIA|hvs\.|npm_)[A-Za-z0-9]/,
+  /(?:^|[\s"'])-p[a-z0-9]/i,
+  /\b(?:mysql|mysqldump|mariadb|sshpass|sqlcmd)\b[^\n]*?\s-p\s+\S/i,
+  /\bredis-cli\b[^\n]*?\s-a\s+\S/,
   /(?:^|\s)-u\s*[^\s:]+:\S/,
   /:\/\/[^\s/:@]+:[^\s/@]+@/,
 ]
