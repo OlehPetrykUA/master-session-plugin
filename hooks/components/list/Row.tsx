@@ -24,7 +24,7 @@ export const KIND_WORD: Record<RowItem['kind'], string> = { session: 'Session', 
 export function Row(ui: Ui, props: RowProps) {
   const { Box, Text, Button, Svg } = ui
   const { item, context, isNarrow } = props
-  const fit = rowFitOf(item, context, { width: props.width, isNarrow, home: props.home, chat: props.chat?.label })
+  const fit = rowFitOf(item, context, { width: props.width, isNarrow, home: props.home, chat: props.chat?.label, isInCard: props.isInCard })
   const { name, line, model, isNeeds, elapsed, steps, where, dirty, git, isChatIcon, isPersonaCut } = fit
   const status = STATUS[item.status]
   const id = `${props.isInCard ? 'top' : 'row'}-${item.id}`
@@ -132,9 +132,9 @@ export function Row(ui: Ui, props: RowProps) {
       <Svg key={`${id}-badge`} source={statusBadge(item.status, 28)} alt={line.word?.text ?? status.word} width={28} height={28} />
       <Box flexDirection="column" gap={down(2)} flexGrow={1} flexShrink={1} minWidth={0}>
         <Box flexDirection="row" alignItems="center" gap={across(4)} minWidth={0}>
-          <Box key={`${id}-persona`} flexShrink={isPersonaCut ? 1 : 0} minWidth={0}>
+          <Box key={`${id}-persona`} flexShrink={isPersonaCut || props.isInCard ? 1 : 0} minWidth={0}>
             {ui.Client ? (
-              <Text weight="semibold" size="heading" wrap="truncate-end">
+              <Text weight="semibold" size="heading" wrap={props.isInCard ? 'wrap' : 'truncate-end'}>
                 {name.persona}
               </Text>
             ) : (
@@ -150,7 +150,7 @@ export function Row(ui: Ui, props: RowProps) {
           ) : null}
           {name.task && !isPersonaCut ? (
             <Box flexShrink={1} minWidth={0}>
-              <Text size="heading" color={C.muted} wrap="truncate-end">
+              <Text size="heading" color={C.muted} wrap={props.isInCard ? 'wrap' : 'truncate-end'}>
                 {oneLine(name.task)}
               </Text>
             </Box>

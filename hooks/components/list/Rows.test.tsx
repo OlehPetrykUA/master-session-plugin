@@ -293,7 +293,7 @@ test('a status line with newlines stays one line on a narrow row and in the term
   await terminal.unmount()
 })
 
-test('the press target of a needs-you row with a two-line question is its drawn 72 px, and 64 px in a card', async ($, on) => {
+test('the press target of a needs-you row with a two-line question is its drawn 72 px, and 64 px in a card plus the two extra rows its wrapped name takes', async ($, on) => {
   const ask = 'Approve the settings.json edit and then restart every hook so that the new rules apply to all workers'
   await started($, on, { ...BOARD, sessions: BOARD.sessions.map(one => (one.id === 'local_env' ? { ...one, needsYou: ask } : one)) })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
@@ -306,6 +306,6 @@ test('the press target of a needs-you row with a two-line question is its drawn 
   expect(await size('hit-row-local_env')).toEqual([Math.ceil(width / CH), Math.ceil(72 / LH)])
   expect([hitPxOf(72, false), hitPxOf(72, true), hitPxOf(56, true)]).toEqual([72, 64, 50])
   await click(ui, 'hit-row-local_env')
-  expect(await size('hit-top-local_env')).toEqual([Math.ceil((width - 6) / CH), Math.ceil(64 / LH)])
+  expect(await size('hit-top-local_env')).toEqual([Math.ceil((width - 6) / CH), Math.ceil((64 + 2 * LH) / LH)])
   await ui.unmount()
 })

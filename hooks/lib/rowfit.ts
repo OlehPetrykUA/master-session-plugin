@@ -1,7 +1,7 @@
 import { gitPill } from '../theme/icons'
 import { modelFamilyOf } from './format'
 import { dirtyOf } from './git'
-import { faceWidth, textWidth } from './layout'
+import { LH, faceWidth, textWidth } from './layout'
 import { displayNameOf, elapsedOfItem, lineOf, oneLine, rowsOf, stepsOfItem, tildeOf } from './list'
 import type { Context, RowItem } from './list'
 import { whereOf } from './rows'
@@ -12,7 +12,7 @@ export const hitPxOf = (height: number, isInCard: boolean) => (isInCard ? Math.m
 export const modelWordOf = (item: RowItem) =>
   modelFamilyOf(item.kind === 'session' ? item.row.live?.model : item.kind === 'archived' ? item.one.model : item.kind === 'subagent' ? item.agent.requestedModel || item.agent.model : item.kind === 'agent' ? item.agent.model : undefined)
 
-export type RowFitInput = { width: number; isNarrow: boolean; home: string; chat?: string }
+export type RowFitInput = { width: number; isNarrow: boolean; home: string; chat?: string; isInCard?: boolean }
 
 export function rowFitOf(item: RowItem, context: Context, input: RowFitInput) {
   const name = displayNameOf(item)
@@ -36,6 +36,10 @@ export function rowFitOf(item: RowItem, context: Context, input: RowFitInput) {
   const column = base - chatWidth(isChatIcon)
   const ask = isNeeds ? rowsOf(tildeOf(line.text, input.home), column - 16, 12, 2, { isBold: true }) : []
   const askPx = 16 * Math.max(1, ask.length)
-  const height = isNeeds ? Math.max(ROW, 2 + 16 + 20 + 2 + (line.chain ? 16 + 2 + askPx : askPx)) : ROW
-  return { name, line, model, isNeeds, elapsed, steps, where, dirty, git, isChatIcon, isPersonaCut: personaWidth + modelWidth > column, ask, height }
+  const nameLines = input.isInCard
+    ? Math.max(rowsOf(oneLine(name.persona), column - modelWidth, 14, 12, { isBold: true }).length, name.task ? rowsOf(oneLine(name.task), column - modelWidth - personaWidth, 14, 12).length : 1)
+    : 1
+  const wrapped = (Math.max(1, nameLines) - 1) * LH
+  const height = wrapped + (isNeeds ? Math.max(ROW, 2 + 16 + 20 + 2 + (line.chain ? 16 + 2 + askPx : askPx)) : ROW)
+  return { name, line, model, isNeeds, elapsed, steps, where, dirty, git, isChatIcon, isPersonaCut: !input.isInCard && personaWidth + modelWidth > column, ask, height }
 }

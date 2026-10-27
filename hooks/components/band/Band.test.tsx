@@ -942,3 +942,28 @@ test('the first agent started with the pane closed draws the bar on the band’s
   expect(String((await stripOf(fresh))?.props.source)).toContain('animateTransform')
   await fresh.unmount()
 })
+
+const crowd = (total: number, finished: number): BoardSession[] =>
+  Array.from({ length: total }, (_, index) => ({ id: `local_${index}`, name: `worker-${index}`, state: index < finished ? ('done' as const) : ('working' as const), progress: 'step 1 of 2 — go' }))
+
+for (const [finished = 0, total = 0] of [[3, 7], [23, 31]]) {
+  for (const px of [300, 600, 900]) {
+    test(`${finished}/${total} at ${px} px: lead, bar, count and gaps add up to the band width, and the bar box is the bar`, () => {
+      const { view } = viewOf(crowd(total, finished), { agents: [], workflows: [], at: 0 }, columnsFor(px))
+      const width = columnsFor(px) * CH - 16
+      const items = [view.leadWidth, view.barWidth, view.countsWidth, view.actionWidth].filter(Boolean)
+      const row = view.padLeft + view.padRight + 2 + items.reduce((sum, one) => sum + one, 0) + (items.length - 1) * view.gap
+      expect(Math.abs(row - width)).toBeLessThanOrEqual(2)
+      const boxes: Record<string, unknown>[] = []
+      const Box = (props: Record<string, unknown>) => {
+        boxes.push(props)
+        return props.children ?? null
+      }
+      const stub = (props: Record<string, unknown>) => props.children ?? null
+      Band({ Box, Text: stub, Button: stub, Svg: stub } as unknown as Parameters<typeof Band>[0], { view })
+      const bar = boxes.find(one => String(one.key).startsWith('bar-'))
+      expect([bar?.width, bar?.flexGrow]).toEqual([across(view.barWidth), undefined])
+      if (view.showCounts) expect(boxes.some(one => one.width === across(view.countsWidth))).toBe(true)
+    })
+  }
+}

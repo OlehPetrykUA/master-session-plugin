@@ -16,3 +16,10 @@ test('the terminal card times a needs item like the GUI card, from asking.since,
   expect(timeOf(subagent({}))).toMatch(/^Time: running 1m 30s · started /)
   expect(timeOf({ ...subagent({ asking: { text: 'Allow Bash: ls', since: 60_000 } }), status: 'needs' })).toMatch(/^Time: waiting 30s · started /)
 })
+
+test('the terminal open item shows the full name and task and wraps them', () => {
+  const task = 'x'.repeat(120)
+  const card = JSON.stringify(TextSubagentDetail(ui, { item: subagent({ name: task }), context: { at: 90_000, trees: [], sessions: [], agents: [], rows: [] }, onCollapse: () => {} }))
+  expect(card).toContain(task)
+  expect(card).toContain('"wrap":"wrap"')
+})

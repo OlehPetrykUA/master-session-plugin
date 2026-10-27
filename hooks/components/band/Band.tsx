@@ -34,7 +34,7 @@ export function Band(ui: Ui, props: BandProps) {
     </Box>
   ) : null
   const counter = showCounts ? (
-    <Box flexDirection="row" alignItems="center" flexShrink={0}>
+    <Box flexDirection="row" alignItems="center" flexShrink={0} width={across(view.countsWidth)}>
       <Text color={C.muted} wrap="truncate-end">
         {parts.map((part, index) =>
           part.isNumber ? (
@@ -51,7 +51,7 @@ export function Band(ui: Ui, props: BandProps) {
   return (
     <Box flexDirection="row" alignItems="center" gap={across(view.gap)} height={tall(BAR.height)} paddingLeft={across(view.padLeft)} paddingRight={across(view.padRight)} paddingY={0} borderStyle="round" borderColor={C.border} backgroundColor={C.surface}>
       {lead}
-      <Box key={`bar-${view.barWidth}-${view.isRunning ? 'run' : 'still'}`} flexDirection="column" alignItems="stretch" flexGrow={1} flexShrink={1} width={0} minWidth={0}>
+      <Box key={`bar-${view.barWidth}-${view.isRunning ? 'run' : 'still'}`} flexDirection="column" alignItems="stretch" flexShrink={0} width={across(view.barWidth)}>
         <Svg source={strip({ width: view.barWidth, overall: view.overall, tone: view.tone, isSliding: view.isRunning })} alt={alt} width={view.barWidth} height={10} isInteractive />
       </Box>
       {counter}

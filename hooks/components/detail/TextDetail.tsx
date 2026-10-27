@@ -24,7 +24,7 @@ function TextCard(ui: TextUi, props: TextCardProps) {
   return (
     <Box key={`detail-${props.id}`} flexDirection="column" padding="sm" borderStyle="round" borderColor={props.isNeeds ? 'error' : CARD_BORDER}>
       <Box flexDirection="row" gap="sm">
-        <Text weight="semibold">{props.title}</Text>
+        <Text weight="semibold" wrap="wrap">{props.title}</Text>
         <Box flexGrow={1} />
         <Button key={`collapse-${props.id}`} plain label="Collapse" onPress={props.onCollapse} />
       </Box>
