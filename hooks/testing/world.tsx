@@ -107,7 +107,23 @@ export function world(on: On, child: Child = {}) {
     child.files[`${HOME}/.claude/state/master-session/boards/${MASTER}.json`] ??= '{}'
   }
   mock.env(on, { HOME })
-  const clock = mock.clock(on, { now: 3_600_000 })
+  const timers = { fired: 0 }
+  const timed = new Proxy(on, {
+    apply(target, self, args: unknown[]) {
+      const last = args.length - 1
+      const handler = args[last]
+      if (args[0] === 'clock.every' && typeof handler === 'function') {
+        args[last] = async (...inner: unknown[]) => {
+          const out = await handler(...inner)
+          timers.fired += 1
+          return out
+        }
+      }
+      return Reflect.apply(target, self, args)
+    },
+  })
+  const clock = mock.clock(timed, { now: 3_600_000 })
+  const reads = { count: 0 }
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.surfaces', () => ({ value: [...(child.surfaces ?? ['desktop' as const])] }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
@@ -133,11 +149,13 @@ export function world(on: On, child: Child = {}) {
     return { value: [] }
   })
   on('fs.stat', (_, e) => {
+    reads.count += 1
     const file = child.files?.[e.path]
     if (file === undefined) throw new Error('ENOENT')
     return { value: { kind: 'file' as const, size: file.length, mtimeMs: stampOf(file), isLink: false } }
   })
   on('fs.read', (_, e) => {
+    reads.count += 1
     const file = child.files?.[e.path]
     if (file === undefined) throw new Error('ENOENT')
     return { value: file }
@@ -153,6 +171,7 @@ export function world(on: On, child: Child = {}) {
     flight.active -= 1
   }
   on('fs.list', async (_, e) => {
+    reads.count += 1
     await slowly('list', child.slowMs?.list)
     return {
       value: Object.entries(child.files ?? {})
@@ -192,7 +211,7 @@ export function world(on: On, child: Child = {}) {
     const stdout = verb === 'for-each-ref' ? 'x\nxorigin/main\n' : (child.git?.[`${cwd} ${e.argv.slice(4).join(' ')}`] ?? child.git?.[`${cwd} ${verb}`] ?? GIT[`${cwd} ${verb}`] ?? '')
     return { value: { exitCode: stdout ? 0 : 128, stdout, stderr: stdout ? '' : 'not a git repository', isStdoutTruncated: false, isStderrTruncated: false } }
   })
-  return { calls, opened, toasts, ran, clock, gits, flights, scans, tools }
+  return { calls, opened, toasts, ran, clock, gits, flights, scans, tools, timers, reads }
 }
 
 export const PANE = {
