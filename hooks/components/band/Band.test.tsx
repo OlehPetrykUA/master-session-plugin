@@ -633,6 +633,7 @@ test('geometry: bar 56 with gap 12, percent 36, pill 34 with 0 12 0 8, check 18,
   expect([bar?.props.height, bar?.props.gap, bar?.props.paddingLeft, bar?.props.paddingRight]).toEqual([tall(56), across(12), across(16), across(8)])
   expect((await ui.findAll({ type: 'Box' })).some(box => box.props.width === across(36) && JSON.stringify(box.children).includes('80%'))).toBe(true)
   expect((await stripOf(ui))?.props.height).toBe(6)
+  expect((await ui.findAll({ type: 'Box' })).find(box => box.props.flexDirection === 'column' && box.props.justifyContent === 'center' && box.props.flexGrow === 1)?.props.gap).toBe(tall(4))
   expect((await ui.find({ key: 'face-band-board' }))?.props.height).toBe(tall(32))
   await ui.unmount()
   await $.tool.call({ tool: BOARD_TOOL, ...publish(NEEDS) })

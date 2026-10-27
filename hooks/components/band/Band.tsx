@@ -88,7 +88,7 @@ export function Band(ui: Ui, props: BandProps) {
   return (
     <Box flexDirection="row" alignItems="center" gap={across(view.gap)} height={tall(BAR.height)} paddingLeft={across(view.padLeft)} paddingRight={across(view.padRight)} paddingY={0} borderStyle="round" borderColor={C.border} backgroundColor={C.surface}>
       {lead}
-      <Box flexDirection="column" flexGrow={1} flexShrink={1} width={0} minWidth={0} justifyContent="center">
+      <Box flexDirection="column" flexGrow={1} flexShrink={1} width={0} minWidth={0} justifyContent="center" gap={tall(4)}>
         <Box flexDirection="row" alignItems="center" gap={across(view.gap)} height={tall(LINE_ONE)}>
           {bar}
           {counter}

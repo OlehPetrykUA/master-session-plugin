@@ -148,7 +148,7 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
 const firstAskerOf = (units: readonly Unit[]) => units.reduce<Asker | undefined>((first, one) => (one.asker && (!first || (one.asker.since ?? Infinity) < (first.since ?? Infinity)) ? one.asker : first), undefined)
 
 export const askToolOf = (reason: string | undefined) => {
-  const found = /^Allow ([^:\n]{1,40})(?::|$)/.exec(reason ?? '')
+  const found = /^Allow ([^:\s]+)/.exec(reason ?? '')
   return found ? `Allow ${found[1]}` : reason
 }
 
