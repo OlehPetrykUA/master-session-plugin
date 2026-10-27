@@ -19,7 +19,7 @@ This runs inside a validator session. If `/master-session:start` hasn't run in t
 
 ## When a workflow may run
 
-The validator reads this section by path for [Execution shape](../start/SKILL.md#2-brief-the-worker) rule 4.
+The validator reads this section by path for [Execution shape](../start/shape.md#execution-shape) rule 4.
 - Only a read-only fan-out: independent readers or auditors of one question, with no sign-off between stages; never build work or gated actions.
 - Start one only when the user typed the request in this chat (`/master-session:workflow`, `ultracode`, or their own words), or when `/effort ultracode` is on. A brief, a quote or a wish for parallel work never opts in: fan out subagents instead and offer the workflow in one line.
 - Announce `Workflow: ~N agents` first: 5 or fewer by default, 10 at most unless the user gives a number. Its agents count toward the count line.

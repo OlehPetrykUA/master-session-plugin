@@ -4,7 +4,7 @@ A persona is a fixed role the validator hands out. Each one has its own skill, `
 
 | Persona | Runs as | Skill and agent |
 |---|---|---|
-| Implementer | subagent; session by [Execution shape](SKILL.md#2-brief-the-worker) rule 3 | [`master-session:implementer`](../implementer/SKILL.md), with [`master-session:worker`](../worker/SKILL.md) |
+| Implementer | subagent; session by [Execution shape](shape.md#execution-shape) rule 3 | [`master-session:implementer`](../implementer/SKILL.md), with [`master-session:worker`](../worker/SKILL.md) |
 | Refactorer | subagent; session by rule 3 | [`master-session:refactorer`](../refactorer/SKILL.md), with [`master-session:worker`](../worker/SKILL.md) |
 | Code reviewer | subagent, risk-flagged pieces | [`master-session:reviewer`](../reviewer/SKILL.md) |
 | QA verifier | subagent, every checked sha | [`master-session:qa-verifier`](../qa-verifier/SKILL.md) |

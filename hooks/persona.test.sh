@@ -35,6 +35,22 @@ has 'AC32 step 6 says helpers are not pieces' 'helpers (QA verifier, Code review
 has 'AC32 step 6 says a fix round adds no piece' 'A fix round after a FAIL adds no piece'
 has 'AC32 step 6 says user work extends the plan' 'work the user adds mid-run adds one'
 
+rule() {
+  if grep -qF -- "$3" "$root/$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi
+}
+
+rule 'designer: single source of truth' skills/designer/SKILL.md 'single source of truth'
+rule 'designer: untouched' skills/designer/SKILL.md 'untouched'
+rule 'designer: fold' skills/designer/SKILL.md 'fold'
+rule 'implementer: NEEDS_CONTEXT' skills/implementer/SKILL.md 'NEEDS_CONTEXT'
+rule 'reviewer: Visuals' skills/reviewer/SKILL.md '**Visuals:**'
+rule 'start: git worktree list' skills/start/SKILL.md 'git worktree list'
+rule 'start: running count line' skills/start/SKILL.md 'Count: N running (ready:'
+rule 'start: one full gate' skills/start/SKILL.md 'has had one full gate'
+rule 'start: Your checks' skills/start/SKILL.md '## Your checks'
+rule 'start: Checker gate' skills/start/SKILL.md '## Checker gate'
+rule 'qa-verifier: full suite never rerun' skills/qa-verifier/SKILL.md 'never rerun it'
+
 tmp=$(mktemp -d)
 trap 'rm -r "$tmp"' EXIT
 odd="$tmp/a&b|c\\d"

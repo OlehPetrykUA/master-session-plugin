@@ -11,7 +11,7 @@ Invoked with: `$ARGUMENTS`. The text is the task. A last word naming a persona f
 
 This runs inside a validator session. If `/master-session:start` hasn't run in this session yet, become the validator first: read `${CLAUDE_PLUGIN_ROOT}/skills/start/SKILL.md` and do its section 1 with no settings, then continue here.
 
-Use it only for pieces that [Execution shape](../start/SKILL.md#2-brief-the-worker) rule 3 gives a worker session; anything else is a subagent (rule 5).
+Use it only for pieces that [Execution shape](../start/shape.md#execution-shape) rule 3 gives a worker session; anything else is a subagent (rule 5).
 
 1. Plan and brief the worker as [section 2 of the start skill](../start/SKILL.md#2-brief-the-worker) says, then start it as Session start below. The user typed the command, so it starts in this turn.
 2. Right after, arm [the loop](../start/SKILL.md#3-the-loop) if none is armed (`CronList` shows none), with section 3's `/loop` args, and say so in one line. A loop that is already armed picks the worker up from the ledger.
