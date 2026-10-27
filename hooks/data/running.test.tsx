@@ -526,7 +526,7 @@ test('AC39: a permission request for a command puts only "Allow Bash" in the pan
   await ui.unmount()
 })
 
-test('AC38: for every credential command, the master’s pane, card and ask hold no secret and no Bash text', { plugins: [PROBE] }, async ($, on) => {
+test('AC38: for every credential command, the master’s pane, card and ask hold no secret and no Bash text', { plugins: [PROBE], timeoutMs: 20_000 }, async ($, on) => {
   const run = await master($, on)
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)

@@ -30,7 +30,7 @@ type Outcome = { ok: true; text: string } | { ok: false; isGuard: boolean }
 let queue: { job: Job; at: number }[] = []
 let active = 0
 let epoch = 0
-let tried = new Set<string>()
+const claimed = new Set<string>()
 
 const WORD_BAD = /[\d`\\=:@$";|&<>{}[\]]/
 
@@ -49,7 +49,9 @@ export const isUnsafe = (reply: string, source: string) =>
     .split(' ')
     .some(word => isShaped(stripped(word), source) || isShaped(core(word), source))
 
-export const masked = (source: string) => source.replace(/\S+/g, word => (isShaped(word, source) ? 'it' : word))
+const ID_SHAPED = /(^|\s)(?=[\p{L}\p{N}]*\d)[\p{L}\p{N}]+(?=[.,;:]?(?:\s|$))/gu
+
+export const masked = (text: string) => text.replace(ID_SHAPED, '$1it')
 
 export const normalized = (reply: string) => reply.replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ').trim()
 
@@ -57,11 +59,11 @@ export const capped = (text: string) => (text.length > STORED_MAX ? `${text.slic
 
 export const cleaned = (reply: string) => capped(normalized(reply))
 
-const promptOf = (job: Job, source: string) => `Kind: ${job.kind}\nShort name: ${job.name}\n\nThe task as it was given:\n${source}`
+const promptOf = (job: Job, isStrict: boolean) => `Kind: ${job.kind}\nShort name: ${isStrict ? masked(job.name) : job.name}\n\nThe task as it was given:\n${isStrict ? masked(job.source) : job.source}`
 
 async function attempt($: EngineInterface, job: Job, isStrict: boolean): Promise<Outcome> {
   const asked = $.model
-    .complete({ model: MODEL, effort: 'low', maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, system: isStrict ? `${INSTRUCTION} ${STRICT}` : INSTRUCTION, prompt: promptOf(job, isStrict ? masked(job.source) : job.source) })
+    .complete({ model: MODEL, effort: 'low', maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, system: isStrict ? `${INSTRUCTION} ${STRICT}` : INSTRUCTION, prompt: promptOf(job, isStrict) })
     .catch(() => undefined)
   const result = await Promise.race([asked, $.clock.sleep(TIMEOUT_MS).then(() => undefined)])
   if (!result?.isAnswered) return { ok: false, isGuard: false }
@@ -70,7 +72,7 @@ async function attempt($: EngineInterface, job: Job, isStrict: boolean): Promise
   return isUnsafe(text, job.source) ? { ok: false, isGuard: true } : { ok: true, text: capped(text) }
 }
 
-const taskOf = (outcome: Outcome): TaskText | undefined => (outcome.ok ? { state: 'done', text: outcome.text } : undefined)
+const taskOf = (outcome: Outcome, target: Target): TaskText | undefined => (outcome.ok ? { state: 'done', text: outcome.text } : target.type === 'agent' ? { state: 'failed' } : undefined)
 
 async function store($: EngineInterface, target: Target, task: TaskText | undefined) {
   const set = <T extends { id: string; task?: TaskText }>(items: T[]) => items.map(one => (one.id === target.id && one.task?.state === 'pending' ? { ...one, task } : one))
@@ -93,7 +95,7 @@ function pump($: EngineInterface) {
     active += 1
     const { job, at } = next
     void run($, job)
-      .then(outcome => (at === epoch ? store($, job.target, taskOf(outcome)) : undefined))
+      .then(outcome => (at === epoch ? store($, job.target, taskOf(outcome, job.target)) : undefined))
       .catch(() => undefined)
       .finally(() => {
         if (at !== epoch) return
@@ -119,18 +121,23 @@ async function isFresh($: EngineInterface, target: Target) {
 export const isMasterRole = () => isActive() && roleOf().role !== 'worker'
 
 export async function describe($: EngineInterface, job: Job) {
-  if (!isActive() || !job.source.trim() || (job.target.type === 'agent' && tried.has(job.target.id)) || !(await isFresh($, job.target))) return
-  if (job.target.type === 'agent') tried.add(job.target.id)
-  await pending($, job.target)
-  queue.push({ job, at: epoch })
-  pump($)
+  const key = `${job.target.type}:${job.target.id}`
+  if (claimed.has(key)) return
+  claimed.add(key)
+  try {
+    if (!isActive() || !job.source.trim() || !(await isFresh($, job.target))) return
+    await pending($, job.target)
+    queue.push({ job, at: epoch })
+    pump($)
+  } finally {
+    claimed.delete(key)
+  }
 }
 
 export async function settleTasks($: EngineInterface) {
   epoch += 1
   queue = []
   active = 0
-  tried = new Set()
   const drop = <T extends { task?: TaskText }>(items: T[]) => items.map(one => (one.task?.state === 'pending' ? { ...one, task: undefined } : one))
   await saveAgents($, agents => drop(agents))
   await saveWorkflows($, runs => drop(runs))

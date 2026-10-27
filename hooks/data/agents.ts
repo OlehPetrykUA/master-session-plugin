@@ -158,7 +158,7 @@ export async function describeSpawn($: EngineInterface, e: AgentSpawnInput, out:
 
 export async function describeMissing($: EngineInterface) {
   for (const one of await getAgents($)) {
-    if (one.task || one.parentSessionId || !one.prompt || one.prompt === PLACEHOLDER || !one.description) continue
+    if (one.task || !one.prompt || one.prompt === PLACEHOLDER || !one.description) continue
     await describe($, { target: { type: 'agent', id: one.id }, kind: one.run ? 'workflow agent' : 'subagent', name: one.description, source: one.prompt })
   }
 }

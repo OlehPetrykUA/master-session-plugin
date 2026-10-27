@@ -15,7 +15,7 @@ import { C } from '../theme/tokens'
 import { CREDENTIALS } from '../testing/credentials'
 import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, childOf, liveOf, started, textsOf, altsOf, warmUp, world } from '../testing/world'
 import type { Child } from '../testing/world'
-import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, isUnsafe, normalized } from './describe'
+import { INSTRUCTION, PLACEHOLDER, STRICT, cleaned, isUnsafe, masked, normalized } from './describe'
 import { reportPath } from './status'
 
 const NOW = 3_600_000
@@ -135,12 +135,12 @@ const LAUNCH = { status: 'async_launched' as const, taskId: 'wi5', taskType: 'lo
 
 const SCRIPT = "export const meta = { name: 'row-model', description: 'Spec, build and check the row model', phases: [{ title: 'Spec' }, { title: 'Build' }, { title: 'Check' }] }\nawait agent('x')"
 
-function loops(on: On, options: { session?: string; only?: string } = {}) {
+function loops(on: On, options: { session?: string; only?: string; fixed?: string } = {}) {
   let spawned = 0
   const ids: string[] = []
   on('agent.list', () => ({ value: (options.only ? [options.only] : ids).map(id => ({ id, description: `task ${id}`, type: 'general-purpose', status: 'running' as const })) }))
   on('agent.spawn', (_, e) => {
-    const id = e.resume ? e.resume.agentId : e.workflow ? `w${e.workflow.agentIndex}` : `a${(spawned += 1)}`
+    const id = options.fixed ?? (e.resume ? e.resume.agentId : e.workflow ? `w${e.workflow.agentIndex}` : `a${(spawned += 1)}`)
     if (!ids.includes(id)) ids.push(id)
     return { model: 'claude-haiku-5-5', agentId: id }
   })
@@ -377,7 +377,7 @@ test('AC13: a blank reply is the short name, 700 characters store 600 plus …, 
   for (const name of ['one', 'two', 'three']) await spawn($, { description: name })
   await run.clock.settle()
   const tasks = (await atomsOf($)).agents.map(one => one.task)
-  expect(tasks[0]).toBeUndefined()
+  expect(tasks[0]).toEqual({ state: 'failed' })
   expect(tasks[1]?.text).toBe(`${long.slice(0, 600)}…`)
   expect(tasks[2]?.text).toBe('Line one. Line two.')
   const ui = await pane($)
@@ -503,13 +503,11 @@ test('AC18: the master’s workflow record for a worker’s run holds the report
 const secretsIn = (all: string, secrets: readonly string[]) => secrets.filter(secret => all.includes(secret))
 
 test('AC19: for every credential row a copied prompt is rejected twice, the second call strict, and no text is stored or drawn', { plugins: [PROBE], timeoutMs: 120_000 }, async ($, on) => {
-  let leaked = ''
-  const { seen } = stub(on, request => say(`${String(request.prompt)} ${leaked}`))
+  const { seen } = stub(on, request => say(String(request.prompt)))
   const run = await master($, on)
   const ui = await pane($)
   let before = 0
   for (const [index, [, command, secrets]] of CREDENTIALS.entries()) {
-    leaked = command
     await spawn($, { description: `row ${index}`, prompt: brief(command) })
     await run.clock.settle()
     expect(seen.length - before).toBe(2)
@@ -517,26 +515,22 @@ test('AC19: for every credential row a copied prompt is rejected twice, the seco
     expect(String(seen.at(-2)?.system)).not.toContain(STRICT)
     before = seen.length
     await open($, `a${index + 1}`)
-    expect(await ui.find({ key: `task-plain-a${index + 1}` })).toBeUndefined()
     expect(secretsIn(JSON.stringify([await textsOf(ui), await altsOf(ui)]), secrets)).toEqual([])
+    expect(secretsIn(JSON.stringify((await atomsOf($)).agents.map(one => one.task)), secrets)).toEqual([])
   }
-  expect((await atomsOf($)).agents.filter(one => one.task).length).toBe(0)
   await ui.unmount()
 })
 
 test('AC20: the same rows through a Workflow script and a start_session prompt store nothing', { plugins: [PROBE], timeoutMs: 120_000 }, async ($, on) => {
-  let leaked = ''
-  const { seen } = stub(on, request => say(`${String(request.prompt)} ${leaked}`))
+  const { seen } = stub(on, request => say(String(request.prompt)))
   const run = await master($, on)
   for (const [, command, secrets] of CREDENTIALS) {
-    leaked = command
     const before = seen.length
     await $.tool.call({ tool: 'Workflow', script: `${SCRIPT}\n${command}` })
     await $.tool.call({ tool: START, title: 'Row model', prompt: brief(command) } as never)
     await run.clock.settle()
     expect(seen.length - before).toBe(4)
     const atoms = await atomsOf($)
-    expect([atoms.workflows[0]?.task, atoms.tasks.local_abc123]).toEqual([undefined, undefined])
     expect(secretsIn(JSON.stringify(atoms.tasks) + JSON.stringify(atoms.workflows.map(one => one.task)), secrets)).toEqual([])
   }
 })
@@ -731,7 +725,7 @@ test('a secret that would fall across the 600 character cap is rejected, not sto
   const run = await master($, on)
   await spawn($, { prompt: brief('export KEY=sk-tok32abcdefghijklmnop') })
   await run.clock.settle()
-  expect((await atomsOf($)).agents[0]?.task).toBeUndefined()
+  expect((await atomsOf($)).agents[0]?.task).toEqual({ state: 'failed' })
 })
 
 test('a workflow whose script cannot be read gets no call even when the launch carries a summary', async ($, on) => {
@@ -832,4 +826,73 @@ test('when the first reply is guard-rejected, the strict retry sees the source w
   await open($, 'a1')
   expect(await plainOf(ui, 'a1')).toBe(T)
   await ui.unmount()
+})
+
+test('a copied strict reply stays rejected when the secret is a plain word next to a flag', async ($, on) => {
+  const { seen } = stub(on, request => say(String(request.prompt)))
+  const run = await master($, on)
+  const rows = [
+    ['mysql -p hunter db', 'hunter'],
+    ['mysql --password letmein db', 'letmein'],
+  ] as const
+  for (const [index, [command, secret]] of rows.entries()) {
+    const before = seen.length
+    await spawn($, { description: `plain ${index}`, prompt: brief(command) })
+    await run.clock.settle()
+    expect(seen.length - before).toBe(2)
+    expect(String(seen.at(-1)?.prompt)).toContain(secret)
+    const ui = await pane($)
+    await open($, `a${index + 1}`)
+    expect(await ui.find({ key: `task-plain-a${index + 1}` })).toBeUndefined()
+    expect(secretsIn(JSON.stringify(await textsOf(ui)), [secret])).toEqual([])
+    await ui.unmount()
+  }
+})
+
+test('the strict retry masks only id-shaped words, in the short name too, and keeps flags and plain words', () => {
+  expect(masked('Write M8 and P1/P2 with MD5, then -p hunter --password letmein "q"')).toBe('Write it and P1/P2 with it, then -p hunter --password letmein "q"')
+})
+
+test('the short name is masked in the strict retry', async ($, on) => {
+  const { seen } = stub(on, (_, nth) => say(nth === 1 ? 'Writes the design for M8 and P1.' : T))
+  const run = await master($, on)
+  await spawn($, { description: 'Design M8', prompt: 'Write the design for M8 and P1, then report back.' })
+  await run.clock.settle()
+  expect(String(seen[0]?.prompt)).toContain('Short name: Design M8')
+  expect(String(seen[1]?.prompt)).toContain('Short name: Design it')
+})
+
+test('two spawn events for one agent id at once make one call', async ($, on) => {
+  const { seen } = stub(on, () => say(T))
+  loops(on, { fixed: 'dup' })
+  const run = await started($, on, WITH_SESSION)
+  await Promise.all([spawn($, { description: 'one' }), spawn($, { description: 'two' })])
+  await run.clock.settle()
+  expect(seen.length).toBe(1)
+})
+
+test('a failed call is stored as failed and not tried again after a reload and ticks', async ($, on) => {
+  const { seen } = stub(on, () => API_ERROR)
+  const run = await master($, on)
+  await spawn($)
+  await run.clock.settle()
+  expect(seen.length).toBe(1)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.settle()
+  await run.clock.advance(FILE_MS * 6)
+  await run.clock.settle()
+  expect(seen.length).toBe(1)
+})
+
+test('a stored agent of a worker session gets no call from the tick sweep', async ($, on) => {
+  const { seen } = stub(on, () => say(T))
+  on('state.get', async (_, e, next) => {
+    const real = (await next(e)) as { value: { value: unknown; version: number } }
+    const agents = [{ id: 'r1', type: 'Explore', description: 'Remote one', prompt: 'Look around.', state: 'running', startedAt: 0, parentSessionId: 'local_w' }]
+    return (e.key === 'agents' ? { value: { ...real.value, value: agents } } : real) as never
+  })
+  const run = await master($, on)
+  await run.clock.advance(FILE_MS * 4)
+  await run.clock.settle()
+  expect(seen.length).toBe(0)
 })

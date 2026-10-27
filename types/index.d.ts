@@ -146,7 +146,7 @@ export type AgentState = 'running' | 'done' | 'failed'
 
 export type AgentAsk = { text: string; since: number }
 
-export type TaskText = { state: 'pending' | 'done'; text?: string }
+export type TaskText = { state: 'pending' | 'done' | 'failed'; text?: string }
 
 export type AgentRecord = {
   id: string
