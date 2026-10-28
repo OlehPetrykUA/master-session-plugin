@@ -65,7 +65,7 @@ The only waits: a dependency not done (merged, or approved for a doc piece), the
 ## Checker gate  the full suite and build, run once per sha by the checker
 ## Timebox       T0 10 min, T1 30 min, T2/T3 60 min, spec, design or investigate 25 min
 ## Rules         the user's rules that apply; docs first, cited
-## Report        to <validator local_id>; status lines on every change ([worker](../worker/SKILL.md)); the final report in this format:
+## Report        to main (SendMessage `to: "main"`); status lines on every change ([worker](../worker/SKILL.md)); the final report in this format:
 STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
 Progress: step N of M — <step name>
 Changed:  ready <sha> (worktree path), or <commits / files>
@@ -81,7 +81,7 @@ Open:     <questions, or "none">
 **Names** (`title`, `name`, `description`, `label`): [shape.md](shape.md#names).
 
 **Execution shape.** One per piece, named in the ledger; the first match wins.
-This session never starts sessions or sub-chats and never calls `start_session`; every persona runs as a subagent or workflow agent here. Work that needs its own chat (the user approving in that chat, or work that must outlive this session) is a 🔴 Needs you line asking the user or the chat orchestrator to start that chat; splitting work into chats belongs to the chat orchestrator.
+This session never starts sessions or sub-chats and never calls `start_session`; every persona runs as a subagent or workflow agent here. Work that needs its own chat (an action auto mode blocks until the user names it in that chat: a shared-artifact publish or delete, or an edit to `~/.claude`, `~/.agents`, `~/.copilot` or a settings file; the user wants to redirect it mid-run; the user will quit or restart the app) is a 🔴 Needs you line asking the user or the chat orchestrator to start that chat; splitting work into chats belongs to the chat orchestrator.
 The four rules (inline, background Bash or Monitor, workflow, background subagent), the plan-time allow rules and the subagent report statuses: read [shape.md](shape.md#execution-shape).
 
 **Worker lifetime.** One agent per piece.
@@ -107,7 +107,7 @@ On every wake, do one tick:
    - A verdict is a claim, never proof; an uncited finding goes back to its author. Gate: [qa-verifier](../qa-verifier/SKILL.md); severity: [Verdict rules](../reviewer/SKILL.md#verdict-rules).
 3. Merge. The sha that merges has had one full gate: after an all-`=` rebase, or a recheck by the Code reviewer alone, run the Checker gate inline first (as for T0, in the background); it counts as the one suite-runner. Then `git -C <live repo> merge --ff-only <sha>`. Not a fast-forward: the builder is resumed by ID with `rebase onto <master sha>, rerun Your checks, report ready <new sha>`. A merged sha retires its worker.
 4. Fix round: one SendMessage per worker per round bundling every Blocking finding with evidence and fix, logged in the ledger. Nits go to the ledger backlog. Never resend. At most 2 fix rounds per piece: still blocking after round 2, no third fix message; cut scope to what passes, re-brief a fresh agent, or ask the user, and log which.
-5. Stalls. A subagent past its timebox, or whose spawn's output file has not changed for 15 minutes (`stat -f %m <output_file>`; never read that file) with no job of its own running, is stopped (`TaskStop`) and re-briefed fresh with a handover ([shape.md](shape.md#worker-lifetime)). A stalled loop is recreated as Heartbeat says.
+5. Stalls. A subagent past its timebox, or whose spawn's output file has not changed for 15 minutes (`stat -f %m <output_file>`; never read that file) and its latest status line is also older than 15 minutes, with no job of its own running, is stopped (`TaskStop`) and re-briefed fresh with a handover ([shape.md](shape.md#worker-lifetime)). A stalled loop is recreated as Heartbeat says.
 6. Post the full board as [board.md](board.md) shows, every tick and in every reply to the user; a tick with a 🔴 also sends a `PushNotification`.
 7. No re-arm: update the Heartbeat line's `last tick`. Wake on a branch move with a `Monitor` on `git rev-parse <branch>`, or on a job's end with a background `until grep -qE '<done|fail>' <log>; do sleep 5; done`.
 

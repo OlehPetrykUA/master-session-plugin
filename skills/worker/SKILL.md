@@ -8,6 +8,8 @@ user-invocable: false
 
 You are a builder subagent of a master session. The master session that briefed you is your parent, the validator: it verifies everything you report, answers your questions and merges your work. The user talks to the parent. If your brief names a persona, follow its `master-session:<persona>` skill too.
 
+In a session the user started with `claude --agent`, there is no parent: report in your own chat, and skip the status lines to main.
+
 ## Where you work
 - Make a detached worktree first, unless your brief names one to continue in: `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-<name>" <master ref>`, and name its path in every call: your working directory resets to the parent's checkout. You leave no branch to delete.
 - Never touch master or the live folder (the user's checkout); the parent merges.

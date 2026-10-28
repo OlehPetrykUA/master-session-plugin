@@ -102,10 +102,14 @@ rule 'start: validator pushes status lines up' skills/start/SKILL.md 'push it th
 rule 'start: never starts sessions or sub-chats' skills/start/SKILL.md 'This session never starts sessions or sub-chats and never calls `start_session`; every persona runs as a subagent or workflow agent here.'
 rule 'start: own chat goes to the chat orchestrator' skills/start/SKILL.md 'splitting work into chats belongs to the chat orchestrator'
 rule 'stop: stops subagents with TaskStop' skills/stop/SKILL.md 'then stop it with `TaskStop`'
+rule 'answering: brief lists self-modifying edits' skills/start/answering.md 'A brief lists every self-modifying edit up front, quoting the user, so auto mode sees the intent at spawn.'
+rule 'start: stall needs a stale status line too' skills/start/SKILL.md 'and its latest status line'
+rule 'start: report goes to main' skills/start/SKILL.md 'to main (SendMessage `to: "main"`)'
+rule 'worker: claude --agent has no parent' skills/worker/SKILL.md 'In a session the user started with `claude --agent`, there is no parent'
 rule 'stop: logs pending step first' skills/stop/SKILL.md 'first write its pending step and its worktree'
 
 never='This session never starts sessions or sub-chats and never calls `start_session`'
-hits=$(grep -rnE 'start_session|stop_session|notify_when_idle|master-session:subchat' "$root/skills" | grep -vF -- "$never")
+hits=$(grep -rnE 'start_session|stop_session|notify_when_idle|master-session:subchat' "$root/skills" | sed "s/$never//" | grep -E 'start_session|stop_session|notify_when_idle|master-session:subchat')
 if [ -z "$hits" ]; then echo 'ok   skills: no session tools outside the never rule'; else echo 'FAIL skills: session tools outside the never rule'; printf '%s\n' "$hits"; fail=1; fi
 if [ -e "$root/skills/subchat" ]; then echo 'FAIL skills/subchat is gone'; fail=1; else echo 'ok   skills/subchat is gone'; fi
 
