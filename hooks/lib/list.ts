@@ -235,12 +235,12 @@ export const listedRowsOf = (rows: readonly Row[], agents: readonly AgentRecord[
 
 export const isGhostRun = (run: WorkflowRun, at: number | undefined) => at !== undefined && !run.agents.length && at - run.startedAt >= AGENT_SHOWN_MS
 
-export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> & { cleared?: number; open?: readonly string[]; self?: string } = {}): ListItem[] {
-  const isOpen = (ids: readonly string[]) => ids.some(id => context.open?.includes(id))
-  const isOld = (at: number | undefined) => context.at !== undefined && at !== undefined && context.at - at >= AGENT_SHOWN_MS
+const finishOf = (item: ListItem) => (item.kind === 'subagent' ? (item.agent.endedAt ?? 0) : item.kind === 'workflow' ? (item.run.endedAt ?? 0) : 0)
+
+export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> & { cleared?: number; self?: string } = {}): ListItem[] {
   const isCleared = (at: number | undefined) => at !== undefined && at <= (context.cleared ?? 0)
-  const stale = new Set(workflowRunsOf(agents, workflows).filter(one => isGhostRun(one, context.at) || (one.state !== 'running' && ((isOld(one.endedAt) && !isOpen([one.id, ...one.agents.map(agent => agent.id)])) || isCleared(one.endedAt)))).map(one => one.id))
-  const shown = agents.filter(agent => (agent.run ? !stale.has(agent.run.id) : (!isOld(agent.endedAt) || isOpen([agent.id])) && !isCleared(agent.endedAt)))
+  const stale = new Set(workflowRunsOf(agents, workflows).filter(one => isGhostRun(one, context.at) || (one.state !== 'running' && isCleared(one.endedAt))).map(one => one.id))
+  const shown = agents.filter(agent => (agent.run ? !stale.has(agent.run.id) : !isCleared(agent.endedAt)))
   const runs = workflows.filter(one => !stale.has(one.id))
   const session = (row: Row): ListItem => {
     const status = sessionStatusOf(row, context.trees, context.sessions)
@@ -273,7 +273,8 @@ export function countsOfItems(items: readonly ListItem[], archived: number): Rec
 }
 
 export function groupsOf(items: readonly ListItem[], archived: readonly LiveSession[], chosen: Filter, archiveView: ArchiveView, kept?: SessionState): ListGroup[] {
-  const groupOf = (id: SessionState, isPinned = false): ListGroup => ({ id, items: items.filter(item => item.group === id), archived: [], isPinned, isOpen: true })
+  const newestFirst = (left: ListItem, right: ListItem) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind] || finishOf(right) - finishOf(left)
+  const groupOf = (id: SessionState, isPinned = false): ListGroup => ({ id, items: id === 'done' ? items.filter(item => item.group === id).sort(newestFirst) : items.filter(item => item.group === id), archived: [], isPinned, isOpen: true })
   const needs = items.some(item => item.group === 'needs-you') ? [groupOf('needs-you', chosen !== 'all' && chosen !== 'needs-you')] : []
   const archive = (isOpen: boolean): ListGroup => ({ id: 'archived', items: [], archived, isPinned: false, isOpen })
   if (chosen === 'archived') return [...needs, archive(true)]
@@ -395,28 +396,75 @@ export const EMPTY_TEXT: Record<Filter, { title: string; body: string }> = {
   archived: { title: 'Nothing archived yet', body: 'Archived sessions land here.' },
 }
 
-export type Block = { key: string; label: string; value: string; sub: string; shorts?: readonly string[]; dots?: readonly { tone: 'red' | 'green' | 'amber' | 'grey'; count: number }[]; isAlert: boolean }
+export type Block = {
+  key: string
+  label: string
+  value: string
+  sub: string
+  shorts?: readonly string[]
+  bad?: string
+  chats?: number
+  dots?: readonly { tone: 'red' | 'green' | 'amber' | 'grey'; count: number }[]
+  isAlert: boolean
+}
+
+export const tokensText = (count: number) => (count < 1_000 ? String(count) : count < 1_000_000 ? `${Math.round(count / 1_000)}k` : `${String(Math.round(count / 100_000) / 10)}M`)
 
 export const shownDots = (block: Block) => (block.dots ?? []).filter(mark => mark.count > 0)
 
 export function blocksOf(totals: RunSummary, hasWork: boolean, end?: string): Block[] {
-  const { sessions, subagents, workflows, commits, tests, duration, git } = totals
-  const needs = totals.needsYou.sessions + totals.needsYou.subagents
+  const { plan, needsYou: needs, agents, tokens, commits, tests, duration, git } = totals
   const since = clockOf(duration.since)
+  const isPlanDone = plan.total > 0 && plan.done === plan.total
+  const repos = commits.repos > 1 ? ` · ${commits.repos} repos` : ''
+  const trees = git.trees > 1 ? `to commit · ${git.trees} trees` : 'to commit'
+  const stale = git.stale.files ? `+${git.stale.files} in ${git.stale.trees} stale tree${git.stale.trees === 1 ? '' : 's'}` : ''
+  const gitBase = git.dirty ? trees : 'clean'
   return [
-    { key: 'sessions', label: 'Sessions', value: String(sessions.total), sub: '', dots: [{ tone: 'red', count: totals.needsYou.sessions }, { tone: 'green', count: sessions.working }, { tone: 'amber', count: sessions.waiting }, { tone: 'grey', count: sessions.done }], isAlert: false },
+    {
+      key: 'plan',
+      label: 'Plan',
+      value: plan.total ? `${plan.done}/${plan.total}` : '—',
+      sub: !plan.total ? 'no plan yet' : isPlanDone ? 'all done' : '',
+      shorts: !plan.total ? ['—'] : isPlanDone ? ['done'] : [],
+      dots: plan.total && !isPlanDone ? [{ tone: 'green', count: plan.working }, { tone: 'amber', count: plan.verifying }, { tone: 'grey', count: plan.queued }] : undefined,
+      chats: plan.sessions,
+      isAlert: false,
+    },
     {
       key: 'needs-you',
       label: 'Needs you',
       value: String(needs),
-      sub: needs ? [totals.needsYou.sessions ? plural(totals.needsYou.sessions, 'session') : '', totals.needsYou.subagents ? plural(totals.needsYou.subagents, 'subagent') : ''].filter(Boolean).join(' · ') : 'nothing waiting',
-      shorts: needs ? [plural(needs, 'blocker'), String(needs)] : ['none'],
+      sub: needs ? `${needs} waiting` : 'nothing waiting',
+      shorts: needs ? [String(needs)] : ['none'],
       isAlert: needs > 0,
     },
-    { key: 'subagents', label: 'Subagents', value: String(subagents.total), sub: subagents.running ? `${subagents.running} running` : subagents.total ? 'all finished' : 'none', shorts: subagents.running ? [String(subagents.running)] : subagents.total ? ['done'] : [], isAlert: false },
-    { key: 'workflows', label: 'Workflows', value: String(workflows.total), sub: workflows.total ? `${workflows.agentsDone}/${workflows.agents} agents` : 'none', shorts: workflows.total ? [`${workflows.agentsDone}/${workflows.agents}`] : [], isAlert: false },
-    { key: 'commits', label: 'Commits', value: String(commits.total), sub: commits.total ? plural(commits.repos, 'repo') : '—', shorts: commits.total ? [String(commits.repos)] : [], isAlert: false },
-    { key: 'tests', label: 'Tests', value: tests.value, sub: tests.sub, shorts: /^\d+$/.test(tests.value) ? [`${tests.value} passed`, tests.value] : tests.value === '—' ? ['none'] : [tests.value], isAlert: false },
+    {
+      key: 'agents',
+      label: 'Agents',
+      value: String(agents.total),
+      sub: !agents.total ? 'none yet' : `${agents.working} working · ${agents.done} done`,
+      shorts: !agents.total ? ['none'] : [`${agents.working} working`, ...(agents.failed ? [] : [String(agents.working)])],
+      bad: agents.failed ? `${agents.failed} failed` : undefined,
+      isAlert: false,
+    },
+    {
+      key: 'commits',
+      label: 'Commits',
+      value: String(commits.total),
+      sub: commits.total ? `on main since ${since}${repos}` : 'none yet',
+      shorts: commits.total ? [`since ${since}${repos}`, ...(repos ? [`${commits.repos} repos`] : []), `since ${since}`] : ['none'],
+      isAlert: false,
+    },
+    {
+      key: 'tests',
+      label: 'Tests',
+      value: tests.value,
+      sub: tests.failing ? '' : tests.sub,
+      shorts: tests.failing ? [] : (tests.shorts ?? (tests.value === '—' ? ['none'] : [])),
+      bad: tests.failing ? `${tests.failing} failing` : undefined,
+      isAlert: false,
+    },
     {
       key: 'duration',
       label: 'Duration',
@@ -425,6 +473,14 @@ export function blocksOf(totals: RunSummary, hasWork: boolean, end?: string): Bl
       shorts: !hasWork ? ['—'] : end ? [`until ${end}`, end] : [since],
       isAlert: false,
     },
-    { key: 'git', label: 'Git', value: String(git.dirty), sub: git.dirty ? 'to commit' : 'clean', shorts: git.dirty ? [String(git.dirty)] : [], isAlert: false },
+    {
+      key: 'git',
+      label: 'Git',
+      value: String(git.dirty),
+      sub: stale ? `${gitBase} · ${stale}` : gitBase,
+      shorts: stale ? [stale, `+${git.stale.files} stale`, ...(git.dirty ? ['to commit'] : [])] : git.dirty ? ['to commit'] : [],
+      isAlert: false,
+    },
+    { key: 'tokens', label: 'Tokens', value: tokensText(tokens), sub: 'agents only', isAlert: false },
   ]
 }
