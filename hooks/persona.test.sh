@@ -15,6 +15,7 @@ check 'master-session:reviewer gets its skill' '{"session_id":"x","agent_type": 
 check 'master-session:designer gets its skill' '{"agent_type":"master-session:designer"}' '# Designer'
 check 'master-session:spec-writer gets its skill' '{"agent_type":"master-session:spec-writer"}' '# Spec writer'
 check 'master-session:architect gets its skill' '{"agent_type":"master-session:architect"}' '# Architect'
+check 'master-session:investigator gets its skill' '{"agent_type":"master-session:investigator"}' '# Investigator'
 check 'bare reviewer, a user agent, gets nothing' '{"agent_type":"reviewer"}' ''
 check 'another plugin reviewer gets nothing' '{"agent_type":"other:reviewer"}' ''
 check 'master-session:start gets nothing' '{"agent_type":"master-session:start"}' ''
@@ -57,6 +58,11 @@ rule 'start: heartbeat none on stop' skills/start/SKILL.md 'Heartbeat: none'
 rule 'subchat: argument-hint is only the task' skills/subchat/SKILL.md "argument-hint: '<task>'"
 rule 'subagent: argument-hint is only the task' skills/subagent/SKILL.md "argument-hint: '<task>'"
 rule 'qa-verifier: full suite never rerun' skills/qa-verifier/SKILL.md 'never rerun it'
+rule 'start: plan list has Investigate' skills/start/SKILL.md 'Investigate (if a bug'"'"'s cause is unknown'
+rule 'start: doc tier covers investigate' skills/start/SKILL.md '`doc` for investigate, spec, design and architect pieces'
+rule 'investigator: never fixes' skills/investigator/SKILL.md 'You find the cause; you never fix it.'
+rule 'investigator: no suite unless suite-runner' skills/investigator/SKILL.md "unless the brief names you the run's suite-runner"
+rule 'investigator: validator approves the report' skills/investigator/SKILL.md 'the validator approves the report'
 
 tmp=$(mktemp -d)
 trap 'rm -r "$tmp"' EXIT

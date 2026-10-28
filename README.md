@@ -12,7 +12,7 @@ A Claude Code plugin that turns one session into a **validator** for a team of w
 | Skills `subchat`, `subagent`, `workflow` | `/master-session:subchat`, `/master-session:subagent` and `/master-session:workflow`: start a worker session, a persona subagent or a workflow of persona agents from the validator. |
 | Skill `worker` | The protocol every worker session follows: its own worktree, the report tool, talking to the validator, the `ready <sha>` gate. |
 | Status mod | `/master-session:info` opens it: a pane beside the chat with one row per worker (state, progress, git, tests, commits) under run-total tiles, a band above the prompt, archive and unarchive, and **Ask for updates** (shown once workers are listed). Workers report through the `mcp__master-session__report` tool; the mod also records their commits, test runs, edits and waits by itself. |
-| Personas | Nine roles, each a skill plus an agent of the same name: `implementer`, `refactorer`, `reviewer`, `qa-verifier`, `design-checker`, `researcher`, `spec-writer`, `architect` and `designer`. |
+| Personas | Ten roles, each a skill plus an agent of the same name: `implementer`, `refactorer`, `reviewer`, `qa-verifier`, `design-checker`, `researcher`, `investigator`, `spec-writer`, `architect` and `designer`. |
 
 ## Install
 
@@ -98,6 +98,7 @@ Each persona is a skill, `master-session:<persona>`, and an agent of the same na
 | `qa-verifier` | Owns the verification of a ready sha in a clean detached worktree: the one full gate, tests and mutations, the review checklist in combined mode (the single checker for most pieces), rechecks after a fix, and live checks when given a window id. |
 | `design-checker` | Compares a readable render of the built UI with the approved design. |
 | `researcher` | Answers one question from published docs, citing each claim. |
+| `investigator` | Finds why a bug, failing test, regression or slowdown happens in the project's own code: reproduces and traces it in its own worktree and returns the root cause with evidence, a repro and fix options; never fixes it. |
 | `spec-writer` | Writes the feature's spec in the project's Claude Doc, one tab per feature, with testable acceptance criteria, before design and build. |
 | `architect` | For features spanning several modules or workers: turns the approved spec into a technical design in its tab (module map, interfaces, one piece per worker, order, risks, test proofs); read-only on code. |
 | `designer` | A fresh subagent per design pass that edits the project's canonical design artboards, the single source of truth for visuals, in place (a new one only for a new component or state), in light and dark, for the user to approve before any UI code. |

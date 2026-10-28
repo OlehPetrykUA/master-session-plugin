@@ -10,6 +10,7 @@ A persona is a fixed role the validator hands out. Each one has its own skill, `
 | QA verifier | subagent, every checked sha | [`master-session:qa-verifier`](../qa-verifier/SKILL.md) |
 | Design checker | subagent of the QA verifier, on a render it can read | [`master-session:design-checker`](../design-checker/SKILL.md) |
 | Researcher | subagent | [`master-session:researcher`](../researcher/SKILL.md) |
+| Investigator | subagent | [`master-session:investigator`](../investigator/SKILL.md) |
 | Spec writer | subagent | [`master-session:spec-writer`](../spec-writer/SKILL.md) |
 | Architect | subagent | [`master-session:architect`](../architect/SKILL.md) |
 | Designer | a fresh subagent per design pass | [`master-session:designer`](../designer/SKILL.md) |
