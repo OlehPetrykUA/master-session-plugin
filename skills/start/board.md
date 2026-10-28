@@ -9,7 +9,7 @@ The board posted on every tick and in every reply to the user. Every part is alw
 |---|---|---|---|
 | 🟢 | [setup-build](#local_<id>) | rewriting setup screens | smoke, check, amend |
 | ✅ | [conductor-build](#local_<id>) | done · 07ab1b7 · archive? | — |
-| ✅ | setup-design | approved v4 | — |
+| ✅ | [setup-design](#local_<id>) | approved v4 | — |
 
 #### 🟢 [setup-build](#local_<id>) — checkbox setup UI
 | | |
@@ -44,18 +44,18 @@ Nothing right now.
 | ✅ | my-app | master | 0 | no upstream | 07ab1b7 |
 
 **📦 Results so far**
-- Conductor build merged and verified: 07ab1b7 on master
-- Setup design approved: [canvas](<canvas link>) v4
+- [conductor-build](#local_<id>) merged and verified: 07ab1b7 on master
+- [setup-design](#local_<id>) approved: [canvas](<canvas link>) v4
 
-**Summary:** Setup build is on its screens, then a smoke run and its check; nothing needs you.
+**Summary:** [setup-build](#local_<id>) is on its screens, then a smoke run and its check; nothing needs you.
 
-**Answer:** yes, Conductor build is on master as 07ab1b7 and its check passed.
+**Answer:** yes, [conductor-build](#local_<id>) is on master as 07ab1b7 and its check passed.
 ```
 
 - **Header:** the ledger's run name, the counts of Quick-table rows by marker, and the next tick time from the Heartbeat line.
-- **Names:** the Plan and Results use the piece's name from the ledger's Plan table (start §2, stable for life); the Quick table and mini tables use the worker's `name`, the kebab-case form of its piece's name (`Setup build` → `setup-build`, per shape.md Names). A piece with no worker yet, or done inline, appears only in the Plan.
+- **Names:** the Plan uses the piece's name from the ledger's Plan table (start §2, stable for life). Every worker session named anywhere on the board (Quick table, mini table headings, Needs you, Results, Summary, Answer) is a link `[name](#local_<id>)`; subagent and workflow names stay plain text, since they have no session to open. The Quick table and mini tables use the worker's `name`, the kebab-case form of its piece's name (`Setup build` → `setup-build`, per shape.md Names). A piece with no worker yet, or done inline, appears only in the Plan.
 - **Quick table:** every worker; sessions linked `[name](#local_id)`, subagents and workflows by their description. Sort 🔴 needs you or blocked, 🟡 waiting or stalled, 🟢 working, ✅ done and verified. Cells 6 words or fewer.
-- **Mini tables:** one `####` per non-✅ worker, rows in the order shown, plus `❓ Needs you` last; leave out ⚠️ and ❓ when empty. ⏱ comes from `get_session` (`createdAt`, `lastActivityAt`), 📍 from the worker's `Progress:` line, 🔍 only from what the validator re-checked (SHAs, test counts), else "nothing yet". 🌿 names each repo the worker touches. Uncommitted work on a DONE worker is a ⚠️ Risk.
+- **Mini tables:** one `####` per non-✅ worker, rows in the order shown, plus `❓ Needs you` last; leave out ⚠️ and ❓ when empty. ⏱ comes from `get_session` (`createdAt`, `lastActivityAt`), ▸ Now (here and in the Quick table) from the worker's latest status line, 📍 from that line or its `Progress:` line, 🔍 only from what the validator re-checked (SHAs, test counts), else "nothing yet". 🌿 names each repo the worker touches. Uncommitted work on a DONE worker is a ⚠️ Risk.
 - A worker's `ready <sha>` is a claim: it stays 🟢 or 🟡 until the validator has verified and merged it. Only then ✅, with just a quick-table row `done · <SHA> · archive?`.
 - **Plan:** every piece of the whole run, queued ones included, written from the ledger's Plan table on every board, in plan order: marker, piece name, tier (T0 to T3, or `doc`), then the detail. ✅ done (merged sha, or "approved" for a doc piece), ▶ working or verifying (the worker's `step N of M — label`, or the check and its round), ⏳ queued, ⏸ paused (during a pause), ✖ dropped (with why).
   - A piece is a deliverable of any shape (worker session, subagent, workflow); helpers (QA verifier, Code reviewer, Researcher checks) are not pieces.

@@ -67,7 +67,7 @@ The only waits: a dependency not done (merged, or approved for a doc piece), the
 ## Checker gate  the full suite and build, run once per sha by the checker
 ## Timebox       T0 10 min, T1 30 min, T2/T3 60 min, spec, design or investigate 25 min
 ## Rules         the user's rules that apply; docs first, cited
-## Report        to <validator local_id>, in this format:
+## Report        to <validator local_id>; status lines on every change ([worker](../worker/SKILL.md)); the final report in this format:
 STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
 Progress: step N of M — <step name>
 Changed:  ready <sha> on <branch>, or <commits / files>
@@ -92,6 +92,8 @@ Reuse, handover, retirement and drift: read [shape.md](shape.md#worker-lifetime)
 
 **Heartbeat.** While any worker of this validator is open, a recurring tick runs every 5 minutes (or the interval the user asks for). Start it once: Skill `loop`, args `5m master-session tick for <run name>: read the whole ${CLAUDE_SKILL_DIR}/SKILL.md, ${CLAUDE_SKILL_DIR}/answering.md, ${CLAUDE_SKILL_DIR}/shape.md and ${CLAUDE_SKILL_DIR}/board.md, and <scratchpad>/protocol.md, then do one tick`. `/loop 5m` makes a recurring cron job (`CronCreate` `*/5 * * * *`, per the bundled loop skill): it fires only while this session is idle, may land up to half an interval late, needs no re-arm, is gone with the session and expires after 7 days (the CronCreate tool description). Write `Heartbeat: cron <job id> · every 5m · since HH:MM · last tick HH:MM` in the ledger; the other skills check that line. Stop it only at Done, on `/master-session:stop` or on a pause: `CronDelete <job id>`, then `Heartbeat: none · stopped HH:MM`. A `last tick` over 15 minutes old while workers are open, checked on every tick and every reply, is a stalled loop: recreate it only if `CronList` doesn't list it; delete any duplicate. For a session the user named, SendMessage with `notify_when_idle: true` (one-shot). Write the args with this folder's absolute path; `${CLAUDE_SKILL_DIR}` is expanded only in a loaded skill, so a skill that read this file by path writes `${CLAUDE_PLUGIN_ROOT}/skills/start`.
 
+**The tick is only a safeguard.** Status lines, completion notices and worker messages are the primary signal and wake you at once; the tick catches what they miss (stalls, a dead loop). When another session or an orchestrator started this run, push it the same status line on every change (a piece starts or ends, a ready sha, a check's PASS or FAIL, a merge, a push, a question or blocker, DONE), `<run name>` first.
+
 **Pause and resume.** The user's pause stops all work and the loop; resume restarts it: read [shape.md](shape.md#pause-and-resume).
 
 **Ticks stay short; the user comes first.** Every reply to the user is the full board with the answer at the bottom, under its Summary line ([board.md](board.md)). A message that lands mid-tick gets that reply at your next tool step, without waiting for the tick's long checks; a question outside a tick gets it at once. A tick is a few quick calls (the ledger, `get_session` and `list_events` per session, the standing-check commands); gates, suites, big diffs and transcript reads run with `run_in_background` or in a checker, never inside the tick.
@@ -102,10 +104,7 @@ On every wake, do one tick:
    - **T0:** read the diff and run the Checker gate once yourself, with `run_in_background`, in `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-verify-<short sha>" <sha>`, removed after.
    - **T1 to T3:** one `master-session:qa-verifier` in `Mode: combined`.
    - **Risk flag:** `master-session:qa-verifier` in `Mode: qa` and `master-session:reviewer` in parallel.
-   - **Recheck** after a fix: one agent, the checker whose Blocking finding failed, on `git diff <old sha> <new sha>`. A Code reviewer finding goes to a Code reviewer recheck, a QA finding to a QA verifier in `Mode: recheck`, both, or a combined-mode checklist finding, to a QA verifier in `Mode: recheck` with the reviewer Checklist.
-   - **Rebase:** `git range-diff` old against new. All `=`: no re-verify (step 3's inline gate). Any `!`: one recheck agent on those commits.
-   - **Live check** only for a visual risk unit tests can't see, named in the plan: a QA verifier in `Mode: live` with the target app's window id (CoreGraphics `CGWindowListCopyWindowInfo`, its owner, layer 0) and what must show; captured read-only, never brought to the front.
-   - **Engine:** plugin checks use the desktop's bundled `~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude`, not a `claude` on PATH.
+   - Recheck, rebase, live check and engine: [shape.md](shape.md#verify-details).
    - A verdict is a claim, never proof; an uncited finding goes back to its author. Gate: [qa-verifier](../qa-verifier/SKILL.md); severity: [Verdict rules](../reviewer/SKILL.md#verdict-rules).
 3. Merge. The sha that merges has had one full gate: after an all-`=` rebase, or a recheck by the Code reviewer alone, run the Checker gate inline first (as for T0, in the background); it counts as the one suite-runner. Then `git -C <live repo> merge --ff-only <sha>`. Not a fast-forward: a session rebases itself, a subagent gets `rebase onto <master sha>, rerun Your checks, report ready <new sha>`. A merged sha retires its worker.
 4. Fix round: one SendMessage per worker per round bundling every Blocking finding with evidence and fix, logged in the ledger. Nits go to the ledger backlog. Never resend; an ignored message may be a permission-mode hold. At most 2 fix rounds per piece: still blocking after round 2, no third fix message; cut scope to what passes, re-brief a fresh agent, or ask the user, and log which.

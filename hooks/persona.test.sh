@@ -57,7 +57,7 @@ rule 'board: states move one way' skills/start/board.md 'States move one way: qu
 rule 'board: a fix round adds no piece' skills/start/board.md 'A fix round after a FAIL adds no piece'
 rule 'board: user work extends the plan' skills/start/board.md 'work the user adds mid-run adds one'
 rule 'board: never delete a piece' skills/start/board.md 'never delete a piece: abandoned or split work is dropped'
-rule 'board: names plan vs worker' skills/start/board.md 'the Quick table and mini tables use the worker'"'"'s `name`, the kebab-case form'
+rule 'board: names plan vs worker' skills/start/board.md 'The Quick table and mini tables use the worker'"'"'s `name`, the kebab-case form'
 rule 'board: Nothing right now' skills/start/board.md '`Nothing right now.` when empty'
 rule 'board: no done summary piece' skills/start/board.md 'Never list done work as a summary piece'
 rule 'board: full plan before the first spawn' skills/start/board.md 'Post the full plan on the first board, before the first spawn'
@@ -81,6 +81,13 @@ rule 'start: protocol.md' skills/start/SKILL.md '`protocol.md` (the head)'
 rule 'start: log.md' skills/start/SKILL.md '`log.md` (the appended log)'
 rule 'start: copy the ledger at wrap-up' skills/start/SKILL.md 'At Wrap-up, and before this session could be deleted or archived, copy the final `protocol.md` and `log.md`'
 rule 'stop: CronDelete' skills/stop/SKILL.md 'CronDelete'
+rule 'worker: status line on every change' skills/worker/SKILL.md 'On every change, push one status line to the parent'
+rule 'worker: status line next' skills/worker/SKILL.md '· next: <next step>'
+rule 'worker: status line needs' skills/worker/SKILL.md '· needs: <nothing | the question>'
+rule 'worker: subagent sends to main' skills/worker/SKILL.md 'SendMessage `to: "main"`'
+rule 'board: every worker session is a link' skills/start/board.md 'Every worker session named anywhere on the board'
+rule 'start: tick is only a safeguard' skills/start/SKILL.md 'The tick is only a safeguard.'
+rule 'start: validator pushes status lines up' skills/start/SKILL.md 'push it the same status line on every change'
 
 tmp=$(mktemp -d)
 trap 'rm -r "$tmp"' EXIT

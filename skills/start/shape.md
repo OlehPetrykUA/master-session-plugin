@@ -19,6 +19,14 @@ One per piece, named in the ledger; the first match wins.
 - Record each piece's pending step and its worktree's `git status --short` in the ledger and stop the loop (`CronDelete <job id>`, then `Heartbeat: none · stopped HH:MM`); nothing runs until resume.
 - On resume: a fresh agent per paused subagent piece, briefed as in [Worker lifetime](#worker-lifetime) to continue in its recorded worktree at its sha with its uncommitted work, never in a new worktree; each session one `RESUME` with its pending step; `git worktree remove --force` each verify worktree a stopped checker or your inline gate left, so the next tick starts a fresh checker on the same sha; start each paused workflow piece again with a fresh `Workflow` call (workflows are read-only); arm again each Monitor and background wait the ledger lists; start the loop again with section 3's `/loop 5m` args, a new `Heartbeat: cron <job id>` line.
 
+## Verify details
+
+Part of tick step 2 of the [start](SKILL.md#3-the-loop) skill.
+- **Recheck** after a fix: one agent, the checker whose Blocking finding failed, on `git diff <old sha> <new sha>`. A Code reviewer finding goes to a Code reviewer recheck, a QA finding to a QA verifier in `Mode: recheck`, both, or a combined-mode checklist finding, to a QA verifier in `Mode: recheck` with the reviewer Checklist.
+- **Rebase:** `git range-diff` old against new. All `=`: no re-verify (step 3's inline gate). Any `!`: one recheck agent on those commits.
+- **Live check** only for a visual risk unit tests can't see, named in the plan: a QA verifier in `Mode: live` with the target app's window id (CoreGraphics `CGWindowListCopyWindowInfo`, its owner, layer 0) and what must show; captured read-only, never brought to the front.
+- **Engine:** plugin checks use the desktop's bundled `~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app/Contents/MacOS/claude`, not a `claude` on PATH.
+
 ## Design pass
 
 Design only when visuals change; logic behind an existing element (which rows show, when a list refreshes) skips it. The design canvas is the single source of truth for visuals ([Designer](../designer/SKILL.md)). One Designer pass per plan covers every piece whose visuals change; the user approves before any UI build brief. An approved design gets no new pass unless the user asks for a visual change (mid-build, in a fix round, after a merge): that goes to a Designer pass first, then the build. The build brief always names the canvas id, version and artboard names.

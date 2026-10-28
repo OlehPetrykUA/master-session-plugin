@@ -16,7 +16,7 @@ Run the same protocol with what Copilot has:
 
 ## worker
 
-Copilot has no SendMessage. Put each update, question and `ready <sha>` in your own chat, in the report format, for the user to relay to the parent. Without a Monitor, check your start condition and master each time the user writes.
+Copilot has no SendMessage. Write each status line in your own chat for the user to relay, and put each question and `ready <sha>` there in the report format. Without a Monitor, check your start condition and master each time the user writes.
 
 ## subchat
 

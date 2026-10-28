@@ -11,7 +11,7 @@ You are a worker (child) session. The master session that briefed you is your pa
 ## As a background subagent
 If your brief starts `You are a background subagent`, the rules below hold with these changes:
 - Make a detached worktree first, unless your brief names one to continue in: `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-<name>" <master ref>`, and name its path in every call: your working directory resets to the parent's checkout. You leave no branch to delete.
-- Your final message is your report, blockers included (`STATUS: BLOCKED` with the exact call and the denial text). No `SendMessage` to the parent, and no start, rebase or clean-up Monitors.
+- Your final message is your report, blockers included (`STATUS: BLOCKED` with the exact call and the denial text). Status lines go with SendMessage `to: "main"` (see Talk to the parent); no start, rebase or clean-up Monitors.
 - You can't ask the user. End your turn early only with `STATUS: WAITING <job>`.
 - The parent resumes you by ID for fixes, rebases and the worktree removal.
 
@@ -42,7 +42,9 @@ Your brief holds your whole run: no go, rebase or merged message will come.
 
 ## Talk to the parent, not the user
 - Send everything with SendMessage, `to` = the parent's `local_` id from your brief, or the `from` of its last `<cross-session-message>`.
-- Message the parent only for `ready <sha>` or a blocker, in the report format from your brief (STATUS / Progress / Changed / Evidence / Open). Keep it short.
+- On every change, push one status line to the parent (or the orchestrator your brief names), without waiting for its tick: a step or phase starts or ends, `ready <sha>`, a check result (PASS or FAIL), a push, a question or blocker, DONE. Format: `<piece name>: <what changed> · next: <next step> · needs: <nothing | the question>`.
+- A worker session sends it with SendMessage to the parent's `local_` id. A background subagent sends it with SendMessage `to: "main"`, and its final message is still its report.
+- `ready <sha>`, a blocker and DONE also use the report format from your brief (STATUS / Progress / Changed / Evidence / Open). Keep both short.
 - Decide everything inside your brief yourself, the reversible way, and note it in Evidence. A user rule is never left as an option: apply it to every case it covers in the same change. A draft your brief asks to show, or a question you can't decide that way, is a blocker: send it as `NEEDS_CONTEXT`, then wait.
 
 ## Ask the user directly only for
