@@ -6,7 +6,7 @@ import { archivedItemOf } from '../../lib/list'
 import type { Context, ListItem, RowItem } from '../../lib/list'
 import { statusSentenceOf } from '../../lib/status'
 import type { Actions, TextUi } from '../types'
-import { TextArchivedDetail, TextSessionDetail, TextSubagentDetail } from './TextDetail'
+import { TextArchivedDetail, TextSessionDetail, TextSubagentDetail, TextWorkflowDetail } from './TextDetail'
 
 const ui = { Box: 'Box', Text: 'Text', Button: 'Button' } as unknown as TextUi
 
@@ -85,4 +85,24 @@ for (const probe of PROBES) {
       expect(strings).toContain('plain step')
     })
   }
+}
+
+const TOOK = [
+  [125_000, 'took 2m · '],
+  [3_720_000, 'took 1h 2m · '],
+  [42_000, 'took 42s · '],
+] as const
+
+for (const [ms, word] of TOOK) {
+  test(`R9: the terminal subagent card reads ${word.trim()} for a run of ${ms} ms`, () => {
+    const done = subagent({ state: 'done', startedAt: 1_000_000, endedAt: 1_000_000 + ms })
+    expect(timeOf({ ...done, status: 'done' } as Extract<RowItem, { kind: 'subagent' }>)).toMatch(new RegExp(`^${word}\\d`))
+  })
+
+  test(`R9: the terminal workflow card reads ${word.trim()} for a run of ${ms} ms`, () => {
+    const run = { id: 'wf', name: 'wf', description: '', phases: [], state: 'done', startedAt: 1_000_000, endedAt: 1_000_000 + ms, agents: [], counts: { total: 0, running: 0, done: 0, failed: 0, asking: 0 }, tokens: 0 }
+    const item = { kind: 'workflow', id: 'wf', group: 'done', status: 'done', run } as unknown as Extract<ListItem, { kind: 'workflow' }>
+    const card = TextWorkflowDetail(ui, { item, context, home: '/h', open: [], onToggle: () => {}, onCollapse: () => {} })
+    expect(valueOf(card, 'Time')).toMatch(new RegExp(`^${word}\\d`))
+  })
 }

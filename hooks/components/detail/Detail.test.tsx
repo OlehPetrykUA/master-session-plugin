@@ -1012,3 +1012,36 @@ test('AC26: Open shows on the session card and the archived card only for a sess
   expect(card.some(text => /^session other · archived$/.test(String(text)))).toBe(true)
   await ui.unmount()
 })
+
+const TOOK = [
+  [125_000, 'took 2m'],
+  [3_720_000, 'took 1h 2m'],
+] as const
+
+for (const [ms, word] of TOOK) {
+  test(`R9: a done subagent card on the desktop reads "${word}" for a run of ${ms} ms`, async ($, on) => {
+    seededAgents(on, [{ id: 'q1', type: 'master-session:qa-verifier', description: 'Verify the gate', state: 'done', startedAt: NOW_MS - ms - 1_000, endedAt: NOW_MS - 1_000, result: 'passed' }])
+    await started($, on)
+    const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+    await click(ui, 'hit-row-q1')
+    expect(await textsOf(ui)).toContain(word)
+    await ui.unmount()
+  })
+
+  test(`R9: a done workflow card on the desktop reads "${word}" for a run of ${ms} ms`, async ($, on) => {
+    const startedAt = NOW_MS - ms - 1_000
+    const all: Record<string, unknown> = {
+      agents: [{ id: 'w0', type: 'workflow-subagent', prompt: 'go', description: 'scan', state: 'done', startedAt, endedAt: NOW_MS - 1_000, run: { id: 'wf_1', index: 0 } }],
+      workflows: [{ id: 'wf_1', toolUseId: 't', name: 'audit', phases: [], startedAt }],
+    }
+    on('state.get', async (_, e, next) => {
+      const real = (await next(e)) as { value: { value: unknown; version: number } }
+      return (e.key in all ? { value: { ...real.value, value: all[e.key] } } : real) as never
+    })
+    await started($, on)
+    const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+    await click(ui, 'hit-row-wf_1')
+    expect(await textsOf(ui)).toContain(word)
+    await ui.unmount()
+  })
+}
