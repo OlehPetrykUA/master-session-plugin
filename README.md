@@ -105,9 +105,10 @@ Urgency: 🔴 blocking now · 🟡 later or after X. Kind: 🖥 run a command ·
 **🛡 Standing checks**
 - **Git safety:**
   - ✅ ~/dotfiles: committed and on master; nothing lives only in scratch
-  - 🟡 my-app: committed on branch `setup-ui ＠ 3c1d7e2`, owner Implementer: setup build, merges after the QA verdict
+  - 🟡 my-app: committed on branch `setup-ui ＠ 9f95022`, owner Implementer: setup build, merges after the QA verdict
 - **To delete later:**
-  - worktree `wt-my-app-setup-build` (detached) · Implementer: setup build · holds the unmerged ready sha · after merge
+  - worktree `wt-my-app-setup-build` (detached at 9f95022) · Implementer: setup build · holds the unmerged ready sha · after merge
+  - branch `setup-ui` · Implementer: setup build · same commit 9f95022 as the worktree · after merge
   - branch `setup-import` · Implementer: setup import · piece dropped · owner retired ⚠
 - ✅ PC load: CPU 62% idle · load 5.1 / 10 cores
 

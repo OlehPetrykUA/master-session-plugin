@@ -20,7 +20,7 @@ The board posted on every tick that has news and in every reply to the user. Eve
 | ✔ Done | tech choice (bash), setup design v4 approved |
 | ▸ Now | rewriting setup.sh screens (+27 −32) |
 | 🔍 Verified | mockups match spec; worktree holds only its edit |
-| 🌿 Git | my-app wt-my-app-setup-build, detached · 1 uncommitted · last 9f95022 |
+| 🌿 Git | my-app wt-my-app-setup-build, detached · 0 uncommitted · last 9f95022 |
 | ⚠️ Risk | bash 3.2 key handling unproven |
 | → Next | smoke on /bin/bash, check, amend · ETA ~20 min |
 
@@ -46,9 +46,10 @@ Urgency: 🔴 blocking now · 🟡 later or after X. Kind: 🖥 run a command ·
 **🛡 Standing checks**
 - **Git safety:**
   - ✅ ~/dotfiles: committed and on master; nothing lives only in scratch
-  - 🟡 my-app: committed on branch `setup-ui ＠ 3c1d7e2`, owner Implementer: setup build, merges after the QA verdict; 1 uncommitted path, Implementer: setup build's own
+  - 🟡 my-app: committed on branch `setup-ui ＠ 9f95022`, owner Implementer: setup build, merges after the QA verdict
 - **To delete later:**
-  - worktree `wt-my-app-setup-build` (detached) · Implementer: setup build · holds the unmerged ready sha · after merge
+  - worktree `wt-my-app-setup-build` (detached at 9f95022) · Implementer: setup build · holds the unmerged ready sha · after merge
+  - branch `setup-ui` · Implementer: setup build · same commit 9f95022 as the worktree · after merge
   - branch `setup-import` · Implementer: setup import · piece dropped · owner retired ⚠
 - ✅ PC load: CPU 62% idle · load 5.1 / 10 cores · no suites or builds
 
@@ -86,7 +87,7 @@ Urgency: 🔴 blocking now · 🟡 later or after X. Kind: 🖥 run a command ·
 - **Standing checks:** recomputed from fresh commands on every board, never copied from the last one.
   - Git safety: one line per repo the run touches, with exactly one of: ✅ committed and on main (and pushed, when the user's task asked for a push); 🟡 committed on a branch not yet merged, written `branch ＠ sha`, with its owner and when it merges; 🔴 uncommitted: the path count and whose they are (a working worker's own worktree edit is its owner's). The line also says nothing the run needs lives only in a scratch folder.
   - To delete later: a list of every extra worktree and branch the run made, each with its owner, why it still exists and when it goes ("after merge", "after QA verdict", "owner retired ⚠"). Take them from `git worktree list --porcelain` and `git for-each-ref refs/heads`. A live worker's or checker's detached worktree is fine; one whose owner is retired or gone is ⚠. A removed entry leaves the list.
-  - Merged check: a branch counts as merged when `git branch --merged main` lists it ("only list branches whose tips are reachable from <commit>", git-branch(1)), or when `git cherry main <branch>` prints only `-` lines ("prefixed with - for commits that have an equivalent in <upstream>, and + for commits that do not", git-cherry(1)), which catches the rebase-merged case where the tips differ. Use `--merged` first; use `git cherry` when it does not list the branch; fall back to the tree compare `git diff --quiet main <branch>` (exit 0, same content) when a squash merge leaves no equivalent commits.
+  - Merged check: a branch counts as merged when `git branch --merged main` lists it ("only list branches whose tips are reachable from <commit>", git-branch(1)), or when `git cherry main <branch>` prints only `-` lines ("prefixed with - for commits that have an equivalent in <upstream>, and + for commits that do not", git-cherry(1)), which catches the rebase-merged case where the tips differ. Use `--merged` first; use `git cherry` when it does not list the branch; fall back to the tree compare `git diff --quiet main <branch>` (exit 0, same content) when a squash merge leaves no equivalent commits; it can under-report a squash-merged branch whose files main changed later, which is safe for a delete list.
   - Then the Repos table, every repo the run touches.
   - Git facts: `git -C <repo> status --porcelain=v2 --branch` gives `# branch.oid`, `# branch.head`, `# branch.ab +A -B`; no `# branch.upstream` line means no upstream; every other line is one uncommitted path. It reads only that checkout: read a worker's worktree with `git -C <its worktree> status`, for its mini table's 🌿 row. Local branches with no upstream (📤): `git -C <repo> for-each-ref refs/heads --format='%(refname:short) %(upstream:short)'`. A Repos row is ✅ when clean and in sync, ⚠️ otherwise.
   - PC load: CPU idle, 1-minute load over core count, heavy jobs (suites, builds), from `sysctl -n vm.loadavg`, `sysctl -n hw.ncpu`, `top -l 2 -n 0 -s 1 | grep 'CPU usage' | tail -1` and `ps -Ao %cpu,command` filtered for test suites and builds. ⚠️ when idle is under 15%, or the load is over 1.2 × cores with idle under 35%. It is a report, not a wait: it never holds doc-only work and adds no wait to start's "Count and waits".
