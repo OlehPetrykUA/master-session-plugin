@@ -11,9 +11,11 @@ export type SummaryProps = { blocks: readonly Block[]; perRow: number; width: nu
 
 export const CAPTION = 11
 
+export const joinOf = (sub: string | undefined, bad?: string) => (bad ? (sub ? `${sub} · ${bad}` : bad) : (sub ?? ''))
+
 export function subOf(one: Block, inner: number) {
   const subs = [one.sub, ...(one.shorts ?? [])]
-  return subs.find(text => textWidth(text, CAPTION) <= inner) ?? subs.at(-1)
+  return subs.find(text => textWidth(joinOf(text, one.bad), CAPTION) <= inner) ?? (one.bad ? '' : subs.at(-1))
 }
 
 export function Summary(ui: Ui, props: SummaryProps) {
@@ -44,6 +46,14 @@ export function Summary(ui: Ui, props: SummaryProps) {
               {one.label}
             </Text>
           </Box>
+          {one.chats ? (
+            <Box key={`tile-chats-${one.key}`} flexDirection="row" alignItems="center" gap={across(2)} flexShrink={0}>
+              {Icon(ui, { id: `block-chats-icon-${one.key}`, name: 'chat', size: 10, tone: 'muted', alt: `${one.chats} sessions` })}
+              <Text size="caption" weight="semibold" color={C.muted} tabular>
+                {String(one.chats)}
+              </Text>
+            </Box>
+          ) : null}
         </Box>
         <Svg key={`block-value-${one.key}`} source={value.source} alt={`${one.label} ${one.value}`} width={value.width} height={24} />
         {one.dots ? (
@@ -56,6 +66,17 @@ export function Summary(ui: Ui, props: SummaryProps) {
                 </Text>
               </Box>
             ))}
+          </Box>
+        ) : one.bad ? (
+          <Box key={`block-bad-${one.key}`} flexDirection="row" minWidth={0}>
+            {sub ? (
+              <Text size="caption" color={C.muted} wrap="truncate-end">
+                {`${sub} · `}
+              </Text>
+            ) : null}
+            <Text size="caption" weight="semibold" color={C.red} wrap="truncate-end">
+              {one.bad}
+            </Text>
           </Box>
         ) : (
           <Text size="caption" color={C.muted} wrap="truncate-end">

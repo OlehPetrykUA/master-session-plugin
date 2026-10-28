@@ -9,6 +9,7 @@ import { headerButtonsOf, paneViewOf } from '../lib/view'
 import { TERMINAL_COLOR } from '../theme/tokens'
 import { clearOf } from './clear'
 import { TextProcesses } from './TextProcesses'
+import { TextSummary } from './TextSummary'
 import { TextArchivedDetail, TextSessionDetail, TextSubagentDetail, TextWorkflowDetail, colorOf, wordColorOf } from './detail/TextDetail'
 import type { PaneData, TextUi } from './types'
 import { UnarchiveConfirm } from './UnarchiveConfirm'
@@ -79,23 +80,23 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
 
   const empty = (id: string) => (
     <Box key={`empty-${id}`} flexDirection="column">
-      <Text weight="semibold">{EMPTY_TEXT[data.chosen].title}</Text>
-      <Text dimColor>{EMPTY_TEXT[data.chosen].body}</Text>
-      {data.chosen === 'all' ? null : <Button key={`show-all-${id}`} plain label="Show all" onPress={() => actions.filter('all')} />}
+      <Text weight="semibold">{EMPTY_TEXT[view.chosen].title}</Text>
+      <Text dimColor>{EMPTY_TEXT[view.chosen].body}</Text>
+      {view.chosen === 'all' ? null : <Button key={`show-all-${id}`} plain label="Show all" onPress={() => actions.filter('all')} />}
     </Box>
   )
 
   const group = (one: ListGroup) => {
     if (one.id === 'archived') {
-      if (data.chosen === 'archived' && !one.archived.length) return empty('archived')
+      if (view.chosen === 'archived' && !one.archived.length) return empty('archived')
       return (
         <Box key="group-archived" flexDirection="column">
           <Box flexDirection="row" gap="sm">
             <Text weight="semibold">{`${GROUP_LABEL.archived} ${one.archived.length}`}</Text>
             <Box flexGrow={1} />
-            {data.chosen === 'all' ? <Button key="archived-toggle" plain label={one.isOpen ? 'Hide' : 'Show'} onPress={() => actions.archiveView(one.isOpen ? 'closed' : 'open')} /> : null}
+            {view.chosen === 'all' ? <Button key="archived-toggle" plain label={one.isOpen ? 'Hide' : 'Show'} onPress={() => actions.archiveView(one.isOpen ? 'closed' : 'open')} /> : null}
           </Box>
-          {one.isOpen ? shownArchived(one, data.archiveView, data.chosen).map(entry => archivedRow(archivedItemOf(entry, data.board))) : null}
+          {one.isOpen ? shownArchived(one, data.archiveView, view.chosen).map(entry => archivedRow(archivedItemOf(entry, data.board))) : null}
           {view.hasMore ? <Button key="archived-more" plain label={`Show ${one.archived.length - ARCHIVED_PEEK} more`} onPress={() => actions.archiveView('all')} /> : null}
         </Box>
       )
@@ -114,8 +115,6 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
       </Box>
     )
   }
-
-  const blocks = view.blocks.map(block => `${block.label} ${block.value}${block.dots ? ` (${block.dots.map(mark => mark.count).join(' / ')})` : block.sub && block.sub !== '—' ? ` ${block.sub}` : ''}`)
 
   return (
     <Box flexDirection="column" gap="sm">
@@ -149,18 +148,15 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
           </Text>
         </Box>
       ) : null}
-      <Box key="section-summary" flexDirection="column">
-        <Text>{blocks.slice(0, 4).join(' · ')}</Text>
-        <Text dimColor>{blocks.slice(4).join(' · ')}</Text>
-      </Box>
+      {TextSummary(ui, { blocks: view.blocks, columns: data.columns })}
       {view.processes ? TextProcesses(ui, { view: view.processes, actions }) : null}
       <Box key="section-chips" flexDirection="row" flexWrap="wrap" gap="xs">
         {view.chips.map(chip => (
-          <Button key={`filter-${chip.id}`} variant={data.chosen === chip.id ? 'primary' : undefined} label={`${chip.label} ${chip.count}`} onPress={() => actions.filter(chip.id)} />
+          <Button key={`filter-${chip.id}`} variant={view.chosen === chip.id ? 'primary' : undefined} label={`${chip.label} ${chip.count}`} onPress={() => actions.filter(chip.id)} />
         ))}
       </Box>
       <Box key="section-list" flexDirection="column" gap="sm">
-        {data.chosen === 'all' && !view.items.length ? empty('all') : null}
+        {view.chosen === 'all' && !view.items.length ? empty('all') : null}
         {view.groups.map(group)}
       </Box>
     </Box>
