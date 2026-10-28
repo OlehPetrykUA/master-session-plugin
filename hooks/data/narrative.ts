@@ -3,6 +3,8 @@ import type { EngineInterface } from 'claude-code'
 import type { Board } from '../../types'
 import { cleanNarrativeOf } from '../lib/board'
 import { NARRATIVE_CAP } from '../lib/constants'
+import { hasCue } from '../lib/cues'
+import { clean } from '../lib/status'
 import { getAgents, getNarrativeNote, getWorkflows, setNarrativeNote } from '../state/atoms'
 import { isActive, isOff } from './recorder'
 import { boardOf, isPaneOpen } from './sources'
@@ -18,6 +20,8 @@ let isFlying = false
 
 const cut = (value: string | undefined) => (value ?? '').replace(/\s+/g, ' ').trim().slice(0, FIELD)
 
+const safe = (text: string | undefined) => (text && !hasCue(text) ? cut(clean(text)) || undefined : undefined)
+
 async function factsOf($: EngineInterface, board: Board) {
   const agents = await getAgents($)
   const workflows = await getWorkflows($)
@@ -25,12 +29,12 @@ async function factsOf($: EngineInterface, board: Board) {
     title: cut(one.title),
     persona: cut(one.persona),
     state: one.state,
-    progress: cut(one.progress),
-    now: cut(one.now),
-    next: cut(one.next),
-    needsYou: cut(one.needsYou),
-    done: cut(one.done),
-    verified: cut(one.verified),
+    progress: safe(one.progress),
+    now: safe(one.now),
+    next: safe(one.next),
+    needsYou: safe(one.needsYou),
+    done: safe(one.done),
+    verified: safe(one.verified),
   }))
   const keys = board.sessions.slice(0, ROWS).map(one => [one.name, one.state, one.needsYou, one.sha, one.verified, one.done])
   const plan = (board.plan ?? []).slice(0, 60).map(one => ({ name: cut(one.name), state: one.state, progress: cut(one.progress) }))
@@ -64,7 +68,7 @@ export async function refreshNarrative($: EngineInterface) {
   try {
     await setNarrativeNote($, value => ({ ...value, calledAt: at }))
     const reply = await $.model.complete({ model: 'haiku', effort: 'low', maxTokens: 220, timeoutMs: 20_000, system: RULES, prompt: promptOf(board.narrative, facts) })
-    const text = reply.isAnswered ? cleanNarrativeOf(reply.text) : undefined
+    const text = reply.isAnswered && !hasCue(reply.text) ? cleanNarrativeOf(reply.text) : undefined
     if (!text) return
     const written = await $.clock.now()
     await setNarrativeNote($, value => ({ ...value, text, sign, at: written }))

@@ -214,3 +214,54 @@ test('the text sent to the model holds no prompt, command or credential', async 
     for (const secret of secrets) expect(sent).not.toContain(secret)
   }
 })
+
+const LEAKY = {
+  ...BOARD,
+  narrative: OLD,
+  sessions: [
+    { id: 'local_a', name: 'a', title: 'Database work', state: 'needs-you' as const, needsYou: 'Run mysql -u root -p hunter2', progress: 'token ghp_abcdef1234567890abcd set' },
+    { id: 'local_b', name: 'b', title: 'Build work', state: 'working' as const, now: 'npm run build && npm test', next: 'Review the mockups' },
+  ],
+}
+
+async function leaky($: Engine, on: On, reply?: (count: number) => Promise<unknown> | unknown) {
+  const asked = model(on, reply)
+  const run = await started($, on, LEAKY)
+  await run.clock.advance(TICK_MS)
+  const ui = await pane($)
+  await spawn($, 'Docs lookup')
+  await run.clock.advance(TICK_MS)
+  return { asked, ui }
+}
+
+test('report fields with a secret or a command never reach the prompt, clean ones do', async ($, on) => {
+  const { asked, ui } = await leaky($, on)
+  expect(asked).toHaveLength(1)
+  const prompt = String(asked[0]?.prompt)
+  for (const text of ['mysql', 'hunter2', 'npm run build', 'ghp_', 'abcdef1234567890abcd']) expect(prompt).not.toContain(text)
+  expect(prompt).toContain('Review the mockups')
+  expect(prompt).toContain('Database work')
+  await ui.unmount()
+})
+
+test('a reply with a token is not shown and the previous narrative stays', async ($, on) => {
+  const text = 'Token ghp_abcdef1234567890abcd is set. Nothing needs you.'
+  const { asked, ui } = await leaky($, on, () => ({ isAnswered: true, text, usage: USAGE }))
+  expect(asked).toHaveLength(1)
+  expect((await shown(ui)).text).toBe(OLD)
+  await ui.unmount()
+})
+
+test('a reply with a password flag is not shown and the previous narrative stays', async ($, on) => {
+  const text = 'Run mysql -u root -p hunter2 to continue.'
+  const { asked, ui } = await leaky($, on, () => ({ isAnswered: true, text, usage: USAGE }))
+  expect(asked).toHaveLength(1)
+  expect((await shown(ui)).text).toBe(OLD)
+  await ui.unmount()
+})
+
+test('a normal reply still shows beside leaky inputs', async ($, on) => {
+  const { ui } = await leaky($, on)
+  expect((await shown(ui)).text).toBe(FRESH)
+  await ui.unmount()
+})
