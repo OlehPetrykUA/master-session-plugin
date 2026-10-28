@@ -7,7 +7,7 @@ import { BOARD_SCHEMA, FILE_MS, LIVE_MS, SECTIONS, TICK_MS } from '../lib/consta
 import { rowsOf } from '../lib/list'
 import { across, bodyWidthOf, down } from '../lib/layout'
 import { C } from '../theme/tokens'
-import { BAND, BOARD, BOARD_TOOL, HOME, MASTER, PANE, SELF, altsOf, childOf, click, started, textsOf, warmUp, world } from '../testing/world'
+import { BAND, BOARD, BOARD_TOOL, COLD_MS, HOME, MASTER, PANE, SELF, altsOf, childOf, click, started, textsOf, warmUp, world } from '../testing/world'
 import type { Ui } from '../testing/world'
 import { REPORTS_TOOL } from './contract'
 
@@ -152,7 +152,7 @@ test('AC6 a board restored from the transcript hides the narrative until the nex
   await ui.unmount()
 })
 
-test('AC7 a second before the limit the age reads 14m with no "stale" and the text keeps its colour', async ($, on) => {
+test('AC7 a second before the limit the age reads 14m with no "stale" and the text keeps its colour', { timeoutMs: COLD_MS }, async ($, on) => {
   const run = await master($, on)
   const ui = await pane($)
   const fresh = await colorShown(ui)
@@ -162,7 +162,7 @@ test('AC7 a second before the limit the age reads 14m with no "stale" and the te
   await ui.unmount()
 })
 
-test('AC8 at the limit the age reads "15m ago · stale" and the text turns muted', async ($, on) => {
+test('AC8 at the limit the age reads "15m ago · stale" and the text turns muted', { timeoutMs: COLD_MS }, async ($, on) => {
   const run = await master($, on)
   const ui = await pane($)
   const fresh = await colorShown(ui)
@@ -174,7 +174,7 @@ test('AC8 at the limit the age reads "15m ago · stale" and the text turns muted
   await ui.unmount()
 })
 
-test('AC9 an hour and five minutes reads "1h 5m ago · stale" and the text stays whole', { timeoutMs: 30_000 }, async ($, on) => {
+test('AC9 an hour and five minutes reads "1h 5m ago · stale" and the text stays whole', { timeoutMs: COLD_MS }, async ($, on) => {
   const run = await master($, on)
   const ui = await pane($)
   await run.clock.advance(minutes(15))
@@ -471,7 +471,7 @@ test('AC28 the terminal draws the whole text between the header and the summary,
   await ui.unmount()
 })
 
-test('AC29 a stale narrative in the terminal dims its text too', async ($, on) => {
+test('AC29 a stale narrative in the terminal dims its text too', { timeoutMs: COLD_MS }, async ($, on) => {
   const run = await master($, on)
   const ui = await pane($, 'terminal')
   await run.clock.advance(minutes(15))

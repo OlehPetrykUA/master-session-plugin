@@ -5,7 +5,7 @@ import type { AgentInfo, On } from 'claude-code'
 import type { AgentRecord, Report } from '../../types'
 
 import { FILE_MS, LIVE_MS, TICK_MS } from '../lib/constants'
-import { BAND, BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, altsOf, buttonsOf, childOf, labelOf, started, textsOf, warmUp, world } from '../testing/world'
+import { BAND, BOARD, BOARD_TOOL, COLD_MS, HOME, PANE, SELF, SPAWN, altsOf, buttonsOf, childOf, labelOf, started, textsOf, warmUp, world } from '../testing/world'
 import { CREDENTIALS } from '../testing/credentials'
 import type { Child, Ui } from '../testing/world'
 import { reportPath } from './status'
@@ -560,7 +560,7 @@ test('AC39: a permission request for a command puts only the tool name in the pa
   await ui.unmount()
 })
 
-test('AC38: for every credential command, the master’s pane, card and ask hold no secret and no Bash text', { plugins: [PROBE], timeoutMs: 20_000 }, async ($, on) => {
+test('AC38: for every credential command, the master’s pane, card and ask hold no secret and no Bash text', { plugins: [PROBE], timeoutMs: COLD_MS }, async ($, on) => {
   const run = await master($, on)
   await $.tool.call({ tool: OPEN, expand: 'a1' })
   const ui = await pane($)
@@ -578,7 +578,7 @@ test('AC38: for every credential command, the master’s pane, card and ask hold
   await ui.unmount()
 })
 
-test('AC38: for every credential command, a worker’s reports hold no secret and no Bash text', async ($, on) => {
+test('AC38: for every credential command, a worker’s reports hold no secret and no Bash text', { timeoutMs: COLD_MS }, async ($, on) => {
   const { run, writes, mine } = await worker($, on)
   for (const [, command, secrets] of CREDENTIALS) {
     const before = mine().length

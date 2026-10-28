@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { AgentInfo, On } from 'claude-code'
 
-import { BAND, BOARD, BOARD_TOOL, HOME, PANE, SPAWN, world } from '../testing/world'
+import { BAND, BOARD, BOARD_TOOL, HOME, PANE, SPAWN, COLD_MS, world } from '../testing/world'
 import type { Child } from '../testing/world'
 
 const SECONDS = 300
@@ -135,14 +135,14 @@ function within(cost: Cost, bound: Cost) {
   expect(cost).toEqual({ ...cost, ...Object.fromEntries(Object.entries(bound).filter(([key, max]) => cost[key as keyof Cost] > max).map(([key, max]) => [key, `at most ${max}`])) })
 }
 
-test('cost: a plain chat that spawns one subagent', async ($, on) => {
+test('cost: a plain chat that spawns one subagent', { timeoutMs: COLD_MS }, async ($, on) => {
   within(await measured($, on, {}, 1, false, false), BOUNDS.plain)
 })
 
-test('cost: a master with the pane closed and two running subagents', async ($, on) => {
+test('cost: a master with the pane closed and two running subagents', { timeoutMs: COLD_MS }, async ($, on) => {
   within(await measured($, on, { isPaneOpen: false }, 2, false, true), BOUNDS.closed)
 })
 
-test('cost: a master with the pane open, two running subagents and one board session', async ($, on) => {
+test('cost: a master with the pane open, two running subagents and one board session', { timeoutMs: COLD_MS }, async ($, on) => {
   within(await measured($, on, {}, 2, true, true), BOUNDS.open)
 })

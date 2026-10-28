@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { BOARD_TOOL, GIT, HOME, PANE, click, started, warmUp } from '../../testing/world'
+import { BOARD_TOOL, COLD_MS, GIT, HOME, PANE, click, started, warmUp } from '../../testing/world'
 
 const MAIN = `${HOME}/Work/designer-main`
 const TREE = `${HOME}/Work/designer-tree`
@@ -68,7 +68,7 @@ test('a worktree whose sha is proven an ancestor of base reads merged', async ($
   expect((await merged($, on, boardOf(ON_TOO, TREE), treeGit({ [`${MAIN} merge-base --is-ancestor ${ON_TOO} refs/heads/main`]: 'ok' }))).word).toBeDefined()
 })
 
-test('repeat refreshes add no merge-base call while the base head is unchanged, and re-check only the negatives when it moves', async ($, on) => {
+test('repeat refreshes add no merge-base call while the base head is unchanged, and re-check only the negatives when it moves', { timeoutMs: COLD_MS }, async ($, on) => {
   const shas = Array.from({ length: 20 }, (_, index) => `${index < 10 ? 'e' : 'f'}${String(index).padStart(6, '0')}`)
   const rows = shas.map((sha, index) => ({ id: `local_r${index}`, name: `r${index}`, state: 'done', progress: 'step 1 of 1 — x', sha, cwd: MAIN }))
   const git = gitOf(MAIN, Object.fromEntries(shas.filter((_, index) => index < 10).map(sha => [`${MAIN} merge-base --is-ancestor ${sha} refs/heads/main`, 'ok'])))

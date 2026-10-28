@@ -1,10 +1,10 @@
 import { expect, test } from 'claude-code/testing'
 
-import { BOARD, BOARD_TOOL, HOME, started, warmUp, world } from '../testing/world'
+import { BOARD, BOARD_TOOL, COLD_MS, HOME, started, warmUp, world } from '../testing/world'
 
 warmUp()
 
-test('the git scan tick skips while the last scan is still running, so scans never overlap', async ($, on) => {
+test('the git scan tick skips while the last scan is still running, so scans never overlap', { timeoutMs: COLD_MS }, async ($, on) => {
   const { clock, flights } = await started($, on, BOARD, { slowMs: { git: 2_000 } })
   await clock.advance(30_000)
   const first = flights.git.started
@@ -13,7 +13,7 @@ test('the git scan tick skips while the last scan is still running, so scans nev
   expect(flights.git.peak).toBe(1)
 })
 
-test('forced refreshes asked while a scan runs wait for it instead of starting another', async ($, on) => {
+test('forced refreshes asked while a scan runs wait for it instead of starting another', { timeoutMs: COLD_MS }, async ($, on) => {
   const { clock, flights } = await started($, on, BOARD, { slowMs: { git: 2_000 } })
   for (let index = 0; index < 3; index += 1) {
     await $.tool.call({ tool: BOARD_TOOL, ...BOARD })
