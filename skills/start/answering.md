@@ -13,7 +13,7 @@ A worker asking for a "go", an approval or what next gets a direct instruction q
 
 ## 5. Permissions
 
-- A brief lists every self-modifying edit up front, quoting the user, so auto mode sees the intent at spawn.
+- A brief lists every self-modifying edit up front, quoting the user, so auto mode sees the intent at spawn (code.claude.com/docs/en/permission-modes, "How auto mode handles subagents").
 - **Prompts:** answer a subagent's permission prompt for that call only.
 - **Blocked:** an auto-mode block, or a call still denied after your instruction, is 🔴: give the user the exact allow rule, then resume the agent by ID. A relayed approval doesn't lift it; never move the work to another agent or chat.
 - Never raise a permission mode unless the user asks.
