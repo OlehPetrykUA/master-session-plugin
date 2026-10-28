@@ -10,7 +10,7 @@ check() {
 }
 
 check 'master-session:implementer gets its Mission' '{"agent_type":"master-session:implementer"}' '**Mission:** build one deliverable'
-check 'master-session:implementer gets the worker protocol' '{"agent_type":"master-session:implementer"}' '# Worker session protocol'
+check 'master-session:implementer gets the worker protocol' '{"agent_type":"master-session:implementer"}' '# Worker protocol'
 check 'master-session:reviewer gets its skill' '{"session_id":"x","agent_type": "master-session:reviewer","source":"resume"}' '# Reviewer'
 check 'master-session:designer gets its skill' '{"agent_type":"master-session:designer"}' '# Designer'
 check 'master-session:spec-writer gets its skill' '{"agent_type":"master-session:spec-writer"}' '# Spec writer'
@@ -41,7 +41,6 @@ rule 'start: Checker gate' skills/start/SKILL.md '## Checker gate'
 rule 'start: tick reads answering.md and shape.md' skills/start/SKILL.md 'answering.md, ${CLAUDE_SKILL_DIR}/shape.md'
 rule 'start: tick reads the whole skill' skills/start/SKILL.md 'read the whole ${CLAUDE_SKILL_DIR}/SKILL.md'
 rule 'start: heartbeat none on stop' skills/start/SKILL.md 'Heartbeat: none'
-rule 'subchat: argument-hint is only the task' skills/subchat/SKILL.md "argument-hint: '<task>'"
 rule 'subagent: argument-hint is only the task' skills/subagent/SKILL.md "argument-hint: '<task>'"
 rule 'qa-verifier: full suite never rerun' skills/qa-verifier/SKILL.md 'never rerun it'
 rule 'start: plan list has Investigate' skills/start/SKILL.md 'Investigate (if a bug'"'"'s cause is unknown'
@@ -58,13 +57,14 @@ rule 'board: a fix round adds no piece' skills/start/board.md 'A fix round after
 rule 'board: user work extends the plan' skills/start/board.md 'work the user adds mid-run adds one'
 rule 'board: never delete a piece' skills/start/board.md 'never delete a piece: abandoned or split work is dropped'
 rule 'board: workers use the display name' skills/start/board.md 'every worker is shown by its display name `<Persona>: <short task>`'
-rule 'board: session link by display name' skills/start/board.md 'A worker session'"'"'s display name is always a link `[<Persona>: <short task>](#local_<id>)`'
+rule 'board: plain names, no links' skills/start/board.md 'The board lists only subagents and workflow agents, every name as plain text with no link.'
 rule 'board: plan keeps ledger names' skills/start/board.md 'The Plan keeps the ledger'"'"'s piece names'
 rule 'board: plan step format' skills/start/board.md '`<n>. <marker> <piece name> · <tier> · <detail>`'
 rule 'board: checking step example' skills/start/board.md '`▶ Setup build · T3 · QA verifier: check setup build, round 0`'
 rule 'board: results start with the deliverer' skills/start/board.md 'Each line starts with the display name of who delivered it'
 rule 'board: each working step names its worker' skills/start/board.md 'each ▶ step names its active worker'
-rule 'board: session name never shows' skills/start/board.md 'The session `name` never shows on the board.'
+rule 'board: agent ids never show' skills/start/board.md 'Agent IDs never show on the board.'
+rule 'board: time from spawn and status line' skills/start/board.md '⏱ comes from the spawn time in the ledger and the time of the agent'"'"'s latest status line'
 rule 'shape: persona-first display name' skills/start/shape.md '`<Persona>: <short task>`'
 rule 'shape: name never shows on the board' skills/start/shape.md 'It never shows on the board.'
 if grep -rqF -i -- 'no persona word' "$root/skills"; then echo 'FAIL skills: no "no persona word"'; fail=1; else echo 'ok   skills: no "no persona word"'; fi
@@ -73,7 +73,6 @@ rule 'board: no done summary piece' skills/start/board.md 'Never list done work 
 rule 'board: full plan before the first spawn' skills/start/board.md 'Post the full plan on the first board, before the first spawn'
 rule 'board: live detached worktree is fine' skills/start/board.md 'a detached worktree whose worker or checker is retired or gone is ⚠️'
 rule 'stop: copies the ledger' skills/stop/SKILL.md 'copy the final `protocol.md` and `log.md` into the run'"'"'s note'
-rule 'subchat: restarts a dead loop' skills/subchat/SKILL.md '`CronList` doesn'"'"'t list its job'
 rule 'subagent: restarts a dead loop' skills/subagent/SKILL.md '`CronList` doesn'"'"'t list its job'
 rule 'workflow: restarts a dead loop' skills/workflow/SKILL.md '`CronList` doesn'"'"'t list its job'
 rule 'start: recreate only if not listed' skills/start/SKILL.md 'recreate it only if `CronList` doesn'"'"'t list it'
@@ -98,9 +97,17 @@ rule 'worker: status line on every change' skills/worker/SKILL.md 'On every chan
 rule 'worker: status line next' skills/worker/SKILL.md '· next: <next step>'
 rule 'worker: status line needs' skills/worker/SKILL.md '· needs: <nothing | the question>'
 rule 'worker: subagent sends to main' skills/worker/SKILL.md 'SendMessage `to: "main"`'
-rule 'board: every worker session is a link' skills/start/board.md 'A worker session'"'"'s display name is always a link'
 rule 'start: tick is only a safeguard' skills/start/SKILL.md 'The tick is only a safeguard.'
 rule 'start: validator pushes status lines up' skills/start/SKILL.md 'push it the same status line on every change'
+rule 'start: never starts sessions or sub-chats' skills/start/SKILL.md 'This session never starts sessions or sub-chats and never calls `start_session`; every persona runs as a subagent or workflow agent here.'
+rule 'start: own chat goes to the chat orchestrator' skills/start/SKILL.md 'splitting work into chats belongs to the chat orchestrator'
+rule 'stop: stops subagents with TaskStop' skills/stop/SKILL.md 'then stop it with `TaskStop`'
+rule 'stop: logs pending step first' skills/stop/SKILL.md 'first write its pending step and its worktree'
+
+never='This session never starts sessions or sub-chats and never calls `start_session`'
+hits=$(grep -rnE 'start_session|stop_session|notify_when_idle|master-session:subchat' "$root/skills" | grep -vF -- "$never")
+if [ -z "$hits" ]; then echo 'ok   skills: no session tools outside the never rule'; else echo 'FAIL skills: session tools outside the never rule'; printf '%s\n' "$hits"; fail=1; fi
+if [ -e "$root/skills/subchat" ]; then echo 'FAIL skills/subchat is gone'; fail=1; else echo 'ok   skills/subchat is gone'; fi
 
 tmp=$(mktemp -d)
 trap 'rm -r "$tmp"' EXIT

@@ -1,6 +1,6 @@
 # In Copilot CLI
 
-Copilot CLI loads this plugin too, without `start_session`, SendMessage, `/loop`, `CronCreate`, `Workflow`, Claude Docs or Artifacts (the design canvas). It leaves `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` as written: read them as the plugin folder (two levels up from any skill file) and that skill's folder. The skills that need a Copilot change link their section here.
+Copilot CLI loads this plugin too, without SendMessage, `/loop`, `CronCreate`, `Workflow`, Claude Docs or Artifacts (the design canvas). It leaves `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` as written: read them as the plugin folder (two levels up from any skill file) and that skill's folder. The skills that need a Copilot change link their section here.
 
 Persona subagents everywhere: the `task` tool with `agent_type: "master-session:<persona>"` and `model` set to a Copilot model id, such as this session's own. Copilot rejects the agents' `sonnet` and `opus`, and its error lists the ids. `/tasks` shows them. The agents carry `reasoning-effort` for Copilot beside `effort` for Claude Code.
 
@@ -9,18 +9,13 @@ Worktrees live at `$HOME/.copilot/worktrees/wt-<repo>-<branch>`. Never `/delegat
 ## start
 
 Run the same protocol with what Copilot has:
-- **Workers:** give the user the brief to paste into a session they open with `/new`, or `/fork` when it needs this chat. The worker reports in its own chat in the report format; the user relays it.
 - **Persona subagents:** the `task` tool, as above; `/fleet` runs several in parallel.
 - **Loop and board:** no heartbeat. Do a tick on every user turn and every subagent result, and post the chat board as [board.md](board.md) shows; its header's next tick reads "on your next message".
 - **Ledger:** Copilot has no session scratchpad: keep `protocol.md` and `log.md` in `~/.copilot/scratch/<run>/`.
 
 ## worker
 
-Copilot has no SendMessage. Write each status line in your own chat for the user to relay, and put each question and `ready <sha>` there in the report format. Without a Monitor, check your start condition and master each time the user writes.
-
-## subchat
-
-Copilot can't start a session or arm a loop. Write the brief as the subchat skill's step 1 says, give it to the user to paste into a session they open with `/new` (or `/fork` to keep this chat), and list the worker by the name they give it. It reports in its own chat; check on it whenever the user writes.
+Copilot has no SendMessage. A `task` subagent sends no status lines: its final message is its report, with each question and `ready <sha>` in the report format.
 
 ## subagent
 
@@ -44,4 +39,4 @@ Copilot has no Artifacts, so no design canvas, and the Design checker has no can
 
 ## Install
 
-Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do. `start`, `stop`, `subchat`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them.
+Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do. `start`, `stop`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them.

@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Builds one deliverable from a master-session brief in its own worktree (a branch for a session, detached for a subagent), then reports ready <sha> with the gate output. A worker session runs as it, or the master session spawns it.
+description: Builds one deliverable from a master-session brief in its own detached worktree, then reports ready <sha> with the gate output. The master session spawns it as a background subagent.
 model: sonnet
 effort: medium
 reasoning-effort: medium

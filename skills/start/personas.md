@@ -1,11 +1,11 @@
 # Personas
 
-A persona is a fixed role the validator hands out. Each one has its own skill, `master-session:<persona>` (mission, inputs, output, gate, must-not), and its own agent of the same name, which preloads that skill as a subagent; a session started with `claude --agent master-session:<persona>` gets it from the plugin's SessionStart hook. A `start_session` worker can't pick an agent, so its brief's first line loads the `master-session:worker` and `master-session:<persona>` skills. Which personas a piece gets, and its checkers, come from the [tier table](SKILL.md#2-brief-the-worker). The agent frontmatter holds each persona's default model and effort; the tier table says when the `Agent` call overrides it. A `start_session` worker can't go above the validator's own model.
+A persona is a fixed role the validator hands out. Each one has its own skill, `master-session:<persona>` (mission, inputs, output, gate, must-not), and its own agent of the same name, which preloads that skill as a subagent; a session the user starts with `claude --agent master-session:<persona>` gets it from the plugin's SessionStart hook. The validator runs every persona as a subagent or workflow agent in its own chat. Which personas a piece gets, and its checkers, come from the [tier table](SKILL.md#2-brief-the-worker). The agent frontmatter holds each persona's default model and effort; the tier table says when the `Agent` call overrides it.
 
 | Persona | Runs as | Skill and agent |
 |---|---|---|
-| Implementer | subagent; session by [Execution shape](shape.md#execution-shape) rule 3 | [`master-session:implementer`](../implementer/SKILL.md), with [`master-session:worker`](../worker/SKILL.md) |
-| Refactorer | subagent; session by rule 3 | [`master-session:refactorer`](../refactorer/SKILL.md), with [`master-session:worker`](../worker/SKILL.md) |
+| Implementer | subagent, [Execution shape](shape.md#execution-shape) rule 4 | [`master-session:implementer`](../implementer/SKILL.md), with [`master-session:worker`](../worker/SKILL.md) |
+| Refactorer | subagent, rule 4 | [`master-session:refactorer`](../refactorer/SKILL.md), with [`master-session:worker`](../worker/SKILL.md) |
 | Code reviewer | subagent, risk-flagged pieces | [`master-session:reviewer`](../reviewer/SKILL.md) |
 | QA verifier | subagent, every checked sha | [`master-session:qa-verifier`](../qa-verifier/SKILL.md) |
 | Design checker | subagent of the QA verifier, on a render it can read | [`master-session:design-checker`](../design-checker/SKILL.md) |

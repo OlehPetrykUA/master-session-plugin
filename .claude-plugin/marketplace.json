@@ -8,7 +8,7 @@
     {
       "name": "master-session",
       "source": "./",
-      "description": "Validator skill and persona subagents for running work through worker sessions."
+      "description": "A validator session that runs persona subagents and workflows, verifies what they deliver and merges it."
     }
   ]
 }
