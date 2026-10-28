@@ -13,7 +13,6 @@ export const I = {
   clock: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M12 7.5V12l3 2',
   working: 'M3 12h4l3-7 4 14 3-7h4',
   done: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M8 12.5l2.7 2.7L16 9.5',
-  house: 'M4 11l8-7 8 7 M6 9.5V20h12V9.5 M10 20v-5h4v5',
   branch: 'M6 3v12 M18 9a3 3 0 1 0 0-6a3 3 0 0 0 0 6Z M6 21a3 3 0 1 0 0-6a3 3 0 0 0 0 6Z M18 9a9 9 0 0 1-9 9',
   refresh: 'M20 11a8 8 0 1 0-2.3 5.7 M20 4v7h-7',
   collapse: 'M6 15l6-6 6 6',
@@ -28,14 +27,11 @@ export const I = {
   all: 'M4 4h7v7H4Z M13 4h7v7h-7Z M4 13h7v7H4Z M13 13h7v7h-7Z',
   folder: 'M3 6h6l2 2h10v11H3Z',
   check: 'M5 12.5l4.5 4.5L19 7.5',
-  blocker: 'M12 4l9 16H3Z M12 10v4.5 M12 17.4v.1',
   now: 'M8 5l11 7-11 7Z',
   next: 'M5 12h14 M13 6l6 6-6 6',
   git: 'M12 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6Z M3 12h6 M15 12h6',
   tests: 'M9 3h6 M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3',
   files: 'M6 3h8l4 4v14H6Z M14 3v4h4',
-  permission: 'M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6Z',
-  pulse: 'M3 12h4l3-7 4 14 3-7h4',
   idle: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M10 9v6 M14 9v6',
   ready: 'M5 21V4 M5 4h12l-2.5 4L17 12H5',
   verified: 'M2 12.5l4.5 4.5L15.5 8 M10 15.5l1.5 1.5L21 8',
@@ -46,7 +42,6 @@ export const I = {
   elapsed: 'M12 8a7 7 0 1 0 0 14a7 7 0 0 0 0-14Z M12 11.5V15 M10 2h4 M12 2v3 M18.5 6.5l1.5-1.5',
   usage: 'M5 20v-8 M10 20V6 M15 20v-9 M20 20v-4',
   offline: 'M3 3l18 18 M8.6 8.6A8 8 0 0 0 5 11 M12.5 5a12 12 0 0 1 7.5 3 M8.5 14.5a5 5 0 0 1 6.2-.5 M12 18.5h.01',
-  info: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M12 11v5 M12 7.6v.1',
   stop: 'M7 7h10v10H7Z',
   pause: 'M8.5 5v14 M15.5 5v14',
   undo: 'M9 14L4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-3',
@@ -124,7 +119,7 @@ export const STATUS: Record<Status, { icon: IconName; tone: Tone; tint: string; 
 
 export const statusBadge = (status: Status, size: 28 | 32) => square(STATUS[status].icon, STATUS[status].tone, STATUS[status].tint, size, size === 28 ? 8 : 10, size === 28 ? 16 : 18, 1.75)
 
-export function square(name: IconName, tone: Tone, tint: string, size: number, radius: number, iconSize: number, weight = 2.2) {
+function square(name: IconName, tone: Tone, tint: string, size: number, radius: number, iconSize: number, weight = 2.2) {
   const at = (size - iconSize) / 2
   return svg(size, size, `<rect width="${size}" height="${size}" rx="${radius}" style="fill:var(--${tint})"/><g transform="translate(${at} ${at}) scale(${iconSize / 24})">${stroke(I[name], tone, weight)}</g>`)
 }
@@ -144,15 +139,6 @@ export const dot = (tone: Tone, size = 7) => svg(size, size, `<circle cx="${size
 
 export const liveDot = (tone: Tone) =>
   svg(14, 14, `<circle cx="7" cy="7" r="7" style="fill:var(--${tone === 'green' ? 'greenTint' : 'amberTint'})"/><circle cx="7" cy="7" r="4" style="fill:var(--${tone})"/>`)
-
-export function gitPill(count: number) {
-  const label = String(count)
-  const width = Math.ceil(6 + 6 + 4 + label.length * 6.6 + 6)
-  return {
-    source: svg(width, 16, `<rect width="${width}" height="16" rx="8" style="fill:var(--surface2)"/><circle cx="9" cy="8" r="3" style="fill:var(--text)"/><text x="16" y="12" style="fill:var(--text);font-size:11px;font-weight:600">${escape(label)}</text>`),
-    width,
-  }
-}
 
 export function numeral(value: string, tone: Tone) {
   const width = Math.ceil(textWidth(value, 18) * 1.25) + 4
@@ -175,7 +161,7 @@ export function buttonFace(width: number, height: number, icon: IconName, text: 
   return svg(width, height, shell(width, height, look) + glyphAt(icon, left + 1, height, size, look.ink) + label(text, left + 1 + size + gap, height, look.ink, 600, look.isUnderlined))
 }
 
-export type ChipMark = { dot: Tone } | { icon: IconName } | undefined
+type ChipMark = { dot: Tone } | { icon: IconName } | undefined
 
 export function chipFace(width: number, height: number, mark: ChipMark, text: string, count: string, look: FaceLook) {
   const markWidth = mark ? ('dot' in mark ? 8 : 14) : 0
