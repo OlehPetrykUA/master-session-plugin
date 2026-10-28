@@ -18,8 +18,8 @@ The board posted on every tick that has news and in every reply to the user. Eve
 | ⏱ Time | spawned 19:00 (20 min) · last status 19:19 |
 | 📍 Progress | step 3 of 5 — build screens |
 | ✔ Done | tech choice (bash), setup design v4 approved |
-| ▸ Now | rewriting setup.sh screens (+27 −32) |
-| 🔍 Verified | mockups match spec; worktree holds only its edit |
+| ▸ Now | rewriting setup.sh screens, edits so far committed (+27 −32) |
+| 🔍 Verified | mockups match spec; worktree holds only its commit |
 | 🌿 Git | my-app wt-my-app-setup-build, detached · 0 uncommitted · last 9f95022 |
 | ⚠️ Risk | bash 3.2 key handling unproven |
 | → Next | smoke on /bin/bash, check, amend · ETA ~20 min |

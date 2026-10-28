@@ -84,7 +84,7 @@ order_ok() {
   awk 'BEGIN{n=0} /^━+ 🏭 END/ {if(!end)end=n+1} !end{split("**📋 Plan**|**🙋 Needs you**|**🛡 Standing checks**|**📦 Results so far**|**🔭 Current state**",h,"|"); if($0==h[n+1])n++} END{exit !(n==5&&end==6)}' "$1"
 }
 if order_ok "$root/skills/start/board.md"; then echo 'ok   board: example section order'; else echo 'FAIL board: example section order'; fail=1; fi
-if grep -rqF -- 'Summary'"$root/skills/start/board.md" "$root/README.md"; then echo 'FAIL board: no Summary'; fail=1; else echo 'ok   board: no Summary'; fi
+if grep -rqF -- 'Summary' "$root/skills/start/board.md" "$root/README.md"; then echo 'FAIL board: no Summary'; fail=1; else echo 'ok   board: no Summary'; fi
 rule 'board: no done summary piece' skills/start/board.md 'Never list done work as a summary piece'
 rule 'board: full plan before the first spawn' skills/start/board.md 'Post the full plan on the first board, before the first spawn'
 rule 'board: live detached worktree is fine' skills/start/board.md 'one whose owner is retired or gone is ⚠'
