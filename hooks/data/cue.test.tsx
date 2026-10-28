@@ -20,6 +20,10 @@ test('a bare login at the start cues', () => {
   loud(['login -p hunter2', 'LOGIN -p hunter2', 'Login -u me -p hunter2'])
 })
 
+test('a login after a space, a prompt, a newline, a semicolon, a quote or a parenthesis cues, and so does mysqladmin', () => {
+  loud(['  login -p hunter2', '$ login -p hunter2', 'Deploy:\nlogin -p hunter2', 'a; login -p hunter2', '"login -p hunter2"', '$(login -p hunter2)', 'mysqladmin -p hunter2'])
+})
+
 test('a weak word continued in camelCase cues', () => {
   loud(['keyPrefix: s3cr3t', 'tokenValue=abc', 'secretName: x1', 'passHash: x1', 'credentialsFile = x1', 'authHeader: x1', 'pwHash=x1'])
 })

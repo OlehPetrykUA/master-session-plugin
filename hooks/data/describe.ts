@@ -93,7 +93,7 @@ const CUES = [
   new RegExp(`(?<![a-z0-9-])--(?:${WEAK})(?![a-z0-9])`, 'i'),
   /(?<![A-Za-z0-9])(?:gh[pousr]_|github_pat_|glpat-|xox[abpr]-|sk-|AKIA|ASIA|hvs\.|npm_)[A-Za-z0-9]/,
   /(?:^|[\s"'])-p[a-z0-9]/i,
-  /\b(?:mysql|mysqldump|mariadb|sshpass|sqlcmd|mongosh?|ssh-keygen|zip|unzip|mosquitto_pub|(?:^|[\w-]+\s+)login)\b[^\n]*?\s-p\s+\S/i,
+  /\b(?:mysql|mysqladmin|mysqldump|mariadb|sshpass|sqlcmd|mongosh?|ssh-keygen|zip|unzip|mosquitto_pub|(?<![\w-])login)\b[^\n]*?\s-p\s+\S/i,
   /\bredis-cli\b[^\n]*?\s-a\s+\S/,
   /(?:^|\s)(?:-u\s*|--user[=\s]\s*)[^\s:]+:\S/,
   /\bldap\w*\b[^\n]*?\s-w\s+\S/i,
