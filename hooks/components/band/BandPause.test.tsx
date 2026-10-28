@@ -144,11 +144,14 @@ test('AC18 desktop: Paused in C.amber, semibold, with 3/7 kept', { timeoutMs: 60
   await desktop.unmount()
 })
 
-test('AC18 desktop: the bar is grey and still while paused, green and sliding while pausing', { timeoutMs: 60_000 }, async ($, on) => {
+test('AC18 desktop: the bar is grey and still while paused, green and static while pausing', { timeoutMs: 60_000 }, async ($, on) => {
   const run = await setup($, on)
   await run.press()
   const pausing = await run.band('desktop')
-  expect(await stripOf(pausing)).toContain('fill:var(--green)')
+  const pausingSource = await stripOf(pausing)
+  expect(pausingSource).toContain('fill:var(--green)')
+  expect(pausingSource).toContain('linearGradient')
+  expect(pausingSource).not.toContain('<animate')
   await pausing.unmount()
   await run.settle()
   const desktop = await run.band('desktop')
