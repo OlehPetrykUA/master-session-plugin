@@ -68,17 +68,17 @@ test('the run summary counts sessions by state, needs you, subagents, workflows,
   const live = liveOf(['d'])
   const rows = rowsOf(board, { ...live, sessions: live.sessions.map(one => (one.id === 'a' ? { ...one, createdAt: NOW - 3_600_000 } : one)) })
   expect(runSummaryOf({ rows, sessions: [], agents: AGENTS, workflows: RUNS, board, trees: [], at: NOW })).toEqual({
-    sessions: { total: 3, waiting: 0, working: 1, done: 1 },
-    needsYou: { sessions: 1, subagents: 0 },
-    subagents: { total: 2, running: 1, done: 1, failed: 0, asking: 0 },
-    workflows: { total: 3, running: 2, done: 1, failed: 0, asking: 0, agents: 3, agentsDone: 2 },
+    plan: { total: 0, done: 0, working: 0, verifying: 0, queued: 0, sessions: 3 },
+    needsYou: 1,
+    agents: { total: 5, working: 2, done: 2, failed: 1 },
+    tokens: 0,
     commits: { total: 3, repos: 0 },
-    tests: { value: '526', sub: 'smoke 398 · hooks 128' },
-    duration: { since: NOW - 3_600_000, ms: 3_600_000 },
-    git: { dirty: 0 },
+    tests: { value: '526', sub: 'smoke 398 · hooks 128', shorts: ['passed'], failing: 0 },
+    duration: { since: NOW - 60_000, ms: 60_000 },
+    git: { dirty: 0, trees: 0, stale: { files: 0, trees: 0 } },
   })
   const empty = runSummaryOf({ rows: [], sessions: [], agents: [], workflows: [], board: null, trees: [], at: NOW })
-  expect([empty.tests, empty.duration]).toEqual([{ value: '—', sub: 'none reported' }, { since: NOW, ms: 0 }])
+  expect([empty.tests, empty.duration]).toEqual([{ value: '—', sub: 'none reported', shorts: ['none'], failing: 0 }, { since: NOW, ms: 0 }])
 })
 
 test("a worker's reported agents stay out of the master's own subagents and workflow runs", () => {

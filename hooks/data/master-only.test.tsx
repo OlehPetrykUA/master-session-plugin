@@ -218,7 +218,7 @@ test('/master-session:start makes the session a master at once: it scans before 
   await run.clock.settle()
   await $.skill.prompt(START)
   await run.clock.advance(15_000)
-  expect(run.gits.length).toBeGreaterThan(0)
+  expect(run.calls.filter(one => one.tool === 'list_sessions').length).toBeGreaterThan(0)
   expect(run.opened).toEqual([])
   expect((await $.command.run(typed('master-session:info', ''))).text).toBe('Master session pane opened.')
   expect(run.opened).toEqual([PANE.requestId])

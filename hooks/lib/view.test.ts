@@ -3,8 +3,9 @@ import { expect, test } from 'claude-code/testing'
 import type { PaneData } from '../components/types'
 import { AGENT_SHOWN_MS } from './constants'
 import { compactOf } from './format'
+import { itemsOf } from './list'
 import { headerButtonsOf, paneViewOf, statusOf } from './view'
-import { runSummaryOf } from './totals'
+import { runSetOf, runSummaryOf } from './totals'
 
 const dataOf = (rows: number) => ({ rows: Array.from({ length: rows }, () => ({})), asked: null, columns: 60, isRefreshing: false }) as unknown as PaneData
 
@@ -39,6 +40,7 @@ test('the Duration tile stops at the board time once the run is done, so its val
       archived: [],
       agents,
       workflows: [],
+      items: itemsOf(rows as never, agents, [], { at: now }),
       running: {},
       totals: runSummaryOf({ rows: rows as never, sessions: [], agents, workflows: [], board, trees: [], at: now }),
       chosen: 'all',
@@ -54,27 +56,47 @@ test('the Duration tile stops at the board time once the run is done, so its val
   expect(duration(at + 3_600_000)?.value).toBe('10m')
 })
 
-test('an expanded finished subagent stays listed past AGENT_SHOWN_MS, a collapsed one does not', () => {
+const viewOf = (extra: Record<string, unknown>) => {
   const agents = [{ id: 'x2', type: 'Explore', description: 'Find usages', state: 'done', startedAt: 1_000, endedAt: 2_000 }]
-  const data = (open: string[]) =>
-    ({
-      board: null,
-      live: { self: 's', sessions: [], at: 0, title: '', error: '' },
-      trees: [],
-      rows: [],
-      archived: [],
-      agents,
-      workflows: [],
-      running: {},
-      totals: runSummaryOf({ rows: [], sessions: [], agents: agents as never, workflows: [], board: null, trees: [], at: 2_000 + AGENT_SHOWN_MS }),
-      chosen: 'all',
-      open,
-      archiveView: 'closed',
-      cleared: 0,
-      at: 2_000 + AGENT_SHOWN_MS,
-      columns: 100,
-      isNarrativeOpen: false,
-    }) as unknown as PaneData
-  expect(paneViewOf(data([])).items.map(one => one.id)).toEqual([])
-  expect(paneViewOf(data(['x2'])).items.map(one => one.id)).toEqual(['x2'])
+  const at = 2_000 + AGENT_SHOWN_MS * 30
+  const board = { sessions: [], needsYou: [], repos: [], source: 'tool' as const, since: 500 }
+  const live = { self: 's', sessions: [], at: 0, title: '', error: '' }
+  const set = runSetOf({ board, live, agents: agents as never, workflows: [], at })
+  return paneViewOf({
+    board,
+    live,
+    trees: [],
+    rows: set.rows,
+    archived: set.archived,
+    agents: set.agents,
+    workflows: set.workflows,
+    items: set.items,
+    running: {},
+    totals: runSummaryOf({ rows: set.rows, sessions: [], agents: set.agents, workflows: [], board, trees: [], at, items: set.items }),
+    chosen: 'all',
+    open: [],
+    archiveView: 'closed',
+    cleared: 0,
+    at,
+    columns: 100,
+    isNarrativeOpen: false,
+    ...extra,
+  } as unknown as PaneData)
+}
+
+test('a finished subagent stays in Done however old, and the Done chip and the Agents tile count it', () => {
+  const view = viewOf({})
+  expect(view.items.map(one => one.id)).toEqual(['x2'])
+  expect(view.chips.find(chip => chip.id === 'done')?.count).toBe(1)
+  expect(view.blocks.find(block => block.key === 'agents')).toEqual(expect.objectContaining({ value: '1', sub: '0 working · 1 done' }))
+})
+
+test('the Archived chip is drawn only when something is archived, and the archived filter falls back to All without it', () => {
+  const view = viewOf({ chosen: 'archived' })
+  expect(view.chips.map(chip => chip.id)).toEqual(['all', 'needs-you', 'working', 'waiting', 'done'])
+  expect(view.chosen).toBe('all')
+  const archived = [{ id: 'z', name: 'z', title: '', cwd: '/', isRunning: false, isArchived: true, lastActivityAt: 0 }]
+  const shown = viewOf({ chosen: 'archived', archived })
+  expect(shown.chips.at(-1)).toEqual(expect.objectContaining({ id: 'archived', count: 1 }))
+  expect(shown.chosen).toBe('archived')
 })

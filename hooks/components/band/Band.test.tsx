@@ -806,8 +806,8 @@ test('subagents that finished stay in the percent: 2 of 3 done read 66% now and 
 test('the band draws every linked worker on a stale board and leaves the archived one out: 2 of 4 published gives 4 units, and the pane draws the same 4 rows', async ($, on) => {
   await band($, on, WORKING.slice(0, 2), false, WORKING.map((one, index) => linkedOf(one.id, one.name, index !== 3)).concat(linkedOf('local_z', 'gone', false, true)))
   const ui = await mount($)
-  expect(await textsOf(ui)).toEqual(['35%', '0/4', '0', '4', '50m', 'Open board'])
-  expect((await stripOf(ui))?.props.alt).toBe('Master session: 35 percent, 0 of 4 done. 50m elapsed.')
+  expect(await textsOf(ui)).toEqual(['35%', '0/4', '0', '4', '<1m', 'Open board'])
+  expect((await stripOf(ui))?.props.alt).toBe('Master session: 35 percent, 0 of 4 done. <1m elapsed.')
   await ui.unmount()
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const rows = (await pane.findAll({ type: 'Box' })).flatMap(box => box.key?.match(/^row-(local_\w+)$/)?.slice(1) ?? [])

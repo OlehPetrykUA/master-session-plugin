@@ -126,13 +126,13 @@ test('a wrapped dot line pushes every section top below the tiles down by exactl
   expect(contentHeightOf({ ...input, blockExtra: 16 })).toBe((contentHeightOf(input) ?? 0) + 16)
 })
 
-test('the view of a board whose Sessions dots wrap moves the chips down one dot line more than a one-dot board: at 41 and 47 columns, not at 60', () => {
+test('the view of a board whose Plan dots wrap moves the chips down one dot line more than a one-dot board: at 41 and 47 columns, not at 60', () => {
   const chipsGap = ([red, working, waiting, done]: number[], columns: number) => {
     const board: Board = { sessions: [], needsYou: [], repos: [], source: 'tool' }
     const totals = runSummaryOf({ rows: [], sessions: [], agents: [], workflows: [], board, trees: [], at: 10_000_000 })
-    const counted = { ...totals, sessions: { total: red! + working! + waiting! + done!, working: working!, waiting: waiting!, done: done! }, needsYou: { ...totals.needsYou, sessions: red! } }
-    const tops = sectionsOf({ board, live: liveOf(), trees: [], rows: [], archived: [], agents: [], workflows: [], totals: counted, chosen: 'all', open: [], asking: '', archiveView: 'open', asked: null, undone: null, isRefreshing: false, at: 10_000_000, home: '/h', columns, offset: 0, bodyRows: 60, isAligned: true } as unknown as PaneData)
+    const counted = { ...totals, plan: { total: red! + working! + waiting! + done!, done: done!, working: working!, verifying: red!, queued: waiting!, sessions: 0 } }
+    const tops = sectionsOf({ board, live: liveOf(), trees: [], rows: [], archived: [], agents: [], workflows: [], items: [], totals: counted, chosen: 'all', open: [], asking: '', archiveView: 'open', asked: null, undone: null, isRefreshing: false, at: 10_000_000, home: '/h', columns, offset: 0, bodyRows: 60, isAligned: true } as unknown as PaneData)
     return (tops['section-chips'] ?? 0) - (tops['section-summary'] ?? 0)
   }
-  expect([41, 47, 60].map(columns => chipsGap([12, 3, 7, 1], columns) - chipsGap([0, 1, 0, 0], columns))).toEqual([16, 16, 0])
+  expect([41, 47, 60].map(columns => chipsGap([30, 20, 10, 1], columns) - chipsGap([0, 1, 0, 0], columns))).toEqual([16, 16, 0])
 })

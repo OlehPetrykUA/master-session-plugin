@@ -30,14 +30,14 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
   ])
   expect(await buttonsOf(ui)).toEqual([])
   const texts = await textsOf(ui)
-  const order = ['Sessions', 'Needs you', 'Subagents', 'Workflows', 'Commits', 'Tests', 'Duration', 'Git', 'Needs you', 'Working', 'Waiting', 'Done', 'Archived', 'Master session', 'updated just now', 'Ask for updates', 'Refresh', 'Repos']
+  const order = ['Plan', 'Needs you', 'Agents', 'Commits', 'Tests', 'Duration', 'Git', 'Tokens', 'Needs you', 'Working', 'Waiting', 'Done', 'Archived', 'Master session', 'updated just now', 'Ask for updates', 'Refresh', 'Repos']
   let from = -1
   for (const word of order) {
     const at = texts.indexOf(word, from + 1)
     expect(at).toBeGreaterThan(from)
     from = at
   }
-  for (const word of ['1 session', 'none', '—', 'Session', 'Redo toolkit setup UI', 'Validator ›', 'needs you', 'waiting', '40m']) expect(texts).toContain(word)
+  for (const word of ['1 waiting', 'no plan yet', 'Session', 'Redo toolkit setup UI', 'Validator ›', 'needs you', 'waiting', '40m']) expect(texts).toContain(word)
   for (const word of ['Approve the settings.json edit', 'waiting for the go']) expect(texts).not.toContain(word)
   expect(texts.some(text => /^since \d\d:\d\d$/.test(text))).toBe(true)
   expect((await ui.find({ key: 'block-needs-you' }))?.props).toEqual(expect.objectContaining({ backgroundColor: C.redTint, borderColor: C.red, borderStyle: 'round' }))
@@ -65,7 +65,7 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
     if (surface === 'terminal') {
       const lines = await textsOf(other)
       expect(lines).toEqual(expect.arrayContaining(['Needs you 1', 'Waiting 1', 'Archived 1', 'opus · 50m · 4/6', 'opus · 40m · 2/5', 'Validator ›', 'needs you', 'waiting']))
-      expect(lines.some(line => line.startsWith('Sessions 2 (1 / 0 / 1 / 0) · Needs you 1 1 session'))).toBe(true)
+      expect(lines).toEqual(expect.arrayContaining(['Plan', 'Needs you', '1 waiting', 'Agents', 'Commits', 'Tests', 'Duration', 'Git', 'Tokens', 'agents only']))
       expect((await other.find({ key: 'row-open-local_env' }))?.text).toBe('Session · Test and validate local agent environment')
     }
     await other.unmount()
@@ -126,8 +126,7 @@ test('subagents and workflows are rows with their kind and the same groups: runn
   expect(heads).toEqual(['group-head-needs-you', 'group-head-working', 'group-head-waiting', 'group-head-done', 'group-head-archived'])
   expect((await hitsOf(ui)).filter(hit => hit.startsWith('hit-row-') && !hit.endsWith('-chevron'))).toEqual(['hit-row-local_env', 'hit-row-wf_7', 'hit-row-Review auth flow', 'hit-row-local_setup', 'hit-row-Find token usages'])
   expect(await altsOf(ui)).toEqual(expect.arrayContaining(['1 of 2', 'working', 'done']))
-  expect((await ui.find({ key: 'block-subagents' }))?.text).toContain('1 running')
-  expect((await ui.find({ key: 'block-workflows' }))?.text).toContain('1/2 agents')
+  expect((await ui.find({ key: 'block-agents' }))?.text).toContain('2 working')
   expect(await altsOf(ui)).toContain('All 5')
   await ui.unmount()
   const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
@@ -168,7 +167,7 @@ test('all done stays the one list: finished header line, every row under Done wi
   expect(texts).toContain('finished 19:46')
   expect(texts).not.toContain('Run summary')
   expect(texts).toEqual(expect.arrayContaining(['smoke 398 · hooks 128', 'Done', 'done']))
-  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Tests 526', 'Sessions 2', 'Needs you 0']))
+  expect(await altsOf(ui)).toEqual(expect.arrayContaining(['Tests 526', 'Plan —', 'Needs you 0']))
   const heads = (await ui.findAll({ type: 'Box' })).flatMap(box => (box.key?.startsWith('group-head-') ? [box.key] : []))
   expect(heads).toEqual(['group-head-done', 'group-head-archived'])
   expect((await ui.find({ key: 'block-needs-you' }))?.props.backgroundColor).toBe(C.surface)
@@ -205,25 +204,24 @@ test('the header: 56 tall, title and live dot over the status line, Ask and Refr
   }
 })
 
-test('the Sessions tile dot row is flexWrap wrap and keeps red, green, amber, grey order at 41 and 47 columns', async ($, on) => {
-  const session = (id: string, state: string) => ({ id, name: id, state })
-  const four = { ...BOARD, sessions: [session('n1', 'needs-you'), session('w1', 'working'), session('p1', 'waiting'), session('d1', 'done')], needsYou: [] }
-  await started($, on, four)
+const piece = (name: string, state: string) => ({ name, state })
+
+test('the Plan tile dot row is flexWrap wrap and keeps green, amber, grey order at 41 and 47 columns', async ($, on) => {
+  await started($, on, { ...BOARD, plan: [piece('a', 'working'), piece('b', 'verifying'), piece('c', 'queued'), piece('d', 'done')] })
   for (const columns of [41, 47]) {
     const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: columns }, surface: 'desktop' })
-    expect((await ui.find({ key: 'block-dots-sessions' }))?.props.flexWrap).toBe('wrap')
-    const dots = (await ui.findAll({ type: 'Box' })).flatMap(one => (one.key?.startsWith('block-dot-box-sessions-') ? [one.key] : []))
-    expect(dots).toEqual(['red', 'green', 'amber', 'grey'].map(tone => `block-dot-box-sessions-${tone}`))
+    expect((await ui.find({ key: 'block-dots-plan' }))?.props.flexWrap).toBe('wrap')
+    const dots = (await ui.findAll({ type: 'Box' })).flatMap(one => (one.key?.startsWith('block-dot-box-plan-') ? [one.key] : []))
+    expect(dots).toEqual(['green', 'amber', 'grey'].map(tone => `block-dot-box-plan-${tone}`))
     await ui.unmount()
   }
 })
 
-test('the Sessions tile leaves out the dot of an empty bucket', async ($, on) => {
-  const session = (id: string, state: string) => ({ id, name: id, state })
-  await started($, on, { ...BOARD, sessions: [session('w1', 'working'), session('p1', 'waiting'), session('d1', 'done')], needsYou: [] })
+test('the Plan tile leaves out the dot of an empty bucket', async ($, on) => {
+  await started($, on, { ...BOARD, plan: [piece('a', 'working'), piece('c', 'queued'), piece('d', 'done')] })
   const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: 47 }, surface: 'desktop' })
-  const dots = (await ui.findAll({ type: 'Box' })).flatMap(one => (one.key?.startsWith('block-dot-box-sessions-') ? [one.key] : []))
-  expect(dots).toEqual(['block-dot-box-sessions-green', 'block-dot-box-sessions-amber', 'block-dot-box-sessions-grey'])
+  const dots = (await ui.findAll({ type: 'Box' })).flatMap(one => (one.key?.startsWith('block-dot-box-plan-') ? [one.key] : []))
+  expect(dots).toEqual(['block-dot-box-plan-green', 'block-dot-box-plan-grey'])
 })
 
 const offlineOf = async ($: Engine) => (await textsOf(await $.ui.mount({ ...PANE, surface: 'desktop' }))).filter(one => one.startsWith('Can’t read sessions') || one === 'live data unavailable')
@@ -564,20 +562,20 @@ test('the pane clips its pinned header, so the pin can never stretch the scroll 
   await ui.unmount()
 })
 
-test('a board session whose id equals a subagent id is no row and no Sessions tile count', async ($, on) => {
+test('a board session whose id equals a subagent id is no row and no All chip count', async ($, on) => {
   on('agent.list', () => ({ value: [] }))
   on('agent.spawn', (_, e) => ({ model: 'claude-haiku-5-5', agentId: e.description }))
   await started($, on)
   const tile = async () => {
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-    const line = (await textsOf(ui)).find(text => text?.startsWith('Sessions '))
+    const label = String((await ui.find({ key: 'filter-all' }))?.props.label)
     await ui.unmount()
-    return Number(/^Sessions (\d+)/.exec(line ?? '')?.[1])
+    return Number(/^All (\d+)/.exec(label)?.[1])
   }
   const before = await tile()
   await $.agent.spawn({ ...SPAWN, name: undefined, description: 'local_setup', subagentType: 'Explore', model: 'haiku' })
   const after = await tile()
-  expect([before, after]).toEqual([2, 1])
+  expect([before, after]).toEqual([2, 2])
 })
 
 test('AC26 and R8: the terminal archived row reads its row line, then Unarchive, and Open only for a session this master started; an open one draws its card', async ($, on) => {

@@ -48,25 +48,28 @@ test('a board row named after an agent or a workflow is dropped, so no row is dr
   const ids = itemsOf(rowsOf(named, liveOf()), agents, workflows).map(item => [item.kind, item.id])
   expect(ids).toEqual(items.map(item => [item.kind, item.id]))
   const later = itemsOf(rowsOf(named, liveOf()), agents, workflows, { at: NOW + 86_400_000 }).map(item => item.id)
-  expect(later.filter(id => ['x1', 'x2', 'w3', 'wf_1'].includes(id))).toEqual(['wf_1', 'x1'])
-  const totalOf = (rows: Row[]) => runSummaryOf({ rows, sessions: [], agents, workflows, board: named, trees: [], at: NOW }).sessions.total
+  expect(later.filter(id => ['x1', 'x2', 'w3', 'wf_1'].includes(id))).toEqual(['wf_1', 'x1', 'x2'])
+  const totalOf = (rows: Row[]) => runSummaryOf({ rows, sessions: [], agents, workflows, board: named, trees: [], at: NOW }).plan.sessions
   const all = rowsOf(named, liveOf())
   expect(all.length).toBeGreaterThan(rowsOf(board, liveOf()).length)
   expect(totalOf(listedRowsOf(all, agents, workflows))).toBe(totalOf(rowsOf(board, liveOf())))
   expect(listedRowsOf(all, agents, workflows).map(row => row.id)).toEqual(items.filter(item => item.kind === 'session').map(item => item.id))
 })
 
-test('an expanded finished subagent or workflow card outlives AGENT_SHOWN_MS while open; Clear done still hides it', () => {
+test('a finished subagent or workflow stays listed however long ago it ended; only Clear done hides it', () => {
   const late = NOW + 86_400_000
   const finished = agents.map(one => (one.state === 'running' ? { ...one, state: 'done' as const, endedAt: NOW - 1 } : one))
-  const ids = (open: string[], cleared?: number) => itemsOf(rowsOf(board, liveOf()), finished, workflows, { at: late, open, cleared }).map(item => item.id)
-  expect(ids([])).not.toContain('x2')
-  expect(ids([])).not.toContain('wf_1')
-  expect(ids(['x2'])).toContain('x2')
-  expect(ids(['wf_1'])).toContain('wf_1')
-  expect(ids(['w2'])).toContain('wf_1')
-  expect(ids(['x2', 'wf_1'], late)).not.toContain('x2')
-  expect(ids(['x2', 'wf_1'], late)).not.toContain('wf_1')
+  const ids = (cleared?: number) => itemsOf(rowsOf(board, liveOf()), finished, workflows, { at: late, cleared }).map(item => item.id)
+  expect(ids()).toContain('x2')
+  expect(ids()).toContain('wf_1')
+  expect(ids(late)).not.toContain('x2')
+  expect(ids(late)).not.toContain('wf_1')
+})
+
+test('Done lists the newest finish first', () => {
+  const done = (id: string, endedAt: number): AgentRecord => ({ id, type: 'Explore', description: id, state: 'done', startedAt: 1, endedAt })
+  const groups = groupsOf(itemsOf([], [done('old', 10), done('new', 30), done('mid', 20)], [], { at: NOW }), [], 'done', 'closed')
+  expect(groups.at(-1)?.items.map(item => item.id)).toEqual(['new', 'mid', 'old'])
 })
 
 test('Open chat targets only a needs-you session this session started, the sessions open_session_in accepts', () => {
@@ -224,16 +227,14 @@ test('an archived session names itself from its board entry and says when it was
   expect(said(archivedItemOf(one))).toEqual(['archived', 'Session · old title', 'archived'])
 })
 
-test('the run starts at the earliest of the board, the sessions and the subagents, so duration and since agree', () => {
+test('the run starts at the board since, so an older subagent does not pull duration back', () => {
   const HOUR = 3_600_000
   const old = [{ id: 'z1', type: 'Explore', description: 'scan', state: 'running' as const, startedAt: NOW - 2 * HOUR }]
   const only = runSummaryOf({ rows: [], sessions: [], agents: old, workflows: [], board: null, trees: [], at: NOW })
-  expect(only.duration).toEqual({ since: NOW - 2 * HOUR, ms: 2 * HOUR })
+  expect(only.duration).toEqual({ since: NOW, ms: 0 })
   const fresh = { sessions: [], needsYou: [], repos: [], source: 'tool' as const, since: NOW - 60_000 }
   const withBoard = runSummaryOf({ rows: [], sessions: [], agents: old, workflows: [], board: fresh, trees: [], at: NOW })
-  expect(withBoard.duration.since).toBe(NOW - 2 * HOUR)
-  const none = runSummaryOf({ rows: [], sessions: [], agents: [], workflows: [], board: fresh, trees: [], at: NOW })
-  expect(none.duration.since).toBe(NOW - 60_000)
+  expect(withBoard.duration).toEqual({ since: NOW - 60_000, ms: 60_000 })
 })
 
 test('commits count what landed on the base since the run start when that is more than the workers reported', () => {
@@ -248,40 +249,34 @@ test('summary blocks read the run totals as the design words them, zeros and das
   const totals = runSummaryOf({ rows, sessions: [], agents, workflows, board, trees: [], at: NOW })
   const blocks = blocksOf(totals, true)
   expect(blocks.map(block => [block.label, block.value, block.sub, block.isAlert])).toEqual([
-    ['Sessions', '4', '', false],
-    ['Needs you', '1', '1 session', true],
-    ['Subagents', '2', '1 running', false],
-    ['Workflows', '1', '2/3 agents', false],
-    ['Commits', '0', '—', false],
+    ['Plan', '—', 'no plan yet', false],
+    ['Needs you', '1', '1 waiting', true],
+    ['Agents', '5', '2 working · 2 done', false],
+    ['Commits', '0', 'none yet', false],
     ['Tests', '—', 'none reported', false],
-    ['Duration', '6m', expect.stringMatching(/^since \d\d:\d\d$/), false],
+    ['Duration', '<1m', expect.stringMatching(/^since \d\d:\d\d$/), false],
     ['Git', '0', 'clean', false],
+    ['Tokens', '0', 'agents only', false],
   ])
-  expect(blocksOf(totals, true, '20:04')[6]?.sub).toMatch(/^\d\d:\d\d – 20:04$/)
-  expect(blocksOf(totals, true, '20:04')[6]?.shorts).toEqual(['until 20:04', '20:04'])
-  expect(blocksOf({ ...totals, subagents: { total: 2, running: 0, done: 2, failed: 0, asking: 0 } }, true)[2]?.sub).toBe('all finished')
+  expect(blocks[2]?.bad).toBe('1 failed')
+  expect(blocksOf(totals, true, '20:04')[5]?.sub).toMatch(/^\d\d:\d\d – 20:04$/)
+  expect(blocksOf(totals, true, '20:04')[5]?.shorts).toEqual(['until 20:04', '20:04'])
   const asking = [...agents, { id: 'ask1', type: 'master-session:reviewer', description: 'Review the diff', state: 'running' as const, startedAt: NOW, asking: { text: 'Allow Bash: npm test', since: NOW } }, { id: 'ask2', type: 'workflow-subagent', description: 'scan', state: 'running' as const, startedAt: NOW, run: { id: 'wf_x', index: 0 }, asking: { text: 'Allow Read: a', since: NOW } }, { id: 'ask3', type: 'workflow-subagent', description: 'scan 2', state: 'running' as const, startedAt: NOW, run: { id: 'wf_x', index: 1 }, asking: { text: 'Allow Read: b', since: NOW } }]
   const needs = runSummaryOf({ rows, sessions: [], agents: asking, workflows, board, trees: [], at: NOW })
-  expect(needs.needsYou).toEqual({ sessions: 1, subagents: 2 })
-  expect(blocksOf(needs, true)[1]).toEqual(expect.objectContaining({ value: '3', sub: '1 session · 2 subagents', isAlert: true }))
-  expect(blocksOf({ ...needs, needsYou: { sessions: 2, subagents: 0 } }, true)[1]?.sub).toBe('2 sessions')
-  expect(blocksOf({ ...needs, needsYou: { sessions: 0, subagents: 0 } }, true)[1]).toEqual(expect.objectContaining({ value: '0', sub: 'nothing waiting', shorts: ['none'], isAlert: false }))
-  expect(blocks[0]?.dots).toEqual([
-    { tone: 'red', count: 1 },
-    { tone: 'green', count: 1 },
-    { tone: 'amber', count: 1 },
-    { tone: 'grey', count: 1 },
-  ])
+  expect(needs.needsYou).toBe(countsOfItems(itemsOf(rows, asking, workflows, { at: NOW }), 0)['needs-you'])
+  expect(needs.needsYou).toBe(3)
+  expect(blocksOf(needs, true)[1]).toEqual(expect.objectContaining({ value: '3', sub: '3 waiting', isAlert: true }))
+  expect(blocksOf({ ...needs, needsYou: 0 }, true)[1]).toEqual(expect.objectContaining({ value: '0', sub: 'nothing waiting', shorts: ['none'], isAlert: false }))
   const empty = blocksOf(runSummaryOf({ rows: [], sessions: [], agents: [], workflows: [], board: null, trees: [], at: NOW }), false)
   expect(empty.map(block => [block.value, block.sub])).toEqual([
-    ['0', ''],
+    ['—', 'no plan yet'],
     ['0', 'nothing waiting'],
-    ['0', 'none'],
-    ['0', 'none'],
-    ['0', '—'],
+    ['0', 'none yet'],
+    ['0', 'none yet'],
     ['—', 'none reported'],
     ['—', 'not started'],
     ['0', 'clean'],
+    ['0', 'agents only'],
   ])
 })
 
@@ -297,26 +292,24 @@ test('relative paths: under a root, else under home as ~, and an empty home chan
   expect(relativeOf('~/c.ts', [], '')).toBe('~/c.ts')
 })
 
-test('the pane hides subagents and runs that finished two minutes ago; the stores keep them', () => {
+test('finished subagents and runs stay listed whatever their age; a launch with no agents for two minutes is debris', () => {
   const idle = { ...agents[0]!, state: 'done' as const, endedAt: NOW - 119_000 }
-  const old = { ...agents[1]!, endedAt: NOW - 120_000 }
+  const old = { ...agents[1]!, endedAt: NOW - 3_600_000 }
   const kinds = (list: AgentRecord[], runs: WorkflowRecord[] = []) => itemsOf([], list, runs, { at: NOW }).map(item => item.id)
-  expect(kinds([idle, old])).toEqual(['x1'])
-  expect(itemsOf([], [idle, old], []).map(item => item.id)).toEqual(['x1', 'x2'])
-  expect(kinds(agents, workflows)).toEqual(['wf_1', 'x1'])
-  const finished = agents.map(agent => ({ ...agent, state: 'done' as const, endedAt: NOW - 120_000 }))
-  expect(kinds(finished, workflows)).toEqual([])
+  expect(kinds([idle, old])).toEqual(['x1', 'x2'])
+  expect(kinds(agents, workflows)).toEqual(['wf_1', 'x1', 'x2'])
+  const finished = agents.map(agent => ({ ...agent, state: 'done' as const, endedAt: NOW - 3_600_000 }))
+  expect(kinds(finished, workflows)).toEqual(['wf_1', 'x1', 'x2'])
   expect(kinds([], workflows)).toEqual([])
   expect(itemsOf([], [], workflows, { at: NOW - 263_000 }).map(item => item.id)).toEqual(['wf_1'])
 })
 
-test('a done session with a sha is ready: the Sessions tile, the chips and the groups all count it as waiting', () => {
+test('a done session with a sha is ready: the chips and the groups both count it as waiting', () => {
   const ready: Board = { ...board, sessions: [{ id: 'r', name: 'ready-one', state: 'done', sha: 'abc1234', done: 'built' }] }
   const rows = rowsOf(ready, liveOf())
   const items = itemsOf(rows, [], [])
-  const totals = runSummaryOf({ rows, sessions: [], agents: [], workflows: [], board: ready, trees: [], at: NOW })
   expect(items.map(item => [item.status, item.group])).toEqual([['ready', 'waiting']])
-  expect([totals.sessions.waiting, totals.sessions.done, countsOfItems(items, 0).waiting]).toEqual([1, 0, 1])
+  expect(countsOfItems(items, 0)).toEqual({ all: 1, 'needs-you': 0, working: 0, waiting: 1, done: 0, archived: 0 })
 })
 
 test('a needs-you row with a long question stays 56 tall at every width, and the tile counts needs-you apart', () => {
@@ -326,16 +319,21 @@ test('a needs-you row with a long question stays 56 tall at every width, and the
   const [item] = itemsOf(rows, [], [])
   const context: Context = { at: NOW, trees: [], sessions: [], agents: [], rows }
   expect([rowFitOf(item!, context, { width: 360, isNarrow: false, chat: 'Open chat' }).height, rowFitOf(item!, context, { width: 1500, isNarrow: false, chat: 'Open chat' }).height]).toEqual([56, 56])
-  expect(runSummaryOf({ rows, sessions: [], agents: [], workflows: [], board: asking, trees: [], at: NOW }).needsYou.sessions).toBe(1)
+  expect(runSummaryOf({ rows, sessions: [], agents: [], workflows: [], board: asking, trees: [], at: NOW }).needsYou).toBe(1)
 })
 
-test('the Sessions tile dots add up to its total: needs you, working, waiting and done', () => {
-  const rows = rowsOf(board, liveOf())
-  const totals = runSummaryOf({ rows, sessions: [], agents: [], workflows: [], board, trees: [], at: NOW })
-  const tile = blocksOf(totals, true)[0]!
-  expect(tile.dots?.map(mark => mark.tone)).toEqual(['red', 'green', 'amber', 'grey'])
-  expect([tile.dots?.reduce((sum, mark) => sum + mark.count, 0), tile.value]).toEqual([4, '4'])
-  expect(tile.dots?.map(mark => mark.count)).toEqual([1, 1, 1, 1])
+test('the Plan tile reads the board pieces as done/total with working, verifying and queued dots; dropped pieces count in neither', () => {
+  const planned: Board = { ...board, plan: [{ name: 'a', state: 'done' }, { name: 'b', state: 'working' }, { name: 'c', state: 'verifying' }, { name: 'd', state: 'queued' }, { name: 'e', state: 'queued' }, { name: 'f', state: 'dropped' }] }
+  const rows = rowsOf(planned, liveOf())
+  const tile = blocksOf(runSummaryOf({ rows, sessions: [], agents: [], workflows: [], board: planned, trees: [], at: NOW }), true)[0]!
+  expect([tile.value, tile.chats]).toEqual(['1/5', 4])
+  expect(tile.dots).toEqual([
+    { tone: 'green', count: 1 },
+    { tone: 'amber', count: 1 },
+    { tone: 'grey', count: 2 },
+  ])
+  const all = blocksOf(runSummaryOf({ rows, sessions: [], agents: [], workflows: [], board: { ...planned, plan: [{ name: 'a', state: 'done' }] }, trees: [], at: NOW }), true)[0]!
+  expect([all.value, all.sub, all.dots]).toEqual(['1/1', 'all done', undefined])
 })
 
 test('the Sessions tile dots drop zero buckets and wrap inside the tile: known line counts at 41, 47 and 60 columns', () => {

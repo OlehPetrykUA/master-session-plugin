@@ -74,7 +74,7 @@ test('a nested subagent names its immediate parent and folds the earlier ones; n
   seeded(on, [
     agent('p1', { type: 'master-session:qa-verifier', description: 'verify a38c72e', parentSessionId: 'local_setup' }),
     agent('k1', { description: 'review a38c72e', parentAgentId: 'p1', asking: ASK }),
-    agent('d1', { type: 'master-session:researcher', description: 'find usages', state: 'done', endedAt: NOW - 1_000, result: 'found 3', parentSessionId: 'local_setup' }),
+    agent('d1', { type: 'master-session:researcher', description: 'find usages', state: 'done', startedAt: NOW, endedAt: NOW + 59_000, result: 'found 3', parentSessionId: 'local_setup' }),
   ])
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })

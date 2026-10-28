@@ -849,7 +849,7 @@ test('a done session with a reported sha reads ready for verify in Waiting, and 
 })
 
 test('a merged worktree with a reported sha sits in Done, which needs its git state, and archiving it puts the Undo bar in Done, not Waiting', async ($, on) => {
-  const { calls } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...finished('local_clean'), sha: '1111111' }] }, { git: PROVEN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN)] })
+  const { calls } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...finished('local_clean'), sha: '1111111', worktrees: [WORKTREE] }] }, { git: PROVEN_GIT(), sessions: [session('local_clean', 'clean-work', CLEAN)] })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const before = await keysOf(ui)
   expect(before.indexOf('group-head-done')).toBeLessThan(before.indexOf('row-local_clean'))
@@ -910,7 +910,7 @@ test('AC9: a session card shows Name, Status, Now and Next, Activity, Tests, Com
 })
 
 test('AC8: a subagent card shows Name, Status, Model and Time, then Started by, in that order with no removed block', async ($, on) => {
-  seededAgents(on, [{ id: 'q1', type: 'master-session:qa-verifier', description: 'Verify the gate', state: 'done', startedAt: NOW_MS -60_000, endedAt: NOW_MS -1_000, result: 'passed', task: { state: 'done', text: 'Runs the gate on the ready commit.' } }])
+  seededAgents(on, [{ id: 'q1', type: 'master-session:qa-verifier', description: 'Verify the gate', state: 'done', startedAt: NOW_MS, endedAt: NOW_MS + 59_000, result: 'passed', task: { state: 'done', text: 'Runs the gate on the ready commit.' } }])
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await click(ui, 'hit-row-q1')
@@ -944,9 +944,9 @@ test('AC12: an Architect waiting on one running child of its own reads who it wa
 
 test('AC20: a failed subagent shows Failed after its duration on the red tint; a reason with command text is dropped, none says it stopped without an answer', async ($, on) => {
   seededAgents(on, [
-    { id: 'f1', type: 'Explore', description: 'Check one', state: 'failed', startedAt: NOW_MS -60_000, endedAt: NOW_MS -20_000, result: 'The folder is empty.\nsecond line' },
-    { id: 'f2', type: 'Explore', description: 'Check two', state: 'failed', startedAt: NOW_MS -60_000, endedAt: NOW_MS -20_000, result: 'git push --force failed' },
-    { id: 'f3', type: 'Explore', description: 'Check three', state: 'failed', startedAt: NOW_MS -60_000, endedAt: NOW_MS -20_000 },
+    { id: 'f1', type: 'Explore', description: 'Check one', state: 'failed', startedAt: NOW_MS, endedAt: NOW_MS + 40_000, result: 'The folder is empty.\nsecond line' },
+    { id: 'f2', type: 'Explore', description: 'Check two', state: 'failed', startedAt: NOW_MS, endedAt: NOW_MS + 40_000, result: 'git push --force failed' },
+    { id: 'f3', type: 'Explore', description: 'Check three', state: 'failed', startedAt: NOW_MS, endedAt: NOW_MS + 40_000 },
   ])
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })

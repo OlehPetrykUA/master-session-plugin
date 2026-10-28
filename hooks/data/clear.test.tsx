@@ -13,6 +13,8 @@ const live = (id: string, patch: Record<string, unknown> = {}) => ({ sessionId: 
 
 const fin = (id: string) => ({ id, name: id, state: 'done', progress: 'step 2 of 2 — merged' })
 
+const seeded = (id: string) => ({ ...fin(id), worktrees: [WORKTREE] })
+
 const boardOf = (...sessions: Record<string, unknown>[]) => ({ ...BOARD, needsYou: [], sessions })
 
 const DONE = boardOf(fin('local_a'), fin('local_b'))
@@ -46,6 +48,8 @@ const rowsOf = async (ui: Ui) => (await hitsOf(ui)).filter(hit => hit.startsWith
 const keysOf = async (ui: Ui) => (await ui.findAll({ type: 'Box' })).map(box => box.key ?? '')
 
 const chip = async (ui: Ui, id: string) => Number(/(\d+)$/.exec(String((await ui.find({ key: `chip-${id}` }))?.text))?.[1])
+
+const chipAlt = async (ui: Ui, id: string) => Number(/"alt":"[^"]* (\d+)"/.exec(JSON.stringify(await ui.find({ key: `chip-${id}` })))?.[1])
 
 const alt = async (band: Ui) => String((await band.findAll({ type: 'Svg' })).find(one => String(one.props.source).includes('width="4096"'))?.props.alt)
 
@@ -184,7 +188,7 @@ test('AC8 a clean clear stops, deletes, messages and unarchives nothing, opens n
 })
 
 test('AC9 a dirty session is skipped and counted, stays in Done with its loss line, and opens no box', async ($, on) => {
-  const { calls, clock } = await started($, on, DONE, MIXED(DIRTY))
+  const { calls, clock } = await started($, on, boardOf(seeded('local_a'), fin('local_b')), MIXED(DIRTY))
   const ui = await mountPane($)
   await click(ui, 'hit-clear-done')
   await clock.settle()
@@ -199,7 +203,7 @@ test('AC9 a dirty session is skipped and counted, stays in Done with its loss li
 })
 
 test('AC10 the skipped session keeps its own Archive… and the existing ArchiveBox, archiving only after Archive and remove', async ($, on) => {
-  const { calls, clock } = await started($, on, DONE, MIXED(DIRTY))
+  const { calls, clock } = await started($, on, boardOf(seeded('local_a'), fin('local_b')), MIXED(DIRTY))
   const ui = await mountPane($)
   await click(ui, 'hit-clear-done')
   await clock.settle()
@@ -286,7 +290,7 @@ test('AC16 the press hides a finished subagent and run at once with no ccd call 
   await ui.unmount()
 })
 
-test('AC17 a subagent that finishes after the clear shows in Done and hides after 2 minutes', async ($, on) => {
+test('AC17 a subagent that finishes after the clear shows in Done and stays there until the next clear, however old', async ($, on) => {
   const { clock, c } = await withCrew($, on, DONE, { sessions: [] })
   const ui = await mountPane($)
   await click(ui, 'hit-clear-done')
@@ -295,8 +299,8 @@ test('AC17 a subagent that finishes after the clear shows in Done and hides afte
   await c.end('Later job')
   expect(await rowsOf(ui)).toContain('hit-row-Later job')
   expect(await rowsOf(ui)).not.toContain('hit-row-Review auth flow')
-  await clock.advance(121_000)
-  expect(await rowsOf(ui)).not.toContain('hit-row-Later job')
+  await clock.advance(300_000)
+  expect(await rowsOf(ui)).toContain('hit-row-Later job')
   await ui.unmount()
 })
 
@@ -455,7 +459,7 @@ const WORKER = { id: 'local_w', name: 'local_w', state: 'working', progress: 'st
 test('AC25 a skipped-only press shows the skipped bar without Undo and leaves the cleared time alone', async ($, on) => {
   let isStale = false
   on('state.get', async (_, e, next) => (isStale && e.key === 'agents' ? { value: { value: [], version: 1 } } : next(e)))
-  const { clock } = await withCrew($, on, boardOf(fin('local_b')), { git: gitOf(DIRTY), sessions: [live('local_b', { cwd: CLEAN })] }, false)
+  const { clock } = await withCrew($, on, boardOf(seeded('local_b')), { git: gitOf(DIRTY), sessions: [live('local_b', { cwd: CLEAN })] }, false)
   const ui = await mountPane($)
   expect(await hitsOf(ui)).toContain('hit-clear-done')
   isStale = true
@@ -465,6 +469,7 @@ test('AC25 a skipped-only press shows the skipped bar without Undo and leaves th
   expect(await ui.find({ key: 'face-undo-done' })).toBeUndefined()
   isStale = false
   await clock.advance(2_000)
+  await ui.redraw()
   expect(await rowsOf(ui)).toContain('hit-row-Review auth flow')
   await ui.unmount()
 })
@@ -526,16 +531,14 @@ test('AC30 after a clear the band count is finished/units and the pane chips sti
   await band.unmount()
 })
 
-test('AC31 the Sessions tile drops by the archived and the hide leaves the Subagents and Workflows tiles', async ($, on) => {
+test('AC31 the All chip drops by the archived and the hidden, and the Agents tile follows the hide', async ($, on) => {
   const { pane, clock } = await bandAndPane($, on, DONE, PAIR, true)
-  const tile = async (name: string) => String((await pane.find({ key: `block-${name}` }))?.text)
-  const count = async () => Number(/\d+/.exec(await tile('sessions'))?.[0] ?? 0)
-  const sessions = await count()
-  const before = [await tile('subagents'), await tile('workflows')]
+  const agents = async () => Number(/"alt":"Agents (\d+)"/.exec(JSON.stringify(await pane.find({ key: 'block-agents' })))?.[1])
+  const readings = async () => [await chipAlt(pane, 'all'), await agents()]
+  expect(await readings()).toEqual([4, 2])
   await click(pane, 'hit-clear-done')
   await clock.settle()
-  expect(await count()).toBe(sessions - 2)
-  expect([await tile('subagents'), await tile('workflows')]).toEqual(before)
+  expect(await readings()).toEqual([0, 0])
   await pane.unmount()
 })
 

@@ -73,7 +73,10 @@ test('AC62 and AC32 a tool call never redraws the band; the minute rolling over 
   const run = await master($, on)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   expect((await textsOf(ui)).some(one => String(one).includes('Bash'))).toBe(false)
-  const minutes = async () => Number((await textsOf(ui)).map(one => String(one).trim()).find(one => /^\d+m$/.test(one))?.slice(0, -1))
+  const minutes = async () => {
+    const text = (await textsOf(ui)).map(one => String(one).trim()).find(one => /^(<1|\d+)m$/.test(one))
+    return text === '<1m' ? 0 : Number(text?.slice(0, -1))
+  }
   const seen = async () => ({ count: invalidated.count, minutes: await minutes() })
   await run.clock.advance(LIVE_MS)
   const quiet = await seen()
