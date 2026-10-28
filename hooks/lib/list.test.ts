@@ -6,7 +6,7 @@ import { liveOf } from '../testing/world'
 import { I, PERSONA_GLYPH } from '../theme/icons'
 import { modelFamilyOf } from './format'
 import { CH, bodyWidthOf } from './layout'
-import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, chatTargetOf, countsOfItems, isStartedBy, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, lineOf, listedRowsOf, nameText, personaOfType, relativeOf, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived, shownDots } from './list'
+import { ARCHIVED_PEEK, ageOf, archivedItemOf, blocksOf, chatTargetOf, countsOfItems, isStartedBy, displayNameOf, groupsOf, isAllDone, itemsOf, kindOfType, listedRowsOf, nameText, personaOfType, relativeOf, runAgentsOf, runStatusOf, sessionStatusOf, shownArchived, shownDots } from './list'
 import type { Context, ListItem, RowItem } from './list'
 import type { Row } from './rows'
 import { elapsedOf, rowsOf } from './rows'
@@ -158,7 +158,6 @@ test('every kind names itself persona · task and says its starter and state wor
     ['working', 'Explore · Review auth flow', 'Validator › running'],
     ['done', 'Researcher · token-finder', 'Validator › done'],
   ])
-  expect(lineOf(of('d') as ListItem, context)).toEqual({ word: { status: 'unmerged', text: 'unmerged' }, text: 'git state unknown' })
   const run = items.find(item => item.kind === 'workflow')
   expect(run?.kind === 'workflow' ? runAgentsOf(run.run, agents).map(one => said(one)) : []).toEqual([
     ['done', 'Agent · review:bugs', 'Workflow › done'],
@@ -167,7 +166,6 @@ test('every kind names itself persona · task and says its starter and state wor
   ])
   const done = itemsOf([], agents.map(agent => ({ ...agent, state: 'done' as const, endedAt: agent.endedAt ?? NOW })), workflows).find(item => item.kind === 'workflow')
   expect(said(done!)).toEqual(['done', 'Workflow · review-changes', 'Validator › done'])
-  expect(lineOf(done as ListItem, context)).toEqual({ word: { status: 'done', text: 'done' }, text: '3 of 3 agents' })
   expect([kindOfType('a:b:c'), kindOfType('Explore'), modelFamilyOf('claude-opus-5-5'), modelFamilyOf('haiku'), modelFamilyOf(undefined)]).toEqual(['c', 'Explore', 'opus', 'haiku', ''])
   const personas = ['implementer', 'refactorer', 'reviewer', 'qa-verifier', 'design-checker', 'researcher', 'designer', 'architect', 'validator'].map(type => personaOfType(`master-session:${type}`))
   expect(personas.map(persona => PERSONA_GLYPH[persona] && PERSONA_GLYPH[persona] in I)).toEqual(personas.map(() => true))

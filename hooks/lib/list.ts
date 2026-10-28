@@ -1,7 +1,6 @@
 import type { AgentRecord, ArchiveView, Board, BoardSession, Filter, LiveSession, Repo, Running, SessionState, TaskText, Undone, WorkflowRecord } from '../../types'
 
 import { lossLineOf, mergedLineOf } from '../components/detail/losses'
-import { STATUS } from '../theme/icons'
 import type { Status } from '../theme/icons'
 import { workflowRunsOf } from './agents'
 import type { WorkflowAgent, WorkflowRun } from './agents'
@@ -32,7 +31,6 @@ export const isStartedBy = (live: LiveSession | undefined, self: string | undefi
 
 export type Name = { persona: string; task: string }
 
-export type Line = { word?: { status: Status; text: string }; text: string }
 
 export const GROUPS: readonly SessionState[] = ['needs-you', 'working', 'waiting', 'done']
 
@@ -86,8 +84,6 @@ const GENERIC = ['general-purpose', 'workflow-subagent']
 export const kindOfType = (type: string) => type.split(':').at(-1) ?? type
 
 export const personaOfType = (type: string) => (GENERIC.includes(kindOfType(type)) ? 'Agent' : (PERSONA[kindOfType(type)] ?? (kindOfType(type) || 'Subagent')))
-
-const firstLine = (text: string | undefined) => (text ?? '').split('\n').find(line => line.trim())?.trim() ?? ''
 
 export function sessionNameOf(title: string, persona: string | undefined): Name {
   const cut = title.indexOf(' · ')
@@ -331,22 +327,6 @@ export function spanOf(startedAt: number, endedAt: number | undefined, at: numbe
 }
 
 export const runningTextOf = (run: Running) => [run.tool, run.text].filter(Boolean).join(' · ')
-
-function sessionLineOf(row: Row, status: Status, context: Context): Line {
-  const board = row.board
-  const loss = status === 'done' ? lossLineOf(row, context.trees, context.sessions) : ''
-  const worded = (word: Status, text: string, label = STATUS[word].word): Line => ({ word: { status: word, text: label }, text })
-  if (loss) return worded('unmerged', loss)
-  if (status === 'verified') return worded('verified', board?.verified ?? '')
-  if (status === 'merged') return worded('merged', board?.sha ?? '', mergedLineOf(row, context.trees))
-  return worded('done', board?.done || 'unverified')
-}
-
-export function lineOf(item: ListItem, context: Context): Line {
-  if (item.kind === 'session') return sessionLineOf(item.row, item.status, context)
-  if (item.kind === 'workflow') return { word: { status: item.status, text: STATUS[item.status].word }, text: item.status === 'failed' ? `${plural(item.run.counts.failed, 'agent')} failed` : `${item.run.counts.done} of ${item.run.counts.total} agents` }
-  return { word: { status: item.status, text: STATUS[item.status].word }, text: firstLine(item.agent.result) }
-}
 
 export const openIdOf = (item: RowItem, open: readonly string[]) =>
   open.includes(item.id) ? item.id : item.kind === 'workflow' ? item.run.agents.find(agent => open.includes(agent.id))?.id : undefined
