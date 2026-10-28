@@ -1,5 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
+import { FILE_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
 import { expandHome } from '../lib/git'
 import {
@@ -30,9 +31,16 @@ import { boardOf, homeOf, isMaster, isPaneOpen } from './sources'
 const FIELDS = 'pid=,ppid=,lstart=,%cpu=,rss=,etime=,ucomm='
 const ASKING = 'process:'
 
-type Snapshot = { isRead: boolean; load: string; error: string; model: Model }
+type Snapshot = { isRead: boolean; load: string; error: string; model: Model; at: number }
 
-const EMPTY: Snapshot = { isRead: false, load: '', error: '', model: { run: [], left: [], tools: [], engines: {}, ancestors: [] } }
+const EMPTY: Snapshot = { isRead: false, load: '', error: '', model: { run: [], left: [], tools: [], engines: {}, ancestors: [] }, at: 0 }
+
+const STALE_MS = 2 * FILE_MS
+
+function drop() {
+  snapshot = EMPTY
+  shown = ''
+}
 
 let uid = ''
 let master = 0
@@ -112,7 +120,7 @@ async function contextOf($: EngineInterface, masterPid: number): Promise<ProcCon
 async function readOnce($: EngineInterface) {
   const { table, error } = await tableOf($)
   const [loaded, pid] = await Promise.all([run($, ['sysctl', '-n', 'vm.loadavg', 'hw.logicalcpu']).then(ran => (ran.exitCode === 0 ? parseLoad(ran.stdout) : ''), () => ''), error ? 0 : masterOf($, table)])
-  let next: Snapshot = { isRead: true, load: loaded, error: '', model: EMPTY.model }
+  let next: Snapshot = { isRead: true, load: loaded, error: '', model: EMPTY.model, at: await $.clock.now() }
   if (error) next = { ...next, error: `Can’t read processes: ${error}` }
   else if (!pid) next = { ...next, error: 'Can’t read processes: the session’s own process was not found' }
   else {
@@ -134,7 +142,7 @@ async function readOnce($: EngineInterface) {
 }
 
 export async function readProcesses($: EngineInterface) {
-  if (isOff() || !(await isMaster($)) || !(await isPaneOpen($)) || !(await getProcessesOpen($))) return
+  if (isOff() || !(await isMaster($)) || !(await isPaneOpen($)) || !(await getProcessesOpen($))) return drop()
   if (reading) return reading
   reading = readOnce($).finally(() => {
     reading = undefined
@@ -145,6 +153,7 @@ export async function readProcesses($: EngineInterface) {
 export async function processesStateOf($: EngineInterface, at: number): Promise<ProcState | null> {
   if (!(await isMaster($))) return null
   const isOpen = await getProcessesOpen($)
+  if (!isOpen || at - snapshot.at > STALE_MS) drop()
   const asking = await getConfirming($)
   const since = Object.fromEntries([...stopping].map(([key, from]) => [key, Math.max(0, Math.floor((at - from) / 1000))]))
   return {
@@ -167,6 +176,7 @@ export async function toggleProcesses($: EngineInterface) {
   await setProcessesOpen($, open => !open)
   $.ui.invalidate('ui.render')
   if (await getProcessesOpen($)) await readProcesses($).catch(() => undefined)
+  else drop()
 }
 
 export function askStop($: EngineInterface, key: string) {

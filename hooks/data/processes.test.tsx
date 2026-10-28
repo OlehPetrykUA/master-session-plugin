@@ -258,6 +258,34 @@ test('AC17: expanding the section reads at once, not after 5 s', async ($, on) =
   expect(FILE_MS).toBe(5_000)
 })
 
+test('reopening the section never shows the rows of an earlier read', async ($, on) => {
+  const child = { ...CHILD }
+  const { run, ui } = await boot($, on, { child })
+  expect(await shown(ui, 'node')).toBeGreaterThan(0)
+  await click(ui, 'hit-processes-toggle')
+  await run.clock.advance(FILE_MS)
+  child.isPaneHidden = true
+  await click(ui, 'hit-processes-toggle')
+  expect(await shown(ui, 'node')).toBe(0)
+  await ui.unmount()
+})
+
+test('rows older than two refresh intervals are not shown while the pane is hidden', async ($, on) => {
+  const child = { ...CHILD }
+  const { fake, run, ui } = await boot($, on, { child })
+  expect(await shown(ui, 'node')).toBeGreaterThan(0)
+  const before = fake.argvs('ps').length
+  child.isPaneHidden = true
+  fake.state.psExit = 1
+  fake.state.psFails = 'boom'
+  await run.clock.advance(4 * FILE_MS)
+  expect(fake.argvs('ps').length).toBe(before)
+  await ui.unmount()
+  const again = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await shown(again, 'node')).toBe(0)
+  await again.unmount()
+})
+
 test('AC18: every lsof names its pids with -p and never -u', async ($, on) => {
   const { fake, ui } = await boot($, on)
   expect(fake.argvs('lsof').length).toBeGreaterThan(0)
