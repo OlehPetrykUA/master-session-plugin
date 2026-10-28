@@ -10,6 +10,7 @@ import { familyOf } from './rows'
 import { NARRATIVE_MAX_ROWS, NARRATIVE_ROWS, NARRATIVE_STALE_MS } from './constants'
 import { ARCHIVED_PEEK, ageOf, blocksOf, clockOf, countsOfItems, groupsOf, isAllDone, openIdOf, rowsOf, shortNameOf } from './list'
 import type { Context } from './list'
+import { pauseButtonOf, pauseStatusOf } from './pause'
 import { processesPxOf, processesViewOf } from './processes'
 import { NARROW_PX, contentHeightOf, dotExtraOf, headerRowsOf, sectionTopsOf, tileInnerOf } from './sections'
 import type { SectionInput } from './sections'
@@ -22,6 +23,8 @@ export const ASK_WIDE_PX = 460
 const newestOf = (data: PaneData) => Math.max(data.live.at, data.board?.at ?? 0, ...data.agents.map(one => Math.max(one.endedAt ?? one.startedAt, one.asking?.since ?? 0)), ...data.workflows.map(one => one.startedAt))
 
 export function statusOf(data: PaneData, isDone: boolean): { text: string; icon: IconName; tone: Tone } {
+  const paused = pauseStatusOf(data.pause, data.board)
+  if (paused) return paused
   if (data.live.error) return { text: 'live data unavailable', icon: 'offline', tone: 'muted' }
   if (data.isRefreshing) return { text: 'refreshing…', icon: 'clock', tone: 'muted' }
   if (data.asked) return { text: `asked ${data.asked.count} worker${data.asked.count === 1 ? '' : 's'} · ${ageOf(data.at - data.asked.at)}`, icon: 'chat', tone: 'muted' }
@@ -92,7 +95,7 @@ export function headerButtonsOf(data: PaneData, onAsk: () => void, onRefresh: ()
     : data.asked
       ? [{ id: 'ask', icon: 'check', label: 'Asked', onPress: onAsk, isQuiet: true }]
       : [{ id: 'ask', icon: 'chat', label: data.columns * CH >= ASK_WIDE_PX ? ASK_WIDE : 'Ask', onPress: onAsk }]
-  return [...ask, { id: 'refresh', icon: 'refresh', label: 'Refresh', onPress: onRefresh, isPressed: data.isRefreshing }]
+  return [pauseButtonOf(data.pause, data.actions.pause), ...ask, { id: 'refresh', icon: 'refresh', label: 'Refresh', onPress: onRefresh, isPressed: data.isRefreshing }]
 }
 
 function sectionInputOf(data: PaneData, view: PaneView): SectionInput {

@@ -6,6 +6,7 @@ import type { SectionInput } from './sections'
 import type { Board } from '../../types'
 import type { PaneData } from '../components/types'
 import { liveOf } from '../testing/world'
+import { IDLE_PAUSE } from './pause'
 import { runSummaryOf } from './totals'
 import { sectionsOf } from './view'
 
@@ -131,7 +132,7 @@ test('the view of a board whose Plan dots wrap moves the chips down one dot line
     const board: Board = { sessions: [], needsYou: [], repos: [], source: 'tool' }
     const totals = runSummaryOf({ rows: [], sessions: [], agents: [], workflows: [], board, trees: [], at: 10_000_000 })
     const counted = { ...totals, plan: { total: red! + working! + waiting! + done!, done: done!, working: working!, verifying: red!, queued: waiting!, sessions: 0 } }
-    const tops = sectionsOf({ board, live: liveOf(), trees: [], rows: [], archived: [], agents: [], workflows: [], items: [], totals: counted, chosen: 'all', open: [], asking: '', archiveView: 'open', asked: null, undone: null, isRefreshing: false, at: 10_000_000, home: '/h', columns, offset: 0, bodyRows: 60, isAligned: true } as unknown as PaneData)
+    const tops = sectionsOf({ board, live: liveOf(), trees: [], rows: [], archived: [], agents: [], workflows: [], items: [], totals: counted, chosen: 'all', open: [], asking: '', archiveView: 'open', asked: null, undone: null, isRefreshing: false, pause: IDLE_PAUSE, actions: { pause: () => undefined }, at: 10_000_000, home: '/h', columns, offset: 0, bodyRows: 60, isAligned: true } as unknown as PaneData)
     return (tops['section-chips'] ?? 0) - (tops['section-summary'] ?? 0)
   }
   expect([41, 47, 60].map(columns => chipsGap([30, 20, 10, 1], columns) - chipsGap([0, 1, 0, 0], columns))).toEqual([16, 16, 0])

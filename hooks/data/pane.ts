@@ -5,7 +5,8 @@ import { familyOf } from '../lib/rows'
 import { runSetOf, runSummaryOf } from '../lib/totals'
 import { UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
-import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getNarrativeNote, getNarrativeOpen, getRefreshing, getReports, getRepos, getTasks, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter, setNarrativeOpen } from '../state/atoms'
+import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getNarrativeNote, getNarrativeOpen, getPause, getRefreshing, getReports, getRepos, getTasks, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter, setNarrativeOpen } from '../state/atoms'
+import { pressPause } from './pause'
 import { askStop, cancelStop, processesStateOf, stopProcess, toggleProcesses } from './processes'
 import { runningViewOf } from './running'
 import { archive, askAll, clearDone, boardOf, homeOf, openSession, refreshAll, stopSession, unarchive, undoArchive } from './sources'
@@ -46,6 +47,7 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
     isClearing: await getClearing($),
     isRefreshing: await getRefreshing($),
     isNarrativeOpen: await getNarrativeOpen($),
+    pause: await getPause($),
     processes: await processesStateOf($, at),
     at,
     home: homeOf(),
@@ -68,6 +70,7 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
       open: (id, name) => settle(openSession($, id, name)),
       narrative: () => settle(setNarrativeOpen($, open => !open)),
       ask: () => settle(askAll($).then(text => $.ui.toast(text))),
+      pause: () => settle(pressPause($)),
       processes: () => settle(toggleProcesses($)),
       askStop: key => settle(askStop($, key)),
       cancelStop: () => settle(cancelStop($)),

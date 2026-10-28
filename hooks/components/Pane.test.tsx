@@ -25,12 +25,13 @@ test('v2 one list: header, repos, summary blocks, chips, groups with Needs you p
     'hit-row-local_setup',
     'hit-row-local_setup-chevron',
     'hit-archived-show',
+    'hit-pause',
     'hit-ask',
     'hit-refresh',
   ])
   expect(await buttonsOf(ui)).toEqual([])
   const texts = await textsOf(ui)
-  const order = ['Plan', 'Needs you', 'Agents', 'Commits', 'Tests', 'Duration', 'Git', 'Tokens', 'Needs you', 'Working', 'Waiting', 'Done', 'Archived', 'Master session', 'updated just now', 'Ask for updates', 'Refresh', 'Repos']
+  const order = ['Plan', 'Needs you', 'Agents', 'Commits', 'Tests', 'Duration', 'Git', 'Tokens', 'Needs you', 'Working', 'Waiting', 'Done', 'Archived', 'Master session', 'updated just now', 'Pause', 'Ask for updates', 'Refresh', 'Repos']
   let from = -1
   for (const word of order) {
     const at = texts.indexOf(word, from + 1)

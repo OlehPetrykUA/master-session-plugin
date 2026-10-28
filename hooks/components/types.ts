@@ -1,6 +1,6 @@
 import type { BoxProps, ButtonProps, ClientProps, ElementConstructor, SvgProps, TextProps } from 'claude-code'
 
-import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Repo, Running, SessionState, TaskText, Undone, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Pause, Repo, Running, SessionState, TaskText, Undone, WorkflowRecord } from '../../types'
 
 import type { ListItem } from '../lib/list'
 import type { ProcState } from '../lib/processes'
@@ -33,6 +33,7 @@ export type Actions = {
   processes: () => void
   askStop: (key: string) => void
   cancelStop: () => void
+  pause: () => void
   stopProcess: (target: { pid: number; lstart: string; ucomm: string; group: 'run' | 'left' }) => void
 }
 
@@ -58,6 +59,7 @@ export type PaneData = {
   isClearing: boolean
   isRefreshing: boolean
   isNarrativeOpen: boolean
+  pause: Pause
   processes: ProcState | null
   at: number
   home: string

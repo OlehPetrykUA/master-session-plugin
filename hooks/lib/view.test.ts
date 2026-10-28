@@ -4,18 +4,21 @@ import type { PaneData } from '../components/types'
 import { AGENT_SHOWN_MS } from './constants'
 import { compactOf } from './format'
 import { itemsOf } from './list'
+import { IDLE_PAUSE } from './pause'
 import { headerButtonsOf, paneViewOf, statusOf } from './view'
 import { runSetOf, runSummaryOf } from './totals'
 
-const dataOf = (rows: number) => ({ rows: Array.from({ length: rows }, () => ({})), asked: null, columns: 60, isRefreshing: false }) as unknown as PaneData
+const ACTIONS = { pause: () => undefined }
+
+const dataOf = (rows: number) => ({ rows: Array.from({ length: rows }, () => ({})), asked: null, columns: 60, isRefreshing: false, pause: IDLE_PAUSE, actions: ACTIONS }) as unknown as PaneData
 
 test('Ask for updates shows only when worker sessions exist: subagents report on their own', () => {
   const ids = (rows: number) => headerButtonsOf(dataOf(rows), () => undefined, () => undefined).map(one => one.id)
-  expect(ids(0)).toEqual(['refresh'])
-  expect(ids(2)).toEqual(['ask', 'refresh'])
+  expect(ids(0)).toEqual(['pause', 'refresh'])
+  expect(ids(2)).toEqual(['pause', 'ask', 'refresh'])
 })
 
-const headerOf = (extra: Record<string, unknown>) => statusOf({ at: 100_000, live: { at: 1_000 }, agents: [], workflows: [], archived: [], asked: null, isRefreshing: false, ...extra } as unknown as PaneData, false).text
+const headerOf = (extra: Record<string, unknown>) => statusOf({ at: 100_000, live: { at: 1_000 }, agents: [], workflows: [], archived: [], asked: null, isRefreshing: false, pause: IDLE_PAUSE, ...extra } as unknown as PaneData, false).text
 
 test('the header reads the newest change: every source moves it, and with none it counts from the session list', () => {
   expect(headerOf({})).toBe(`updated ${compactOf(99_000)} ago`)
@@ -50,6 +53,8 @@ test('the Duration tile stops at the board time once the run is done, so its val
       at: now,
       columns: 100,
       isNarrativeOpen: false,
+      pause: IDLE_PAUSE,
+      actions: ACTIONS,
     }) as unknown as PaneData
   const duration = (now: number) => paneViewOf(data(now)).blocks.find(one => one.key === 'duration')
   expect(duration(at)?.value).toBe('10m')
@@ -80,6 +85,8 @@ const viewOf = (extra: Record<string, unknown>) => {
     at,
     columns: 100,
     isNarrativeOpen: false,
+    pause: IDLE_PAUSE,
+    actions: ACTIONS,
     ...extra,
   } as unknown as PaneData)
 }
