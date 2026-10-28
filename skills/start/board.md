@@ -3,38 +3,39 @@
 The board posted on every tick and in every reply to the user. Every part is always shown, in this order; a reply to the user adds the Answer at the bottom, under the Summary line, so the user never scrolls up. Copy this shape exactly.
 
 ```
-🕐 **Tick 19:20** · run setup-wizard · 🟢 1 working · 🔴 0 need you · ✅ 1 done · next tick 19:25
+🕐 **Tick 19:20** · run setup-wizard · 🟢 1 working · 🔴 0 need you · ✅ 2 done · next tick 19:25
 
 | | 🤖 Session | ▸ Now | → Next |
 |---|---|---|---|
-| 🟢 | [setup-ui-redo](#local_<id>) | rewriting setup screens | smoke, check, amend |
-| ✅ | [conductor-redo](#local_<id>) | done · 07ab1b7 · archive? | — |
+| 🟢 | [setup-build](#local_<id>) | rewriting setup screens | smoke, check, amend |
+| ✅ | [conductor-build](#local_<id>) | done · 07ab1b7 · archive? | — |
+| ✅ | setup-design | approved v4 | — |
 
-#### 🟢 [setup-ui-redo](#local_<id>) — checkbox setup UI
+#### 🟢 [setup-build](#local_<id>) — checkbox setup UI
 | | |
 |---|---|
 | ⏱ Time | started 19:00 (20 min) · last active just now |
 | 📍 Progress | step 3 of 5 — build screens |
-| ✔ Done | tech choice (bash), setup-design v4 read |
+| ✔ Done | tech choice (bash), setup design v4 approved |
 | ▸ Now | rewriting setup.sh screens (+27 −32) |
-| 🔍 Verified | setup-design v4 approved; worktree holds only its edit |
+| 🔍 Verified | mockups match spec; worktree holds only its edit |
 | 🌿 Git | my-app feat/setup-wizard · 1 uncommitted · no upstream · last 9f95022 |
 | ⚠️ Risk | bash 3.2 key handling unproven |
 | → Next | smoke on /bin/bash, check, amend · ETA ~20 min |
 
 **📋 Plan**
-1. ✅ conductor-redo · T1 · merged 07ab1b7
-2. ✅ setup-design · doc · approved v4
-3. ▶ setup-ui-redo · T3 · step 3 of 5 — build screens
+1. ✅ Conductor build · T1 · merged 07ab1b7
+2. ✅ Setup design · doc · approved v4
+3. ▶ Setup build · T3 · step 3 of 5 — build screens
 4. ⏳ Follow-ups · T1 · nit backlog
 5. ⏳ Wrap-up · T0 · Done step
-6. ✖ setup-import · T3 · dropped: user cut the import screen
+6. ✖ Setup import · T3 · dropped: user cut the import screen
 
 **🙋 Needs you**
 Nothing right now.
 
 **🛡 Standing checks**
-- ✅ Git safety: main checkouts clean; 1 uncommitted path only in setup-ui-redo's own worktree; no stray worktrees; nothing only in scratch
+- ✅ Git safety: main checkouts clean; 1 uncommitted path only in setup-build's own worktree; no stray worktrees; nothing only in scratch
 - ✅ PC load: CPU 62% idle · load 5.1 / 10 cores · no suites or builds
 
 | | 📦 Repo | 🌿 Branch | ✏️ Uncommitted | ⇅ Ahead/behind | 🔖 Last |
@@ -43,16 +44,16 @@ Nothing right now.
 | ✅ | my-app | master | 0 | no upstream | 07ab1b7 |
 
 **📦 Results so far**
-- conductor-redo merged and verified: 07ab1b7 on master
-- setup-design approved: [canvas](<canvas link>) v4
+- Conductor build merged and verified: 07ab1b7 on master
+- Setup design approved: [canvas](<canvas link>) v4
 
-**Summary:** setup-ui-redo is on its screens, then a smoke run and its check; nothing needs you.
+**Summary:** Setup build is on its screens, then a smoke run and its check; nothing needs you.
 
-**Answer:** yes, conductor-redo is on master as 07ab1b7 and its check passed.
+**Answer:** yes, Conductor build is on master as 07ab1b7 and its check passed.
 ```
 
 - **Header:** the ledger's run name, the counts of Quick-table rows by marker, and the next tick time from the Heartbeat line.
-- **Names:** one name per piece in the Quick table, the Plan and the Results: the piece's ledger name, which is its worker's `name`.
+- **Names:** the Plan and Results use the piece's name from the ledger's Plan table (start §2, stable for life); the Quick table and mini tables use the worker's `name`, the kebab-case form of its piece's name (`Setup build` → `setup-build`, per shape.md Names). A piece with no worker yet, or done inline, appears only in the Plan.
 - **Quick table:** every worker; sessions linked `[name](#local_id)`, subagents and workflows by their description. Sort 🔴 needs you or blocked, 🟡 waiting or stalled, 🟢 working, ✅ done and verified. Cells 6 words or fewer.
 - **Mini tables:** one `####` per non-✅ worker, rows in the order shown, plus `❓ Needs you` last; leave out ⚠️ and ❓ when empty. ⏱ comes from `get_session` (`createdAt`, `lastActivityAt`), 📍 from the worker's `Progress:` line, 🔍 only from what the validator re-checked (SHAs, test counts), else "nothing yet". 🌿 names each repo the worker touches. Uncommitted work on a DONE worker is a ⚠️ Risk.
 - A worker's `ready <sha>` is a claim: it stays 🟢 or 🟡 until the validator has verified and merged it. Only then ✅, with just a quick-table row `done · <SHA> · archive?`.
