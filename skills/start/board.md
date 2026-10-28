@@ -1,6 +1,6 @@
 # Chat status board
 
-The board posted on every tick and in every reply to the user. Every part is always shown, in this order; the board opens with the BOARD fence line and closes with the END fence line right after the Summary, so its boundaries are plain; a reply to the user adds the Answer at the bottom, below the closing fence, so the user never scrolls up. Copy this shape exactly.
+The board posted on every tick that has news and in every reply to the user. Every part is always shown, in this order; the board opens with the BOARD fence line and closes with the END fence line right after the Summary, so its boundaries are plain; a reply to the user adds the Answer at the bottom, below the closing fence, so the user never scrolls up. Copy this shape exactly.
 
 ```
 ━━━━━━━━━━ 🏭 BOARD · 19:20 · run setup-wizard ━━━━━━━━━━
@@ -80,4 +80,4 @@ Nothing right now.
 - **Results so far:** one line per finished result (a merged and verified sha, an approved doc with its link, a push, a PR), with its link or key fact. Each line starts with the display name of who delivered it (`<Persona>: <piece name>`), then the fact. Each result repeats on every board until the user says "acknowledged" for it (or for all); then it moves to the Acknowledged list in the ledger's `protocol.md` and leaves the board. `None yet.` when empty.
 - **Summary:** one plain sentence: where the run is, what comes next, whether anything needs the user; it names each actor it mentions by display name.
 - **Answer:** only when replying to the user: the answer to their message, at the bottom, below the closing fence, never inside the board. The full board always comes first, answer at the bottom.
-- A quiet tick posts the same full board with the new time; there is no short form.
+- A tick with no news posts nothing; it only updates `last tick`. A reply to the user always gets the full board. There is no short form.

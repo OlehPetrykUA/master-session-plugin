@@ -43,8 +43,8 @@ rule 'start: tick reads the whole skill' skills/start/SKILL.md 'read the whole $
 rule 'start: heartbeat none on stop' skills/start/SKILL.md 'Heartbeat: none'
 rule 'subagent: argument-hint is only the task' skills/subagent/SKILL.md "argument-hint: '<task>'"
 rule 'qa-verifier: full suite never rerun' skills/qa-verifier/SKILL.md 'never rerun it'
-rule 'start: plan list has Investigate' skills/start/SKILL.md 'Investigate (if a bug'"'"'s cause is unknown'
-rule 'start: doc tier covers investigate' skills/start/SKILL.md '`doc` for investigate, spec, design and architect pieces'
+rule 'start: plan list has Investigate' skills/start/shape.md 'Investigate (if a bug'"'"'s cause is unknown'
+rule 'start: doc tier covers investigate' skills/start/shape.md '`doc` for investigate, spec, design and architect pieces'
 rule 'investigator: never fixes' skills/investigator/SKILL.md 'You find the cause; you never fix it.'
 rule 'investigator: no suite unless suite-runner' skills/investigator/SKILL.md "unless the brief names you the run's suite-runner"
 rule 'investigator: validator approves the report' skills/investigator/SKILL.md 'the validator approves the report'
@@ -79,7 +79,11 @@ rule 'start: recreate only if not listed' skills/start/SKILL.md 'recreate it onl
 rule 'board: acknowledged rule' skills/start/board.md 'until the user says "acknowledged" for it'
 rule 'board: Git safety check' skills/start/board.md 'Git safety: for each repo the run touches'
 rule 'board: PC load check' skills/start/board.md 'PC load: CPU idle, 1-minute load over core count'
-rule 'board: every tick and every reply' skills/start/board.md 'every tick and in every reply'
+rule 'board: every tick with news and every reply' skills/start/board.md 'every tick that has news and in every reply'
+rule 'board: quiet tick posts nothing' skills/start/board.md 'A tick with no news posts nothing; it only updates `last tick`. A reply to the user always gets the full board.'
+rule 'start: waiting heartbeat' skills/start/SKILL.md 'Heartbeat: none · waiting for <who> since HH:MM'
+rule 'start: quiet tick posts nothing' skills/start/SKILL.md 'posts nothing and only updates the Heartbeat line'
+rule 'start: re-arm on work' skills/start/SKILL.md 'Re-arm it with the same `/loop 5m` args on the next user message or worker event that opens work'
 rule 'board: answer at the bottom' skills/start/board.md 'answer at the bottom'
 rule 'start: 5m tick args' skills/start/SKILL.md '5m master-session tick'
 rule 'start: answer at the bottom' skills/start/SKILL.md 'the answer at the bottom, below its closing END fence'

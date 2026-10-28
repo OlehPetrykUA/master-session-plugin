@@ -18,6 +18,10 @@ One per piece, named in the ledger; the first match wins.
 - Record each piece's pending step and its worktree's `git status --short` in the ledger and stop the loop (`CronDelete <job id>`, then `Heartbeat: none · stopped HH:MM`); nothing runs until resume.
 - On resume: a fresh agent per paused subagent piece, briefed as in [Worker lifetime](#worker-lifetime) to continue in its recorded worktree at its sha with its uncommitted work, never in a new worktree; `git worktree remove --force` each verify worktree a stopped checker or your inline gate left, so the next tick starts a fresh checker on the same sha; start each paused workflow piece again with a fresh `Workflow` call (workflows are read-only); arm again each Monitor and background wait the ledger lists; start the loop again with section 3's `/loop 5m` args, a new `Heartbeat: cron <job id>` line.
 
+## Plan list
+
+Before the first spawn, write the run's plan list as one table in the ledger, edited in place; the board's Plan is a copy of it. List the whole chain up front: Investigate (if a bug's cause is unknown; you approve its report, its fix and repro go into the build's Must and Checker gate, and a suite or bisect makes it the suite-runner), Spec (if behaviour choices) and Architect (if 2+ modules or workers) per feature, one `Design` piece per plan (a batch added mid-run gets its own) when any visuals change, and one Build per expected worker (`<feature> build 1`, `<feature> build 2` when an Architect will split it). Give each piece its tier, `doc` for investigate, spec, design and architect pieces. Approvals, checks, fix rounds, rebases and the merge are the build's verifying stage, not pieces. Add one queued `Follow-ups` piece (T1, builds the accepted nit backlog) and one `Wrap-up` piece (T0, your own Done step in section 6, done inline) per run; mark them dropped if unused. Names are stable for life: a split marks the old piece dropped and adds the parts; never rename or fold pieces together.
+
 ## Verify details
 
 Part of tick step 2 of the [start](SKILL.md#3-the-loop) skill.
