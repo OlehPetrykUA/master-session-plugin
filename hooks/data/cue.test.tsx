@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { CREDENTIALS } from '../testing/credentials'
-import { hasCue } from './describe'
+import { hasCue } from '../lib/cues'
 
 const CUED_ROWS = new Set([...Array.from({ length: 48 }, (_, index) => index + 1), 52, 57, 64, 66, 72, 75, 81, 84, 85])
 

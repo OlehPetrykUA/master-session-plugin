@@ -8,11 +8,13 @@ import { workflowRunsOf } from './agents'
 import type { WorkflowRun } from './agents'
 import { progressOf, stepOf } from './board'
 import type { Progress } from './board'
+import { hasCue } from './cues'
 import { compactOf } from './format'
 import { CH, fit, textWidth, widthOf } from './layout'
 import { CHAT_LABEL, agentIdsOf, isGhostRun, nameText, personaOfType, sessionNameOf } from './list'
 import type { ListItem } from './list'
 import type { Row } from './rows'
+import { clean } from './status'
 import { agentsInRun, runSetOf } from './totals'
 
 const DIGIT = 0.64
@@ -163,9 +165,12 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
 const firstAskerOf = (units: readonly Unit[]) => units.reduce<Asker | undefined>((first, one) => (one.asker && (!first || (one.asker.since ?? Infinity) < (first.since ?? Infinity)) ? one.asker : first), undefined)
 
 export const askToolOf = (reason: string | undefined) => {
-  const found = /^Allow ([A-Za-z0-9_.-]+)(?::|$)/.exec(reason ?? '')
-  if (found) return `Allow ${found[1]}`
-  return reason?.startsWith('Allow') ? undefined : reason
+  if (!reason) return undefined
+  if (/^allow\b/i.test(reason)) {
+    const found = /^Allow ([A-Za-z0-9_.-]+)(?::|$)/.exec(reason)
+    return found && !hasCue(found[1]!) ? `Allow ${found[1]}` : undefined
+  }
+  return hasCue(reason) ? undefined : clean(reason) || undefined
 }
 
 const headOf = (asker: Asker) => (asker.parent ? `${asker.name}, in ${asker.parent},${NEEDS}` : `${asker.name}${NEEDS}`)

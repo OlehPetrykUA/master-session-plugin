@@ -4,8 +4,8 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord, Board, BoardSession, Live, PlanPiece, Repo, WorkflowRecord } from '../../../types'
 
-import { BAR_MIN, ELAPSED_ICON, PILL_WIDTH, askToolOf, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandSetOf, bandUnitsOf, bandViewOf, countsText, countsWidthOf, overallOf, percentOf } from '../../lib/band'
-import type { AgentCounts, InRunCounts } from '../../lib/band'
+import { BAR_MIN, ELAPSED_ICON, PILL_WIDTH, askToolOf, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandSetOf, bandUnitsOf, bandViewOf, countsText, countsWidthOf, inRunOf, overallOf, percentOf } from '../../lib/band'
+import type { AgentCounts } from '../../lib/band'
 import { CH, across, tall, textWidth, widthOf } from '../../lib/layout'
 import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, started, text, warmUp, world } from '../../testing/world'
 import { PERCENT } from '../../theme/band'
@@ -71,7 +71,7 @@ const mount = ($: Engine, bodyColumns = 100) => $.ui.mount({ ...BAND, surface: '
 
 type Counts = Pick<AgentCounts, 'agents' | 'workflows' | 'at'>
 
-const inRun = (counts: Counts) => counts as InRunCounts
+const inRun = (counts: Counts, current: Board | null = null) => inRunOf(current, counts)
 
 const IDLE = inRun({ agents: [], workflows: [], at: 0 })
 
@@ -135,7 +135,7 @@ warmUp()
 
 const crewValues = (crew: Counts, sessions: BoardSession[] = WORKING, archived: string[] = []) => {
   const live = liveOf(archived, sessions)
-  return bandUnitsOf(progressOf(boardOf(sessions), live)?.segments ?? [], boardOf(sessions), inRun(crew), live)
+  return bandUnitsOf(progressOf(boardOf(sessions), live)?.segments ?? [], boardOf(sessions), inRun(crew, boardOf(sessions)), live)
 }
 
 const agentOf = (id: string, state: AgentRecord['state'], extra: Partial<AgentRecord> = {}): AgentRecord => ({ id, type: 'general-purpose', description: id, state, startedAt: 1, ...extra })
@@ -164,7 +164,7 @@ const viewOf = (sessions: BoardSession[], crew: Counts, columns = 100) => {
   const progress = progressOf(current, live)
   if (!progress) throw new Error('no band')
   const chats: string[] = []
-  const view = bandViewOf(columns, current, progress, false, inRun(crew), { board: () => chats.push('board'), chat: (id, name) => chats.push(`${id} ${name}`) }, live)
+  const view = bandViewOf(columns, current, progress, false, inRun(crew, current), { board: () => chats.push('board'), chat: (id, name) => chats.push(`${id} ${name}`) }, live)
   return { view, chats }
 }
 
@@ -274,7 +274,7 @@ const NO_ACT = { board: () => undefined, chat: () => undefined }
 
 for (const fixture of FIXTURES) test(`the band count reads finished/units, and nothing when it has no band or a pill: ${fixture.name}`, () => {
   const board = fixture.outsiders ? null : boardOf(fixture.sessions)
-  const counts = inRun({ agents: fixture.agents, workflows: fixture.workflows ?? [], at: AT })
+  const counts = inRun({ agents: fixture.agents, workflows: fixture.workflows ?? [], at: AT }, board)
   const live = fixtureLive(fixture)
   const progress = bandProgressWith(board, live, counts)
   const view = progress && bandViewOf(200, board, progress, false, counts, NO_ACT, live, fixture.trees ?? [])
@@ -698,8 +698,8 @@ test('with no worker sessions, running subagents still show the band: 0%, the su
   const crew = crewOf($, on)
   await band($, on, [], false, [])
   expect(bandProgressWith(boardOf([]), liveOf([], []), IDLE)).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), inRun({ agents: [agentOf('a', 'done')], workflows: [], at: 0 }))).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), inRun({ agents: [agentOf('a', 'running')], workflows: [], at: 0 }))?.total).toBe(0)
+  expect(bandProgressWith(boardOf([]), liveOf([], []), inRun({ agents: [agentOf('a', 'done')], workflows: [], at: 0 }, boardOf([])))).toBeUndefined()
+  expect(bandProgressWith(boardOf([]), liveOf([], []), inRun({ agents: [agentOf('a', 'running')], workflows: [], at: 0 }, boardOf([])))?.total).toBe(0)
   expect(bandProgressWith(boardOf(WORKING), liveOf([], WORKING), IDLE)?.total).toBe(4)
   await crew.subagent('docs')
   await crew.subagent('review')
@@ -1093,9 +1093,9 @@ const planView = (px: number, options: { isPaneOpen?: boolean; minutes?: number;
   const sessions = options.sessions ?? WORKING
   const current: Board = { ...boardOf(sessions), plan: options.plan ?? SEVEN, since: 0 }
   const live = liveOf([], sessions)
-  const progress = bandProgressWith(current, live, inRun({ ...(options.crew ?? RUNNING), at: 0 }))
+  const progress = bandProgressWith(current, live, inRun({ ...(options.crew ?? RUNNING), at: 0 }, current))
   if (!progress) throw new Error('no band')
-  const crew = inRun({ ...(options.crew ?? RUNNING), at: (options.minutes ?? 48) * MIN })
+  const crew = inRun({ ...(options.crew ?? RUNNING), at: (options.minutes ?? 48) * MIN }, current)
   return bandViewOf(columnsFor(px), current, progress, !!options.isPaneOpen, crew, NO_ACT, live)
 }
 
@@ -1205,8 +1205,40 @@ test('AC60 the terminal below 340 px draws the bar and the board glyph, and with
 test('askToolOf names a tool only for "Allow <tool>" or "Allow <tool>: detail"; any other Allow text names none, so no path or args show', () => {
   for (const reason of ['Allow Read(~/secret)', 'Allow Bash(git push)', 'Allow  Bash', 'Allow\tBash', 'Allow the push to master?']) expect(askToolOf(reason)).toBeUndefined()
   expect([askToolOf('Allow Bash'), askToolOf('Allow mcp__x__y: detail'), askToolOf('commit blocked'), askToolOf(undefined)]).toEqual(['Allow Bash', 'Allow mcp__x__y', 'commit blocked', undefined])
-  const asking = WORKING.map(one => (one.id === 'local_b' ? { ...one, state: 'needs-you' as const, needsYou: 'Allow Read(~/secret)' } : one))
-  expect(viewOf(asking, IDLE).view.summary).not.toContain('secret')
+  const asking = (needsYou: string | undefined) => WORKING.map(one => (one.id === 'local_b' ? { ...one, state: 'needs-you' as const, needsYou } : one))
+  const { view } = viewOf(asking('Allow Read(~/secret)'), IDLE)
+  expect(view.asker).toBeDefined()
+  expect([view.pillText, view.summary, view.alt].join('|')).not.toContain('secret')
+})
+
+const LEAKS: [string, string][] = [
+  ['Run mysql -u root -p hunter2 to seed the db', 'hunter2'],
+  ['Use token ghp_abcdef123 for the registry', 'ghp_'],
+  ['Please allow Bash(git push --force origin main)', 'force'],
+  ['Approve git push origin main', 'git push'],
+  ['allow Read(~/.aws/credentials)', 'credentials'],
+  ['Approve rm -rf build', 'rm -rf'],
+  ['run curl -u admin:hunter2 x', 'hunter2'],
+  ['Allow ghp_abcdef123: detail', 'ghp_'],
+]
+
+test('a needs-you text that is a command, a secret or an allow of anything but a plain tool shows nothing of itself on any width', () => {
+  const shown = (needsYou: string | undefined, columns: number) => {
+    const { view } = viewOf(NEEDS.map(one => (one.id === 'local_e' ? { ...one, needsYou } : one)), IDLE, columns)
+    expect(view.asker).toBeDefined()
+    return { pillText: view.pillText, summary: view.summary, alt: view.alt }
+  }
+  for (const columns of [100, columnsFor(900), columnsFor(300)]) {
+    const plain = shown(undefined, columns)
+    for (const [reason, fragment] of LEAKS) {
+      const view = shown(reason, columns)
+      expect([reason, view]).toEqual([reason, plain])
+      expect(Object.values(view).join('|')).not.toContain(fragment)
+    }
+  }
+  const named = shown('commit blocked', 900)
+  expect([named.summary, named.alt]).toEqual([expect.stringContaining('commit blocked'), expect.stringContaining('commit blocked')])
+  expect(shown('Allow Bash', 900).pillText).toContain('Allow Bash')
 })
 
 test('one band build runs rowsInRun once: the progress, the view and the asking chat share the run set', () => {
