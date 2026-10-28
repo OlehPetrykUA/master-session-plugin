@@ -1,7 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, NarrativeNote, Repo, Report, Role, TaskText, Undone, WorkflowRecord } from '../../types'
+import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, NarrativeNote, Pause, Repo, Report, Role, TaskText, Undone, WorkflowRecord } from '../../types'
+
+import { IDLE_PAUSE } from '../lib/pause'
 
 const board = atom({ plugin: 'master-session', key: 'board' } as const, null)
 const live = atom({ plugin: 'master-session', key: 'live' } as const, { self: '', title: '', sessions: [], error: '', at: 0 })
@@ -26,7 +28,9 @@ const tasks = atom({ plugin: 'master-session', key: 'tasks' } as const, {})
 const stopped = atom({ plugin: 'master-session', key: 'stopped' } as const, false)
 const isProcessesOpen = atom({ plugin: 'master-session', key: 'isProcessesOpen' } as const, false)
 
-const isSame = (one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other)
+const pause = atom({ plugin: 'master-session', key: 'pause' } as const, IDLE_PAUSE)
+
+const isSame =(one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other)
 
 export function getBoard($: EngineInterface) {
   return read($, board)
@@ -206,6 +210,15 @@ export function getTasks($: EngineInterface) {
 export async function saveTasks($: EngineInterface, change: (value: Record<string, TaskText>) => Record<string, TaskText>) {
   const before = await read($, tasks)
   if (!isSame(change(before), before)) await update($, tasks, change)
+}
+
+export function getPause($: EngineInterface) {
+  return read($, pause)
+}
+
+export async function savePause($: EngineInterface, change: (value: Pause) => Pause) {
+  const before = await read($, pause)
+  if (!isSame(change(before), before)) await update($, pause, change)
 }
 
 export function getProcessesOpen($: EngineInterface) {

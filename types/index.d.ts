@@ -8,6 +8,10 @@ export type Role = { role: 'worker' | 'master' | ''; self: string; parent: strin
 
 export type Asked = { at: number; count: number }
 
+export type PauseState = 'running' | 'pausing' | 'paused' | 'resuming'
+
+export type Pause = { state: PauseState; at: number; agents: number; sessions: number; failed: string[]; isLedgerMissing: boolean }
+
 export type Undone = { ids: string[]; name: string; skipped: number; group: SessionState; index: number; at: number; hid?: { agents: number; runs: number; before: number } }
 
 export type BoardSession = {
@@ -237,6 +241,7 @@ declare module 'claude-code' {
       isPlan: boolean
       stopped: boolean
       isProcessesOpen: boolean
+      pause: Pause
       tasks: Record<string, TaskText>
     }
   }
