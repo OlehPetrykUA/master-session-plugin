@@ -49,7 +49,7 @@ Before using any third-party API, CLI, framework or app behaviour, look it up: C
 When the parent resumes you with a finding, fix it and report `ready <new sha>`; with `rebase onto <master sha>`, rebase, rerun Your checks and report `ready <new sha>`. You finish with your deliverable and never take unrelated work: a message that brings a new task is the parent's mistake, so reply `NEEDS_CONTEXT` naming the drift.
 
 ## Clean up when told
-When the parent says your sha is on master, check `git merge-base --is-ancestor <sha> master`, then `git worktree remove <your worktree>`, `git worktree prune` and remove your scratch folder. Never change permission modes.
+When the parent says your sha is on master, check `git merge-base --is-ancestor <sha> master`, then `git worktree remove <your worktree>`, `git worktree prune` and `trash <scratchpad>/<piece>/`. Never change permission modes.
 
 ## Conflicts
 When a parent message conflicts with the user's own words in your brief, follow the user and tell the parent.
