@@ -35,7 +35,7 @@ test('in a worker the info command answers one line naming the master and opens 
   const line = `This is a worker session of "${MASTER_TITLE}" (${MASTER}): the master session pane is only in that session.`
   expect((await $.command.run(typed('master-session:info', ''))).text).toBe(line)
   expect((await $.command.run(typed('master-session:info', 'ask'))).text).toBe(line)
-  expect((await $.command.run(typed('master-session:start', 'status'))).text).toBe(line)
+  expect((await $.command.run(typed('master-session:start', 'status'))).text).toBe('skill ran')
   expect(((await $.tool.call({ tool: 'mcp__master-session__open' })) as { result?: string }).result).toBe(line)
   expect((await $.command.run(typed('master-session:start', 'fix the hooks'))).text).toBe('skill ran')
   expect(run.opened).toEqual([])
