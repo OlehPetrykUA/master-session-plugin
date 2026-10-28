@@ -285,7 +285,7 @@ test('AC10 band half: no new timers, and the band redraws only when the pause st
   const quiet = { count: run.renders.count, timers: { ...run.timers } }
   await run.clock.advance(LIVE_MS * 3)
   expect(run.renders.count).toBe(quiet.count)
-  expect(run.timers.every).toBeGreaterThanOrEqual(quiet.timers.every)
+  expect([run.timers.after, run.timers.sleep]).toEqual([quiet.timers.after, quiet.timers.sleep])
   expect((await textsOf(ui))[0]).toBe('Paused')
   const sources = await ui.findAll({ type: 'Svg' })
   for (const one of sources) expect(String(one.props.source)).not.toContain('<animate')

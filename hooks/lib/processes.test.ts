@@ -207,7 +207,6 @@ test('empty and error states', () => {
 const INPUT: SectionInput = {
   columns: 60,
   repos: [],
-  isNarrow: false,
   notice: '',
   status: 'x',
   buttons: [],

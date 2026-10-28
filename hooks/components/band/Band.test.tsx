@@ -10,7 +10,7 @@ import { CH, across, tall, textWidth, widthOf } from '../../lib/layout'
 import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, started, text, warmUp, world } from '../../testing/world'
 import { PERCENT } from '../../theme/band'
 import { glyph } from '../../theme/icons'
-import { glowOf, strip } from '../../theme/strip'
+import { strip } from '../../theme/strip'
 import { C } from '../../theme/tokens'
 import { guardSvg } from '../guard'
 import { Band } from './Band'
@@ -325,7 +325,7 @@ test('the user’s case: every session done and 2 subagents running reads 66% an
   const ui = await mount($)
   expect(await textsOf(ui)).toEqual(['66%', '4/6', '4', '6', '<1m', 'Open board'])
   const source = String((await stripOf(ui))?.props.source)
-  expect(source).toContain('linearGradient')
+  expect(source).not.toContain('linearGradient')
   expect(source).toContain('fill:var(--green)')
   expect((await stripOf(ui))?.props.alt).toBe('Master session: 66 percent, 4 of 6 done. <1m elapsed.')
   await crew.finish('docs')
@@ -338,17 +338,14 @@ test('the user’s case: every session done and 2 subagents running reads 66% an
   await done.unmount()
 })
 
-test('the highlight: a still white band 0 → .55 → 0 of max(16, 30% of the fill) at 35%, clipped to the fill while anything runs; none when nothing runs; nothing ever animates', () => {
+test('no glow: a running band bar is a plain fill in its tone, no gradient, clip or animation; a running fill is at least 16 wide', () => {
   const running = strip({ width: 200, overall: 0.5, tone: 'green', isSliding: true })
+  expect(running).not.toContain('linearGradient')
+  expect(running).not.toContain('clipPath')
   expect(running).not.toContain('animate')
   expect(running).not.toContain('class="m"')
-  expect(running).toContain('stop-opacity="0"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>')
-  expect(running).toContain('<g clip-path="url(#c)">')
-  expect(running).toContain('<clipPath id="c"><path d="M3.0,0h94.0a3,3 0 0 1 0,6h-94.0a3,3 0 0 1 0,-6Z"/></clipPath>')
-  expect(running).toContain('<rect x="35.0" y="0" width="30.0" height="6" fill="url(#k)"/>')
-  expect(glowOf(100)).toBe(30)
-  expect(glowOf(40)).toBe(16)
-  expect(strip({ width: 200, overall: 0.05, tone: 'green', isSliding: true })).toContain('width="16.0" height="6" fill="url(#k)"/>')
+  expect(running).toContain('M3.0,0h94.0a3,3 0 0 1 0,6h-94.0a3,3 0 0 1 0,-6Z" style="fill:var(--green)"')
+  expect(strip({ width: 200, overall: 0.05, tone: 'green', isSliding: true })).toContain('M3.0,0h10.0a3,3 0 0 1 0,6h-10.0a3,3 0 0 1 0,-6Z" style="fill:var(--green)"')
   const still = strip({ width: 200, overall: 0.5, tone: 'green', isSliding: false })
   expect(still).not.toContain('animate')
   expect(still).not.toContain('linearGradient')
@@ -705,7 +702,7 @@ test('with no worker sessions, running subagents still show the band: 0%, the su
   await crew.subagent('review')
   const ui = await mount($)
   expect(await textsOf(ui)).toEqual(['0%', '0/2', '0', '2', '<1m', 'Open board'])
-  expect(String((await stripOf(ui))?.props.source)).toContain('linearGradient')
+  expect(String((await stripOf(ui))?.props.source)).not.toContain('linearGradient')
   await ui.unmount()
 })
 
@@ -845,7 +842,7 @@ test('a running unit at 0% still shows: one subagent running and nothing finishe
   expect(await percentIn(ui)).toBe('0%')
   const source = String((await stripOf(ui))?.props.source)
   expect(source).toContain('M3.0,0h10.0a3,3 0 0 1 0,6h-10.0a3,3 0 0 1 0,-6Z" style="fill:var(--green)"')
-  expect(source).toContain('linearGradient')
+  expect(source).not.toContain('linearGradient')
   await ui.unmount()
   expect(strip({ width: 200, overall: 0, tone: 'grey', isSliding: false })).not.toContain('var(--grey)"/><')
 })
@@ -1040,12 +1037,12 @@ test('the first agent started with the pane closed draws the bar on the band’s
   const drawn = await stripOf(ui)
   expect(String(drawn?.props.alt)).not.toBe(before)
   expect(String(drawn?.props.alt)).toContain('1 of 5 done')
-  expect(String(drawn?.props.source)).toContain('linearGradient')
+  expect(String(drawn?.props.source)).not.toContain('linearGradient')
   expect(drawn?.props.width).toBeUndefined()
   expect((await ui.findAll({ type: 'Box' })).map(one => one.key).filter(one => one?.startsWith('bar-'))).toEqual([`bar-${await barWidthOf(ui)}-run`])
   await ui.unmount()
   const fresh = await mount($)
-  expect(String((await stripOf(fresh))?.props.source)).toContain('linearGradient')
+  expect(String((await stripOf(fresh))?.props.source)).not.toContain('linearGradient')
   await fresh.unmount()
 })
 

@@ -621,7 +621,6 @@ test('AC26: no precomputed height leaves the Task rows out: an open card has non
   const input: SectionInput = {
     columns: 47,
     repos: [],
-    isNarrow: true,
     notice: '',
     status: '',
     buttons: [],
