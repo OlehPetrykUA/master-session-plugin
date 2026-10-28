@@ -70,15 +70,15 @@ To run one as your own session: `claude --agent master-session:<persona>`. The S
 
 ## The board
 
-The master session posts the full board on every tick and in every reply. It opens with a `🏭 BOARD` fence and closes with a `🏭 END` fence right after the Summary. A reply to you puts its answer below the END fence.
+The master session posts the full board on every tick and in every reply. It opens with a `🏭 BOARD` fence and closes with a `🏭 END` fence right after 🔭 Current state. A reply to you puts its answer below the END fence.
 
 - **Counts line:** working, waiting, need you, done, and the next tick time.
 - **Quick table and mini tables:** subagents and workflows only, as plain names.
 - **Plan:** every piece of the run, with the piece names kept; each ▶ step names its active worker.
-- **Needs you:** always shown; `Nothing right now.` when empty.
-- **Standing checks:** Git safety and PC load.
-- **Results so far:** kept on every board until you say "acknowledged".
-- **Summary:** one plain sentence.
+- **🙋 Needs you:** numbered actions, each marked 🔴 blocking now or 🟡 later, plus a kind emoji; `✅ Nothing right now.` when empty.
+- **🛡 Standing checks:** Git safety per repo (committed, on a branch, or uncommitted), a To delete later list of extra worktrees and branches, and PC load.
+- **📦 Results so far:** kept on every board until you say "acknowledged".
+- **🔭 Current state:** 2 to 4 bullets on what each worker is doing, waiting for and doing next.
 
 Every worker is named `<Persona>: <short task>`.
 
@@ -98,16 +98,25 @@ Every worker is named `<Persona>: <short task>`.
 3. ⏳ Wrap-up · T0 · Done step
 
 **🙋 Needs you**
-Nothing right now.
+Urgency: 🔴 blocking now · 🟡 later or after X. Kind: 🖥 run a command · 🔁 restart or reload · 🗑 Trash or files · ✋ decision · 🔑 sign-in or approval.
+1. 🟡🔁 After QA verifier: check setup build passes: reload the plugin with `/reload-plugins` in the user's own chat
+2. 🟡🗑 After the merge: move `~/.claude/worktrees/wt-my-app-setup-build` to Trash, in the user's terminal
 
 **🛡 Standing checks**
-- ✅ Git safety: main checkouts clean; no stray worktrees
+- **Git safety:**
+  - ✅ ~/dotfiles: committed and on master; nothing lives only in scratch
+  - 🟡 my-app: committed on branch `setup-ui ＠ 3c1d7e2`, owner Implementer: setup build, merges after the QA verdict
+- **To delete later:**
+  - worktree `wt-my-app-setup-build` (detached) · Implementer: setup build · holds the unmerged ready sha · after merge
+  - branch `setup-import` · Implementer: setup import · piece dropped · owner retired ⚠
 - ✅ PC load: CPU 62% idle · load 5.1 / 10 cores
 
 **📦 Results so far**
 - Implementer: conductor build merged and verified: 07ab1b7 on master
 
-**Summary:** Implementer: setup build is on its screens, then its check; nothing needs you.
+**🔭 Current state**
+- Implementer: setup build is rewriting the setup screens; next a smoke test and its check.
+- QA verifier: check setup build waits for the ready sha; next the gate and a verdict.
 ━━━━━━━━━━ 🏭 END ━━━━━━━━━━
 
 **Answer:** yes, the conductor build is on master as 07ab1b7.
