@@ -76,6 +76,13 @@ test('proof 3b: a session of unknown creation time is outside the run unless the
   expect(setOf([], { board: board({ sessions: [{ id: 'u1', name: 'u1', state: 'working' }] }), live: live([unknown]) }).rows.map(row => row.id)).toContain('u1')
 })
 
+test('proof 3c: with no board, a running session of unknown creation time is counted: running and asking always count', () => {
+  const unknown = session('u1', { createdAt: undefined, isRunning: true })
+  const set = runSetOf({ board: null, live: live([unknown]), agents: [], workflows: [], at: NOW })
+  expect(set.rows.map(row => row.id)).toEqual(['u1'])
+  expect(set.items.map(item => item.id)).toEqual(['u1'])
+})
+
 test('proof 4: the Needs you tile is the chip, the Agents tile adds up, and the band reads the same items as the pane', () => {
   const asking = agent('ask', { state: 'running', endedAt: undefined, asking: { text: 'Allow Bash', since: NOW } })
   const flow: WorkflowRecord = { id: 'wf', toolUseId: 't', name: 'flow', startedAt: SINCE + MINUTE }
@@ -114,7 +121,7 @@ test('proof 5: Clear done removes what ended at or before the mark from the chip
   expect(summaryOf(before).agents.done).toBe(2)
   expect([countsOfItems(after.items, 0).done - countsOfItems(before.items, 0).done, summaryOf(after).agents.done]).toEqual([-1, 1])
   expect(bandItemsOf(board(), agentCountsOf(agents, [], NOW, cleared), live()).map(item => item.id)).toEqual(after.items.map(item => item.id))
-  expect(bandUnitsOf([], board(), agentCountsOf(agents, [], NOW, cleared), live())).toHaveLength(3)
+  expect(bandUnitsOf([], board(), inRunOf(board(), agentCountsOf(agents, [], NOW, cleared)), live())).toHaveLength(3)
 })
 
 test('proof 6: helpers are listed and counted, and the plan and the band done/total stay builder-only', () => {
@@ -127,7 +134,7 @@ test('proof 6: helpers are listed and counted, and the plan and the band done/to
   expect(summaryOf(withHelpers, b).agents.total).toBe(3)
   expect(summaryOf(withHelpers, b).plan).toEqual(summaryOf(without, b).plan)
   const partsOf = (agents: AgentRecord[]) => {
-    const counts = agentCountsOf(agents, [], NOW)
+    const counts = inRunOf(b, agentCountsOf(agents, [], NOW))
     const progress = bandProgressWith(b, live(), counts)
     return progress ? countsText(bandViewOf(100, b, progress, false, counts, { board: () => undefined, chat: () => undefined }, live()).parts) : ''
   }
@@ -155,7 +162,7 @@ test('proof 9: the run lasted 3h 1m: the tile, its since line and the band elaps
   expect(set.since).toBe(SINCE)
   const block = blocksOf(summaryOf(set, b), true).find(one => one.key === 'duration')
   expect([block?.value, block?.sub]).toEqual(['3h 1m', `since ${clockOf(SINCE)}`])
-  const counts = agentCountsOf([], [], NOW)
+  const counts = inRunOf(b, agentCountsOf([], [], NOW))
   const progress = bandProgressWith(b, live(), counts)
   expect(progress && bandViewOf(100, b, progress, false, counts, { board: () => undefined, chat: () => undefined }, live()).elapsed).toBe(compactOf(NOW - SINCE))
   expect(compactOf(NOW - SINCE)).toBe('3h 1m')
