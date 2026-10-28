@@ -3,7 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import { agentCountsOf, bandItemsOf } from '../lib/band'
 import { displayNameOf, nameText } from '../lib/list'
 import { PANE } from '../lib/constants'
-import { getAgents, getLive, getRepos, getWorkflows, saveBoard } from '../state/atoms'
+import { getAgents, getCleared, getLive, getRepos, getWorkflows, saveBoard } from '../state/atoms'
 import { detected, halt, roleOf } from './recorder'
 import { boardOf, forget, homeOf, isMaster, isPaneOpen, isWorker, written } from './sources'
 import { boardPath, reportPath, writeTombstone } from './status'
@@ -17,7 +17,7 @@ const QUIET =
 
 async function runningNames($: EngineInterface) {
   const { board } = await boardOf($)
-  const items = bandItemsOf(board, agentCountsOf(await getAgents($), await getWorkflows($), await $.clock.now()), await getLive($), await getRepos($))
+  const items = bandItemsOf(board, agentCountsOf(await getAgents($), await getWorkflows($), await $.clock.now(), await getCleared($)), await getLive($), await getRepos($))
   return items.flatMap(item => (item.group !== 'working' ? [] : [nameText(displayNameOf(item))]))
 }
 
