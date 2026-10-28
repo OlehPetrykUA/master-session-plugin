@@ -23,20 +23,6 @@ check 'no agent gets nothing' '{"session_id":"x","source":"startup"}' ''
 check 'bad input gets nothing' 'not json' ''
 check 'empty input gets nothing' '' ''
 
-step=$(grep -F '**Status pane:**' "$root/skills/start/SKILL.md")
-
-has() {
-  if printf '%s' "$step" | grep -qF -- "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi
-}
-
-has 'AC31 step 6 lists plan[]' '`plan[]`: every piece of the whole run, written from the ledger on every board call, queued ones included'
-has 'AC31 step 6 lists name, the five states and progress' '`name`, `state` (queued, working, verifying, done, dropped), `tier` (T0 to T3, or `doc`), `progress` ("step N of M — label"'
-has 'step 6 lists run' '`run`: the ledger'"'"'s run name, the same on every board call of the run'
-has 'AC32 step 6 says a piece is a deliverable of any shape' 'A piece is a deliverable of any shape'
-has 'AC32 step 6 says helpers are not pieces' 'helpers (QA verifier, Code reviewer, Researcher checks) are not pieces'
-has 'AC32 step 6 says a fix round adds no piece' 'A fix round after a FAIL adds no piece'
-has 'AC32 step 6 says user work extends the plan' 'work the user adds mid-run adds one'
-
 rule() {
   if grep -qF -- "$3" "$root/$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi
 }
@@ -52,7 +38,7 @@ rule 'start: running count line' skills/start/SKILL.md 'Count: N running (ready:
 rule 'start: one full gate' skills/start/SKILL.md 'has had one full gate'
 rule 'start: Your checks' skills/start/SKILL.md '## Your checks'
 rule 'start: Checker gate' skills/start/SKILL.md '## Checker gate'
-rule 'start: tick reads answering.md and shape.md' skills/start/SKILL.md 'answering.md and ${CLAUDE_SKILL_DIR}/shape.md'
+rule 'start: tick reads answering.md and shape.md' skills/start/SKILL.md 'answering.md, ${CLAUDE_SKILL_DIR}/shape.md'
 rule 'start: tick reads the whole skill' skills/start/SKILL.md 'read the whole ${CLAUDE_SKILL_DIR}/SKILL.md'
 rule 'start: heartbeat none on stop' skills/start/SKILL.md 'Heartbeat: none'
 rule 'subchat: argument-hint is only the task' skills/subchat/SKILL.md "argument-hint: '<task>'"
@@ -63,6 +49,29 @@ rule 'start: doc tier covers investigate' skills/start/SKILL.md '`doc` for inves
 rule 'investigator: never fixes' skills/investigator/SKILL.md 'You find the cause; you never fix it.'
 rule 'investigator: no suite unless suite-runner' skills/investigator/SKILL.md "unless the brief names you the run's suite-runner"
 rule 'investigator: validator approves the report' skills/investigator/SKILL.md 'the validator approves the report'
+rule 'board: plan lists every piece' skills/start/board.md 'every piece of the whole run, queued ones included, written from the ledger'"'"'s Plan table on every board'
+rule 'board: plan markers' skills/start/board.md '✅ done (merged sha, or "approved" for a doc piece), ▶ working or verifying'
+rule 'board: a piece is a deliverable of any shape' skills/start/board.md 'A piece is a deliverable of any shape'
+rule 'board: helpers are not pieces' skills/start/board.md 'helpers (QA verifier, Code reviewer, Researcher checks) are not pieces'
+rule 'board: states move one way' skills/start/board.md 'States move one way: queued, working when spawned, verifying from its first ready sha'
+rule 'board: a fix round adds no piece' skills/start/board.md 'A fix round after a FAIL adds no piece'
+rule 'board: user work extends the plan' skills/start/board.md 'work the user adds mid-run adds one'
+rule 'board: never delete a piece' skills/start/board.md 'never delete a piece: abandoned or split work is dropped'
+rule 'board: Nothing right now' skills/start/board.md 'Nothing right now.'
+rule 'board: acknowledged rule' skills/start/board.md 'until the user says "acknowledged" for it'
+rule 'board: Git safety check' skills/start/board.md 'Git safety: for each repo the run touches'
+rule 'board: PC load check' skills/start/board.md 'PC load: CPU idle, 1-minute load over core count'
+rule 'board: every tick and every reply' skills/start/board.md 'every tick and in every reply'
+rule 'board: answer at the bottom' skills/start/board.md 'answer at the bottom'
+rule 'start: 5m tick args' skills/start/SKILL.md '5m master-session tick'
+rule 'start: answer at the bottom' skills/start/SKILL.md 'the answer at the bottom, under its Summary line'
+rule 'start: CronDelete stops the loop' skills/start/SKILL.md 'CronDelete <job id>'
+rule 'start: tick reads board.md' skills/start/SKILL.md '${CLAUDE_SKILL_DIR}/shape.md and ${CLAUDE_SKILL_DIR}/board.md'
+rule 'start: ledger head order' skills/start/SKILL.md 'Run (name, repos, master ref, validator local_id); User'"'"'s words'
+rule 'start: protocol.md' skills/start/SKILL.md '`protocol.md` (the head)'
+rule 'start: log.md' skills/start/SKILL.md '`log.md` (the appended log)'
+rule 'start: copy the ledger at wrap-up' skills/start/SKILL.md 'At Wrap-up, and before this session could be deleted or archived, copy the final `protocol.md` and `log.md`'
+rule 'stop: CronDelete' skills/stop/SKILL.md 'CronDelete'
 
 tmp=$(mktemp -d)
 trap 'rm -r "$tmp"' EXIT

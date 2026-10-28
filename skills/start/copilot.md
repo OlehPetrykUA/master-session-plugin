@@ -1,6 +1,6 @@
 # In Copilot CLI
 
-Copilot CLI loads this plugin too, without `start_session`, SendMessage, the report tool, the status mod, `/loop`, `ScheduleWakeup`, `Workflow`, Claude Docs or Artifacts (the design canvas). It leaves `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` as written: read them as the plugin folder (two levels up from any skill file) and that skill's folder. The skills that need a Copilot change link their section here.
+Copilot CLI loads this plugin too, without `start_session`, SendMessage, `/loop`, `CronCreate`, `Workflow`, Claude Docs or Artifacts (the design canvas). It leaves `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` as written: read them as the plugin folder (two levels up from any skill file) and that skill's folder. The skills that need a Copilot change link their section here.
 
 Persona subagents everywhere: the `task` tool with `agent_type: "master-session:<persona>"` and `model` set to a Copilot model id, such as this session's own. Copilot rejects the agents' `sonnet` and `opus`, and its error lists the ids. `/tasks` shows them. The agents carry `reasoning-effort` for Copilot beside `effort` for Claude Code.
 
@@ -15,7 +15,7 @@ Run the same protocol with what Copilot has:
 
 ## worker
 
-Copilot has no report tool and no SendMessage. Put each update, question and `ready <sha>` in your own chat, in the report format, for the user to relay to the parent. Without a Monitor, check your start condition and master each time the user writes.
+Copilot has no SendMessage. Put each update, question and `ready <sha>` in your own chat, in the report format, for the user to relay to the parent. Without a Monitor, check your start condition and master each time the user writes.
 
 ## subchat
 
@@ -28,10 +28,6 @@ Call the `task` tool instead of `Agent`, with `name`, `description` and `prompt`
 ## workflow
 
 Copilot has no `Workflow` tool or `workflow-authoring` skill. Announce the plan the same way (agents, phases), then run the personas as parallel `task` calls, or ask the user to run it with `/fleet`.
-
-## info
-
-Copilot has no status mod and no loop. Post the board as [board.md](board.md) shows, then say in one line that Copilot runs no loop, so the board updates when the user writes.
 
 ## spec-writer
 
@@ -47,4 +43,4 @@ Copilot has no Artifacts, so no design canvas, and the Design checker has no can
 
 ## Install
 
-Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do. `start`, `info`, `stop`, `subchat`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them. `stop force` and `info ask` need the status mod, so they do nothing here.
+Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do. `start`, `stop`, `subchat`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them.

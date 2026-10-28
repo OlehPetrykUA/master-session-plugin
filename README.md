@@ -7,7 +7,7 @@ A Claude Code plugin that turns one session into a **validator** for a team of w
 |---|---|
 | Skill `start` | `/master-session:start`, the validator protocol: work tiers, the agent count line, briefs, the tick loop, checkers by tier, permissions, the ledger. Ships `personas.md` (the persona index), `shape.md` (execution shape, worker lifetime, pause and resume, names), `answering.md` (answering workers and permissions), `board.md` (the chat board) and `copilot.md` (the Copilot CLI notes). |
 | Skills `subchat`, `subagent`, `workflow` | `/master-session:subchat`, `/master-session:subagent` and `/master-session:workflow`: start a worker session, a persona subagent or a workflow of persona agents from the validator. |
-| Skill `worker` | The protocol every worker session follows: its own worktree, the report tool, talking to the validator, the `ready <sha>` gate. |
+| Skill `worker` | The protocol every worker session follows: its own worktree, talking to the validator, the `ready <sha>` gate. |
 | Personas | Ten roles, each a skill plus an agent of the same name: `implementer`, `refactorer`, `reviewer`, `qa-verifier`, `design-checker`, `researcher`, `investigator`, `spec-writer`, `architect` and `designer`. |
 
 ## Install
@@ -62,13 +62,13 @@ copilot plugin install master-session@master-session
 | `/master-session:subchat <task>` | Starts a worker session, a side chat, for the task (the master picks the persona) and watches it in the loop. |
 | `/master-session:subagent <task>` | Runs a persona the master picks as a background subagent for a short check, then relays its result. |
 | `/master-session:workflow <task>` | Writes and runs a workflow for the task with persona agents, announcing the agent count first. |
-| `/master-session:stop [force]` | Ends the run: the session stops being a master session or a worker. With workers still running it refuses unless `force`. |
+| `/master-session:stop` | Ends the run: stops this session's heartbeat, posts the final board and lists the workers still running for you to stop. |
 
 `subchat`, `subagent` and `workflow` make the session the validator first if `/master-session:start` hasn't run yet. Type `/master-session:start <task>`; the master decides the heartbeat, the board and the workers.
 
 Workers need nothing installed beyond this plugin: their brief loads the `master-session:worker` skill and their persona's skill.
 
-The ledger, one note per run with every worker, its state and open findings, goes in your notes or memory tool, or a plain markdown file if you use none.
+The ledger, the run's protocol, is two local files in the validator's session folder: `protocol.md` (every worker, its state and the plan) and `log.md` (verdicts, findings, decisions). Your notes or memory tool gets the milestones and, at wrap-up, a copy of both files.
 
 ## Personas
 

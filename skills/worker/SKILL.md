@@ -1,6 +1,6 @@
 ---
 name: worker
-description: Master-session worker protocol for a session briefed by a master-session validator, covering its own worktree, live status through the report tool, talking to the parent and the ready <sha> gate. Use only when a brief says this is a worker session of a master session.
+description: Master-session worker protocol for a session briefed by a master-session validator, covering its own worktree, talking to the parent and the ready <sha> gate. Use only when a brief says this is a worker session of a master session.
 user-invocable: false
 ---
 
@@ -38,10 +38,7 @@ Your brief holds your whole run: no go, rebase or merged message will come.
 - **Clean up yourself:** once `git merge-base --is-ancestor <sha> master` holds, clean up as Hygiene says (`git worktree remove`, then `git worktree prune`; `git branch -d`), then stop.
 - **Pause (sessions):** on `PAUSE`, commit work in progress, stop every Monitor and background job, and end the turn. On `RESUME`, re-arm your watches and continue from the step it names.
 
-## Live status: the report tool
-- Call `mcp__master-session__report` (load it with ToolSearch `select:mcp__master-session__report`) at every step boundary, on a blocker, and when done, with `{ state?: "working"|"waiting"|"needs-you"|"done", persona?: "<your brief's persona, e.g. Implementer>", progress?: "step N of M — label", now?, next?, needsYou?, risk?, activity?: [], commits?: [], tests?: [], files?: [] }`. Never paste status into chat.
-- The mod records commits, test runs, edits and waits by itself, and an idle session sends nothing. No timed loops, heartbeats or ScheduleWakeup for status. Watch a long job with Monitor or a background Bash `until` loop on its own log.
-- Without the tool, send no step updates: the parent reads your session's events.
+- **Status:** no timed loops, heartbeats or ScheduleWakeup for status; watch a long job with a Monitor or a background Bash `until` loop on its own log. You report only by SendMessage or your final message; the parent reads your session's events.
 
 ## Talk to the parent, not the user
 - Send everything with SendMessage, `to` = the parent's `local_` id from your brief, or the `from` of its last `<cross-session-message>`.
