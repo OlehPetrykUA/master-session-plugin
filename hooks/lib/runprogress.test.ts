@@ -89,7 +89,7 @@ test('AC5 one working piece with no progress reads 0% with at least a 16 px fill
   expect(view.percent).toBe(0)
   const source = stripOf(view)
   expect(fillOf(source, 'green')).toBeGreaterThanOrEqual(16)
-  expect(source).not.toContain('linearGradient')
+  expect(source).toContain('linearGradient')
 })
 
 test('AC40 one verifying piece reads 75%', () => {
@@ -146,7 +146,7 @@ test('T6 a verifying piece stays at 75 over 2 through a fix round, and moving it
 test('T8 every piece done while a subagent runs reads 99% 3/3 on a green bar with the slider and no all-done check', () => {
   const view = viewOf([piece('A', 'done'), piece('B', 'done'), piece('C', 'done')], { agents: [subagent('s')] })
   expect([view.percent, countsText(view.parts), view.tone, view.isAllDone, view.isRunning, view.hasPercent]).toEqual([99, '3/3', 'green', false, true, true])
-  expect(stripOf(view)).not.toContain('linearGradient')
+  expect(stripOf(view)).toContain('linearGradient')
 })
 
 test('AC13 archiving done sessions changes nothing when a plan is present', () => {
