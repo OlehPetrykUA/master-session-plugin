@@ -63,6 +63,8 @@ rule 'board: plan step format' skills/start/board.md '`<n>. <marker> <piece name
 rule 'board: checking step example' skills/start/board.md '`▶ Setup build · T3 · QA verifier: check setup build, round 0`'
 rule 'board: results start with the deliverer' skills/start/board.md 'Each line starts with the display name of who delivered it'
 rule 'board: each working step names its worker' skills/start/board.md 'each ▶ step names its active worker'
+rule 'board: plain markdown, never a code block' skills/start/board.md 'never inside a code block'
+if grep -q '^```' "$root/skills/start/board.md"; then echo 'FAIL board: no code fence'; fail=1; else echo 'ok   board: no code fence'; fi
 rule 'board: agent ids never show' skills/start/board.md 'Agent IDs never show on the board.'
 rule 'board: time from spawn and status line' skills/start/board.md '⏱ comes from the spawn time in the ledger and the time of the agent'"'"'s latest status line'
 rule 'shape: persona-first display name' skills/start/shape.md '`<Persona>: <short task>`'

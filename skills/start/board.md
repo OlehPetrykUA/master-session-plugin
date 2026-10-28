@@ -1,8 +1,7 @@
 # Chat status board
 
-The board posted on every tick that has news and in every reply to the user. Every part is always shown, in this order; the board opens with the BOARD fence line and closes with the END fence line right after the Summary, so its boundaries are plain; a reply to the user adds the Answer at the bottom, below the closing fence, so the user never scrolls up. Copy this shape exactly.
+The board posted on every tick that has news and in every reply to the user. Every part is always shown, in this order; the board opens with the BOARD fence line and closes with the END fence line right after the Summary, so its boundaries are plain; a reply to the user adds the Answer at the bottom, below the closing fence, so the user never scrolls up. Post this shape exactly, as plain markdown, never inside a code block: tables, bold and the fence lines must render.
 
-```
 ━━━━━━━━━━ 🏭 BOARD · 19:20 · run setup-wizard ━━━━━━━━━━
 🟢 1 working · 🟡 1 waiting · 🔴 0 need you · ✅ 2 done · next tick 19:25
 
@@ -59,7 +58,6 @@ Nothing right now.
 ━━━━━━━━━━ 🏭 END ━━━━━━━━━━
 
 **Answer:** yes, Implementer: conductor build is on master as 07ab1b7 and its check passed.
-```
 
 - **Header:** the fence line `━━━━━━━━━━ 🏭 BOARD · HH:MM · run <name> ━━━━━━━━━━` (the ledger's run name), then the line `🟢 N working · 🟡 N waiting · 🔴 N need you · ✅ N done · next tick HH:MM`: the counts of Quick-table rows by marker and the next tick time from the Heartbeat line.
 - **Closing fence:** `━━━━━━━━━━ 🏭 END ━━━━━━━━━━`, right after the Summary line.
