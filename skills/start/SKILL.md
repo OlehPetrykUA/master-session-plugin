@@ -60,6 +60,7 @@ The only waits: a dependency not done (merged, or approved for a doc piece), the
 ## Must          the deliverable; ACs inline (T0, T1) or the spec tab link
 ## Nice (~)      extras, each marked ~, cut first
 ## You own       files only this worker may change
+## Scratch       <scratchpad>/<piece>/ only; clean-up trashes that folder, never the root, protocol.md or log.md
 ## Depends on    a dependency's sha or marker file on master, or none
 ## Your checks   own test files, the type check, cheap repo checks
 ## Checker gate  the full suite and build, run once per sha by the checker
@@ -72,6 +73,7 @@ Changed:  ready <sha> (worktree path), or <commits / files>
 Evidence: <Your checks command → result tail, FF-OK, doc sources>
 Open:     <questions, or "none">
 ```
+The validator creates nothing in a scratch subfolder; `protocol.md` and `log.md` at the scratchpad root belong to the validator alone.
 - The first brief holds the whole scope. No scope is added to a running piece: new scope is a new queued piece, or stop the piece and re-brief it in full.
 - At the timebox the worker reports done and left; cut Nice, re-brief or cancel, never extend.
 - Hygiene, commits and clean-up live in [the worker skill](../worker/SKILL.md), not in briefs.
@@ -99,7 +101,7 @@ Reuse, handover, retirement and drift: read [shape.md](shape.md#worker-lifetime)
 
 On every wake, do one tick:
 1. Re-read the whole `protocol.md` (the run's protocol; section 6), and the tail of `log.md` only when needed.
-2. Verify each `ready <sha>` by its tier. A checker is an `Agent` with `run_in_background: true`; its prompt names the mode, repo, master ref, exact sha, the brief with the user's words and its Checker gate, its round (`round N of 2`; 0 for the first check), the spec tab link, the engine path and, for T3, the canvas id, version and artboard names.
+2. Verify each `ready <sha>` by its tier. A checker is an `Agent` with `run_in_background: true`; its prompt names its scratch subfolder `<scratchpad>/<piece>-check/`, the mode, repo, master ref, exact sha, the brief with the user's words and its Checker gate, its round (`round N of 2`; 0 for the first check), the spec tab link, the engine path and, for T3, the canvas id, version and artboard names.
    - **T0:** read the diff and run the Checker gate once yourself, with `run_in_background`, in `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-verify-<short sha>" <sha>`, removed after.
    - **T1 to T3:** one `master-session:qa-verifier` in `Mode: combined`.
    - **Risk flag:** `master-session:qa-verifier` in `Mode: qa` and `master-session:reviewer` in parallel.

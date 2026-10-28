@@ -106,6 +106,10 @@ rule 'answering: brief lists self-modifying edits' skills/start/answering.md 'A 
 rule 'start: stall needs a stale status line too' skills/start/SKILL.md 'and its latest status line'
 rule 'start: report goes to main' skills/start/SKILL.md 'to main (SendMessage `to: "main"`)'
 rule 'worker: claude --agent has no parent' skills/worker/SKILL.md 'In a session the user started with `claude --agent`, there is no parent'
+rule 'start: brief has a Scratch line' skills/start/SKILL.md '## Scratch       <scratchpad>/<piece>/ only; clean-up trashes that folder, never the root, protocol.md or log.md'
+rule 'worker: never the scratchpad root' skills/worker/SKILL.md 'never the scratchpad root'
+rule 'qa-verifier: scratch subfolder only' skills/qa-verifier/SKILL.md 'go only in the scratch subfolder its prompt names'
+rule 'shape: own scratch subfolder per subagent' skills/start/shape.md 'Each subagent gets its own `<scratchpad>/<piece>/` scratch subfolder'
 rule 'stop: logs pending step first' skills/stop/SKILL.md 'first write its pending step and its worktree'
 
 never='This session never starts sessions or sub-chats and never calls `start_session`'

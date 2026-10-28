@@ -20,6 +20,7 @@ In a session the user started with `claude --agent`, there is no parent: report 
 - Change files with the edit tools only (Edit, Write); never `sed -i`, heredocs or scripts that write source files, so every change is a reviewable diff.
 - Never create or switch a branch in the main repo.
 - Scratch goes in a folder named after your piece; never reuse another piece's scratch.
+- Temp files go only in the scratch subfolder `<scratchpad>/<piece>/` your brief names. Clean up with `trash <scratchpad>/<piece>/`: never the scratchpad root, never `protocol.md` or `log.md`, never `rm -rf`.
 - Start no CPU-load processes: no stress loops, parallel suites or extra watchers. You run only your brief's Your checks; the full suite and build are the checker's Checker gate.
 - Commits: one line, `type(scope): summary`, at most 72 characters, no body, no trailers.
 - **Status:** no timed loops, heartbeats or ScheduleWakeup for status; watch a long job with a Monitor or a background Bash `until` loop on its own log.

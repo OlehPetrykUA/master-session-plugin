@@ -8,7 +8,7 @@ One per piece, named in the ledger; the first match wins.
 1. **Inline** only for your own duties: plan, scout (reads only; a cause that needs a repro or a run is an Investigate piece), brief, ledger, board, the inline Checker gate and the `--ff-only` merge. Merging over a `FAIL` is the user's call, quoted in the ledger.
 2. **Background Bash or Monitor** to wait, never to work (`timeout_ms` at most 30 min, then re-arm).
 3. **Workflow** only for a read-only fan-out the user opted into ([workflow](../workflow/SKILL.md#when-a-workflow-may-run)).
-4. **Background subagent** (`Agent` `subagent_type: "master-session:<persona>"`, `run_in_background: true`) for everything else. A builder works in `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-<name>" <master ref>`. Record each agent ID in the ledger. An unregistered persona: [personas.md](personas.md).
+4. **Background subagent** (`Agent` `subagent_type: "master-session:<persona>"`, `run_in_background: true`) for everything else. A builder works in `git -C <repo> worktree add --detach "$HOME/.claude/worktrees/wt-<repo>-<name>" <master ref>`. Record each agent ID in the ledger. Each subagent gets its own `<scratchpad>/<piece>/` scratch subfolder; nothing but the validator writes at the scratchpad root. An unregistered persona: [personas.md](personas.md).
 - At plan time, ask the user once, in one line, for the allow rules each piece needs.
 - Only `STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED` is a subagent's report; on `STATUS: WAITING <job>`, resume it by ID when the job ends. Answer its permission prompts for that call only. An auto-mode block is 🔴 ([section 5](answering.md#5-permissions)): give the exact allow rule, then resume the agent by ID.
 
