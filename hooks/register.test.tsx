@@ -11,16 +11,15 @@ import { BOARD, BOARD_TOOL, HOME, PANE, SELF, SPAWN, click, pluginScroll, starte
 
 warmUp()
 
-test('/master-session:start status opens the pane; with a task it also runs the skill', async ($, on) => {
+test('/master-session:start status runs the skill like any task and opens no pane', async ($, on) => {
   const { opened, ran, clock } = world(on)
   await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
   await clock.settle()
-  expect((await $.command.run(typed('master-session:start', 'status'))).text).toBe('Master session pane opened.')
-  expect(ran).toEqual([])
+  expect((await $.command.run(typed('master-session:start', 'status'))).text).toBe('skill ran')
+  expect(ran).toEqual(['master-session:start status'])
   expect((await $.command.run(typed('master-session:start', 'fix the hooks'))).text).toBe('skill ran')
-  expect(ran).toEqual(['master-session:start fix the hooks'])
-  expect((await $.command.run(typed('start', 'status'))).text).toBe('skill ran')
-  expect(opened).toEqual(['master-session'])
+  expect(ran).toEqual(['master-session:start status', 'master-session:start fix the hooks'])
+  expect(opened).toEqual([])
 })
 
 test('/master-session:info opens the pane without running its skill, and ask asks the workers', async ($, on) => {

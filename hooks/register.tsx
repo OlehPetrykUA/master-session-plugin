@@ -24,7 +24,7 @@ import {
 import { clearPresses, hasFaults, recoverFault, runPress } from './data/presses'
 import { describeSession, describeSpawn, recordAgentEnd, recordSpawn, recordWorkflow } from './data/agents'
 import { settleTasks } from './data/describe'
-import { briefed, claim, engage, inPlan, isOff, recordTurnEnd, recorder, startRecorder, unstop } from './data/recorder'
+import { briefed, claim, engage, inPlan, isOff, recordTurnEnd, recorder, startRecorder } from './data/recorder'
 import { resetLabels, setColumns, startOpenTimers, stopOpenTimers, stopTimers, syncTimers } from './data/timers'
 import { resetProcesses } from './data/processes'
 import { stopMode } from './data/stop'
@@ -131,19 +131,6 @@ export const register: Register = on => {
     if (e.args.trim() === 'ask') return { text: await askAll($) }
     await openPane($)
     return { text: OPENED }
-  }).catch(($, e, next) => next(e))
-
-  on('command.run', { command: SKILL }, async ($, e, next) => {
-    if (e.args.trim() === 'status') {
-      await unstop($)
-      await wake($)
-      const note = await workerNote($)
-      if (note) return { text: note }
-      await markMaster($)
-      await openPane($)
-      return { text: OPENED }
-    }
-    return next(e)
   }).catch(($, e, next) => next(e))
 
   on('skill.prompt', { skill: 'master-session:worker' }, async ($, e, next) => {

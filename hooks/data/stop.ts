@@ -11,7 +11,7 @@ import { boardPath, reportPath, writeTombstone } from './status'
 const NOTHING = 'This session is not a master session: nothing to stop.'
 const STOPPED = 'Stopped: this session is no longer a master session. The band and pane are off; workers, branches and worktrees are untouched. Run /master-session:start to make it a master again.'
 const LOOP =
-  '(to the model, hidden) The user ran /master-session:stop: this session is no longer a master session. Stop its heartbeat now (ScheduleWakeup with stop: true, or delete its /loop job), run no more master-session ticks and do not call mcp__master-session__board. Do not stop, message or archive any worker.'
+  '(to the model, hidden) The user ran /master-session:stop: this session is no longer a master session. Stop its heartbeat now (ScheduleWakeup with stop: true, or delete its /loop job) and set the ledger\'s `Heartbeat:` line to `none · stopped HH:MM`, run no more master-session ticks and do not call mcp__master-session__board. Do not stop, message or archive any worker.'
 const QUIET =
   "(to the model, hidden) The user ran /master-session:stop: this session no longer reports to a master session. Do not call mcp__master-session__report; carry on with the user's requests."
 
