@@ -12,17 +12,17 @@ export type PausedBandView = BandView & { pauseLead?: PauseLead }
 const WORD = { pausing: 'Pausing', paused: 'Paused', resuming: 'Resuming' } as const
 
 export function bandPauseOf(view: BandView, pause: Pause): PausedBandView {
-  if (pause.state === 'running' || !view.hasPercent) return view
+  if (pause.state === 'running' || view.asker || view.isAllDone) return view
   const word = WORD[pause.state]
   const isPausing = pause.state === 'pausing'
   const summary = `Master session: ${word.toLowerCase()}, ${view.parts[0]?.text} of ${view.parts[2]?.text} done.`
   return {
     ...view,
     hasPercent: false,
-    pauseLead: { word, tone: pause.state === 'paused' ? 'amber' : 'text' },
+    pauseLead: view.hasPercent ? { word, tone: pause.state === 'paused' ? 'amber' : 'text' } : undefined,
     tone: isPausing ? view.tone : 'grey',
     isRunning: isPausing ? view.isRunning : false,
-    barWidth: Math.max(BAR_MIN, view.barWidth - (textWidth(word, 15, { isBold: true }) - PERCENT)),
+    barWidth: view.hasPercent ? Math.max(BAR_MIN, view.barWidth - (textWidth(word, 15, { isBold: true }) - PERCENT)) : view.barWidth,
     summary,
     alt: `${summary} ${view.elapsed} elapsed.`,
   }

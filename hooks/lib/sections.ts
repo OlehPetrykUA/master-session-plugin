@@ -11,7 +11,6 @@ export type GroupSize = { rows: number; extra: number; isArchived: boolean }
 export type SectionInput = {
   columns: number
   repos: readonly string[]
-  isNarrow: boolean
   notice: string
   status: string
   buttons: readonly string[]

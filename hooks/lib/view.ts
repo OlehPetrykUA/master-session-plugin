@@ -103,7 +103,6 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
   return {
     columns: data.columns,
     repos: data.trees.map(repo => shortOf(repo.name)),
-    isNarrow: view.isNarrow,
     notice: data.live.error ? noticeOf(data.live.error) : '',
     status: view.status.text,
     buttons: headerButtonsOf(data, () => undefined, () => undefined).map(button => button.label),

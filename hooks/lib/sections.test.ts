@@ -15,7 +15,6 @@ const chips = ['All', 'Needs you', 'Waiting', 'Working', 'Done', 'Archived'].map
 const input: SectionInput = {
   columns: 102,
   repos: ['~/dotfiles', 'toolkit'],
-  isNarrow: false,
   notice: '',
   status: 'updated just now',
   buttons: ['Ask', 'Refresh'],

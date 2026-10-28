@@ -189,9 +189,15 @@ test('AC18 under 340 px no word: the bar and the board icon only', { timeoutMs: 
   const small = await run.band('desktop', 330)
   expect((await textsOf(small)).filter(one => WORDS.test(one) || /%|\d\/\d/.test(one))).toEqual([])
   expect((await small.findAll({ type: 'Client' })).length).toBeGreaterThan(0)
+  const source = await stripOf(small)
+  expect(source).toContain('fill:var(--grey)')
+  expect(source).not.toContain('fill:var(--green)')
+  expect(source).not.toContain('linearGradient')
   await small.unmount()
   const tiny = await run.band('terminal', 40)
-  expect((await textsOf(tiny)).filter(one => WORDS.test(one))).toEqual([])
+  const found = await tiny.findAll({ type: 'Text' })
+  expect(found.filter(one => WORDS.test(one.text))).toEqual([])
+  expect(found.find(one => /^[█░]+$/.test(one.text))?.props.color).toBe('subtle')
   await tiny.unmount()
 })
 
@@ -289,8 +295,10 @@ test('AC10 band half: no new timers, and the band redraws only when the pause st
   await ui.unmount()
 })
 
-test('bandPauseOf leaves a running state and a view with no percent as it is', () => {
-  const view = { hasPercent: false, barWidth: 100 } as Parameters<typeof bandPauseOf>[0]
+test('bandPauseOf leaves a running state, a pill and an all-done view as they are', () => {
+  const view = { hasPercent: false, barWidth: 100, isAllDone: true } as Parameters<typeof bandPauseOf>[0]
+  const pill = { hasPercent: false, barWidth: 100, asker: {} } as Parameters<typeof bandPauseOf>[0]
   expect(bandPauseOf(view, IDLE_PAUSE)).toBe(view)
   expect(bandPauseOf(view, { ...IDLE_PAUSE, state: 'paused' })).toBe(view)
+  expect(bandPauseOf(pill, { ...IDLE_PAUSE, state: 'paused' })).toBe(pill)
 })
