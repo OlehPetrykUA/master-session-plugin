@@ -37,7 +37,7 @@ const input: SectionInput = {
 test('the pinned header is the 56 px header, the repos row and the rule; narrow adds the button row, offline the notice', () => {
   expect(headerPxOf(input)).toBe(56 + 24 + 12 + 1)
   expect(headerRowsOf(input)).toBe(Math.ceil((56 + 24 + 12 + 1) / LH))
-  expect(headerPxOf({ ...input, isNarrow: true })).toBe(12 + 20 + 2 + 16 + 8 + 32 + 8 + 24 + 12 + 1)
+  expect(headerPxOf({ ...input, columns: 40 })).toBe(12 + 20 + 2 + 16 + 8 + 32 + 8 + 24 + 12 + 1)
   expect(headerPxOf({ ...input, notice: 'Can’t read sessions: board.json not found.' })).toBe(56 + 24 + 12 + 1 + 12 + 32)
   expect(noticePxOf('Can’t read sessions: board.json not found. Retrying in 30s.', 46)).toBe(12 + 16 + 2 * 16)
   expect(noticePxOf('', 46)).toBe(0)
@@ -102,12 +102,12 @@ test('content height is known only where every row has a fixed height: closed de
 
 test('a header status that wraps adds its extra lines to the header and moves every section below it', () => {
   const status = 'Asked the validator for a board update at 10:58 · it answers on its next tick and the pane refreshes by itself'
-  const wide = { ...input, columns: 46, status }
+  const wide = { ...input, columns: 60, status }
   const lines = statusLinesOf(wide)
   expect(lines).toBeGreaterThan(2)
   expect(statusLinesOf({ ...wide, status: 'updated just now' })).toBe(1)
   expect(headerPxOf(wide) - headerPxOf({ ...wide, status: 'updated just now' })).toBe(20 + 2 + 16 * lines - 56)
-  const narrow = { ...wide, isNarrow: true }
+  const narrow = { ...wide, columns: 46 }
   expect(headerPxOf(narrow) - headerPxOf({ ...narrow, status: 'updated just now' })).toBe(16 * (statusLinesOf(narrow) - 1))
   expect((sectionTopsOf(wide)['section-summary'] ?? 0) - (sectionTopsOf({ ...wide, status: 'updated just now' })['section-summary'] ?? 0)).toBe((headerRowsOf(wide) - headerRowsOf({ ...wide, status: 'updated just now' })) * LH)
   expect(headerRowsOf(wide)).toBeGreaterThan(headerRowsOf({ ...wide, status: 'updated just now' }))
@@ -115,8 +115,8 @@ test('a header status that wraps adds its extra lines to the header and moves ev
 
 test('the header status room leaves the buttons their drawn width: each face plus 1 for the 16 px icon, and the gaps', () => {
   const px = (value: number) => Math.round(value * 100) / 100
-  expect(px(statusRoomOf({ ...input, columns: 46 }))).toBe(px(46 * CH - 16 - 8 - 8 * 3 - (faceWidth('Ask', 'b32') + 1) - (faceWidth('Refresh', 'b32') + 1) - 12 - 4))
-  expect(px(statusRoomOf({ ...input, columns: 46, isNarrow: true }))).toBe(px(46 * CH - 16 - 8 - 12 - 4))
+  expect(px(statusRoomOf({ ...input, columns: 60 }))).toBe(px(60 * CH - 16 - 8 - 8 * 3 - (faceWidth('Ask', 'b32') + 1) - (faceWidth('Refresh', 'b32') + 1) - 12 - 4))
+  expect(px(statusRoomOf({ ...input, columns: 46 }))).toBe(px(46 * CH - 16 - 8 - 12 - 4))
 })
 
 test('a wrapped dot line pushes every section top below the tiles down by exactly that line', () => {

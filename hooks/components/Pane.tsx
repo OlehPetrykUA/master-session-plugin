@@ -1,5 +1,6 @@
 import { TITLE } from '../lib/constants'
 import { across, bodyWidthOf, down, tall } from '../lib/layout'
+import { isHeaderNarrow } from '../lib/sections'
 import { headerButtonsOf, noticeOf, paneViewOf, pinOf } from '../lib/view'
 import { C } from '../theme/tokens'
 import { FilterChips } from './FilterChips'
@@ -30,7 +31,7 @@ export function Pane(ui: Ui, data: PaneData, view = paneViewOf(data), pin = pinO
             isLive: !data.live.error,
             status: view.status,
             buttons: headerButtonsOf(data, data.actions.ask, data.actions.refresh),
-            isNarrow: view.isNarrow,
+            isNarrow: isHeaderNarrow(data.columns),
           })}
           {RepoChips(ui, { trees: data.trees })}
           <Box key="header-rule" height={tall(1)} flexShrink={0} backgroundColor={C.border} />

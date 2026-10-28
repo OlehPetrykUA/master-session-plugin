@@ -177,18 +177,18 @@ test('all done stays the one list: finished header line, every row under Done wi
 
 test('the header: 56 tall, title and live dot over the status line, Ask and Refresh ghost 32; Ask reads Ask for updates from 460 px; narrow panes move the buttons to a second row', async ($, on) => {
   await started($, on)
-  for (const [columns, ask, isNarrow] of [
-    [40, 'Ask', true],
-    [48, 'Ask', false],
-    [56, 'Ask for updates', false],
-    [80, 'Ask for updates', false],
+  for (const [columns, ask, isRowed, isNarrow] of [
+    [40, 'Ask', true, true],
+    [48, 'Ask', true, false],
+    [56, 'Ask for updates', false, false],
+    [80, 'Ask for updates', false, false],
   ] as const) {
     const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: columns }, surface: 'desktop' })
     expect(columns * CH >= 460).toBe(ask === 'Ask for updates')
     const header = await ui.find({ key: 'section-header' })
     for (const word of ['Master session', 'updated just now', ask, 'Refresh']) expect(header?.text).toContain(word)
-    expect(await ui.find({ key: 'header-buttons' }) !== undefined).toBe(isNarrow)
-    expect(header?.props.minHeight).toBe(isNarrow ? undefined : tall(56))
+    expect(await ui.find({ key: 'header-buttons' }) !== undefined).toBe(isRowed)
+    expect(header?.props.minHeight).toBe(isRowed ? undefined : tall(56))
     expect((await ui.find({ key: 'face-refresh' }))?.props).toEqual(expect.objectContaining({ height: tall(32), borderColor: KINDS.ghost.border }))
     expect((await ui.find({ key: 'face-refresh' }))?.props.backgroundColor).toBeUndefined()
     expect(await hitsOf(ui)).toEqual(expect.arrayContaining(['hit-ask', 'hit-refresh']))

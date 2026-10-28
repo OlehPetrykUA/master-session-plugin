@@ -126,7 +126,7 @@ export function TextPane(ui: TextUi, data: PaneData, view = paneViewOf(data)) {
         </Text>
         <Box flexGrow={1} />
         {headerButtonsOf(data, actions.ask, actions.refresh).map(button => (
-          <Button key={button.id} plain dimColor={button.isQuiet || undefined} label={button.label} onPress={button.onPress} />
+          <Button key={button.id} plain dimColor={button.isQuiet || button.isPressed || undefined} label={button.label} onPress={button.onPress} />
         ))}
       </Box>
       {trees.length ? (
