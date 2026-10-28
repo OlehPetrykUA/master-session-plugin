@@ -4,6 +4,7 @@ import { agentCountsOf, bandItemsOf } from '../lib/band'
 import { displayNameOf, nameText } from '../lib/list'
 import { PANE } from '../lib/constants'
 import { getAgents, getCleared, getLive, getRepos, getWorkflows, saveBoard } from '../state/atoms'
+import { clearPause } from './pause'
 import { detected, halt, roleOf } from './recorder'
 import { boardOf, forget, homeOf, isMaster, isPaneOpen, isWorker, written } from './sources'
 import { boardPath, reportPath, writeTombstone } from './status'
@@ -31,6 +32,7 @@ export async function stopMode($: EngineInterface, isForced: boolean) {
   const self = (await getLive($)).self || known
   await halt($)
   await saveBoard($, () => null)
+  await clearPause($)
   forget()
   await written()
   const isRetired = !self || (await writeTombstone($, isOwner ? boardPath(homeOf(), self) : reportPath(homeOf(), self), self, await $.clock.now()).then(() => true, () => false))

@@ -115,17 +115,17 @@ export async function parentFromBoards($: Io, home: string, self: string) {
   return ''
 }
 
+export async function sendText($: Sender, target: { id: string; engineId: string }, text: string) {
+  const sent = target.engineId ? await $.session.send({ to: { sessionId: target.engineId }, text }).catch(() => undefined) : undefined
+  if (sent?.isDelivered) return 'mod' as const
+  const isSent = await $.mcp
+    .call('ccd_session_mgmt', 'send_message', { session_id: target.id, message: text })
+    .then(result => !result.isError)
+    .catch(() => false)
+  return isSent ? ('message' as const) : ('failed' as const)
+}
+
 export async function askForUpdates($: Sender, targets: readonly { id: string; engineId: string }[], from: string, at: number) {
   const text = askText({ from, at })
-  return Promise.all(
-    targets.map(async target => {
-      const sent = target.engineId ? await $.session.send({ to: { sessionId: target.engineId }, text }).catch(() => undefined) : undefined
-      if (sent?.isDelivered) return { id: target.id, via: 'mod' as const }
-      const isSent = await $.mcp
-        .call('ccd_session_mgmt', 'send_message', { session_id: target.id, message: text })
-        .then(result => !result.isError)
-        .catch(() => false)
-      return { id: target.id, via: isSent ? ('message' as const) : ('failed' as const) }
-    }),
-  )
+  return Promise.all(targets.map(async target => ({ id: target.id, via: await sendText($, target, text) })))
 }

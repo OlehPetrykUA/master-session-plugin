@@ -26,6 +26,7 @@ import { describeSession, describeSpawn, recordAgentEnd, recordSpawn, recordWork
 import { settleTasks } from './data/describe'
 import { briefed, claim, engage, inPlan, isOff, recordTurnEnd, recorder, startRecorder } from './data/recorder'
 import { resetLabels, setColumns, startOpenTimers, stopOpenTimers, stopTimers, syncTimers } from './data/timers'
+import { pauseHooks, resetPause } from './data/pause'
 import { resetProcesses } from './data/processes'
 import { stopMode } from './data/stop'
 import { bandAction } from './lib/band'
@@ -65,12 +66,14 @@ const wake = async ($: EngineInterface) => {
 
 export const register: Register = on => {
   recorder(on)
+  pauseHooks(on)
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     stopTimers()
     startSources(String((await $.env.get('HOME')) ?? ''))
     resetProcesses()
+    resetPause()
     resetLabels()
     await setNarrativeOpen($, () => false)
     await startRecorder($)
