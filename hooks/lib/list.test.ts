@@ -72,6 +72,16 @@ test('Done lists the newest finish first', () => {
   expect(groups.at(-1)?.items.map(item => item.id)).toEqual(['new', 'mid', 'old'])
 })
 
+test('Done sorts the newest finish first across sessions, workflows and subagents, not by kind', () => {
+  const own = liveOf()
+  const finished: Row = { id: 'sess', name: 'sess', title: '', state: 'done', live: { ...own.sessions[0]!, isRunning: false, lastActivityAt: 20 } }
+  const helper: AgentRecord = { id: 'sub', type: 'Explore', description: 'sub', state: 'done', startedAt: 1, endedAt: 30 }
+  const member: AgentRecord = { id: 'wm', type: 'workflow-subagent', description: 'wm', state: 'done', startedAt: 1, endedAt: 10, run: { id: 'wf', index: 1 } }
+  const flow: WorkflowRecord = { id: 'wf', toolUseId: 't', name: 'flow', startedAt: 1 }
+  const groups = groupsOf(itemsOf([finished], [helper, member], [flow], { at: NOW }), [], 'done', 'closed')
+  expect(groups.at(-1)?.items.map(item => item.id)).toEqual(['sub', 'sess', 'wf'])
+})
+
 test('Open chat targets only a needs-you session this session started, the sessions open_session_in accepts', () => {
   const own = liveOf()
   const mine: Row = { id: 'a', name: 'a', title: '', state: 'needs-you', live: { ...own.sessions[0]!, startedBy: own.self } }
