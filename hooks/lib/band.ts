@@ -167,8 +167,8 @@ const firstAskerOf = (units: readonly Unit[]) => units.reduce<Asker | undefined>
 export const askToolOf = (reason: string | undefined) => {
   if (!reason) return undefined
   if (/^allow\b/i.test(reason)) {
-    const found = /^Allow ([A-Za-z0-9_.-]+)(?::|$)/.exec(reason)
-    return found && !hasCue(found[1]!) ? `Allow ${found[1]}` : undefined
+    const tool = /^Allow ([A-Za-z0-9_.-]+)(?::|$)/.exec(reason)?.[1]
+    return tool && !hasCue(tool) ? `Allow ${tool}` : undefined
   }
   return hasCue(reason) ? undefined : clean(reason) || undefined
 }

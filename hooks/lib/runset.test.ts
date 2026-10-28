@@ -144,7 +144,7 @@ test('proof 6: helpers are listed and counted, and the plan and the band done/to
 
 test('proof 6b: a session row whose id equals an agent id still counts that agent child in the band, as the run set does', () => {
   const b = board({ sessions: [{ id: 'x', name: 'x', state: 'working' }] })
-  const agents = [agent('x', { state: 'running', endedAt: undefined }), agent('c', { parentAgentId: 'x' })]
+  const agents = [agent('x', { state: 'running', endedAt: undefined }), agent('c', { parentSessionId: 'x' })]
   const set = setOf(agents, { board: b })
   expect(set.items.filter(item => item.kind === 'subagent').map(item => item.id)).toContain('c')
   const counts = inRunOf(b, agentCountsOf(agents, [], NOW))
