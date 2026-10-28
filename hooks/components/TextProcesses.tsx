@@ -2,6 +2,8 @@ import { PAD_HEAD, confirmText, padLineOf, padProgram, stopGroupOf, stoppingText
 import type { ProcRow, ProcView } from '../lib/processes'
 import type { Actions, TextUi } from './types'
 
+const SLOT = 11
+
 export type TextProcessesProps = { view: ProcView; actions: Actions }
 
 export function TextProcesses(ui: TextUi, props: TextProcessesProps) {
@@ -21,7 +23,9 @@ export function TextProcesses(ui: TextUi, props: TextProcessesProps) {
           )}
           <Box flexGrow={1} />
           <Text dimColor>{padLineOf(one)}</Text>
-          {seconds !== undefined ? <Text dimColor>{stoppingText(seconds)}</Text> : one.canStop ? <Button key={`process-stop-${one.pid}`} plain label="Stop" onPress={() => actions.askStop(one.key)} /> : null}
+          <Box width={SLOT} flexShrink={0} flexDirection="row" justifyContent="flex-end">
+            {seconds !== undefined ? <Text dimColor>{stoppingText(seconds)}</Text> : one.canStop ?<Button key={`process-stop-${one.pid}`} plain label="Stop" onPress={() => actions.askStop(one.key)} /> : null}
+          </Box>
         </Box>
         {note ? <Text color={/^Could not stop/.test(note) ? 'error' : undefined} dimColor={!/^Could not stop/.test(note) || undefined}>{note}</Text> : null}
         {view.asking === one.key ? (
@@ -52,16 +56,16 @@ export function TextProcesses(ui: TextUi, props: TextProcessesProps) {
           <Text dimColor>Program · owner</Text>
           <Box flexGrow={1} />
           <Text dimColor>{PAD_HEAD}</Text>
+          <Box width={SLOT} flexShrink={0} />
         </Box>
       ) : null}
       {view.isOpen
         ? view.groups.map(group => (
-            <Box key={`process-group-${group.id}`} flexDirection="column">
+            <Box key={group.id === 'tools' ? 'processes-chat-tools' : `process-group-${group.id}`} flexDirection="column">
               {group.id !== 'run' ? (
                 <Box flexDirection="row" gap="sm">
-                  {group.id === 'left' ? <Text color="warning">●</Text> : null}
-                  <Text weight="semibold">{group.id === 'left' ? 'Left behind' : 'Chat tools'}</Text>
-                  <Text dimColor>{String(group.total)}</Text>
+                  {group.id === 'left' ? <Text color="warning">{'● '}</Text> : null}
+                  <Text weight="semibold">{`${group.id === 'left' ? 'Left behind' : 'Chat tools'} ${group.total}`}</Text>
                 </Box>
               ) : null}
               {group.rows.map(row)}

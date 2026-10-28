@@ -3,12 +3,12 @@ import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { FILE_MS } from '../lib/constants'
-import { FIXTURE, K1, K2, K3, fakeProcesses, proc } from '../testing/procs'
+import { AC40, FIXTURE, K1, K2, K3, fakeProcesses, proc } from '../testing/procs'
 import type { FakeProc } from '../testing/procs'
 import type { Child, Clickable, Ui as Found } from '../testing/world'
 
 type Ui = Found & Clickable
-import { AT, HOME, PANE, SELF, click, childOf, started, textsOf, warmUp, world } from '../testing/world'
+import { AT, HOME, PANE, SELF, altsOf, click, childOf, started, textsOf, warmUp, world } from '../testing/world'
 
 warmUp()
 
@@ -61,15 +61,17 @@ const whole = async (ui: Found) => {
   return { texts, from, to: to < 0 ? texts.length : to }
 }
 
+const toolsAt = (texts: (string | undefined)[], from: number) => texts.findIndex((one, at) => at >= from && (one === 'Chat tools' || /^Chat tools \d+$/.test(one ?? '')))
+
 const section = async (ui: Found) => {
   const { texts, from, to } = await whole(ui)
-  const tools = texts.indexOf('Chat tools', from)
+  const tools = toolsAt(texts, from)
   return texts.slice(from, tools > -1 && tools < to ? tools : to)
 }
 
 const toolsOf = async (ui: Found) => {
   const { texts, from, to } = await whole(ui)
-  const at = texts.indexOf('Chat tools', from)
+  const at = toolsAt(texts, from)
   return at > -1 && at < to ? texts.slice(at, to) : []
 }
 
@@ -584,10 +586,66 @@ test('Chat tools: a terminal pane draws them as text lines with no Stop button',
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await $.ui.press({ plugin: 'master-session', key: 'processes-toggle' })
   await run.clock.settle()
-  expect((await toolsOf(ui)).slice(0, 4)).toEqual(['Chat tools', '1', 'node    ', '  0%     1 MB     10s'])
+  expect((await toolsOf(ui)).slice(0, 3)).toEqual(['Chat tools 1', 'node    ', '  0%     1 MB     10s'])
   expect(await ui.find({ key: 'process-stop-110' })).toBeUndefined()
   expect(await ui.find({ key: 'process-stop-530' })).toBeDefined()
   expect(fake.kills).toEqual([])
+  await ui.unmount()
+})
+
+const terminalOf = async ($: Engine, on: On, procs: FakeProc[]) => {
+  const fake = fakeProcesses(procs)
+  const run = await started($, on, BOARD_P, { ...CHILD, proc: fake.handle })
+  await run.clock.settle()
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await $.ui.press({ plugin: 'master-session', key: 'processes-toggle' })
+  await run.clock.settle()
+  return { fake, run, ui }
+}
+
+test('a terminal pane gives the header, every run row and every Chat tools row one 11-column slot; only a run row fills it with Stop', async ($, on) => {
+  const { ui } = await terminalOf($, on, [...FIXTURE, ...AC40])
+  const slots = (await ui.findAll({ type: 'Box' })).filter(one => one.props.width === 11)
+  expect(slots.length).toBe(1 + 3 + 4)
+  expect(await ui.find({ key: 'process-stop-130' })).toBeDefined()
+  for (const pid of [110, 111, 112, 510]) expect(await ui.find({ key: `process-stop-${pid}` })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('terminal group headers are one bold span: Left behind has an amber dot, Chat tools none; the keys match the desktop', async ($, on) => {
+  const { ui } = await terminalOf($, on, [...FIXTURE, ...LEFT])
+  const texts = await textsOf(ui)
+  expect(texts).toContain('Left behind 2')
+  expect(texts).toContain('Chat tools 1')
+  expect(texts.filter(one => one === '● ').length).toBe(1)
+  expect(await keysOf(ui)).toEqual(expect.arrayContaining(['process-group-run', 'process-group-left', 'processes-chat-tools']))
+  await ui.unmount()
+})
+
+test('AC40: 111 under 110, 112 and 510 list as Chat tools by CPU, read-only', async ($, on) => {
+  const { fake, ui } = await boot($, on, { procs: [...FIXTURE, ...AC40] })
+  expect(await toolsOf(ui)).toEqual(['Chat tools', '4', 'python', '33%', '84 MB', '3m', 'node', '21%', '84 MB', '1m', 'uv', '13%', '84 MB', '2m', 'node', '0%', '1 MB', '10s'])
+  for (const pid of [110, 111, 112, 510]) expect(await ui.find({ key: `hit-process-stop-${pid}` })).toBeUndefined()
+  expect(fake.kills).toEqual([])
+  await ui.unmount()
+})
+
+test('AC45: the groups run in the order list, Left behind, Chat tools, and only Left behind has a dot', async ($, on) => {
+  const { ui } = await boot($, on, { procs: [...FIXTURE, ...LEFT] })
+  const keys = (await keysOf(ui)).filter(one => /^(process-group-|processes-chat-tools)/.test(one))
+  expect(keys).toEqual(['process-group-run', 'process-group-left', 'processes-chat-tools'])
+  expect((await altsOf(ui)).filter(one => one === 'left behind')).toEqual(['left behind'])
+  await ui.unmount()
+})
+
+test('stopProcess on a pid that is now a Chat tool sends no kill and reads No longer from this run', async ($, on) => {
+  const { fake, run, ui } = await boot($, on)
+  await stopRow(fake, run, ui, 530)
+  fake.state.procs = fake.state.procs.map(one => (one.pid === 530 ? { ...one, ppid: 100 } : one))
+  await click(ui, 'hit-process-yes-530')
+  await run.clock.settle()
+  expect(fake.kills).toEqual([])
+  expect(await all(ui)).toContain('No longer from this run')
   await ui.unmount()
 })
 

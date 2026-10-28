@@ -23,7 +23,13 @@ export const FIXTURE: FakeProc[] = [
   proc(531, 530, 'node', { cpu: 3, rss: 1258291, etime: '01:03:10' }),
 ]
 
-export type Fake = ReturnType<typeof fakeProcesses>
+export const AC40: FakeProc[] = [
+  proc(111, 110, 'node', { cpu: 21, rss: 86016, etime: '01:00' }),
+  proc(112, 100, 'uv', { cpu: 13, rss: 86016, etime: '02:00' }),
+  proc(510, 500, 'python', { cpu: 33, rss: 86016, etime: '03:00' }),
+]
+
+export type Fake =ReturnType<typeof fakeProcesses>
 
 export function fakeProcesses(procs: FakeProc[], options: { shellParent?: number; slow?: number } = {}) {
   const calls: string[][] = []
