@@ -218,6 +218,7 @@ test('the text sent to the model holds no prompt, command or credential', async 
 const LEAKY = {
   ...BOARD,
   narrative: OLD,
+  plan: [{ name: 'Build piece', state: 'working' as const, progress: 'step 1 of 2 — npm run build && npm test' }],
   sessions: [
     { id: 'local_a', name: 'a', title: 'Database work', state: 'needs-you' as const, needsYou: 'Run mysql -u root -p hunter2', progress: 'token ghp_abcdef1234567890abcd set' },
     { id: 'local_b', name: 'b', title: 'Build work', state: 'working' as const, now: 'npm run build && npm test', next: 'Review the mockups' },
@@ -239,6 +240,7 @@ test('report fields with a secret or a command never reach the prompt, clean one
   expect(asked).toHaveLength(1)
   const prompt = String(asked[0]?.prompt)
   for (const text of ['mysql', 'hunter2', 'npm run build', 'ghp_', 'abcdef1234567890abcd']) expect(prompt).not.toContain(text)
+  expect(prompt).toContain('Build piece')
   expect(prompt).toContain('Review the mockups')
   expect(prompt).toContain('Database work')
   await ui.unmount()
@@ -248,6 +250,20 @@ test('a reply with a token is not shown and the previous narrative stays', async
   const text = 'Token ghp_abcdef1234567890abcd is set. Nothing needs you.'
   const { asked, ui } = await leaky($, on, () => ({ isAnswered: true, text, usage: USAGE }))
   expect(asked).toHaveLength(1)
+  expect((await shown(ui)).text).toBe(OLD)
+  await ui.unmount()
+})
+
+test('a reply whose cleaning joins a secret or a password flag is not shown', async ($, on) => {
+  const text = 'mysql\n-u root -p hunter2'
+  const { ui } = await leaky($, on, () => ({ isAnswered: true, text, usage: USAGE }))
+  expect((await shown(ui)).text).toBe(OLD)
+  await ui.unmount()
+})
+
+test('a reply with a control character inside a token is not shown', async ($, on) => {
+  const text = 'ghp\u0001_abcdef1234567890abcd'
+  const { ui } = await leaky($, on, () => ({ isAnswered: true, text, usage: USAGE }))
   expect((await shown(ui)).text).toBe(OLD)
   await ui.unmount()
 })

@@ -37,7 +37,7 @@ async function factsOf($: EngineInterface, board: Board) {
     verified: safe(one.verified),
   }))
   const keys = board.sessions.slice(0, ROWS).map(one => [one.name, one.state, one.needsYou, one.sha, one.verified, one.done])
-  const plan = (board.plan ?? []).slice(0, 60).map(one => ({ name: cut(one.name), state: one.state, progress: cut(one.progress) }))
+  const plan = (board.plan ?? []).slice(0, 60).map(one => ({ name: cut(one.name), state: one.state, progress: safe(one.progress) }))
   const live = {
     agents: agents.slice(-ROWS).map(one => ({ type: cut(one.type), description: cut(one.description), state: one.state })),
     workflows: workflows.slice(-ROWS).map(one => ({ name: cut(one.name), phases: one.phases?.length ?? 0 })),
@@ -69,7 +69,7 @@ export async function refreshNarrative($: EngineInterface) {
     await setNarrativeNote($, value => ({ ...value, calledAt: at }))
     const reply = await $.model.complete({ model: 'haiku', effort: 'low', maxTokens: 220, timeoutMs: 20_000, system: RULES, prompt: promptOf(board.narrative, facts) })
     const text = reply.isAnswered && !hasCue(reply.text) ? cleanNarrativeOf(reply.text) : undefined
-    if (!text) return
+    if (!text || hasCue(text)) return
     const written = await $.clock.now()
     await setNarrativeNote($, value => ({ ...value, text, sign, at: written }))
   } finally {
