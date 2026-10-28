@@ -1020,7 +1020,7 @@ const TOOK = [
 
 for (const [ms, word] of TOOK) {
   test(`R9: a done subagent card on the desktop reads "${word}" for a run of ${ms} ms`, async ($, on) => {
-    seededAgents(on, [{ id: 'q1', type: 'master-session:qa-verifier', description: 'Verify the gate', state: 'done', startedAt: NOW_MS - ms - 1_000, endedAt: NOW_MS - 1_000, result: 'passed' }])
+    seededAgents(on, [{ id: 'q1', type: 'master-session:qa-verifier', description: 'Verify the gate', state: 'done', startedAt: NOW_MS, endedAt: NOW_MS + ms, result: 'passed' }])
     await started($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
     await click(ui, 'hit-row-q1')
@@ -1029,9 +1029,9 @@ for (const [ms, word] of TOOK) {
   })
 
   test(`R9: a done workflow card on the desktop reads "${word}" for a run of ${ms} ms`, async ($, on) => {
-    const startedAt = NOW_MS - ms - 1_000
+    const startedAt = NOW_MS
     const all: Record<string, unknown> = {
-      agents: [{ id: 'w0', type: 'workflow-subagent', prompt: 'go', description: 'scan', state: 'done', startedAt, endedAt: NOW_MS - 1_000, run: { id: 'wf_1', index: 0 } }],
+      agents: [{ id: 'w0', type: 'workflow-subagent', prompt: 'go', description: 'scan', state: 'done', startedAt, endedAt: NOW_MS + ms, run: { id: 'wf_1', index: 0 } }],
       workflows: [{ id: 'wf_1', toolUseId: 't', name: 'audit', phases: [], startedAt }],
     }
     on('state.get', async (_, e, next) => {
