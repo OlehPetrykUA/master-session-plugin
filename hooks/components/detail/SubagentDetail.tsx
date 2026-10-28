@@ -34,28 +34,34 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
         : [Strong(ui, { text: `took ${durationOf(end - agent.startedAt)}`, isFull: true }), Quiet(ui, { text: `${clockOf(agent.startedAt)} – ${clockOf(end)}`, isFull: true })]
   const chain = item.kind === 'subagent' ? parentsOf(item, context).map(nameText) : []
   const [part, nth] = item.kind === 'agent' ? partOfOf(item) : ['', '']
+  const pair = Pair(ui, {
+    id: `pair-model-time-${id}`,
+    left: half('model', 'modelChip', 'Model', [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), agent.type ? Quiet(ui, { text: agent.type, isMono: true, isFull: true }) : null], 8),
+    right: half('time', 'elapsed', 'Time', time),
+  })
+  const lead = Lead(ui, { item, context, home: props.home })
+  if (item.kind === 'agent') {
+    return Card(ui, {
+      ...props.rowProps,
+      children: [...lead, Block(ui, { id: `part-of-${id}`, icon: 'flow', label: 'Part of', children: [Strong(ui, { text: part, isFull: true }), Quiet(ui, { text: nth, isFull: true })] }), pair],
+    })
+  }
   return Card(ui, {
     ...props.rowProps,
     children: [
-      ...Lead(ui, { item, context, home: props.home }),
-      Pair(ui, {
-        id: `pair-model-time-${id}`,
-        left: half('model', 'modelChip', 'Model', [ModelValue(ui, { id, model: item.kind === 'subagent' ? item.agent.model : agent.model, text: model || '—' }), agent.type ? Quiet(ui, { text: agent.type, isMono: true, isFull: true }) : null], 8),
-        right: half('time', 'elapsed', 'Time', time),
+      ...lead,
+      pair,
+      Block(ui, {
+        id: `started-${id}`,
+        icon: 'agent',
+        label: 'Started by',
+        children: [
+          <Text key={`started-text-${id}`} wrap="wrap">
+            {chain.map((name, index) => (index === chain.length - 1 ? <Text weight="semibold">{name}</Text> : `${name} › `))}
+          </Text>,
+          Quiet(ui, { text: [item.agent.isBackground ? 'background' : 'foreground', chain.length > 1 ? `${chain.length} deep` : ''].filter(Boolean).join(' · '), isFull: true }),
+        ],
       }),
-      item.kind === 'agent'
-        ? Block(ui, { id: `part-of-${id}`, icon: 'flow', label: 'Part of', children: [Strong(ui, { text: part, isFull: true }), Quiet(ui, { text: nth, isFull: true })] })
-        : Block(ui, {
-            id: `started-${id}`,
-            icon: 'agent',
-            label: 'Started by',
-            children: [
-              <Text key={`started-text-${id}`} wrap="wrap">
-                {chain.map((name, index) => (index === chain.length - 1 ? <Text weight="semibold">{name}</Text> : `${name} › `))}
-              </Text>,
-              Quiet(ui, { text: [item.agent.isBackground ? 'background' : 'foreground', chain.length > 1 ? `${chain.length} deep` : ''].filter(Boolean).join(' · '), isFull: true }),
-            ],
-          }),
     ],
   })
 }

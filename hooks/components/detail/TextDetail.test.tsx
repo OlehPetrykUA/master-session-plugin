@@ -29,7 +29,7 @@ const valueOf = (tree: unknown, label: string) => {
 const timeOf = (item: Extract<RowItem, { kind: 'subagent' }>) => valueOf(TextSubagentDetail(ui, { item, context, home: '/h', onCollapse: () => {} }), 'Time')
 
 test('the terminal card times a needs item like the GUI card, from asking.since, and a working one from its start', () => {
-  expect(timeOf(subagent({}))).toMatch(/^running 1m 30s · started /)
+  expect(timeOf(subagent({}))).toMatch(/^running 1m · started /)
   expect(timeOf({ ...subagent({ asking: { text: 'Allow Bash: ls', since: 60_000 } }), status: 'needs' })).toMatch(/^waiting 30s · started /)
 })
 
@@ -50,6 +50,13 @@ test('AC29: the head line reads starter › word · model · elapsed, and the St
   expect(strings.some(text => text.includes('rm -rf'))).toBe(false)
   const status = nodesOf(card).find(node => node.type === 'Text' && collect(node).includes('Status: '))
   expect(nodesOf(status).some(node => node.props?.color === 'error')).toBe(true)
+})
+
+test('the archived terminal line reads clock, age and run time', () => {
+  const one: LiveSession = { id: 'z', name: 'z', title: 'Old', cwd: '/r', isRunning: false, isArchived: true, lastActivityAt: 6_000_000, createdAt: 0 }
+  const actions = { open: () => {}, confirm: () => {} } as unknown as Actions
+  const card = TextArchivedDetail(ui, { item: archivedItemOf(one), context: { ...context, at: 6_000_000 + 7_200_000 }, home: '/h', actions, onCollapse: () => {} })
+  expect(valueOf(card, 'Archived')).toMatch(/^\d{2}:\d{2} · 2h ago · ran 1h 40m$/)
 })
 
 test('AC26: the archived terminal card offers Open only for a session this master started, and Unarchive always', () => {

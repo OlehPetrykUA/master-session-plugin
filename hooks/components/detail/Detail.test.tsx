@@ -769,6 +769,59 @@ test('the 15 s refresh keeps reading a side session past the first 50 from the f
   await ui.unmount()
 })
 
+const COMMAND_NOW = (waiting: object) => ({ ...BOARD, sessions: [BOARD.sessions[0], BOARD.sessions[1], { id: 'local_conductor', name: 'conductor-redo', state: 'waiting', next: 'then plain next step', ...waiting }] })
+
+test('AC30: a worker reporting now "running bun test --watch" shows no command on the desktop card', async ($, on) => {
+  await started($, on, COMMAND_NOW({ now: 'running bun test --watch' }), UNMERGED)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-local_conductor')
+  const card = await textsOf(ui)
+  expect(card).toContain('then plain next step')
+  expect(card.some(text => String(text).includes('bun test'))).toBe(false)
+  await ui.unmount()
+})
+
+test('AC30: a worker reporting now "running bun test --watch" leaves the terminal Now line out', async ($, on) => {
+  await started($, on, COMMAND_NOW({ now: 'running bun test --watch' }), UNMERGED)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'row-open-local_conductor' })
+  const lines = await textsOf(ui)
+  expect(lines).toContain('Next: ')
+  expect(lines).not.toContain('Now: ')
+  expect(lines.some(text => String(text).includes('bun test'))).toBe(false)
+  await ui.unmount()
+})
+
+test('AC9: a workflow agent card reads Name, Task, Status, Part of, Model | Time on the desktop', async ($, on) => {
+  await agentsStarted($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-row-wf_7')
+  await click(ui, 'hit-row-w2')
+  const keys = (await keysOf(ui)).filter(key => /^(name|task|status|part-of|pair-model-time)-w2$/.test(key))
+  expect(keys.slice(-2)).toEqual(['part-of-w2', 'pair-model-time-w2'])
+  await ui.unmount()
+})
+
+test('AC9: a workflow agent card reads Status, Part of, Model, Time in the terminal', async ($, on) => {
+  await agentsStarted($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'row-open-wf_7' })
+  await ui.press({ key: 'agent-open-w2' })
+  const lines = (await textsOf(ui)).filter(text => ['Status: ', 'Part of: ', 'Model: ', 'Time: '].includes(String(text)))
+  expect(lines.slice(-5, -1)).toEqual(['Status: ', 'Part of: ', 'Model: ', 'Time: '])
+  await ui.unmount()
+})
+
+test('the terminal workflow card labels its agent lines Agents:', async ($, on) => {
+  await agentsStarted($, on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'row-open-wf_7' })
+  const texts = await textsOf(ui)
+  expect(texts).toContain('Agents:')
+  expect(texts).not.toContain('Agents: No agents started yet.')
+  await ui.unmount()
+})
+
 test('a done session with a reported sha reads ready for verify in Waiting, and archiving it puts the Undo bar in Waiting at its own index, not Done', async ($, on) => {
   const waiting = { id: 'local_conductor', name: 'conductor-redo', state: 'waiting', now: 'waiting for the go' }
   const { calls } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[0], { ...BOARD.sessions[1], state: 'done', sha: '0a4621c' }, waiting] }, UNMERGED)
@@ -900,6 +953,17 @@ test('AC20: a failed subagent shows Failed after its duration on the red tint; a
   expect(await sentence('f1')).toEqual(['Failed after 40s: The folder is empty.', C.redTint])
   expect(await sentence('f2')).toEqual(['Failed after 40s.', C.redTint])
   expect(await sentence('f3')).toEqual(['Failed after 40s; it stopped without an answer.', C.redTint])
+  await ui.unmount()
+})
+
+test('the terminal workflow card with no agents reads Agents: No agents started yet.', async ($, on) => {
+  on('agent.list', () => ({ value: [] }))
+  on('tool.call', { tool: 'Workflow' }, () => ({ result: { status: 'async_launched' as const, taskId: 'wi5', runId: 'wf_7', workflowName: 'review-changes', summary: 'Review the branch' }, text: 'launched' }))
+  await started($, on)
+  await $.tool.call({ tool: 'Workflow', script: "export const meta = { name: 'review-changes', phases: [{ title: 'Review' }] }" })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'row-open-wf_7' })
+  expect(await textsOf(ui)).toContain('Agents: No agents started yet.')
   await ui.unmount()
 })
 

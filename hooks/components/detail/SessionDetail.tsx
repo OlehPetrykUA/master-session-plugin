@@ -17,6 +17,7 @@ import { Activity } from './Activity'
 import { ArchiveBox } from './ArchiveBox'
 import { Block } from './Block'
 import { Commits } from './Commits'
+import { plainOf } from './gate'
 import { Lead } from './Lead'
 import { lossLineOf, lossesOf } from './losses'
 import { ModelValue } from './Model'
@@ -81,8 +82,8 @@ export function SessionDetail(ui: Ui, props: SessionDetailProps) {
       ...Lead(ui, { item, context, home }),
       Pair(ui, {
         id: `pair-now-${row.id}`,
-        left: half('Now', 'now', Strong(ui, { text: facts?.now || '—', isFull: true }), 'now'),
-        right: half('Next', 'next', Strong(ui, { text: facts?.next || '—', isFull: true }), 'next'),
+        left: half('Now', 'now', Strong(ui, { text: plainOf(facts?.now) || '—', isFull: true }), 'now'),
+        right: half('Next', 'next', Strong(ui, { text: plainOf(facts?.next) || '—', isFull: true }), 'next'),
       }),
       activity.length ? Activity(ui, { id: row.id, activity }) : null,
       facts?.tests?.length ? Tests(ui, { id: row.id, tests: facts.tests, width: props.innerWidth }) : null,

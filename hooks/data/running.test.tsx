@@ -747,12 +747,12 @@ test('AC34: under 340 px the elapsed stays on line 1 and the Status reads the sa
   const ui = await pane($, { bodyColumns: 40 })
   await run.clock.advance(TICK_MS)
   expect(await runningOf(ui)).toBe('Running a Bash command for 1s.')
-  expect(await ui.find({ key: 'top-a1-elapsed-box' })).toBeDefined()
+  expect(await ui.find({ key: 'top-a1-elapsed' })).toBeDefined()
   expect(await ui.find({ key: 'top-a1-elapsed-narrow' })).toBeUndefined()
   expect(await labelOf(ui, 'time-a1')).toContain('running 1s')
   await end()
   await run.clock.advance(TICK_MS)
-  expect(await ui.find({ key: 'top-a1-elapsed-box' })).toBeDefined()
+  expect(await ui.find({ key: 'top-a1-elapsed' })).toBeDefined()
   expect(await runningOf(ui)).toMatch(/^Running for \d+s\.$/)
   await ui.unmount()
 })
@@ -824,8 +824,15 @@ test('tick: a chip-filtered item does not redraw the pane while its seconds chan
   expect(await redraws(run, drawn, 3)).toBe(0)
 })
 
-test('tick: an open card redraws each second while its Time block shows seconds past a minute, and a closed one does not', async ($, on) => {
+test('tick: an open card does not redraw while its Time block shows whole minutes past a minute', async ($, on) => {
   seeded(on, { agents: [FRESH], expanded: 'a1' })
+  const drawn = invalidations(on)
+  const run = await started($, on)
+  expect(await redraws(run, drawn, 3)).toBe(0)
+})
+
+test('tick: an open card redraws each second during its first minute', async ($, on) => {
+  seeded(on, { agents: [{ ...FRESH, startedAt: NOW - 5_000 }], expanded: 'a1' })
   const drawn = invalidations(on)
   const run = await started($, on)
   expect(await redraws(run, drawn, 3)).toBe(3)

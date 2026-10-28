@@ -310,7 +310,7 @@ test('tabular digits: the elapsed time is measured at 0.64 em per digit as it re
   seeded(on, [{ id: 't1', name: 'band diff', type: 'master-session:reviewer', description: 'Review', state: 'running', startedAt: 2_940_000, asking: { text: 'Allow Bash: bun install && bun run build && bun test?', since: 3_590_000 } }])
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 46 } })
-  const box = await ui.find({ key: 'row-t1-elapsed-box' })
+  const box = await ui.find({ key: 'row-t1-elapsed' })
   expect([box?.text, box?.props.flexShrink]).toEqual(['11m', 0])
   expect((await ui.findAll({ type: 'Text' })).find(one => one.text === '11m')?.props.tabular).toBe(true)
   await ui.unmount()

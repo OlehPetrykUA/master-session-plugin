@@ -196,7 +196,7 @@ test('the header: 56 tall, title and live dot over the status line, Ask and Refr
     if (isNarrow) {
       expect(await ui.find({ key: 'row-local_setup-meta' })).toBeUndefined()
       expect(await textsOf(ui)).toEqual(expect.arrayContaining(['waiting', '40m']))
-      expect((await ui.find({ key: 'row-local_setup-elapsed-box' }))?.props.flexShrink).toBe(0)
+      expect((await ui.find({ key: 'row-local_setup-elapsed' }))?.props.flexShrink).toBe(0)
       expect(await altsOf(ui)).toContain('2 of 5')
       expect((await ui.find({ key: 'face-chat-local_env' }))?.props.width).toBe(across(32))
       expect((await ui.find({ key: 'blocks-0' }))?.children.length).toBe(3)

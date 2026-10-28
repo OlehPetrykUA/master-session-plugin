@@ -96,7 +96,7 @@ test('AC9, AC10 and AC11: the model is followed by the elapsed on line 1, before
   const [, column] = row.children ?? []
   const [one] = column?.children ?? []
   const keys = (one?.children ?? []).map(keyOf)
-  expect(keys.slice(-2)).toEqual(['row-h1-model', 'row-h1-elapsed-box'])
+  expect(keys.slice(-2)).toEqual(['row-h1-model', 'row-h1-elapsed'])
   expect(keys.indexOf('row-h1-persona')).toBeLessThan(keys.indexOf('row-h1-model'))
   const top = (row.children ?? []).map(keyOf)
   expect(top).not.toContain('row-h1-model')
@@ -109,7 +109,7 @@ test('AC9, AC10 and AC11: the model is followed by the elapsed on line 1, before
   const narrow = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns: 38 } })
   expect((await narrow.find({ key: 'row-h1-model' }))?.text).toBe('')
   expect(((await narrow.find({ key: 'row-h1-model-glyph' }))?.children as { props: { alt: string } }[])[0]?.props.alt).toBe('haiku')
-  expect((await narrow.find({ key: 'row-h1-elapsed-box' }))?.text).toBe('3m')
+  expect((await narrow.find({ key: 'row-h1-elapsed' }))?.text).toBe('3m')
   expect((await narrow.find({ key: 'row-h1-line' }))?.text).not.toContain('3m')
   expect((await narrow.find({ key: 'row-h1-meta' }))).toBeUndefined()
   await narrow.unmount()
@@ -143,7 +143,7 @@ test('edge: a persona with no task and a model reads "Persona" then the model, w
   await started($, on)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   const line = ((await ui.find({ key: 'row-h1' })) as unknown as Node).children?.[1]?.children?.[0]?.children ?? []
-  expect(line.map(keyOf)).toEqual(['row-h1-persona', 'row-h1-model', 'row-h1-elapsed-box'])
+  expect(line.map(keyOf)).toEqual(['row-h1-persona', 'row-h1-model', 'row-h1-elapsed'])
   expect((await ui.find({ key: 'row-h1-model' }))?.text).toBe('supercalifragilistic')
   const [mark] = ((await ui.find({ key: 'row-h3-model-glyph' }))?.children ?? []) as { props: { alt: string } }[]
   expect([(await ui.find({ key: 'row-h3-model' }))?.text, mark?.props.alt]).toEqual(['gpt', 'modelChip'])

@@ -2,7 +2,7 @@ import type { RenderChildren } from 'claude-code'
 
 import { compactOf, modelOf } from '../../lib/format'
 import { modelWordOf } from '../../lib/rowfit'
-import { clockOf, displayNameOf, elapsedOfItem, isStartedBy, nameText, parentsOf, plural, runAgentsOf, shortNameOf } from '../../lib/list'
+import { ageOf, clockOf, displayNameOf, elapsedOfItem, isStartedBy, nameText, parentsOf, plural, runAgentsOf, shortNameOf } from '../../lib/list'
 import type { Context, ListItem, RowItem } from '../../lib/list'
 import { headOf, syncOf, whereOf } from '../../lib/rows'
 import { activityWordsOf, nameIdentOf, partOfOf, starterOf, stateWordOf, statusSentenceOf, taskOf } from '../../lib/status'
@@ -10,6 +10,7 @@ import { CARD_BORDER, TERMINAL_COLOR } from '../../theme/tokens'
 import type { Actions, TextUi } from '../types'
 import { LOST } from './ArchiveBox'
 import { durationOf, runningTimeOf, tokensOf } from './format'
+import { plainOf } from './gate'
 import { lossLineOf, lossesOf } from './losses'
 import { DESCRIBING } from './TaskBlock'
 import { pillsOf } from './Tests'
@@ -102,8 +103,8 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
     head: headOfItem(item, context),
     lines: [
       ...leadOf(item, context, props.home),
-      { label: 'Now', value: facts?.now ?? '' },
-      { label: 'Next', value: facts?.next ?? '' },
+      { label: 'Now', value: plainOf(facts?.now) },
+      { label: 'Next', value: plainOf(facts?.next) },
       { label: 'Activity', value: activityWordsOf(row).map(one => [one.text, one.ago].filter(Boolean).join(' ')).join(' · ') },
       { label: 'Tests', value: (facts?.tests ?? []).length ? pillsOf(facts?.tests ?? []).map(pill => `${pill.isFailed ? '✗' : '✓'} ${pill.full}`).join(' · ') : '' },
       { label: 'Commits', value: (facts?.commits ?? []).slice(0, 3).join(' · ') },
@@ -145,13 +146,16 @@ export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
   const { counts } = run
   const at = context.at
   const end = run.endedAt ?? at
+  const runAgents = runAgentsOf(run, context.agents)
   return TextCard(ui, {
     id: run.id,
     title: nameText(displayNameOf(item)),
     isNeeds: item.status === 'needs',
     head: headOfItem(item, context),
     lines: [...leadOf(item, context, props.home), { label: 'Phases', value: run.phases.join(' · ') }],
-    body: runAgentsOf(run, context.agents).map(agent =>
+    body: [
+      <Text key={`agents-label-${run.id}`} weight="semibold">{runAgents.length ? 'Agents:' : 'Agents: No agents started yet.'}</Text>,
+      ...runAgents.map(agent =>
       agent.kind === 'agent' && props.open.includes(agent.id) ? (
         TextSubagentDetail(ui, { item: agent, context, home: props.home, onCollapse: () => props.onToggle(run.id) })
       ) : (
@@ -163,7 +167,8 @@ export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
           </Text>
         </Box>
       ),
-    ),
+      ),
+    ],
     tail: [
       { label: 'Time', value: run.state === 'running' ? `running ${runningTimeOf(item, at)} · started ${clockOf(run.startedAt)}` : `took ${durationOf(end - run.startedAt)} · ${clockOf(run.startedAt)} – ${clockOf(end)}` },
       { label: 'Usage', value: `${plural(counts.total, 'agent')}${run.tokens ? ` · ${tokensOf(run.tokens)}` : ''}` },
@@ -186,8 +191,9 @@ export function TextSubagentDetail(ui: TextUi, props: TextSubagentProps) {
     head: headOfItem(item, context),
     lines: [
       ...leadOf(item, context, props.home),
+      ...(item.kind === 'agent' ? [{ label: 'Part of', value: `${part} · ${nth}` }] : []),
       { label: 'Model', value: [model, agent.type].filter(Boolean).join(' · ') },
-      item.kind === 'agent' ? { label: 'Part of', value: `${part} · ${nth}` } : { label: 'Started by', value: `${parentsOf(item, context).map(nameText).join(' › ')} · ${item.agent.isBackground ? 'background' : 'foreground'}` },
+      ...(item.kind === 'agent' ? [] : [{ label: 'Started by', value: `${parentsOf(item, context).map(nameText).join(' › ')} · ${item.agent.isBackground ? 'background' : 'foreground'}` }]),
       timeOfAgent(item, context.at),
     ],
     onCollapse: props.onCollapse,
@@ -206,7 +212,7 @@ export function TextArchivedDetail(ui: TextUi, props: TextArchivedProps) {
     head: headOfItem(item, context),
     lines: [
       ...leadOf(item, context, props.home),
-      { label: 'Archived', value: [`archived ${clockOf(one.lastActivityAt)}`, one.createdAt === undefined ? '' : `ran ${compactOf(one.lastActivityAt - one.createdAt)}`].filter(Boolean).join(' · ') },
+      { label: 'Archived', value: [clockOf(one.lastActivityAt), ageOf(context.at - one.lastActivityAt), one.createdAt === undefined ? '' : `ran ${compactOf(one.lastActivityAt - one.createdAt)}`].filter(Boolean).join(' · ') },
       { label: 'Git', value: [board?.git, board?.sha].filter(Boolean).join(' · ') },
     ],
     onCollapse: props.onCollapse,

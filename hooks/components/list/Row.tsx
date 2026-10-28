@@ -109,8 +109,8 @@ export function Row(ui: Ui, props: RowProps) {
             </Box>
           ) : null}
           {elapsed ? (
-            <Box key={`${id}-elapsed-box`} flexDirection="row" alignItems="center" gap={across(4)} flexShrink={0}>
-              {Icon(ui, { id: `${id}-elapsed`, name: 'elapsed', size: 12, tone: 'muted', weight: 2.2 })}
+            <Box key={`${id}-elapsed`} flexDirection="row" alignItems="center" gap={across(4)} flexShrink={0}>
+              {Icon(ui, { id: `${id}-elapsed-icon`, name: 'elapsed', size: 12, tone: 'muted', weight: 2.2 })}
               <Text size="footnote" color={C.muted} tabular>
                 {elapsed}
               </Text>

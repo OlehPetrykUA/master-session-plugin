@@ -74,7 +74,7 @@ test('Open chat keeps its label when the task fits whole beside it, or when at l
     await $.tool.call({ tool: BOARD_TOOL, ...asking(id, id, BASH) })
     const ui = await $.ui.mount({ ...PANE, surface: 'desktop', props: { ...PANE.props, bodyColumns } })
     const width = (await ui.find({ key: `face-chat-${id}` }))?.props.width
-    elapsed = (await ui.find({ key: `row-${id}-elapsed-box` }))?.text ?? ''
+    elapsed = (await ui.find({ key: `row-${id}-elapsed` }))?.text ?? ''
     await ui.unmount()
     return width === across(32) ? 'icon' : 'label'
   }

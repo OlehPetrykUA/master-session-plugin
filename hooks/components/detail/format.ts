@@ -1,3 +1,4 @@
+import { spanOf } from '../../lib/list'
 import type { RowItem } from '../../lib/list'
 
 const pad = (value: number) => String(value).padStart(2, '0')
@@ -14,8 +15,8 @@ export function durationOf(ms: number) {
 export const tokensOf = (count: number) => `${count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count} tokens`
 
 export function runningTimeOf(item: RowItem, at: number) {
-  if (item.kind === 'workflow') return item.run.state === 'running' ? durationOf(at - item.run.startedAt) : ''
+  if (item.kind === 'workflow') return item.run.state === 'running' ? spanOf(item.run.startedAt, undefined, at) : ''
   if (item.kind !== 'subagent' && item.kind !== 'agent') return ''
   const { agent } = item
-  return agent.state === 'running' ? durationOf(at - (item.status === 'needs' && agent.asking ? agent.asking.since : agent.startedAt)) : ''
+  return agent.state === 'running' ? spanOf(item.status === 'needs' && agent.asking ? agent.asking.since : agent.startedAt, undefined, at) : ''
 }
