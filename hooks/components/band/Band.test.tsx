@@ -4,11 +4,12 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord, Board, BoardSession, Live, PlanPiece, Repo, WorkflowRecord } from '../../../types'
 
-import { BAR_MIN, PILL_WIDTH, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, countsWidthOf, overallOf, percentOf } from '../../lib/band'
+import { BAR_MIN, ELAPSED_ICON, PILL_WIDTH, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, countsWidthOf, overallOf, percentOf } from '../../lib/band'
 import type { AgentCounts } from '../../lib/band'
-import { CH, across, tall, widthOf } from '../../lib/layout'
+import { CH, across, tall, textWidth, widthOf } from '../../lib/layout'
 import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, started, text, warmUp, world } from '../../testing/world'
 import { PERCENT } from '../../theme/band'
+import { glyph } from '../../theme/icons'
 import { glowOf, strip } from '../../theme/strip'
 import { C } from '../../theme/tokens'
 import { guardSvg } from '../guard'
@@ -395,6 +396,7 @@ test('counts: done/total, numbers and slash 600 C.text, numbers tabular, with no
   const all = await mount($)
   const found = await styleOf(all)
   expect(found.text).toBe('1/7')
+  expect(String((await all.findAll({ type: 'Svg' })).find(one => one.props.alt === 'elapsed')?.props.source)).toBe(glyph('elapsed', ELAPSED_ICON, 'muted', 2.2))
   expect(found.parent).toEqual(['text', 'semibold'])
   expect(found.numbers).toEqual(['1', '7'].map(value => [value, 'text', 'semibold', true]))
   expect((await stripOf(all))?.props.alt).toBe('Master session: 45 percent, 1 of 7 done. <1m elapsed.')
@@ -641,7 +643,8 @@ test('terminal: one bar of block characters, the percent, the counts with their 
   expect(texts.slice(0, 2)).toEqual(['64%', expect.stringMatching(/^█+░*$/)])
   expect(texts.slice(2)).toEqual(['1/5', '1', '5', '◷ <1m'])
   expect((await ui.findAll({ type: 'Text' })).filter(one => /^\d+$/.test(one.text)).every(one => one.props.weight === 'semibold')).toBe(true)
-  expect((await ui.findAll({ type: 'Text' })).find(one => one.text === '1/5')?.props.dimColor).toBe(true)
+  const count = (await ui.findAll({ type: 'Text' })).find(one => one.text === '1/5')
+  expect([count?.props.weight, count?.props.dimColor]).toEqual(['semibold', undefined])
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
   expect((await ui.findAll({ type: 'Text' })).filter(one => /^[█░]+$/.test(one.text))).toHaveLength(1)
   await ui.press({ key: 'band-board' })
@@ -1169,6 +1172,12 @@ test('AC59 the terminal draws one row: 57%, the bar, 3/7, ◷ 48m and Open board
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
   expect((await ui.findAll({ type: 'Box' })).filter(one => one.props.flexDirection === 'column')).toEqual([])
   await ui.unmount()
+})
+
+test('the count width measures the slash in the bold face it is drawn in', () => {
+  const [one, slash, four] = countsOf(1, 4)
+  expect(countsWidthOf([slash!])).toBe(textWidth('/', 13, { isBold: true }))
+  expect(countsWidthOf([one!, slash!, four!])).toBeGreaterThan(countsWidthOf([one!, four!]))
 })
 
 test('AC60 the terminal below 340 px draws the bar and the board glyph, and with an ask the pill and the bar', async ($, on) => {

@@ -198,7 +198,7 @@ export const countsOf = (done: number, total: number): CountPart[] => [{ text: S
 
 export const countsText = (parts: readonly CountPart[]) => parts.map(one => one.text).join('')
 
-export const countsWidthOf = (parts: readonly CountPart[]) => parts.reduce((sum, one) => sum + (one.isNumber ? DIGIT * 13 * one.text.length : textWidth(one.text, 13)), 0)
+export const countsWidthOf = (parts: readonly CountPart[]) => parts.reduce((sum, one) => sum + (one.isNumber ? DIGIT * 13 * one.text.length : textWidth(one.text, 13, { isBold: true })), 0)
 
 export function bandProgress(current: Board | null, live: Live) {
   const sessions = rowsOf(current, live)

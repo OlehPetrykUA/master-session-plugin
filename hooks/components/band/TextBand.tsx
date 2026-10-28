@@ -28,10 +28,10 @@ export function TextBand(ui: TextUi, props: TextBandProps) {
       ) : null}
       <Text color={TERMINAL[view.tone]}>{'█'.repeat(filled) + '░'.repeat(cells - filled)}</Text>
       {counts ? (
-        <Text dimColor>
+        <Text weight="semibold">
           {parts.map((part, index) =>
             part.isNumber ? (
-              <Text key={`c${index}`} weight="semibold" dimColor={false}>
+              <Text key={`c${index}`} weight="semibold">
                 {part.text}
               </Text>
             ) : (
