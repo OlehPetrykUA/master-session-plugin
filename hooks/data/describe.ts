@@ -83,26 +83,17 @@ const WEAK = 'pass|pw|tokens?|secrets?|auth|authorization|credentials?|key'
 
 const ENV = 'PASS|PW|TOKEN|SECRET|KEY|AUTH'
 
-const NOT_SECRET_CONSTANT = '(?!(?<![A-Za-z0-9_])(?:KEY_PREFIX|KEY_PATTERN|KEY_SEPARATOR|PRIMARY_KEY|SORT_KEY|CACHE_KEY|GROUP_KEY)(?![A-Z0-9_]))'
-
-const anyCase = (word: string) => word.replace(/[a-z]/gi, char => `[${char.toLowerCase()}${char.toUpperCase()}]`)
-
-const MYSQL_LIKE = ['mysql', 'mysqldump', 'mariadb'].map(anyCase).join('|')
-
 const CUES = [
   /password|passwd|passphrase|pwd|apikey|api[ _-]key|private[ _-]key|access[ _-]key|bearer|identified\s+by/i,
   new RegExp(`(?<![a-z0-9])(?:${WEAK})["']?\\s*[:=]\\s*\\S`, 'i'),
   /[a-z](?:Pass|Pw|Tokens?|Secrets?|Auth|Key|Credentials?)["']?\s*[:=]\s*\S/,
   /(?<![A-Za-z0-9])(?:pass|pw|tokens?|secrets?|auth|key|credentials?)[A-Z][A-Za-z0-9]*["']?\s*[:=]\s*\S/,
   new RegExp(`[A-Z0-9_]*(?:${ENV})[A-Z0-9_]*=`),
-  new RegExp(`(?<![A-Z0-9_])${NOT_SECRET_CONSTANT}(?:[A-Z0-9]+_(?:${ENV})|(?:${ENV})_[A-Z0-9_]+)(?![A-Z0-9_])`),
+  new RegExp(`(?<![A-Z0-9_])(?:[A-Z0-9]+_(?:${ENV})|(?:${ENV})_[A-Z0-9_]+)(?![A-Z0-9_])`),
   new RegExp(`(?<![a-z0-9-])--(?:${WEAK})(?![a-z0-9])`, 'i'),
-  /(?<![A-Za-z0-9])(?:gh[pousr]_|github_pat_|glpat-|xox[abpr]-|AKIA|ASIA|hvs\.)[A-Za-z0-9]/,
-  /(?<![A-Za-z0-9])npm_(?!(?:package_version|config_registry|lifecycle_event)(?![A-Za-z0-9_]))[A-Za-z0-9]/,
-  /(?<![A-Za-z0-9])sk-(?!learn(?![\w-]|\.\w))[A-Za-z0-9]/,
-  /(?:^|[\s"'])-(?:p(?!(?:rune|rint[0f]?|ath|erm|thread|l|edantic|ipe)(?![A-Za-z0-9]))|P)[A-Za-z0-9]/,
-  new RegExp(`\\b(?:${MYSQL_LIKE})\\b[^\\n]*?\\s(?:-p\\s+\\S|-p[A-Za-z0-9]|-P\\s+(?!\\d+(?:\\s|$))\\S)`),
-  /\b(?:sshpass|sqlcmd|mongosh?|ssh-keygen|zip|unzip|mosquitto_pub|(?:^|[\w-]+\s+)login)\b[^\n]*?\s-p\s+\S/i,
+  /(?<![A-Za-z0-9])(?:gh[pousr]_|github_pat_|glpat-|xox[abpr]-|sk-|AKIA|ASIA|hvs\.|npm_)[A-Za-z0-9]/,
+  /(?:^|[\s"'])-p[a-z0-9]/i,
+  /\b(?:mysql|mysqldump|mariadb|sshpass|sqlcmd|mongosh?|ssh-keygen|zip|unzip|mosquitto_pub|(?:^|[\w-]+\s+)login)\b[^\n]*?\s-p\s+\S/i,
   /\bredis-cli\b[^\n]*?\s-a\s+\S/,
   /(?:^|\s)(?:-u\s*|--user[=\s]\s*)[^\s:]+:\S/,
   /\bldap\w*\b[^\n]*?\s-w\s+\S/i,
