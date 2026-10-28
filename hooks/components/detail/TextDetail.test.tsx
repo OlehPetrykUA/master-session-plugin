@@ -3,10 +3,10 @@ import { expect, test } from 'claude-code/testing'
 import type { LiveSession } from '../../../types'
 
 import { archivedItemOf } from '../../lib/list'
-import type { Context, RowItem } from '../../lib/list'
+import type { Context, ListItem, RowItem } from '../../lib/list'
 import { statusSentenceOf } from '../../lib/status'
 import type { Actions, TextUi } from '../types'
-import { TextArchivedDetail, TextSubagentDetail } from './TextDetail'
+import { TextArchivedDetail, TextSessionDetail, TextSubagentDetail } from './TextDetail'
 
 const ui = { Box: 'Box', Text: 'Text', Button: 'Button' } as unknown as TextUi
 
@@ -67,3 +67,22 @@ test('AC26: the archived terminal card offers Open only for a session this maste
   expect(keys('you')).toContain('unarchive-z')
   expect(keys('you')).not.toContain('archived-open-z')
 })
+
+const PROBES = ['running bun test --watch', 'npm run build && npm test', 'FOO=1 make']
+
+const sessionCard = (facts: object) => {
+  const row = { id: 's', name: 's', title: 'S', state: 'working', board: { id: 's', name: 's', state: 'working', ...facts } }
+  const item = { kind: 'session', id: 's', group: 'working', status: 'working', row } as unknown as Extract<ListItem, { kind: 'session' }>
+  return collect(TextSessionDetail(ui, { item, context, home: '/h', asking: '', actions: { collapse: () => {} } as unknown as Actions }))
+}
+
+for (const probe of PROBES) {
+  for (const field of ['now', 'next'] as const) {
+    test(`AC30: the terminal card drops a command-text ${field} line: ${probe}`, () => {
+      const other = field === 'now' ? 'next' : 'now'
+      const strings = sessionCard({ [field]: probe, [other]: 'plain step' })
+      expect(strings.some(text => text.includes(probe))).toBe(false)
+      expect(strings).toContain('plain step')
+    })
+  }
+}

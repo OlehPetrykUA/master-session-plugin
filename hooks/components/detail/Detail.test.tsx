@@ -771,26 +771,33 @@ test('the 15 s refresh keeps reading a side session past the first 50 from the f
 
 const COMMAND_NOW = (waiting: object) => ({ ...BOARD, sessions: [BOARD.sessions[0], BOARD.sessions[1], { id: 'local_conductor', name: 'conductor-redo', state: 'waiting', next: 'then plain next step', ...waiting }] })
 
-test('AC30: a worker reporting now "running bun test --watch" shows no command on the desktop card', async ($, on) => {
-  await started($, on, COMMAND_NOW({ now: 'running bun test --watch' }), UNMERGED)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await click(ui, 'hit-row-local_conductor')
-  const card = await textsOf(ui)
-  expect(card).toContain('then plain next step')
-  expect(card.some(text => String(text).includes('bun test'))).toBe(false)
-  await ui.unmount()
-})
+const PROBES = ['running bun test --watch', 'npm run build && npm test', 'FOO=1 make']
 
-test('AC30: a worker reporting now "running bun test --watch" leaves the terminal Now line out', async ($, on) => {
-  await started($, on, COMMAND_NOW({ now: 'running bun test --watch' }), UNMERGED)
-  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  await ui.press({ key: 'row-open-local_conductor' })
-  const lines = await textsOf(ui)
-  expect(lines).toContain('Next: ')
-  expect(lines).not.toContain('Now: ')
-  expect(lines.some(text => String(text).includes('bun test'))).toBe(false)
-  await ui.unmount()
-})
+for (const probe of PROBES) {
+  for (const field of ['now', 'next'] as const) {
+    const other = field === 'now' ? 'next' : 'now'
+
+    test(`AC30: a worker reporting ${field} "${probe}" shows no command on the desktop card`, async ($, on) => {
+      await started($, on, COMMAND_NOW({ [field]: probe, [other]: 'plain step' }), UNMERGED)
+      const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+      await click(ui, 'hit-row-local_conductor')
+      const card = await textsOf(ui)
+      expect(card).toContain('plain step')
+      expect(card.some(text => String(text).includes(probe))).toBe(false)
+      await ui.unmount()
+    })
+
+    test(`AC30: a worker reporting ${field} "${probe}" leaves that terminal line out`, async ($, on) => {
+      await started($, on, COMMAND_NOW({ [field]: probe, [other]: 'plain step' }), UNMERGED)
+      const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+      await ui.press({ key: 'row-open-local_conductor' })
+      const lines = await textsOf(ui)
+      expect(lines).toContain('plain step')
+      expect(lines.some(text => String(text).includes(probe))).toBe(false)
+      await ui.unmount()
+    })
+  }
+}
 
 test('AC9: a workflow agent card reads Name, Task, Status, Part of, Model | Time on the desktop', async ($, on) => {
   await agentsStarted($, on)
