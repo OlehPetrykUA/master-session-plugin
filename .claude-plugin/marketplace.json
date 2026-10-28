@@ -1,6 +1,6 @@
 {
   "name": "master-session",
-  "description": "The master-session plugin: validator skill, status mod and persona subagents.",
+  "description": "The master-session plugin: validator skill and persona subagents.",
   "owner": {
     "name": "Oleh Petryk"
   },
@@ -8,7 +8,7 @@
     {
       "name": "master-session",
       "source": "./",
-      "description": "Validator skill, live status pane and persona subagents for running work through worker sessions."
+      "description": "Validator skill and persona subagents for running work through worker sessions."
     }
   ]
 }

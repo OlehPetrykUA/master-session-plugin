@@ -1,17 +1,13 @@
 # Master session
 
-A Claude Code plugin that turns one session into a **validator** for a team of workers. The validator plans the work, sizes each piece into a tier, starts only the agents the tier and the count line allow, answers their questions, verifies every `ready <sha>` with the checkers its tier names and merges it fast-forward only. You get a live status board instead of a scrolling chat.
-
-<p align="center"><img src="docs/screenshots/pane-dark.png" width="380" alt="The status pane in the dark theme: run totals, filter chips, and worker sessions, subagents and a workflow run grouped into Needs you, Working, Waiting and Done"></p>
-
+A Claude Code plugin that turns one session into a **validator** for a team of workers. The validator plans the work, sizes each piece into a tier, starts only the agents the tier and the count line allow, answers their questions, verifies every `ready <sha>` with the checkers its tier names and merges it fast-forward only.
 ## What's inside
 
 | Part | What it does |
 |---|---|
-| Skill `start` | `/master-session:start`, the validator protocol: work tiers, the agent count line, briefs, the tick loop, checkers by tier, permissions, the ledger. Ships `personas.md` (the persona index), `shape.md` (execution shape, worker lifetime, pause and resume, names), `answering.md` (answering workers and permissions), `board.md` (the chat board when the pane isn't available) and `copilot.md` (the Copilot CLI notes). |
+| Skill `start` | `/master-session:start`, the validator protocol: work tiers, the agent count line, briefs, the tick loop, checkers by tier, permissions, the ledger. Ships `personas.md` (the persona index), `shape.md` (execution shape, worker lifetime, pause and resume, names), `answering.md` (answering workers and permissions), `board.md` (the chat board) and `copilot.md` (the Copilot CLI notes). |
 | Skills `subchat`, `subagent`, `workflow` | `/master-session:subchat`, `/master-session:subagent` and `/master-session:workflow`: start a worker session, a persona subagent or a workflow of persona agents from the validator. |
 | Skill `worker` | The protocol every worker session follows: its own worktree, the report tool, talking to the validator, the `ready <sha>` gate. |
-| Status mod | `/master-session:info` opens it: a pane beside the chat with one row per worker (state, progress, git, tests, commits) under run-total tiles, a band above the prompt, archive and unarchive, and **Ask for updates** (shown once workers are listed). Workers report through the `mcp__master-session__report` tool; the mod also records their commits, test runs, edits and waits by itself. |
 | Personas | Ten roles, each a skill plus an agent of the same name: `implementer`, `refactorer`, `reviewer`, `qa-verifier`, `design-checker`, `researcher`, `investigator`, `spec-writer`, `architect` and `designer`. |
 
 ## Install
@@ -56,7 +52,7 @@ copilot plugin marketplace add <path to your clone>
 copilot plugin install master-session@master-session
 ```
 
-`copilot plugin list` shows it under "Live Plugins". The skills keep their own names (`start`, `subchat`, `worker`, the personas), and the agents are `master-session:<persona>`. What Copilot does instead of the session tools, report tool, status mod and loop: [skills/start/copilot.md](skills/start/copilot.md).
+`copilot plugin list` shows it under "Live Plugins". The skills keep their own names (`start`, `subchat`, `worker`, the personas), and the agents are `master-session:<persona>`. What Copilot does instead of the session tools and the loop: [skills/start/copilot.md](skills/start/copilot.md).
 
 ## Usage
 
@@ -66,25 +62,13 @@ copilot plugin install master-session@master-session
 | `/master-session:subchat <task>` | Starts a worker session, a side chat, for the task (the master picks the persona) and watches it in the loop. |
 | `/master-session:subagent <task>` | Runs a persona the master picks as a background subagent for a short check, then relays its result. |
 | `/master-session:workflow <task>` | Writes and runs a workflow for the task with persona agents, announcing the agent count first. |
-| `/master-session:info [ask]` | Opens the status pane; `ask` asks every running worker for a fresh report. |
-| `/master-session:stop [force]` | Ends the run: the session stops being a master session or a worker, and the pane and band go. With workers still running it refuses unless `force`. |
+| `/master-session:stop [force]` | Ends the run: the session stops being a master session or a worker. With workers still running it refuses unless `force`. |
 
 `subchat`, `subagent` and `workflow` make the session the validator first if `/master-session:start` hasn't run yet. Type `/master-session:start <task>`; the master decides the heartbeat, the board and the workers.
 
-Workers need nothing installed beyond this plugin: their brief loads the `master-session:worker` skill and their persona's skill, and they report through the status tool.
+Workers need nothing installed beyond this plugin: their brief loads the `master-session:worker` skill and their persona's skill.
 
 The ledger, one note per run with every worker, its state and open findings, goes in your notes or memory tool, or a plain markdown file if you use none.
-
-## Screenshots
-
-| Light | Dark |
-|---|---|
-| <img src="docs/screenshots/pane-light.png" width="380" alt="The status pane in the light theme: run totals, filter chips and workers grouped by state"> | <img src="docs/screenshots/pane-dark.png" width="380" alt="The status pane in the dark theme: run totals, filter chips and workers grouped by state"> |
-| The status pane: run totals, filter chips and every worker grouped by state. | The same pane in the dark theme. |
-| <img src="docs/screenshots/session-card-light.png" width="380" alt="An expanded session card showing now and next, recent activity, worktree, git state, commits, tests, files owned, permission mode and model"> | <img src="docs/screenshots/subagent-needs-dark.png" width="380" alt="A subagent card that needs you: a permission prompt for a Bash command, its task, model and the session that started it"> |
-| A session opened in place: now and next, activity, worktree, git, commits, tests and files. | A subagent waiting on a permission prompt, with Open chat for the chat that holds it. |
-| <img src="docs/screenshots/band-needs-light.png" width="424" alt="Status band asking for attention: a red &quot;Designer needs you&quot; pill, a red progress bar about half full, and an Open chat button"> | <img src="docs/screenshots/pane-narrow-dark.png" width="300" alt="The status pane at 300 pixels wide, with elapsed time folded into each row's second line"> |
-| The band above the prompt names whoever needs you, shows one progress bar and opens their chat. | The pane at 300 px: the meta column folds into the second line. |
 
 ## Personas
 
@@ -114,10 +98,8 @@ The validator also spawns each one as a subagent, `master-session:<persona>`, wh
 ## Requirements
 
 - Claude Code 2.1.275 or later for the one-line `/plugin install … --marketplace` form, 2.1.292 or later for its shell form. Built and tested on 2.1.304.
-- The Claude desktop app's **Code** tab. The skill starts and messages worker sessions through the app's session tools, and the pane draws there. In a terminal the mod falls back to a text pane and band.
+- The Claude desktop app's **Code** tab. The skill starts and messages worker sessions through the app's session tools.
 - git. Workers work in their own worktrees and the validator merges with `--ff-only`.
-
-The mod keeps worker reports under `~/.claude/state/master-session/`.
 
 ## Development
 
@@ -125,17 +107,11 @@ The mod keeps worker reports under `~/.claude/state/master-session/`.
 claude plugin validate .
 ```
 
-```bash
-claude plugin test .
-```
-
-`plugin test` runs the mod's tests only. Check the SessionStart persona hook with:
+Check the SessionStart persona hook with:
 
 ```bash
 sh hooks/persona.test.sh
 ```
-
-Type-check against the engine's generated types: load the plugin once with `claude --plugin-dir .` so the engine writes `.claude-plugin/types/`, then run `tsc -p .`.
 
 ## License
 
