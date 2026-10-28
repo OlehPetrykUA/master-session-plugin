@@ -74,6 +74,8 @@ rule 'board: Nothing right now' skills/start/board.md '`✅ Nothing right now.` 
 rule 'board: section order' skills/start/board.md '**Order:** header, Quick table, mini tables, 📋 Plan, 🙋 Needs you, 🛡 Standing checks, 📦 Results so far, 🔭 Current state, END fence; the Answer follows below it.'
 rule 'board: urgency legend' skills/start/board.md 'Urgency: 🔴 blocking now · 🟡 later or after X (name X).'
 rule 'board: kind legend' skills/start/board.md 'Kind: 🖥 run a command · 🔁 restart or reload · 🗑 Trash or files · ✋ decision · 🔑 sign-in or approval.'
+rule 'board: legend never printed' skills/start/board.md 'Never print this legend on a board.'
+if sed -n '/ BOARD · /,/ END ━/p' "$root/skills/start/board.md" | grep -q '^Urgency:' || grep -q '^Urgency:' "$root/README.md"; then echo 'FAIL board: no printed legend in examples'; fail=1; else echo 'ok   board: no printed legend in examples'; fi
 rule 'board: to delete later' skills/start/board.md 'To delete later: a list of every extra worktree and branch'
 rule 'board: git cherry merged check' skills/start/board.md '`git cherry main <branch>` prints only `-` lines'
 rule 'board: branch merged check' skills/start/board.md '`git branch --merged main` lists it'

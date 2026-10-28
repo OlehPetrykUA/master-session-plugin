@@ -98,7 +98,6 @@ Every worker is named `<Persona>: <short task>`.
 3. ⏳ Wrap-up · T0 · Done step
 
 **🙋 Needs you**
-Urgency: 🔴 blocking now · 🟡 later or after X. Kind: 🖥 run a command · 🔁 restart or reload · 🗑 Trash or files · ✋ decision · 🔑 sign-in or approval.
 1. 🟡🔁 After QA verifier: check setup build passes: reload the plugin with `/reload-plugins` in the user's own chat
 2. 🟡🗑 After the merge: move `~/.claude/worktrees/wt-my-app-setup-build` to Trash, in the user's terminal
 

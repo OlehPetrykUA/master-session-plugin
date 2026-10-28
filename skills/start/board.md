@@ -39,7 +39,6 @@ The board posted on every tick that has news and in every reply to the user. Eve
 6. ✖ Setup import · T3 · dropped: user cut the import screen
 
 **🙋 Needs you**
-Urgency: 🔴 blocking now · 🟡 later or after X. Kind: 🖥 run a command · 🔁 restart or reload · 🗑 Trash or files · ✋ decision · 🔑 sign-in or approval.
 1. 🟡🔁 After QA verifier: check setup build passes: reload the plugin with `/reload-plugins` in the user's own chat
 2. 🟡🗑 After the merge: move `~/.claude/worktrees/wt-my-app-setup-build` to Trash, in the user's terminal
 
@@ -81,7 +80,7 @@ Urgency: 🔴 blocking now · 🟡 later or after X. Kind: 🖥 run a command ·
   - States move one way: queued, working when spawned, verifying from its first ready sha (it stays verifying through checks, fix rounds, rebases and the user's approval), done when merged or, for a doc piece, approved.
   - A fix round after a FAIL adds no piece; work the user adds mid-run adds one. Never move a piece back; never delete a piece: abandoned or split work is dropped.
   - Never list done work as a summary piece. Post the full plan on the first board, before the first spawn.
-- **Needs you:** every action the user must take, numbered in the order to do them. Each item starts with one urgency emoji and one kind emoji, then the exact command or action and the chat or place. `✅ Nothing right now.` when empty. The legend is shown once, as the first line under the heading when there are items:
+- **Needs you:** every action the user must take, numbered in the order to do them. Each item starts with one urgency emoji and one kind emoji, then the exact command or action and the chat or place. `✅ Nothing right now.` when empty. The emojis are defined here for the writer only. Never print this legend on a board.
   - Urgency: 🔴 blocking now · 🟡 later or after X (name X).
   - Kind: 🖥 run a command · 🔁 restart or reload · 🗑 Trash or files · ✋ decision · 🔑 sign-in or approval.
 - **Standing checks:** recomputed from fresh commands on every board, never copied from the last one.
