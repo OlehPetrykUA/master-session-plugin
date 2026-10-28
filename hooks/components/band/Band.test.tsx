@@ -4,8 +4,8 @@ import type { On } from 'claude-code'
 
 import type { AgentRecord, Board, BoardSession, Live, PlanPiece, Repo, WorkflowRecord } from '../../../types'
 
-import { BAR_MIN, ELAPSED_ICON, PILL_WIDTH, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandUnitsOf, bandViewOf, countsText, countsWidthOf, overallOf, percentOf } from '../../lib/band'
-import type { AgentCounts } from '../../lib/band'
+import { BAR_MIN, ELAPSED_ICON, PILL_WIDTH, askToolOf, askingChatOf, countsOf, bandAction, bandProgress, bandProgressWith, bandSetOf, bandUnitsOf, bandViewOf, countsText, countsWidthOf, overallOf, percentOf } from '../../lib/band'
+import type { AgentCounts, InRunCounts } from '../../lib/band'
 import { CH, across, tall, textWidth, widthOf } from '../../lib/layout'
 import { BAND, BOARD_TOOL, PANE, SELF, SPAWN, click, started, text, warmUp, world } from '../../testing/world'
 import { PERCENT } from '../../theme/band'
@@ -69,7 +69,13 @@ async function band($: Engine, on: On, sessions: BoardSession[], isPaneOpen = fa
 
 const mount = ($: Engine, bodyColumns = 100) => $.ui.mount({ ...BAND, surface: 'desktop', props: { ...BAND.props, bodyColumns } })
 
-const IDLE = { agents: [], workflows: [], at: 0 }
+type Counts = Pick<AgentCounts, 'agents' | 'workflows' | 'at'>
+
+const inRun = (counts: Counts) => counts as InRunCounts
+
+const IDLE = inRun({ agents: [], workflows: [], at: 0 })
+
+const progressOf = (current: Board | null, live: Live) => bandProgress(bandSetOf(current, IDLE, live, [], true).rows, current, live)
 
 function crewOf($: Engine, on: On) {
   let running: string[] = []
@@ -127,16 +133,16 @@ const scopesOf = async (ui: Found) => (await faceOf(ui)).map(one => one.key)
 
 warmUp()
 
-const crewValues = (crew: AgentCounts, sessions: BoardSession[] = WORKING, archived: string[] = []) => {
+const crewValues = (crew: Counts, sessions: BoardSession[] = WORKING, archived: string[] = []) => {
   const live = liveOf(archived, sessions)
-  return bandUnitsOf(bandProgress(boardOf(sessions), live, 0)?.segments ?? [], boardOf(sessions), crew, live)
+  return bandUnitsOf(progressOf(boardOf(sessions), live)?.segments ?? [], boardOf(sessions), inRun(crew), live)
 }
 
 const agentOf = (id: string, state: AgentRecord['state'], extra: Partial<AgentRecord> = {}): AgentRecord => ({ id, type: 'general-purpose', description: id, state, startedAt: 1, ...extra })
 
 const CREW = (asking: { own?: boolean; remote?: boolean; flow?: boolean } = {}) => {
   const ask = { text: 'Allow Bash: rm -rf dist', since: 1 }
-  return {
+  return inRun({
     agents: [
       { id: 'o1', name: 'QA verifier', type: 'master-session:qa-verifier', description: 'Verify the sha', state: 'running' as const, startedAt: 1 },
       { id: 'o2', name: 'Reviewer', type: 'master-session:reviewer', description: 'Review the diff', state: 'running' as const, startedAt: 2, parentAgentId: 'o1', ...(asking.own ? { asking: ask } : {}) },
@@ -148,28 +154,28 @@ const CREW = (asking: { own?: boolean; remote?: boolean; flow?: boolean } = {}) 
     ],
     workflows: [{ id: 'wf_1', toolUseId: 't1', name: 'review-changes', phases: ['Scan', 'Check'], startedAt: 6 }],
     at: 0,
-  }
+  })
 }
 
 
-const viewOf = (sessions: BoardSession[], crew: AgentCounts, columns = 100) => {
+const viewOf = (sessions: BoardSession[], crew: Counts, columns = 100) => {
   const current = boardOf(sessions)
   const live = liveOf([], sessions)
-  const progress = bandProgress(current, live, 0)
+  const progress = progressOf(current, live)
   if (!progress) throw new Error('no band')
   const chats: string[] = []
-  const view = bandViewOf(columns, current, progress, false, crew, { board: () => chats.push('board'), chat: (id, name) => chats.push(`${id} ${name}`) }, live)
+  const view = bandViewOf(columns, current, progress, false, inRun(crew), { board: () => chats.push('board'), chat: (id, name) => chats.push(`${id} ${name}`) }, live)
   return { view, chats }
 }
 
 
 test('no band with no board and no worker of mine, with an empty board and no workers, or with every worker archived; archived ones drop out', () => {
   const outsider = { id: 'local_x', name: 'outsider', title: '', cwd: '/', isRunning: true, isArchived: false, lastActivityAt: 0 }
-  expect(bandProgress(null, { ...liveOf([], []), sessions: [outsider] }, 0)).toBeUndefined()
-  expect(bandProgress(boardOf([]), liveOf([], []), 0)).toBeUndefined()
-  expect(bandProgress(boardOf(WORKING), liveOf(WORKING.map(one => one.id), WORKING), 0)).toBeUndefined()
-  expect(bandProgress(boardOf(NEEDS), liveOf(['local_b']), 0)?.segments.map(one => one.id)).toEqual(['local_e', 'local_a', 'local_c', 'local_d'])
-  expect(bandProgress(boardOf(WORKING), liveOf([], WORKING), 0)?.segments.map(one => one.fill)).toEqual([0.8, 0.6, 0.8, 1])
+  expect(progressOf(null, { ...liveOf([], []), sessions: [outsider] })).toBeUndefined()
+  expect(progressOf(boardOf([]), liveOf([], []))).toBeUndefined()
+  expect(progressOf(boardOf(WORKING), liveOf(WORKING.map(one => one.id), WORKING))).toBeUndefined()
+  expect(progressOf(boardOf(NEEDS), liveOf(['local_b']))?.segments.map(one => one.id)).toEqual(['local_e', 'local_a', 'local_c', 'local_d'])
+  expect(progressOf(boardOf(WORKING), liveOf([], WORKING))?.segments.map(one => one.fill)).toEqual([0.8, 0.6, 0.8, 1])
 })
 
 
@@ -268,7 +274,7 @@ const NO_ACT = { board: () => undefined, chat: () => undefined }
 
 for (const fixture of FIXTURES) test(`the band count reads finished/units, and nothing when it has no band or a pill: ${fixture.name}`, () => {
   const board = fixture.outsiders ? null : boardOf(fixture.sessions)
-  const counts = { agents: fixture.agents, workflows: fixture.workflows ?? [], at: AT }
+  const counts = inRun({ agents: fixture.agents, workflows: fixture.workflows ?? [], at: AT })
   const live = fixtureLive(fixture)
   const progress = bandProgressWith(board, live, counts)
   const view = progress && bandViewOf(200, board, progress, false, counts, NO_ACT, live, fixture.trees ?? [])
@@ -277,7 +283,8 @@ for (const fixture of FIXTURES) test(`the band count reads finished/units, and n
 
 test('the band reads finished/units: one own subagent running reads 0/1, one subagent and one workflow running read 0/2', () => {
   const texts = (agents: AgentRecord[]) => {
-    const view = bandViewOf(100, null, bandProgressWith(null, liveOf([], []), { agents, workflows: [], at: 0 }) ?? { segments: [], total: 0 }, false, { agents, workflows: [], at: 0 }, NO_ACT, liveOf([], []))
+    const counts = inRun({ agents, workflows: [], at: 0 })
+    const view = bandViewOf(100, null, bandProgressWith(null, liveOf([], []), counts) ?? { segments: [], total: 0 }, false, counts, NO_ACT, liveOf([], []))
     return countsText(view.parts)
   }
   expect(texts([own('s1')])).toBe('0/1')
@@ -300,7 +307,7 @@ test('units count the master’s own subagents and runs, each worker’s subagen
 })
 
 test('fill tone: red when anyone needs you, else green while anything runs, else grey; green and full when all done', () => {
-  const view = (sessions: BoardSession[], crew: AgentCounts = IDLE) => viewOf(sessions, crew).view
+  const view = (sessions: BoardSession[], crew: Counts = IDLE) => viewOf(sessions, crew).view
   const waiting = WORKING.map(one => ({ ...one, state: 'waiting' as const }))
   expect([view(NEEDS).tone, view(WORKING).tone, view(waiting).tone, view(DONE).tone]).toEqual(['red', 'green', 'grey', 'green'])
   expect(view(NEEDS, { agents: [agentOf('s1', 'running')], workflows: [], at: 0 }).tone).toBe('red')
@@ -542,7 +549,7 @@ test('without a Client: one native Button per face, each press runs its action',
   const current = boardOf(NEEDS)
   on('ui.render', { component: 'Pane', requestId: PROBE }, ($, event) => {
     const live = liveOf()
-    const progress = bandProgress(current, live, 0)
+    const progress = progressOf(current, live)
     if (!progress) throw new Error('no band')
     const table = $.ui.resolve(event)
     const { Box, Button, Text } = table
@@ -691,8 +698,8 @@ test('with no worker sessions, running subagents still show the band: 0%, the su
   const crew = crewOf($, on)
   await band($, on, [], false, [])
   expect(bandProgressWith(boardOf([]), liveOf([], []), IDLE)).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'done')], workflows: [], at: 0 })).toBeUndefined()
-  expect(bandProgressWith(boardOf([]), liveOf([], []), { agents: [agentOf('a', 'running')], workflows: [], at: 0 })?.total).toBe(0)
+  expect(bandProgressWith(boardOf([]), liveOf([], []), inRun({ agents: [agentOf('a', 'done')], workflows: [], at: 0 }))).toBeUndefined()
+  expect(bandProgressWith(boardOf([]), liveOf([], []), inRun({ agents: [agentOf('a', 'running')], workflows: [], at: 0 }))?.total).toBe(0)
   expect(bandProgressWith(boardOf(WORKING), liveOf([], WORKING), IDLE)?.total).toBe(4)
   await crew.subagent('docs')
   await crew.subagent('review')
@@ -826,7 +833,7 @@ test('archived sessions are out of the work set: 21 archived and 1 working sessi
   const archived: BoardSession[] = Array.from({ length: 21 }, (_, index) => ({ id: `local_old${index}`, name: `old${index}`, state: 'done', progress: 'step 5 of 5 — x' }))
   const live = liveOf(archived.map(one => one.id), [...archived, { id: 'local_x', name: 'x', state: 'working' }])
   const board = boardOf([...archived, { id: 'local_x', name: 'x', state: 'working', progress: 'step 1 of 2 — x' }])
-  const units = bandUnitsOf(bandProgress(board, live, 0)?.segments ?? [], board, IDLE, live)
+  const units = bandUnitsOf(progressOf(board, live)?.segments ?? [], board, IDLE, live)
   expect([units.length, percentOf(units)]).toEqual([1, 50])
 })
 
@@ -853,7 +860,7 @@ const FIVE: BoardSession[] = [
 
 const fiveUnits = (sessions: BoardSession[], idle: string[] = ['local_i']) => {
   const live = liveOf([], sessions, idle)
-  return bandUnitsOf(bandProgress(boardOf(sessions), live, 0)?.segments ?? [], boardOf(sessions), IDLE, live)
+  return bandUnitsOf(progressOf(boardOf(sessions), live)?.segments ?? [], boardOf(sessions), IDLE, live)
 }
 
 test('unit state follows the pane: a working session that is not live is idle and waits, a ready session (done with a sha) is not finished; five sessions have none finished', () => {
@@ -920,7 +927,7 @@ test('Open chat hides when the prompt is already in this chat or a subagent asks
 test('Open chat shows only for a worker this session started, the one open_session_in accepts', () => {
   const foreign: Live = { ...liveOf(), sessions: liveOf().sessions.map(one => ({ ...one, startedBy: 'someone-else' })) }
   expect(askingChatOf(boardOf(NEEDS), foreign, IDLE, [])).toBeUndefined()
-  const units = bandUnitsOf(bandProgress(boardOf(NEEDS), foreign, 0)?.segments ?? [], boardOf(NEEDS), IDLE, foreign)
+  const units = bandUnitsOf(progressOf(boardOf(NEEDS), foreign)?.segments ?? [], boardOf(NEEDS), IDLE, foreign)
   expect(units.some(one => one.asker?.chat)).toBe(false)
 })
 
@@ -981,7 +988,7 @@ test('without a Client the narrow Board button is still named Open board', async
   const current = boardOf(WORKING)
   on('ui.render', { component: 'Pane', requestId: PROBE }, ($, event) => {
     const live = liveOf([], WORKING)
-    const progress = bandProgress(current, live, 0)
+    const progress = progressOf(current, live)
     if (!progress) throw new Error('no band')
     const table = $.ui.resolve(event)
     const { Box, Button, Text } = table
@@ -1086,9 +1093,9 @@ const planView = (px: number, options: { isPaneOpen?: boolean; minutes?: number;
   const sessions = options.sessions ?? WORKING
   const current: Board = { ...boardOf(sessions), plan: options.plan ?? SEVEN, since: 0 }
   const live = liveOf([], sessions)
-  const progress = bandProgressWith(current, live, { ...(options.crew ?? RUNNING), at: 0 })
+  const progress = bandProgressWith(current, live, inRun({ ...(options.crew ?? RUNNING), at: 0 }))
   if (!progress) throw new Error('no band')
-  const crew = { ...(options.crew ?? RUNNING), at: (options.minutes ?? 48) * MIN }
+  const crew = inRun({ ...(options.crew ?? RUNNING), at: (options.minutes ?? 48) * MIN })
   return bandViewOf(columnsFor(px), current, progress, !!options.isPaneOpen, crew, NO_ACT, live)
 }
 
@@ -1193,4 +1200,28 @@ test('AC60 the terminal below 340 px draws the bar and the board glyph, and with
   expect(await textsOf(asking)).toEqual([expect.stringMatching(/^● Session needs you/), expect.stringMatching(/^[█░]+$/)])
   expect(await buttonsOf(asking)).toEqual([])
   await asking.unmount()
+})
+
+test('askToolOf names a tool only for "Allow <tool>" or "Allow <tool>: detail"; any other Allow text names none, so no path or args show', () => {
+  for (const reason of ['Allow Read(~/secret)', 'Allow Bash(git push)', 'Allow  Bash', 'Allow\tBash', 'Allow the push to master?']) expect(askToolOf(reason)).toBeUndefined()
+  expect([askToolOf('Allow Bash'), askToolOf('Allow mcp__x__y: detail'), askToolOf('commit blocked'), askToolOf(undefined)]).toEqual(['Allow Bash', 'Allow mcp__x__y', 'commit blocked', undefined])
+  const asking = WORKING.map(one => (one.id === 'local_b' ? { ...one, state: 'needs-you' as const, needsYou: 'Allow Read(~/secret)' } : one))
+  expect(viewOf(asking, IDLE).view.summary).not.toContain('secret')
+})
+
+test('one band build runs rowsInRun once: the progress, the view and the asking chat share the run set', () => {
+  let reads = 0
+  const worker = { id: 'local_w', name: 'w', title: 'w', cwd: '/', isRunning: true, isArchived: false, lastActivityAt: 0, startedBy: SELF, get createdAt() { reads += 1; return 1 } }
+  const base = liveOf([], WORKING)
+  const live: Live = { ...base, sessions: [...base.sessions, worker] }
+  const current = boardOf(WORKING)
+  const set = bandSetOf(current, IDLE, live, [], true)
+  expect(reads).toBe(1)
+  const progress = bandProgressWith(current, live, IDLE, set)
+  if (!progress) throw new Error('no band')
+  bandViewOf(100, current, progress, false, IDLE, NO_ACT, live, [], set)
+  expect(reads).toBe(1)
+  reads = 0
+  askingChatOf(current, live, IDLE, [])
+  expect(reads).toBe(1)
 })

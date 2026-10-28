@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import type { AgentRecord, Board, BoardSession, Live, PlanPiece, PlanState } from '../../types'
 
-import { bandProgressWith, bandViewOf, countsText } from './band'
+import { bandProgressWith, bandViewOf, countsText, inRunOf } from './band'
 import type { AgentCounts } from './band'
 import { boardFromChat, boardFromJson, mergePlan, planNoteOf, planOf } from './board'
 import { BOARD_SCHEMA, PLAN_LIMIT } from './constants'
@@ -50,7 +50,7 @@ const viewOf = (plan: PlanPiece[] | undefined, options: Options = {}) => {
   const sessions = options.sessions ?? []
   const board: Board = { sessions, needsYou: [], repos: [], source: 'tool', ...(plan ? { plan } : {}) }
   const live = liveOf(sessions, options.archived, options.running)
-  const counts: AgentCounts = { agents: options.agents ?? [], workflows: [], at: options.at ?? AT }
+  const counts = inRunOf(board, { agents: options.agents ?? [], workflows: [], at: options.at ?? AT })
   const progress = bandProgressWith(board, live, counts)
   if (!progress) throw new Error('no band')
   return bandViewOf(options.columns ?? 100, board, progress, false, counts, { board: () => undefined, chat: () => undefined }, live)

@@ -12,7 +12,8 @@ import { compactOf } from './format'
 import { CH, fit, textWidth, widthOf } from './layout'
 import { CHAT_LABEL, agentIdsOf, isGhostRun, nameText, personaOfType, sessionNameOf } from './list'
 import type { ListItem } from './list'
-import { agentsInRun, rowsInRun, runSetOf } from './totals'
+import type { Row } from './rows'
+import { agentsInRun, runSetOf } from './totals'
 
 const DIGIT = 0.64
 export const HIT = 'band-hit-'
@@ -38,6 +39,10 @@ type BandActions = { board: () => void; chat: (id: string, name: string) => void
 
 export type AgentCounts = { agents: readonly AgentRecord[]; workflows: readonly WorkflowRecord[]; at: number; cleared?: number }
 
+declare const windowed: unique symbol
+
+export type InRunCounts = AgentCounts & { readonly [windowed]: true }
+
 type Asker = { name: string; short: string; glyph: IconName; parent?: string; reason?: string; since?: number; chat?: { id: string; name: string } }
 
 type Unit = { value: number; isRunning: boolean; isFinished: boolean; asker?: Asker }
@@ -51,7 +56,10 @@ export const bandAction = (element: string) => {
 
 export const agentCountsOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], at: number, cleared?: number): AgentCounts => ({ agents, workflows, at, cleared })
 
-export const inRunOf = (current: Board | null, counts: AgentCounts): AgentCounts => ({ ...counts, ...agentsInRun(current, counts.agents, counts.workflows, counts.at) })
+export function inRunOf(current: Board | null, counts: AgentCounts) {
+  const windowedCounts: AgentCounts = { ...counts, ...agentsInRun(current, counts.agents, counts.workflows, counts.at) }
+  return windowedCounts as InRunCounts
+}
 
 const clamp = (value: number) => Math.min(1, Math.max(0, value))
 
@@ -113,7 +121,7 @@ const remoteOf = ({ agents, workflows, at }: AgentCounts, id: string, place: Pla
   return { subs: subagentUnits(mine.filter(one => !one.run), place), runs }
 }
 
-export function bandUnitsOf(segments: Progress['segments'], current: Board | null, counts: AgentCounts, live: Live, trees: readonly Repo[] = [], items: readonly ListItem[] = bandSetOf(current, counts, live, trees, true).withSelf): Unit[] {
+export function bandUnitsOf(segments: Progress['segments'], current: Board | null, counts: InRunCounts, live: Live, trees: readonly Repo[] = [], items: readonly ListItem[] = bandSetOf(current, counts, live, trees, true).withSelf): Unit[] {
   const { agents } = counts
   const own = agents.filter(one => !one.parentSessionId)
   const units: Unit[] = subagentUnits(
@@ -155,8 +163,9 @@ export function bandUnitsOf(segments: Progress['segments'], current: Board | nul
 const firstAskerOf = (units: readonly Unit[]) => units.reduce<Asker | undefined>((first, one) => (one.asker && (!first || (one.asker.since ?? Infinity) < (first.since ?? Infinity)) ? one.asker : first), undefined)
 
 export const askToolOf = (reason: string | undefined) => {
-  const found = /^Allow ([^:\s]+)/.exec(reason ?? '')
-  return found ? `Allow ${found[1]}` : reason
+  const found = /^Allow ([A-Za-z0-9_.-]+)(?::|$)/.exec(reason ?? '')
+  if (found) return `Allow ${found[1]}`
+  return reason?.startsWith('Allow') ? undefined : reason
 }
 
 const headOf = (asker: Asker) => (asker.parent ? `${asker.name}, in ${asker.parent},${NEEDS}` : `${asker.name}${NEEDS}`)
@@ -203,24 +212,25 @@ export const countsText = (parts: readonly CountPart[]) => parts.map(one => one.
 
 export const countsWidthOf = (parts: readonly CountPart[]) => parts.reduce((sum, one) => sum + (one.isNumber ? DIGIT * 13 * one.text.length : textWidth(one.text, 13, { isBold: true })), 0)
 
-export function bandProgress(current: Board | null, live: Live, at: number) {
-  const sessions = rowsInRun(current, live, at)
+export function bandProgress(rows: readonly Row[], current: Board | null, live: Live) {
+  const sessions = rows
     .filter(row => current || row.live?.startedBy === live.self)
     .map(row => ({ ...row.board, id: row.id, name: row.name, state: row.state }))
   const progress = progressOf({ sessions, needsYou: [], repos: [], source: 'tool' }, live)
   return progress.total ? progress : undefined
 }
 
-export function askingChatOf(current: Board | null, live: Live, agents: AgentCounts, trees: readonly Repo[]) {
-  const chat = firstAskerOf(bandUnitsOf(bandProgress(current, live, agents.at)?.segments ?? [], current, agents, live, trees))?.chat
+export function askingChatOf(current: Board | null, live: Live, agents: InRunCounts, trees: readonly Repo[]) {
+  const set = bandSetOf(current, agents, live, trees, true)
+  const chat = firstAskerOf(bandUnitsOf(bandProgress(set.rows, current, live)?.segments ?? [], current, agents, live, trees, set.withSelf))?.chat
   return chat && chat.id !== live.self ? chat : undefined
 }
 
 const IDLE_PROGRESS: Progress = { segments: [], total: 0 }
 
-export function bandProgressWith(current: Board | null, live: Live, counts: AgentCounts) {
+export function bandProgressWith(current: Board | null, live: Live, counts: InRunCounts, set = bandSetOf(current, counts, live, [], true)) {
   const { agents } = counts
-  const progress = bandProgress(current, live, counts.at)
+  const progress = bandProgress(set.rows, current, live)
   if (progress) return progress
   const isBusy = agents.some(one => one.state === 'running') || liveRunsOf(counts).some(run => run.state === 'running')
   return isBusy || piecesOf(current) ? IDLE_PROGRESS : undefined
@@ -228,11 +238,10 @@ export function bandProgressWith(current: Board | null, live: Live, counts: Agen
 
 export const bandSignatureOf = (view: BandView) => [view.summary, view.tone, view.isRunning, view.pillText, view.hasElapsed ? view.elapsed : '', view.action?.accessibleName ?? '', view.action?.label ?? ''].join('|')
 
-export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live: Live, trees: readonly Repo[] = []) {
+export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: InRunCounts, act: BandActions, live: Live, trees: readonly Repo[] = [], set = bandSetOf(current, agents, live, trees, true)) {
   const width = columns * CH - 16
   const isNarrow = width < NARROW_BELOW
   const isTiny = width < PERCENT_BELOW
-  const set = bandSetOf(current, agents, live, trees, true)
   const units = bandUnitsOf(progress.segments, current, agents, live, trees, set.withSelf)
   const asker = firstAskerOf(units)
   const pieces = piecesOf(current)
