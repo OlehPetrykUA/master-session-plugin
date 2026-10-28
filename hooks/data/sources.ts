@@ -10,13 +10,13 @@ import { ARCHIVE_LIMIT, BOARD_TOOL, GIT_CAP, LIVE_LIMIT, PANE, REPOS_CLOSED_MS, 
 import { messageOf } from '../lib/format'
 import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
-import { runStartOf } from '../lib/totals'
+import { agentsInRun, runSetOf } from '../lib/totals'
 import { familyOf, rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
 import { getAgents, getBoard, getCleared, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setCleared, setClearing, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
 import { BOARD_MAX_AGE_MS, askSummary, askTargets, isArchivable, liveReportsOf, merge } from './contract'
 import { claim, detected, inPlan, isActive, isOff, roleOf, sessionFacts, unstop } from './recorder'
-import { askForUpdates, readReports, writeBoard } from './status'
+import { askForUpdates, readBoard, readReports, writeBoard } from './status'
 
 let home = ''
 let published = ''
@@ -68,6 +68,13 @@ export async function whoAmI($: EngineInterface) {
 }
 
 async function refreshTranscript($: EngineInterface) {
+  const master = (await getLive($)).self || roleOf().self
+  const saved = master ? await readBoard($, home, master, await $.clock.now()) : undefined
+  if (saved) {
+    claim($)
+    await saveBoard($, () => ({ ...saved.board, at: saved.at }))
+    return
+  }
   const messages = await $.session.messages()
   for (const message of [...messages].reverse()) {
     if (message.role !== 'assistant') continue
@@ -297,8 +304,7 @@ async function refreshRepos($: EngineInterface, sessions?: readonly LiveSession[
   const prior = await getRepos($)
   const { board: current } = await boardOf($)
   const live = await getLive($)
-  const rows = rowsOf(current, live)
-  const start = runStartOf(rows, await getAgents($), current, await $.clock.now())
+  const { rows, since: start } = runSetOf({ board: current, live, agents: await getAgents($), workflows: await getWorkflows($), cleared: await getCleared($), at: await $.clock.now() })
   const paths = [
     ...rows.flatMap(row => [row.board?.cwd ?? '', row.live?.cwd ?? ''].filter(Boolean)),
     ...rows.flatMap(row => sideOf(row, sessions ?? familyOf(live), [])).map(one => one.cwd),
@@ -411,7 +417,7 @@ export async function openSession($: EngineInterface, id: string, name: string) 
 
 export async function openAsking($: EngineInterface) {
   const { board: current } = await boardOf($)
-  const agents = agentCountsOf(await getAgents($), await getWorkflows($), await $.clock.now())
+  const agents = agentCountsOf(await getAgents($), await getWorkflows($), await $.clock.now(), await getCleared($))
   const chat = askingChatOf(current, await getLive($), agents, await getRepos($))
   if (chat) await openSession($, chat.id, chat.name)
 }
@@ -457,7 +463,8 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
     return
   }
   const clean = all ? allowed.filter(row => !lossesOf(row, trees, sessions).length) : allowed.slice(0, 1)
-  const items = itemsOf(fresh, await getAgents($), await getWorkflows($), { trees, sessions })
+  const inRun = agentsInRun((await boardOf($)).board, await getAgents($), await getWorkflows($))
+  const items = itemsOf(fresh, inRun.agents, inRun.workflows, { trees, sessions, cleared: await getCleared($) })
   const archived: Row[] = []
   for (const row of clean) {
     try {
@@ -487,7 +494,8 @@ export async function clearDone($: EngineInterface, rows: readonly Row[], skippe
   try {
     const at = await $.clock.now()
     const before = await getCleared($)
-    const finished = itemsOf([], await getAgents($), await getWorkflows($), { at, cleared: before }).filter(item => item.group === 'done')
+    const set = runSetOf({ board: (await boardOf($)).board, live: await getLive($), agents: await getAgents($), workflows: await getWorkflows($), cleared: before, at })
+    const finished = set.items.filter(item => item.kind !== 'session' && item.group === 'done')
     const hid = { agents: finished.filter(item => item.kind === 'subagent').length, runs: finished.filter(item => item.kind === 'workflow').length, before }
     if (rows.length) await archive($, rows, { group: 'done', skipped })
     const total = hid.agents + hid.runs
