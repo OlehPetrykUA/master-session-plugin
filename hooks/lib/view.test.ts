@@ -10,12 +10,16 @@ import { runSetOf, runSummaryOf } from './totals'
 
 const ACTIONS = { pause: () => undefined }
 
-const dataOf = (rows: number) => ({ rows: Array.from({ length: rows }, () => ({})), asked: null, columns: 60, isRefreshing: false, pause: IDLE_PAUSE, actions: ACTIONS }) as unknown as PaneData
+const dataOf = (rows: number, board: unknown = {}) => ({ board, rows: Array.from({ length: rows }, () => ({})), asked: null, columns: 60, isRefreshing: false, pause: IDLE_PAUSE, actions: ACTIONS }) as unknown as PaneData
 
 test('Ask for updates shows only when worker sessions exist: subagents report on their own', () => {
   const ids = (rows: number) => headerButtonsOf(dataOf(rows), () => undefined, () => undefined).map(one => one.id)
   expect(ids(0)).toEqual(['pause', 'refresh'])
   expect(ids(2)).toEqual(['pause', 'ask', 'refresh'])
+})
+
+test('Pause is drawn only with a board', () => {
+  expect(headerButtonsOf(dataOf(2, null), () => undefined, () => undefined).map(one => one.id)).toEqual(['ask', 'refresh'])
 })
 
 const headerOf = (extra: Record<string, unknown>) => statusOf({ at: 100_000, live: { at: 1_000 }, agents: [], workflows: [], archived: [], asked: null, isRefreshing: false, pause: IDLE_PAUSE, ...extra } as unknown as PaneData, false).text

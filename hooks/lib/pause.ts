@@ -45,7 +45,7 @@ const namesOf = (names: readonly string[]) => (names.length ? names.join(', ') :
 
 export function pausePromptOf(input: { at: number; stopped: readonly Target[]; failed: readonly Failure[] }) {
   const failed = input.failed.length ? input.failed.map(one => `${one.target.name} (${oneLine(one.reason)})`).join(', ') : 'none'
-  return `${PAUSE_HEAD} at ${clockOf(input.at)}. Stopped: ${namesOf(input.stopped.map(one => one.name))}. Failed: ${failed}; stop any that failed yourself. Now record each piece's pending step and its worktree's \`git status --short\` in the ledger, stop the heartbeat (ScheduleWakeup with stop: true, or delete the /loop job), post one board, then end the turn. Start, message or resume nothing.`
+  return `${PAUSE_HEAD} at ${clockOf(input.at)}. Stopped: ${namesOf(input.stopped.map(one => one.name))}. Failed: ${failed}; stop any that failed yourself. Now record each piece's pending step and its worktree's \`git status --short\` in the ledger, stop the heartbeat (ScheduleWakeup with stop: true, or delete the /loop job), stop your own background jobs and Monitors (TaskStop) and list them in the ledger, post one board, then end the turn. Start, message or resume nothing.`
 }
 
 export const resumePromptOf = () =>

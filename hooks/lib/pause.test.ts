@@ -2,6 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { AgentInfo } from 'claude-code'
 
 import type { Pause } from '../../types'
+import { I } from '../theme/icons'
 import { clockOf } from './list'
 import type { ListItem } from './list'
 import { HOLD, IDLE_PAUSE, PAUSE_HEAD, RESUME_HEAD, isHeld, pauseButtonOf, pausePromptOf, pauseStatusOf, resumePromptOf, targetsOf, waitingOf } from './pause'
@@ -45,6 +46,11 @@ test('the prompt names stopped pieces and failures on one line each, cut to 120 
   expect(text).toContain(`Failed: beta (line one ${'x'.repeat(111)});`)
   expect(text).not.toContain('\n')
   expect(pausePromptOf({ at, stopped: [], failed: [] })).toContain('Stopped: nothing. Failed: none;')
+  expect(text).toContain('stop your own background jobs and Monitors')
+})
+
+test('the pause glyph is the canvas two outlined bars', () => {
+  expect(I.pause).toBe('M7 5h3.5v14H7Z M13.5 5H17v14h-3.5Z')
 })
 
 test('the resume prompt opens with its head and names the resume steps', () => {

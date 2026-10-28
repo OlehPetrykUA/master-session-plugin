@@ -20,7 +20,7 @@ const PROBE = {
 
 const WITH = { plugins: [PROBE] }
 
-const RESTART ={ cwd: HOME, surface: 'desktop', isInteractive: true } as const
+const RESTART = { cwd: HOME, surface: 'desktop', isInteractive: true } as const
 
 const W3 = { sessionId: 'local_w3', name: 'third', title: 'Third worker', cwd: WORKTREE, isRunning: true, isArchived: false, lastActivityAt: AT, startedBy: SELF }
 
@@ -34,7 +34,7 @@ const BOARD3 = { ...BOARD, needsYou: [], plan: PLAN, sessions: [BOARD.sessions[0
 
 const sub = (id: string, status: AgentInfo['status'] = 'running'): AgentInfo => ({ id, description: `task ${id}`, type: 'general-purpose', status })
 
-type Cfg = { listed: AgentInfo[]; decision: 'allow' | 'ask' | 'deny'; failTask: Set<string>; failStop: Set<string>; failSend: Set<string>; submit: 'ok' | 'drop' | 'reject' }
+type Cfg = { listed: AgentInfo[]; afterAbort?: AgentInfo[]; decision: 'allow' | 'ask' | 'deny'; failTask: Set<string>; failStop: Set<string>; failSend: Set<string>; submit: 'ok' | 'drop' | 'reject' }
 
 const COUNTED = new Set(['clock.every', 'clock.after', 'clock.sleep'])
 
@@ -90,6 +90,7 @@ async function setup($: Engine, on: On, init: Partial<Cfg> = {}, child: Child = 
   on('turn.complete', (_, e) => ({ text: e.answer }))
   on('turn.abort', (_, e) => {
     log.push(`abort ${e.turnId}`)
+    if (cfg.afterAbort) cfg.listed = cfg.afterAbort
     return { value: undefined }
   })
   on('prompt.submit', (_, e) => {
@@ -209,7 +210,7 @@ test('AC5 one prompt names every stopped piece, the ledger, git status and the h
   expect(run.prompts).toHaveLength(1)
   const text = run.prompts[0] ?? ''
   expect(text.startsWith(PAUSE_HEAD)).toBe(true)
-  for (const word of ['task a1', 'review-changes', 'env-e2e-test', 'third', 'task a2 (no such task)', 'ledger', 'git status --short', 'ScheduleWakeup with stop: true']) expect(text).toContain(word)
+  for (const word of ['task a1', 'review-changes', 'env-e2e-test', 'third', 'task a2 (no such task)', 'ledger', 'git status --short', 'ScheduleWakeup with stop: true', 'background jobs and Monitors']) expect(text).toContain(word)
 })
 
 test('AC6 the status reads Pausing before the pause turn completes, then Paused in amber with Resume', WITH, async ($, on) => {
@@ -396,14 +397,78 @@ test('AC15 after a reload any main-loop turn.complete settles pausing', WITH, as
   expect(await run.status()).toMatch(/^Paused at/)
 })
 
-test('a typed prompt during pausing is not the settle turn', WITH, async ($, on) => {
+test('the aborted turn does not settle the pause; the next main-loop turn does', WITH, async ($, on) => {
   const run = await full($, on)
   await run.press()
-  await run.turn('typed1', 'what is going on?')
+  await run.turn('m1', 'working on it', true)
   expect(await run.status()).toMatch(/^Pausing/)
-  await run.turn('subagent-turn', 'inner')
-  await run.settle()
+  await run.turn('typed1', 'what is going on?')
   expect(await run.status()).toMatch(/^Paused at/)
+})
+
+test('the pause turn settles even when its text does not start with the head', WITH, async ($, on) => {
+  const run = await full($, on)
+  await run.press()
+  await run.turn('framed1', `The plugin sent a message: ${run.prompts.at(-1) ?? ''}`)
+  expect(await run.status()).toMatch(/^Paused at/)
+  await run.press()
+  await run.turn('framed2', 'something else')
+  expect(await run.status()).toBe('')
+})
+
+test('a subagent that the abort already stopped gets no TaskStop and no failure', WITH, async ($, on) => {
+  const run = await full($, on, { listed: [sub('a1'), sub('a2')], afterAbort: [sub('a1', 'killed'), sub('a2')], failTask: new Set(['a1']) })
+  await run.press()
+  await run.settle()
+  expect(run.log).not.toContain('TaskStop a1')
+  expect(run.log).toContain('TaskStop a2')
+  expect(run.toasts).toEqual([])
+  expect(run.prompts[0]).toContain('Failed: none')
+  expect(await run.status()).toMatch(/^Paused at \d\d:\d\d · 2 pieces waiting$/)
+})
+
+test('a plain pane with a foreign running session draws no Pause and touches nothing', WITH, async ($, on) => {
+  const log: string[] = []
+  on('agent.list', () => ({ value: [] }))
+  on('tool.check', () => ({ decision: 'allow' as const }))
+  on('turn.abort', () => ({ value: undefined }))
+  on('prompt.submit', (_, e) => {
+    log.push('prompt')
+    return { text: e.text }
+  })
+  const run = world(on, { isBare: true, sessions: [{ sessionId: 'local_foreign', name: 'unrelated', title: 'Someone else chat', cwd: '/elsewhere', isRunning: true, isArchived: false, lastActivityAt: AT }] })
+  await $.session.start(RESTART)
+  await run.clock.settle()
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(ui, 'hit-refresh')
+  await run.clock.settle()
+  expect(await hitsOf(ui)).not.toContain('hit-pause')
+  await ui.unmount()
+  expect(run.calls.filter(one => one.tool === 'stop_session' || one.tool === 'send_message')).toEqual([])
+  expect(log).toEqual([])
+})
+
+test('a board master never stops a foreign running session', WITH, async ($, on) => {
+  const foreign = { sessionId: 'local_foreign', name: 'unrelated', title: 'Someone else chat', cwd: '/elsewhere', isRunning: true, isArchived: false, lastActivityAt: AT }
+  const run = await setup($, on, {}, { sessions: [W3, foreign] })
+  await run.press()
+  expect(run.log).toContain('stop_session local_w3')
+  expect(run.log.some(entry => entry.includes('local_foreign'))).toBe(false)
+})
+
+test('reading the pause atom fails while paused: spawn and start_session stay denied', WITH, async ($, on) => {
+  let isBroken = false
+  on('state.get', async (_, e, next) => {
+    if (isBroken && e.key === 'pause') throw new Error('state down')
+    return next(e)
+  })
+  const run = await full($, on)
+  await run.press()
+  await run.settle()
+  isBroken = true
+  expect((await $.agent.spawn({ ...SPAWN, description: 'x', subagentType: 'general-purpose' })).deny).toBe(HOLD)
+  expect(JSON.stringify(await $.tool.call({ tool: 'mcp__ccd_session__start_session', prompt: 'go' }))).toContain('press Resume')
+  isBroken = false
 })
 
 test('a subagent turn ending never settles the pause', WITH, async ($, on) => {
@@ -437,6 +502,7 @@ test('nothing running: only the prompt is sent and the state reaches paused', WI
 test('no secrets reach the prompt or a toast', WITH, async ($, on) => {
   const run = await full($, on, { failTask: new Set(['a1']) })
   await $.agent.spawn({ ...SPAWN, description: 'secret holder', prompt: 'xyz-secret in the prompt', subagentType: 'general-purpose' })
+  await $.tool.call({ tool: 'Bash', command: 'API_KEY=xyz-secret sleep 60', run_in_background: true }).catch(() => undefined)
   await run.press()
   expect(JSON.stringify([run.prompts, run.toasts])).not.toContain('xyz-secret')
 })

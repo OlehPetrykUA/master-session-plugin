@@ -43,7 +43,7 @@ export const I = {
   usage: 'M5 20v-8 M10 20V6 M15 20v-9 M20 20v-4',
   offline: 'M3 3l18 18 M8.6 8.6A8 8 0 0 0 5 11 M12.5 5a12 12 0 0 1 7.5 3 M8.5 14.5a5 5 0 0 1 6.2-.5 M12 18.5h.01',
   stop: 'M7 7h10v10H7Z',
-  pause: 'M8.5 5v14 M15.5 5v14',
+  pause: 'M7 5h3.5v14H7Z M13.5 5H17v14h-3.5Z',
   undo: 'M9 14L4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-3',
   opus: 'M7 4h10l4 5-9 11L3 9Z M3 9h18 M9.5 9L12 20l2.5-11',
   sonnet: 'M19 5C11 5 6 10 5 19 M5 19c8-1 13-6 14-14 M9 15h5 M12 11h4',

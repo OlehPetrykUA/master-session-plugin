@@ -95,7 +95,8 @@ export function headerButtonsOf(data: PaneData, onAsk: () => void, onRefresh: ()
     : data.asked
       ? [{ id: 'ask', icon: 'check', label: 'Asked', onPress: onAsk, isQuiet: true }]
       : [{ id: 'ask', icon: 'chat', label: data.columns * CH >= ASK_WIDE_PX ? ASK_WIDE : 'Ask', onPress: onAsk }]
-  return [pauseButtonOf(data.pause, data.actions.pause), ...ask, { id: 'refresh', icon: 'refresh', label: 'Refresh', onPress: onRefresh, isPressed: data.isRefreshing }]
+  const pause: HeaderButton[] = data.board ? [pauseButtonOf(data.pause, data.actions.pause)] : []
+  return [...pause, ...ask, { id: 'refresh', icon: 'refresh', label: 'Refresh', onPress: onRefresh, isPressed: data.isRefreshing }]
 }
 
 function sectionInputOf(data: PaneData, view: PaneView): SectionInput {

@@ -30,7 +30,7 @@ const isProcessesOpen = atom({ plugin: 'master-session', key: 'isProcessesOpen' 
 
 const pause = atom({ plugin: 'master-session', key: 'pause' } as const, IDLE_PAUSE)
 
-const isSame =(one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other)
+const isSame = (one: unknown, other: unknown) => JSON.stringify(one) === JSON.stringify(other)
 
 export function getBoard($: EngineInterface) {
   return read($, board)

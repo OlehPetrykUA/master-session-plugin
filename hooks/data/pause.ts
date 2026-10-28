@@ -6,7 +6,7 @@ import type { Failure, Target } from '../lib/pause'
 import { runSetOf } from '../lib/totals'
 import { getAgents, getCleared, getLive, getPause, getReports, getRepos, getWorkflows, savePause } from '../state/atoms'
 import { askTargets } from './contract'
-import { boardOf, call } from './sources'
+import { boardOf, call, isMaster } from './sources'
 import { sendText } from './status'
 
 const START = /^mcp__ccd_session__start_session$/
@@ -15,6 +15,8 @@ let running = ''
 let settle = ''
 let isPressing = false
 let isAwaiting = false
+let isSent = false
+let aborted = ''
 let held = false
 let isBusy = false
 
@@ -56,14 +58,17 @@ async function targetsFor($: EngineInterface) {
   const { board } = await boardOf($)
   const live = await getLive($)
   const set = runSetOf({ board, live, agents: await getAgents($), workflows: await getWorkflows($), cleared: await getCleared($), at: await $.clock.now(), trees: await getRepos($) })
+  const onBoard = new Set(board?.sessions.map(one => one.id))
+  const items = set.items.filter(item => item.kind !== 'session' || onBoard.has(item.id) || item.row.live?.startedBy === live.self)
   const engines = Object.fromEntries(askTargets(await getReports($), live, set.rows.map(row => row.id)).map(one => [one.id, one.engineId]))
-  return targetsOf({ listed: await $.agent.list(), items: set.items, engines })
+  return targetsOf({ listed: await $.agent.list(), items, engines })
 }
 
 async function submit($: EngineInterface, text: string) {
   isAwaiting = true
   try {
     const out = await $.prompt.submit({ text })
+    isSent = true
     return out.drop === undefined ? undefined : oneLine(out.drop) || 'dropped'
   } catch (error) {
     return oneLine(messageOf(error))
@@ -73,12 +78,15 @@ async function submit($: EngineInterface, text: string) {
 function finish($: EngineInterface) {
   isPressing = false
   isAwaiting = false
+  isSent = false
   settle = ''
   $.ui.invalidate('ui.render')
 }
 
 function begin() {
   isPressing = true
+  isSent = false
+  aborted = ''
   settle = ''
 }
 
@@ -89,8 +97,10 @@ async function startPause($: EngineInterface) {
   await savePause($, () => ({ state: 'pausing', at, agents: targets.filter(one => one.kind !== 'session').length, sessions: targets.filter(one => one.kind === 'session').length, failed: [], isLedgerMissing: false }))
   held = true
   $.ui.invalidate('ui.render')
+  aborted = running
   if (running) await $.turn.abort({ turnId: running }).catch(() => undefined)
-  const outcomes = await Promise.all(targets.map(target => stopTarget($, target)))
+  const alive = new Set((await $.agent.list()).flatMap(one => (one.status === 'running' ? [one.id] : [])))
+  const outcomes = await Promise.all(targets.map((target): Promise<Outcome> | Outcome => (target.kind === 'agent' && !alive.has(target.id) ? { target, isStopped: true } : stopTarget($, target))))
   const failed: Failure[] = outcomes.flatMap(one => (one.reason ? [{ target: one.target, reason: one.reason }] : []))
   const stopped = outcomes.filter(one => one.isStopped && !one.reason).map(one => one.target)
   await savePause($, pause => ({ ...pause, failed: outcomes.filter(one => !one.isStopped).map(one => one.target.name) }))
@@ -118,6 +128,7 @@ export async function pressPause($: EngineInterface) {
   if (isBusy) return
   isBusy = true
   try {
+    if (!(await isMaster($))) return
     const { state } = await getPause($)
     if (state === 'running') await startPause($)
     else if (state === 'paused') await startResume($)
@@ -139,7 +150,7 @@ export async function clearPause($: EngineInterface) {
 async function settled($: EngineInterface, turnId: string) {
   const { state } = await getPause($)
   if (state !== 'pausing' && state !== 'resuming') return
-  if (isPressing && turnId !== settle) return
+  if (isPressing && turnId !== settle && !(isSent && turnId !== aborted)) return
   const isPause = state === 'pausing'
   await savePause($, pause => (isPause ? { ...pause, state: 'paused' } : IDLE_PAUSE))
   held = isPause
@@ -151,6 +162,8 @@ export function resetPause() {
   settle = ''
   isPressing = false
   isAwaiting = false
+  isSent = false
+  aborted = ''
   held = false
   isBusy = false
 }
