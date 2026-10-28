@@ -26,6 +26,14 @@ test('login shapes stay cued', () => {
   )
 })
 
+test('a bare login at the start cues', () => {
+  check([], ['login -p hunter2', 'LOGIN -p hunter2', 'Login -u me -p hunter2'])
+})
+
+test('a weak word continued in camelCase cues', () => {
+  check([], ['keyPrefix: s3cr3t', 'tokenValue=abc', 'secretName: x1', 'passWord: hunter2', 'credentialsFile = x1', 'authHeader: x1', 'pwHash=x1'])
+})
+
 test('user:password shapes stay cued', () => {
   check([], ['docker run -u 0:0 img && curl -u 1000:1234 x', 'docker pull x && curl -u 4711:12345678 https://api', 'docker pull x $(curl -u 4711:12345678 https://api)', 'curl --user me:pw', 'curl -u admin:hunter2', 'curl -u 1000:hunter2', 'curl --user 1000:1000x', 'curl -uadmin:hunter2', 'curl -u 4711:20240101 https://x', 'curl -u 1000:12345678 https://x', 'curl -u 0:0 https://x'])
 })
