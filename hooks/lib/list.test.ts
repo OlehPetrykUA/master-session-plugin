@@ -251,14 +251,14 @@ test('summary blocks read the run totals as the design words them, zeros and das
   expect(blocks.map(block => [block.label, block.value, block.sub, block.isAlert])).toEqual([
     ['Plan', '—', 'no plan yet', false],
     ['Needs you', '1', '1 waiting', true],
-    ['Agents', '5', '2 working · 2 done', false],
+    ['Agents', '3', '2 working · 1 done', false],
     ['Commits', '0', 'none yet', false],
     ['Tests', '—', 'none reported', false],
     ['Duration', '<1m', expect.stringMatching(/^since \d\d:\d\d$/), false],
     ['Git', '0', 'clean', false],
     ['Tokens', '0', 'agents only', false],
   ])
-  expect(blocks[2]?.bad).toBe('1 failed')
+  expect(blocks[2]?.bad).toBeUndefined()
   expect(blocksOf(totals, true, '20:04')[5]?.sub).toMatch(/^\d\d:\d\d – 20:04$/)
   expect(blocksOf(totals, true, '20:04')[5]?.shorts).toEqual(['until 20:04', '20:04'])
   const asking = [...agents, { id: 'ask1', type: 'master-session:reviewer', description: 'Review the diff', state: 'running' as const, startedAt: NOW, asking: { text: 'Allow Bash: npm test', since: NOW } }, { id: 'ask2', type: 'workflow-subagent', description: 'scan', state: 'running' as const, startedAt: NOW, run: { id: 'wf_x', index: 0 }, asking: { text: 'Allow Read: a', since: NOW } }, { id: 'ask3', type: 'workflow-subagent', description: 'scan 2', state: 'running' as const, startedAt: NOW, run: { id: 'wf_x', index: 1 }, asking: { text: 'Allow Read: b', since: NOW } }]

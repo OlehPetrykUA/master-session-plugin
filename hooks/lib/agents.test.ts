@@ -70,7 +70,7 @@ test('the run summary counts sessions by state, needs you, subagents, workflows,
   expect(runSummaryOf({ rows, sessions: [], agents: AGENTS, workflows: RUNS, board, trees: [], at: NOW })).toEqual({
     plan: { total: 0, done: 0, working: 0, verifying: 0, queued: 0, sessions: 3 },
     needsYou: 1,
-    agents: { total: 5, working: 2, done: 2, failed: 1 },
+    agents: { total: 5, working: 3, done: 2, failed: 0 },
     tokens: 0,
     commits: { total: 3, repos: 0 },
     tests: { value: '526', sub: 'smoke 398 · hooks 128', shorts: ['passed'], failing: 0 },

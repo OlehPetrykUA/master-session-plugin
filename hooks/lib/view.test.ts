@@ -88,7 +88,7 @@ test('a finished subagent stays in Done however old, and the Done chip and the A
   const view = viewOf({})
   expect(view.items.map(one => one.id)).toEqual(['x2'])
   expect(view.chips.find(chip => chip.id === 'done')?.count).toBe(1)
-  expect(view.blocks.find(block => block.key === 'agents')).toEqual(expect.objectContaining({ value: '1', sub: '0 working · 1 done' }))
+  expect(view.blocks.find(block => block.key === 'agents')).toEqual(expect.objectContaining({ value: '1', sub: '1 done' }))
 })
 
 test('the Archived chip is drawn only when something is archived, and the archived filter falls back to All without it', () => {

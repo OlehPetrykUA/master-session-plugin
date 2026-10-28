@@ -78,7 +78,7 @@ test('a subagent prompt in the master marks that subagent asking with the prompt
   expect([over?.state, over?.asking]).toEqual(['done', undefined])
 })
 
-test('two of three subagents finish and three minutes of refresh ticks pass: the store keeps all three and the band percent does not drop', { plugins: [PROBE] }, async ($, on) => {
+test('two of three subagents finish and three minutes of refresh ticks pass: the store keeps all three, the band percent does not drop, and a chat outside the run does not count', { plugins: [PROBE] }, async ($, on) => {
   loops(on, ['a1', 'a2', 'a3'], ['a1', 'a2', 'a3'])
   const { clock } = await started($, on, { ...BOARD, sessions: [BOARD.sessions[1]], needsYou: [] })
   for (const task of ['one', 'two', 'three']) await $.agent.spawn({ ...SPAWN, description: task, subagentType: 'Explore' })
@@ -91,7 +91,7 @@ test('two of three subagents finish and three minutes of refresh ticks pass: the
     return [agents.map(one => [one.id, one.state]), percent]
   }
   const before = await readBand()
-  expect(before).toEqual([[['a1', 'done'], ['a2', 'done'], ['a3', 'running']], '48%'])
+  expect(before).toEqual([[['a1', 'done'], ['a2', 'done'], ['a3', 'running']], '60%'])
   await clock.advance(180_000)
   expect(await readBand()).toEqual(before)
 })

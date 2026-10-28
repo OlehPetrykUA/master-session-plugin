@@ -51,7 +51,7 @@ export const bandAction = (element: string) => {
 
 export const agentCountsOf = (agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], at: number, cleared?: number): AgentCounts => ({ agents, workflows, at, cleared })
 
-const inRunOf = (current: Board | null, counts: AgentCounts): AgentCounts => ({ ...counts, ...agentsInRun(current, counts.agents, counts.workflows) })
+export const inRunOf = (current: Board | null, counts: AgentCounts): AgentCounts => ({ ...counts, ...agentsInRun(current, counts.agents, counts.workflows, counts.at) })
 
 const clamp = (value: number) => Math.min(1, Math.max(0, value))
 
@@ -113,8 +113,7 @@ const remoteOf = ({ agents, workflows, at }: AgentCounts, id: string, place: Pla
   return { subs: subagentUnits(mine.filter(one => !one.run), place), runs }
 }
 
-export function bandUnitsOf(segments: Progress['segments'], current: Board | null, all: AgentCounts, live: Live, trees: readonly Repo[] = [], items: readonly ListItem[] = bandItemsOf(current, all, live, trees)): Unit[] {
-  const counts = inRunOf(current, all)
+export function bandUnitsOf(segments: Progress['segments'], current: Board | null, counts: AgentCounts, live: Live, trees: readonly Repo[] = [], items: readonly ListItem[] = bandItemsOf(current, counts, live, trees, true)): Unit[] {
   const { agents } = counts
   const own = agents.filter(one => !one.parentSessionId)
   const units: Unit[] = subagentUnits(
@@ -193,9 +192,10 @@ const piecesOf = (current: Board | null) => {
   return counted.length ? counted : undefined
 }
 
-export const bandSetOf = (current: Board | null, { agents, workflows, at, cleared }: AgentCounts, live: Live, trees: readonly Repo[] = []) => runSetOf({ board: current, live, agents, workflows, cleared, at, trees })
+export const bandSetOf = (current: Board | null, { agents, workflows, at, cleared }: AgentCounts, live: Live, trees: readonly Repo[] = [], isWindowed = false) =>
+  runSetOf({ board: current, live, agents, workflows, cleared, at, trees, isWindowed })
 
-export const bandItemsOf = (current: Board | null, counts: AgentCounts, live: Live, trees: readonly Repo[] = []) => bandSetOf(current, counts, live, trees).items
+export const bandItemsOf = (current: Board | null, counts: AgentCounts, live: Live, trees: readonly Repo[] = [], isWindowed = false) => bandSetOf(current, counts, live, trees, isWindowed).items
 
 export const countsOf = (done: number, total: number): CountPart[] => [{ text: String(done), isNumber: true }, { text: '/', isNumber: false }, { text: String(total), isNumber: true }]
 
@@ -203,8 +203,8 @@ export const countsText = (parts: readonly CountPart[]) => parts.map(one => one.
 
 export const countsWidthOf = (parts: readonly CountPart[]) => parts.reduce((sum, one) => sum + (one.isNumber ? DIGIT * 13 * one.text.length : textWidth(one.text, 13, { isBold: true })), 0)
 
-export function bandProgress(current: Board | null, live: Live) {
-  const sessions = rowsInRun(current, live)
+export function bandProgress(current: Board | null, live: Live, at: number) {
+  const sessions = rowsInRun(current, live, at)
     .filter(row => current || row.live?.startedBy === live.self)
     .map(row => ({ ...row.board, id: row.id, name: row.name, state: row.state }))
   const progress = progressOf({ sessions, needsYou: [], repos: [], source: 'tool' }, live)
@@ -212,16 +212,15 @@ export function bandProgress(current: Board | null, live: Live) {
 }
 
 export function askingChatOf(current: Board | null, live: Live, agents: AgentCounts, trees: readonly Repo[]) {
-  const chat = firstAskerOf(bandUnitsOf(bandProgress(current, live)?.segments ?? [], current, agents, live, trees))?.chat
+  const chat = firstAskerOf(bandUnitsOf(bandProgress(current, live, agents.at)?.segments ?? [], current, agents, live, trees))?.chat
   return chat && chat.id !== live.self ? chat : undefined
 }
 
 const IDLE_PROGRESS: Progress = { segments: [], total: 0 }
 
-export function bandProgressWith(current: Board | null, live: Live, all: AgentCounts) {
-  const counts = inRunOf(current, all)
+export function bandProgressWith(current: Board | null, live: Live, counts: AgentCounts) {
   const { agents } = counts
-  const progress = bandProgress(current, live)
+  const progress = bandProgress(current, live, counts.at)
   if (progress) return progress
   const isBusy = agents.some(one => one.state === 'running') || liveRunsOf(counts).some(run => run.state === 'running')
   return isBusy || piecesOf(current) ? IDLE_PROGRESS : undefined
@@ -229,12 +228,11 @@ export function bandProgressWith(current: Board | null, live: Live, all: AgentCo
 
 export const bandSignatureOf = (view: BandView) => [view.summary, view.tone, view.isRunning, view.pillText, view.hasElapsed ? view.elapsed : '', view.action?.accessibleName ?? '', view.action?.label ?? ''].join('|')
 
-export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, all: AgentCounts, act: BandActions, live: Live, trees: readonly Repo[] = []) {
+export function bandViewOf(columns: number, current: Board | null, progress: Progress, isPaneOpen: boolean, agents: AgentCounts, act: BandActions, live: Live, trees: readonly Repo[] = []) {
   const width = columns * CH - 16
   const isNarrow = width < NARROW_BELOW
   const isTiny = width < PERCENT_BELOW
-  const set = bandSetOf(current, all, live, trees)
-  const agents = inRunOf(current, all)
+  const set = bandSetOf(current, agents, live, trees, true)
   const { items } = set
   const units = bandUnitsOf(progress.segments, current, agents, live, trees, items)
   const asker = firstAskerOf(units)

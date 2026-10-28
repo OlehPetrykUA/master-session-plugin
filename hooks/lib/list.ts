@@ -235,7 +235,7 @@ export const listedRowsOf = (rows: readonly Row[], agents: readonly AgentRecord[
 
 export const isGhostRun = (run: WorkflowRun, at: number | undefined) => at !== undefined && !run.agents.length && at - run.startedAt >= AGENT_SHOWN_MS
 
-const finishOf = (item: ListItem) => (item.kind === 'subagent' ? (item.agent.endedAt ?? 0) : item.kind === 'workflow' ? (item.run.endedAt ?? 0) : 0)
+const finishOf = (item: ListItem) => (item.kind === 'subagent' ? (item.agent.endedAt ?? 0) : item.kind === 'workflow' ? (item.run.endedAt ?? 0) : (item.row.live?.lastActivityAt ?? 0))
 
 export function itemsOf(rows: readonly Row[], agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], context: Partial<Pick<Context, 'at' | 'trees' | 'sessions'>> & { cleared?: number; self?: string } = {}): ListItem[] {
   const isCleared = (at: number | undefined) => at !== undefined && at <= (context.cleared ?? 0)
@@ -273,7 +273,7 @@ export function countsOfItems(items: readonly ListItem[], archived: number): Rec
 }
 
 export function groupsOf(items: readonly ListItem[], archived: readonly LiveSession[], chosen: Filter, archiveView: ArchiveView, kept?: SessionState): ListGroup[] {
-  const newestFirst = (left: ListItem, right: ListItem) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind] || finishOf(right) - finishOf(left)
+  const newestFirst = (left: ListItem, right: ListItem) => finishOf(right) - finishOf(left) || KIND_ORDER[left.kind] - KIND_ORDER[right.kind]
   const groupOf = (id: SessionState, isPinned = false): ListGroup => ({ id, items: id === 'done' ? items.filter(item => item.group === id).sort(newestFirst) : items.filter(item => item.group === id), archived: [], isPinned, isOpen: true })
   const needs = items.some(item => item.group === 'needs-you') ? [groupOf('needs-you', chosen !== 'all' && chosen !== 'needs-you')] : []
   const archive = (isOpen: boolean): ListGroup => ({ id: 'archived', items: [], archived, isPinned: false, isOpen })
@@ -420,6 +420,7 @@ export function blocksOf(totals: RunSummary, hasWork: boolean, end?: string): Bl
   const trees = git.trees > 1 ? `to commit · ${git.trees} trees` : 'to commit'
   const stale = git.stale.files ? `+${git.stale.files} in ${git.stale.trees} stale tree${git.stale.trees === 1 ? '' : 's'}` : ''
   const gitBase = git.dirty ? trees : 'clean'
+  const agentParts = [...(agents.working ? [`${agents.working} working`] : []), ...(agents.done ? [`${agents.done} done`] : [])]
   return [
     {
       key: 'plan',
@@ -443,8 +444,8 @@ export function blocksOf(totals: RunSummary, hasWork: boolean, end?: string): Bl
       key: 'agents',
       label: 'Agents',
       value: String(agents.total),
-      sub: !agents.total ? 'none yet' : `${agents.working} working · ${agents.done} done`,
-      shorts: !agents.total ? ['none'] : [`${agents.working} working`, ...(agents.failed ? [] : [String(agents.working)])],
+      sub: !agents.total ? 'none yet' : agentParts.join(' · '),
+      shorts: !agents.total ? ['none'] : [...agentParts.slice(0, 1), ...(agents.failed || !agentParts.length ? [] : [String(agents.working || agents.done)])],
       bad: agents.failed ? `${agents.failed} failed` : undefined,
       isAlert: false,
     },

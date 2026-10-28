@@ -13,29 +13,36 @@ export type RunSetInput = {
   cleared?: number
   at: number
   trees?: readonly Repo[]
+  isWindowed?: boolean
 }
 
-const isSince = (board: Board | null, when: number | undefined) => board?.since === undefined || when === undefined || when >= board.since
+const startOf = (board: Board | null, at: number) => board?.since ?? at
 
-export const rowsInRun = (board: Board | null, live: Live) => {
+const isSince = (start: number, when: number | undefined) => when !== undefined && when >= start
+
+export const rowsInRun = (board: Board | null, live: Live, at: number) => {
   const onBoard = new Set(board?.sessions.map(one => one.id))
-  return rowsOf(board, live).filter(row => onBoard.has(row.id) || isSince(board, row.live?.createdAt))
+  const start = startOf(board, at)
+  const isActive = (row: Row) => row.state === 'working' || row.state === 'needs-you'
+  return rowsOf(board, live).filter(row => onBoard.has(row.id) || isSince(start, row.live?.createdAt) || (!board && isActive(row)))
 }
 
-export function agentsInRun(board: Board | null, agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[]) {
-  const isIn = (agent: AgentRecord) => isSince(board, agent.startedAt) || agent.state === 'running' || !!agent.asking
+export function agentsInRun(board: Board | null, agents: readonly AgentRecord[], workflows: readonly WorkflowRecord[], at: number) {
+  const start = startOf(board, at)
+  const isIn = (agent: AgentRecord) => isSince(start, agent.startedAt) || agent.state === 'running' || !!agent.asking
   const runs = new Set(agents.filter(isIn).flatMap(one => (one.run ? [one.run.id] : [])))
   const launched = new Set(agents.flatMap(one => (one.run ? [one.run.id] : [])))
-  return { agents: agents.filter(one => (one.run ? runs.has(one.run.id) : isIn(one))), workflows: workflows.filter(one => isSince(board, one.startedAt) || runs.has(one.id) || !launched.has(one.id)) }
+  return { agents: agents.filter(one => (one.run ? runs.has(one.run.id) : isIn(one))), workflows: workflows.filter(one => isSince(start, one.startedAt) || runs.has(one.id) || !launched.has(one.id)) }
 }
 
-export function runSetOf({ board, live, agents, workflows, cleared, at, trees }: RunSetInput) {
+export function runSetOf({ board, live, agents, workflows, cleared, at, trees, isWindowed }: RunSetInput) {
   const onBoard = new Set(board?.sessions.map(one => one.id))
-  const { agents: inAgents, workflows: inWorkflows } = agentsInRun(board, agents, workflows)
-  const rows = listedRowsOf(rowsInRun(board, live), inAgents, inWorkflows)
-  const archived = archivedOf(live).filter(one => onBoard.has(one.id) || isSince(board, one.createdAt))
+  const start = startOf(board, at)
+  const { agents: inAgents, workflows: inWorkflows } = isWindowed ? { agents, workflows } : agentsInRun(board, agents, workflows, at)
+  const rows = listedRowsOf(rowsInRun(board, live, at), inAgents, inWorkflows)
+  const archived = archivedOf(live).filter(one => onBoard.has(one.id) || isSince(start, one.createdAt))
   const items = itemsOf(rows, inAgents, inWorkflows, { at, trees, sessions: familyOf(live), cleared, self: live.self })
-  return { since: board?.since ?? at, rows, agents: inAgents, workflows: inWorkflows, archived, items }
+  return { since: start, rows, agents: inAgents, workflows: inWorkflows, archived, items }
 }
 
 export type RunSummaryInput = {
@@ -87,7 +94,9 @@ export function runSummaryOf({ rows, sessions, agents, workflows, board, trees, 
   const listed = items ?? itemsOf(rows, agents, workflows, { at, trees, sessions, cleared })
   const counts = countsOfItems(listed, 0)
   const members = listed.flatMap((item): { state: AgentState; tokens?: number }[] => (item.kind === 'subagent' ? [item.agent] : item.kind === 'workflow' ? item.run.agents : []))
-  const count = (state: 'running' | 'done' | 'failed') => members.filter(one => one.state === state).length
+  const helpers = listed.filter(item => item.kind === 'subagent' || item.kind === 'workflow')
+  const failed = helpers.filter(item => item.status === 'failed').length
+  const done = helpers.filter(item => item.group === 'done').length - failed
   const pieces = (board?.plan ?? []).filter(one => one.state !== 'dropped')
   const piece = (state: string) => pieces.filter(one => one.state === state).length
   const known = rows.flatMap(row => [row.board?.cwd, row.live?.cwd, ...(row.board?.worktrees ?? [])]).filter((path): path is string => !!path)
@@ -100,7 +109,7 @@ export function runSummaryOf({ rows, sessions, agents, workflows, board, trees, 
   return {
     plan: { total: pieces.length, done: piece('done'), working: piece('working'), verifying: piece('verifying'), queued: piece('queued'), sessions: listed.filter(item => item.kind === 'session').length },
     needsYou: counts['needs-you'],
-    agents: { total: members.length, working: count('running'), done: count('done'), failed: count('failed') },
+    agents: { total: helpers.length, working: helpers.length - done - failed, done, failed },
     tokens: members.reduce((sum, one) => sum + (one.tokens ?? 0), 0),
     commits: { total: Math.max(rows.reduce((sum, row) => sum + (row.board?.commits?.length ?? 0), 0), trees.reduce((sum, repo) => sum + (repo.landed ?? 0), 0)), repos: trees.length },
     tests: testsOf(rows, board),

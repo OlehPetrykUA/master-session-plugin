@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import type { AgentRecord, Board, Live, LiveSession, WorkflowRecord } from '../../types'
 
-import { agentCountsOf, bandItemsOf, bandProgressWith, bandUnitsOf, bandViewOf, countsText } from './band'
+import { agentCountsOf, bandItemsOf, bandProgressWith, bandUnitsOf, bandViewOf, countsText, inRunOf } from './band'
 import { blocksOf, clockOf, countsOfItems } from './list'
 import { compactOf } from './format'
 import { agentsInRun, runSetOf, runSummaryOf } from './totals'
@@ -41,7 +41,7 @@ test('proof 1: a subagent that ended ten minutes ago is still in Done, in the ch
   expect(done.map(item => item.id)).toEqual(['x'])
   expect(countsOfItems(set.items, 0).done).toBe(1 + 1)
   const tile = blocksOf(summaryOf(set), true).find(block => block.key === 'agents')
-  expect([tile?.value, tile?.sub]).toEqual(['1', '0 working · 1 done'])
+  expect([tile?.value, tile?.sub]).toEqual(['1', '1 done'])
 })
 
 test('proof 2: a finished subagent from before the run is in no consumer, a running or asking one is in all of them', () => {
@@ -55,23 +55,45 @@ test('proof 2: a finished subagent from before the run is in no consumer, a runn
   expect(summaryOf(set).agents).toEqual({ total: 2, working: 2, done: 0, failed: 0 })
   const counts = agentCountsOf([old, running, asking], [], NOW)
   expect(bandItemsOf(board(), counts, live()).filter(item => item.kind === 'subagent').map(item => item.id)).toEqual(['run', 'ask'])
-  const units = bandUnitsOf([], board(), counts, live())
+  const units = bandUnitsOf([], board(), inRunOf(board(), counts), live())
   expect(units).toHaveLength(2)
-  expect(agentsInRun(board(), [old, running, asking], []).agents.map(one => one.id)).toEqual(['run', 'ask'])
+  expect(agentsInRun(board(), [old, running, asking], [], NOW).agents.map(one => one.id)).toEqual(['run', 'ask'])
+})
+
+test('proof 3: with no board there is no run window, so only a running or asking item is listed and counted', () => {
+  const old = agent('old', { startedAt: SINCE, endedAt: SINCE + MINUTE })
+  const running = agent('run', { state: 'running', startedAt: SINCE, endedAt: undefined })
+  const set = runSetOf({ board: null, live: live(), agents: [old, running], workflows: [], at: NOW })
+  expect(set.since).toBe(NOW)
+  expect(set.agents.map(one => one.id)).toEqual(['run'])
+  expect(set.items.filter(item => item.kind === 'subagent').map(item => item.id)).toEqual(['run'])
+  expect(runSummaryOf({ rows: set.rows, sessions: [], agents: set.agents, workflows: set.workflows, board: null, trees: [], at: NOW, items: set.items }).agents).toEqual({ total: 1, working: 1, done: 0, failed: 0 })
+})
+
+test('proof 3b: a session of unknown creation time is outside the run unless the board lists it', () => {
+  const unknown = session('u1', { createdAt: undefined })
+  expect(setOf([], { live: live([unknown]) }).rows.map(row => row.id)).not.toContain('u1')
+  expect(setOf([], { board: board({ sessions: [{ id: 'u1', name: 'u1', state: 'working' }] }), live: live([unknown]) }).rows.map(row => row.id)).toContain('u1')
 })
 
 test('proof 4: the Needs you tile is the chip, the Agents tile adds up, and the band reads the same items as the pane', () => {
   const asking = agent('ask', { state: 'running', endedAt: undefined, asking: { text: 'Allow Bash', since: NOW } })
-  const agents = [agent('d1'), agent('f1', { state: 'failed' }), agent('r1', { state: 'running', endedAt: undefined }), asking]
-  const set = setOf(agents, { live: live([session('a'), session('b', { isRunning: true }), session('c')]) })
+  const flow: WorkflowRecord = { id: 'wf', toolUseId: 't', name: 'flow', startedAt: SINCE + MINUTE }
+  const members = [agent('w1', { run: { id: 'wf', index: 1 } }), agent('w2', { run: { id: 'wf', index: 2 }, state: 'failed' }), agent('w3', { run: { id: 'wf', index: 3 } })]
+  const agents = [agent('d1'), agent('f1', { state: 'failed' }), agent('r1', { state: 'running', endedAt: undefined }), asking, ...members]
+  const sessions = live([session('a'), session('b', { isRunning: true }), session('c')])
+  const set = setOf(agents, { live: sessions, workflows: [flow] })
   const counts = countsOfItems(set.items, set.archived.length)
   const summary = summaryOf(set)
   expect(summary.needsYou).toBe(counts['needs-you'])
   expect(counts['needs-you']).toBe(2)
   const { working, done, failed, total } = summary.agents
   expect(working + done + failed).toBe(total)
-  expect([working, done, failed]).toEqual([2, 1, 1])
-  expect(bandItemsOf(board(), agentCountsOf(agents, [], NOW), live([session('a'), session('b', { isRunning: true }), session('c')])).map(item => item.id)).toEqual(set.items.map(item => item.id))
+  expect(total).toBe(5)
+  expect([working, done, failed]).toEqual([2, 1, 2])
+  const doneSessions = set.items.filter(item => item.kind === 'session' && item.group === 'done').length
+  expect(done + failed).toBe(counts.done - doneSessions)
+  expect(bandItemsOf(board(), agentCountsOf(agents, [flow], NOW), sessions).map(item => item.id)).toEqual(set.items.map(item => item.id))
 })
 
 test('proof 4b: a working agent counts asking and waiting ones too, so working, done and failed add up to the value', () => {
@@ -139,13 +161,13 @@ test('proof 9: the run lasted 3h 1m: the tile, its since line and the band elaps
   expect(compactOf(NOW - SINCE)).toBe('3h 1m')
 })
 
-test('a finished workflow run of the run window keeps its agents counted as agents, never as sessions', () => {
+test('a finished workflow run of the run window is one Agents entry whose agents add to Tokens, never sessions', () => {
   const flow: WorkflowRecord = { id: 'wf', toolUseId: 't', name: 'flow', startedAt: SINCE + MINUTE }
   const members = [agent('w1', { run: { id: 'wf', index: 1 }, tokens: 1_500 }), agent('w2', { run: { id: 'wf', index: 2 }, state: 'failed', tokens: 500 })]
   const set = setOf(members, { workflows: [flow] })
   const summary = summaryOf(set)
-  expect(summary.agents).toEqual({ total: 2, working: 0, done: 1, failed: 1 })
+  expect(summary.agents).toEqual({ total: 1, working: 0, done: 0, failed: 1 })
   expect(summary.tokens).toBe(2_000)
   const tile = blocksOf(summary, true).find(block => block.key === 'agents')
-  expect([tile?.bad, tile?.sub]).toEqual(['1 failed', '0 working · 1 done'])
+  expect([tile?.bad, tile?.sub]).toEqual(['1 failed', ''])
 })

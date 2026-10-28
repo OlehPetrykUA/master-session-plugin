@@ -4,13 +4,13 @@ import type { Board, LiveSession, Repo, SessionState, Worktree } from '../../typ
 
 import { lossesOf, sideOf } from '../components/detail/losses'
 import { withReported, withReportedRuns } from '../lib/agents'
-import { agentCountsOf, askingChatOf } from '../lib/band'
+import { agentCountsOf, askingChatOf, inRunOf } from '../lib/band'
 import { boardFromChat, boardFromJson } from '../lib/board'
 import { ARCHIVE_LIMIT, BOARD_TOOL, GIT_CAP, LIVE_LIMIT, PANE, REPOS_CLOSED_MS, TITLE, TREE_STALE_MS, UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
 import { expandHome, locate, parseStatus, parseWorktrees } from '../lib/git'
 import { itemsOf } from '../lib/list'
-import { agentsInRun, runSetOf } from '../lib/totals'
+import { runSetOf } from '../lib/totals'
 import { familyOf, rowsOf } from '../lib/rows'
 import type { Row } from '../lib/rows'
 import { getAgents, getBoard, getCleared, getLive, getReports, getRepos, getUndone, getWorkflows, saveAgents, saveBoard, saveWorkflows, saveLive, saveReports, saveRepos, setAsked, setCleared, setClearing, setConfirming, setExpanded, setRefreshing, setUndone } from '../state/atoms'
@@ -417,7 +417,7 @@ export async function openSession($: EngineInterface, id: string, name: string) 
 
 export async function openAsking($: EngineInterface) {
   const { board: current } = await boardOf($)
-  const agents = agentCountsOf(await getAgents($), await getWorkflows($), await $.clock.now(), await getCleared($))
+  const agents = inRunOf(current, agentCountsOf(await getAgents($), await getWorkflows($), await $.clock.now(), await getCleared($)))
   const chat = askingChatOf(current, await getLive($), agents, await getRepos($))
   if (chat) await openSession($, chat.id, chat.name)
 }
@@ -463,8 +463,7 @@ export async function archive($: EngineInterface, rows: readonly Row[], all?: { 
     return
   }
   const clean = all ? allowed.filter(row => !lossesOf(row, trees, sessions).length) : allowed.slice(0, 1)
-  const inRun = agentsInRun((await boardOf($)).board, await getAgents($), await getWorkflows($))
-  const items = itemsOf(fresh, inRun.agents, inRun.workflows, { trees, sessions, cleared: await getCleared($) })
+  const { items } = runSetOf({ board: (await boardOf($)).board, live: await getLive($), agents: await getAgents($), workflows: await getWorkflows($), cleared: await getCleared($), at: await $.clock.now(), trees })
   const archived: Row[] = []
   for (const row of clean) {
     try {
