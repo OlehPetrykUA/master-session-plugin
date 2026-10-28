@@ -113,7 +113,7 @@ const remoteOf = ({ agents, workflows, at }: AgentCounts, id: string, place: Pla
   return { subs: subagentUnits(mine.filter(one => !one.run), place), runs }
 }
 
-export function bandUnitsOf(segments: Progress['segments'], current: Board | null, counts: AgentCounts, live: Live, trees: readonly Repo[] = [], items: readonly ListItem[] = bandItemsOf(current, counts, live, trees, true)): Unit[] {
+export function bandUnitsOf(segments: Progress['segments'], current: Board | null, counts: AgentCounts, live: Live, trees: readonly Repo[] = [], items: readonly ListItem[] = bandSetOf(current, counts, live, trees, true).withSelf): Unit[] {
   const { agents } = counts
   const own = agents.filter(one => !one.parentSessionId)
   const units: Unit[] = subagentUnits(
@@ -233,8 +233,7 @@ export function bandViewOf(columns: number, current: Board | null, progress: Pro
   const isNarrow = width < NARROW_BELOW
   const isTiny = width < PERCENT_BELOW
   const set = bandSetOf(current, agents, live, trees, true)
-  const { items } = set
-  const units = bandUnitsOf(progress.segments, current, agents, live, trees, items)
+  const units = bandUnitsOf(progress.segments, current, agents, live, trees, set.withSelf)
   const asker = firstAskerOf(units)
   const pieces = piecesOf(current)
   const isRunning = units.some(one => one.isRunning)

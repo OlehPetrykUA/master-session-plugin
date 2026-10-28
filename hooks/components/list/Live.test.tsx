@@ -294,6 +294,39 @@ test('Needs you draws "N waiting" when it fits the tile, the bare count otherwis
   await ui.unmount()
 })
 
+test('AC11: the tile words at 560, 390 and 300 px follow the canvas ladders, zero parts left out', () => {
+  const since = new Date(2026, 0, 1, 21, 30).getTime()
+  const base: RunSummary = {
+    plan: { total: 17, done: 9, working: 3, verifying: 2, queued: 3, sessions: 3 },
+    needsYou: 2,
+    agents: { total: 12, working: 4, done: 8, failed: 0 },
+    tokens: 2_100_000,
+    commits: { total: 14, repos: 2 },
+    tests: { value: '412', sub: 'from 3 QA passes', shorts: ['3 passes'], failing: 0 },
+    duration: { since, ms: 181 * 60_000 },
+    git: { dirty: 7, trees: 3, stale: { files: 0, trees: 0 } },
+  }
+  const wordsAt = (totals: RunSummary, px: number, hasWork = true) => {
+    const columns = Math.round(px / CH)
+    const inner = tileInnerOf(bodyWidthOf(columns), px < 340 ? 3 : 4)
+    return Object.fromEntries(blocksOf(totals, hasWork).map(block => [block.key, joinOf(subOf(block, inner), block.bad)]))
+  }
+  const wide = wordsAt(base, 560)
+  expect([wide.agents, wide['needs-you'], wide.tests, wide.duration, wide.git]).toEqual(['4 working · 8 done', '2 waiting', 'from 3 QA passes', `since 21:30`, 'to commit · 3 trees'])
+  for (const px of [390, 300]) {
+    const words = wordsAt(base, px)
+    expect([px, words.agents, words.tests, words.git]).toEqual([px, '4 working', '3 passes', 'to commit'])
+  }
+  const quiet = { ...base, needsYou: 0 }
+  expect([wordsAt(quiet, 560)['needs-you'], wordsAt(quiet, 390)['needs-you'], wordsAt(quiet, 300)['needs-you']]).toEqual(['nothing waiting', 'none', 'none'])
+  const failing: RunSummary = { ...base, agents: { total: 12, working: 3, done: 8, failed: 1 } }
+  expect([wordsAt(failing, 560).agents, wordsAt(failing, 300).agents]).toEqual(['3 working · 1 failed', '1 failed'])
+  const doneOnly: RunSummary = { ...base, agents: { total: 2, working: 0, done: 2, failed: 0 } }
+  expect([560, 390, 300].map(px => wordsAt(doneOnly, px).agents)).toEqual(['2 done', '2 done', '2 done'])
+  const workingOnly: RunSummary = { ...base, agents: { total: 3, working: 3, done: 0, failed: 0 } }
+  expect([560, 300].map(px => wordsAt(workingOnly, px).agents)).toEqual(['3 working', '3 working'])
+})
+
 test('each tile draws the FIRST of [sub, ...shorts] whose width fits, and it fits, at every width from 47 to 60 columns, for long, short and empty data', () => {
   const base: RunSummary = {
     plan: { total: 17, done: 9, working: 3, verifying: 2, queued: 3, sessions: 3 },

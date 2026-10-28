@@ -95,6 +95,7 @@ test('quiet seconds redraw nothing: the tiles and rows change only with a count 
 })
 
 test('a new run name or the first plan resets the run window; the same name keeps it; a stop clears the board', LONG, async ($, on) => {
+  on('skill.prompt', (_, event) => ({ text: event.text }))
   const run = await started($, on, { ...BOARD, run: 'x' })
   const durationOf = async () => {
     const ui = await $.ui.mount(WIDE)
@@ -115,6 +116,61 @@ test('a new run name or the first plan resets the run window; the same name keep
   expect(await durationOf()).toBe('Duration <1m')
   const stopped = await $.command.run(typed('master-session:stop', 'force'))
   expect(stopped.text).toMatch(/^Stopped/)
+  await run.clock.advance(3 * MINUTE)
+  const bare = await $.ui.mount(WIDE)
+  expect(await bare.find({ key: 'block-duration' })).toBeUndefined()
+  await bare.unmount()
+  await $.skill.prompt({ skill: 'master-session:start', text: 'Validator.', frontmatter: {}, source: 'plugin' })
+  await run.clock.settle()
+  await $.tool.call({ tool: BOARD_TOOL, ...BOARD, run: 'y', plan: [{ name: 'b', state: 'queued' }] })
+  expect(await durationOf()).toBe('Duration <1m')
+})
+
+test('AC12: the terminal tiles are rows of 4, 3 and 2 at 100, 76 and 36 columns, each Label value over its sub', LONG, async ($, on) => {
+  const plan = [{ name: 'a', state: 'done' }, { name: 'b', state: 'working' }, { name: 'c', state: 'queued' }]
+  await started($, on, { ...BOARD, plan })
+  const mount = (columns: number) => $.ui.mount({ ...PANE, surface: 'terminal', props: { ...PANE.props, bodyColumns: columns } })
+  type Node = { props?: Record<string, unknown>; children?: (Node | string)[] }
+  const tilesOf = async (columns: number) => {
+    const ui = await mount(columns)
+    const rows = (await ui.findAll({ type: 'Box' })).filter(one => /^tiles-\d+$/.test(one.key ?? '')).length
+    const tile = async (key: string) => JSON.parse(JSON.stringify(await ui.find({ key: `tile-${key}` }))) as Node & { text: string }
+    const found = { rows, needs: await tile('needs-you'), commits: await tile('commits'), plan: await tile('plan') }
+    await ui.unmount()
+    return found
+  }
+  const lineOf = (tile: Node, index: number) => (tile.children?.[index] as Node).children as Node[]
+  const wide = await tilesOf(100)
+  const mid = await tilesOf(76)
+  const narrow = await tilesOf(36)
+  expect([wide.rows, mid.rows, narrow.rows]).toEqual([2, 3, 4])
+  expect(wide.plan.text).toContain('· 2 sessions')
+  expect(narrow.plan.text).not.toContain('sessions')
+  const [label, value] = lineOf(wide.needs, 0)
+  expect([label?.children, value?.children]).toEqual([['Needs you'], ['1']])
+  expect([label?.props?.color, value?.props?.color, value?.props?.weight]).toEqual(['error', 'error', 'semibold'])
+  const [calmLabel, calmValue] = lineOf(wide.commits, 0)
+  expect([calmLabel?.props?.dimColor, calmValue?.props?.weight, calmValue?.props?.color]).toEqual([true, 'semibold', undefined])
+  expect(lineOf(wide.commits, 1).every(one => one.props?.dimColor === true && one.props?.wrap === 'truncate-end')).toBe(true)
+  expect(wide.needs.children).toHaveLength(2)
+})
+
+test('AC12: an all-done run reads its first variant that fits the 17 column tile at 36 columns', LONG, async ($, on) => {
+  await started($, on, { ...BOARD, sessions: [{ id: 'local_env', name: 'env', state: 'done' }], needsYou: [], plan: [{ name: 'a', state: 'done' }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', props: { ...PANE.props, bodyColumns: 36 } })
+  expect(String((await ui.find({ key: 'tile-duration' }))?.text)).toMatch(/^Duration\S+\d\d:\d\d – \d\d:\d\d$/)
+  await ui.unmount()
+})
+
+test('AC13: when the master itself asks, the band shows the question and the Needs you chip and tile stay 0', LONG, async ($, on) => {
+  await started($, on, { ...BOARD, sessions: [{ id: SELF, name: 'master', state: 'needs-you', needsYou: 'Approve the push' }], needsYou: [] })
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const alt = String((await band.findAll({ type: 'Svg' })).find(one => String(one.props.source).includes('width="4096"'))?.props.alt)
+  expect(alt).toContain('Approve the push')
+  await band.unmount()
+  const ui = await $.ui.mount(WIDE)
+  expect([await countOf(ui, 'chip-needs-you'), await altOf(ui, 'block-needs-you')]).toEqual([0, 'Needs you 0'])
+  await ui.unmount()
 })
 
 test('cold start: the merged board file wins over the last board call, so the plan and the run start survive a reload', LONG, async ($, on) => {

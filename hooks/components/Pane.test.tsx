@@ -562,7 +562,7 @@ test('the pane clips its pinned header, so the pin can never stretch the scroll 
   await ui.unmount()
 })
 
-test('a board session whose id equals a subagent id is no row and no All chip count', async ($, on) => {
+test('a board session whose id equals a subagent id is replaced by the subagent item: its row is gone, and the All chip does not count it twice', async ($, on) => {
   on('agent.list', () => ({ value: [] }))
   on('agent.spawn', (_, e) => ({ model: 'claude-haiku-5-5', agentId: e.description }))
   await started($, on)
@@ -576,6 +576,11 @@ test('a board session whose id equals a subagent id is no row and no All chip co
   await $.agent.spawn({ ...SPAWN, name: undefined, description: 'local_setup', subagentType: 'Explore', model: 'haiku' })
   const after = await tile()
   expect([before, after]).toEqual([2, 2])
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const texts = (await textsOf(ui)).map(String)
+  expect(texts.some(text => text.includes('setup-ui-redo'))).toBe(false)
+  expect(JSON.stringify(await ui.find({ key: 'row-local_setup' }))).toContain('Explore')
+  await ui.unmount()
 })
 
 test('AC26 and R8: the terminal archived row reads its row line, then Unarchive, and Open only for a session this master started; an open one draws its card', async ($, on) => {

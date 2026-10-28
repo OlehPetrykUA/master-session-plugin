@@ -41,8 +41,9 @@ export function runSetOf({ board, live, agents, workflows, cleared, at, trees, i
   const { agents: inAgents, workflows: inWorkflows } = isWindowed ? { agents, workflows } : agentsInRun(board, agents, workflows, at)
   const rows = listedRowsOf(rowsInRun(board, live, at), inAgents, inWorkflows)
   const archived = archivedOf(live).filter(one => onBoard.has(one.id) || isSince(start, one.createdAt))
-  const items = itemsOf(rows, inAgents, inWorkflows, { at, trees, sessions: familyOf(live), cleared, self: live.self })
-  return { since: start, rows, agents: inAgents, workflows: inWorkflows, archived, items }
+  const withSelf = itemsOf(rows, inAgents, inWorkflows, { at, trees, sessions: familyOf(live), cleared, self: live.self })
+  const items = withSelf.filter(item => item.kind !== 'session' || item.id !== live.self)
+  return { since: start, rows, agents: inAgents, workflows: inWorkflows, archived, items, withSelf }
 }
 
 export type RunSummaryInput = {
