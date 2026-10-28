@@ -162,6 +162,14 @@ test('AC12: an all-done run reads its first variant that fits the 17 column tile
   await ui.unmount()
 })
 
+test('AC12: a Tests tile of 412 shows its full sub "from 3 QA passes" at 36 columns, where it fits only at the full tile width', LONG, async ($, on) => {
+  const sessions = [100, 200, 112].map((count, index) => ({ id: `local_q${index}`, name: `q${index}`, state: 'done', tests: [`vitest · ${count} passed`] }))
+  await started($, on, { ...BOARD, sessions, needsYou: [], plan: [{ name: 'a', state: 'done' }] })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal', props: { ...PANE.props, bodyColumns: 36 } })
+  expect(String((await ui.find({ key: 'tile-tests' }))?.text)).toBe('Tests412from 3 QA passes')
+  await ui.unmount()
+})
+
 test('AC13: when the master itself asks, the band shows the question and the Needs you chip and tile stay 0', LONG, async ($, on) => {
   await started($, on, { ...BOARD, sessions: [{ id: SELF, name: 'master', state: 'needs-you', needsYou: 'Approve the push' }], needsYou: [] })
   const band = await $.ui.mount({ ...BAND, surface: 'desktop' })

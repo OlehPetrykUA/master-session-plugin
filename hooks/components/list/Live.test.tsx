@@ -320,7 +320,7 @@ test('AC11: the tile words at 560, 390 and 300 px follow the canvas ladders, zer
   const quiet = { ...base, needsYou: 0 }
   expect([wordsAt(quiet, 560)['needs-you'], wordsAt(quiet, 390)['needs-you'], wordsAt(quiet, 300)['needs-you']]).toEqual(['nothing waiting', 'none', 'none'])
   const failing: RunSummary = { ...base, agents: { total: 12, working: 3, done: 8, failed: 1 } }
-  expect([wordsAt(failing, 560).agents, wordsAt(failing, 300).agents]).toEqual(['3 working · 1 failed', '1 failed'])
+  expect([wordsAt(failing, 560).agents, wordsAt(failing, 390).agents, wordsAt(failing, 300).agents]).toEqual(['3 working · 1 failed', '1 failed', '1 failed'])
   const doneOnly: RunSummary = { ...base, agents: { total: 2, working: 0, done: 2, failed: 0 } }
   expect([560, 390, 300].map(px => wordsAt(doneOnly, px).agents)).toEqual(['2 done', '2 done', '2 done'])
   const workingOnly: RunSummary = { ...base, agents: { total: 3, working: 3, done: 0, failed: 0 } }
