@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { shortOf } from '../lib/format'
 import { CH, tall } from '../lib/layout'
 import { HEADER_NARROW_PX, headerRowsOf, isHeaderNarrow } from '../lib/sections'
-import { PANE, BOARD, hitsOf, started, textsOf, warmUp } from '../testing/world'
+import { PANE, BOARD, click, hitsOf, started, textsOf, warmUp } from '../testing/world'
 
 warmUp()
 
@@ -47,4 +47,29 @@ test('AC16 the header buttons sit on their own row below 460 px and beside the t
     expect((await ui.find({ key: 'header-space' }))?.props.height).toBe(rows)
     await ui.unmount()
   }
+})
+
+test('the terminal Pause button is dim while the pause is under way', async ($, on) => {
+  on('agent.list', () => ({ value: [] }))
+  on('tool.check', () => ({ decision: 'allow' as const }))
+  on('skill.prompt', (_, e) => ({ text: e.text }))
+  on('classic.UserPromptSubmit', () => ({}))
+  on('fs.write', () => ({ value: undefined }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('turn.abort', () => ({ value: undefined }))
+  on('prompt.submit', (_, e) => ({ text: e.text }))
+  const run = await started($, on)
+  const button = async () => {
+    const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    const found = await ui.find({ key: 'pause' })
+    await ui.unmount()
+    return found?.props.dimColor
+  }
+  expect(await button()).toBeUndefined()
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await click(pane, 'hit-pause')
+  await run.clock.settle()
+  await pane.unmount()
+  expect(await button()).toBe(true)
 })

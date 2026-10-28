@@ -128,30 +128,53 @@ test('AC17 one line per state: the word takes the percent place; bar, 3/7, elaps
   await ui.unmount()
 })
 
-test('AC18 the paused band: Paused in amber (terminal warning bold), a grey bar, 3/7 kept; under 340 px no word', { timeoutMs: 60_000 }, async ($, on) => {
+async function paused($: Engine, on: On) {
   const run = await setup($, on)
-  const before = await run.band('desktop')
-  const running = await barWidthOf(before)
-  const runningSource = await stripOf(before)
-  expect(runningSource).toContain('fill:var(--green)')
-  await before.unmount()
   await run.press()
-  const pausing = await run.band('desktop')
-  expect((await stripOf(pausing)).includes('fill:var(--green)')).toBe(true)
-  await pausing.unmount()
   await run.settle()
+  return run
+}
+
+test('AC18 desktop: Paused in C.amber, semibold, with 3/7 kept', { timeoutMs: 60_000 }, async ($, on) => {
+  const run = await paused($, on)
   const desktop = await run.band('desktop')
   const word = (await desktop.findAll({ type: 'Text' })).find(one => one.text === 'Paused')
   expect([word?.props.color, word?.props.weight]).toEqual([C.amber, 'semibold'])
+  expect(await textsOf(desktop)).toContain('3/7')
+  await desktop.unmount()
+})
+
+test('AC18 desktop: the bar is grey and still while paused, green and sliding while pausing', { timeoutMs: 60_000 }, async ($, on) => {
+  const run = await setup($, on)
+  await run.press()
+  const pausing = await run.band('desktop')
+  expect(await stripOf(pausing)).toContain('fill:var(--green)')
+  await pausing.unmount()
+  await run.settle()
+  const desktop = await run.band('desktop')
   const source = await stripOf(desktop)
   expect(source).toContain('fill:var(--grey)')
+  expect(source).not.toContain('fill:var(--green)')
   expect(source).not.toContain('linearGradient')
   expect(source).not.toContain('<animate')
-  expect(await textsOf(desktop)).toContain('3/7')
-  const drawn = await barWidthOf(desktop)
-  const expected = running - (textWidth('Paused', 15, { isBold: true }) - PERCENT)
-  expect(Math.abs(drawn - Math.max(BAR_MIN, expected))).toBeLessThanOrEqual(1)
   await desktop.unmount()
+})
+
+test('AC18 desktop: the bar gives the word the room the percent had', { timeoutMs: 60_000 }, async ($, on) => {
+  const run = await setup($, on)
+  const before = await run.band('desktop')
+  const running = await barWidthOf(before)
+  await before.unmount()
+  await run.press()
+  await run.settle()
+  const desktop = await run.band('desktop')
+  const expected = running - (textWidth('Paused', 15, { isBold: true }) - PERCENT)
+  expect(Math.abs((await barWidthOf(desktop)) - Math.max(BAR_MIN, expected))).toBeLessThanOrEqual(1)
+  await desktop.unmount()
+})
+
+test('AC18 terminal: Paused in warning bold, a subtle bar, 3/7 kept', { timeoutMs: 60_000 }, async ($, on) => {
+  const run = await paused($, on)
   const terminal = await run.band('terminal')
   const found = await terminal.findAll({ type: 'Text' })
   const lead = found.find(one => one.text === 'Paused')
@@ -159,6 +182,10 @@ test('AC18 the paused band: Paused in amber (terminal warning bold), a grey bar,
   expect(found.find(one => /^[█░]+$/.test(one.text))?.props.color).toBe('subtle')
   expect(found.find(one => one.text === '3/7')?.props.weight).toBe('semibold')
   await terminal.unmount()
+})
+
+test('AC18 under 340 px no word: the bar and the board icon only', { timeoutMs: 60_000 }, async ($, on) => {
+  const run = await paused($, on)
   const small = await run.band('desktop', 330)
   expect((await textsOf(small)).filter(one => WORDS.test(one) || /%|\d\/\d/.test(one))).toEqual([])
   expect((await small.findAll({ type: 'Client' })).length).toBeGreaterThan(0)
@@ -204,6 +231,7 @@ test('O3 a needs-you pill and the all-done lead stay as they are while paused', 
     const texts = await textsOf(ui)
     expect(texts.some(one => WORDS.test(one))).toBe(false)
     expect(texts.some(one => one.includes('needsyou'))).toBe(true)
+    expect((await ui.findAll({ type: 'Svg' })).some(one => /paused/i.test(String(one.props.alt)))).toBe(false)
     await ui.unmount()
   }
   await $.tool.call({ tool: BOARD_TOOL, ...publish({ sessions: SESSIONS.map(one => ({ ...one, state: 'done' })), plan: SEVEN.map(one => piece(one.name, 'done')) }) })
