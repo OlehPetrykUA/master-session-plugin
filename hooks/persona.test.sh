@@ -60,6 +60,7 @@ rule 'board: never delete a piece' skills/start/board.md 'never delete a piece: 
 rule 'board: workers use the display name' skills/start/board.md 'every worker is shown by its display name `<Persona>: <short task>`'
 rule 'board: session link by display name' skills/start/board.md 'A worker session'"'"'s display name is always a link `[<Persona>: <short task>](#local_<id>)`'
 rule 'board: plan keeps ledger names' skills/start/board.md 'The Plan keeps the ledger'"'"'s piece names'
+rule 'board: each working step names its worker' skills/start/board.md 'each ▶ step names its active worker'
 rule 'board: session name never shows' skills/start/board.md 'The session `name` never shows on the board.'
 rule 'shape: persona-first display name' skills/start/shape.md '`<Persona>: <short task>`'
 rule 'shape: name never shows on the board' skills/start/shape.md 'It never shows on the board.'
