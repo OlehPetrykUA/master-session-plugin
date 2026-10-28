@@ -2,6 +2,7 @@ import type { BoxProps, ButtonProps, ClientProps, ElementConstructor, SvgProps, 
 
 import type { AgentRecord, ArchiveView, Asked, Board, Filter, Live, LiveSession, Repo, Running, SessionState, TaskText, Undone, WorkflowRecord } from '../../types'
 
+import type { ListItem } from '../lib/list'
 import type { ProcState } from '../lib/processes'
 import type { Row } from '../lib/rows'
 import type { RunSummary } from '../lib/totals'
@@ -43,6 +44,7 @@ export type PaneData = {
   archived: readonly LiveSession[]
   agents: readonly AgentRecord[]
   workflows: readonly WorkflowRecord[]
+  items: readonly ListItem[]
   running: Readonly<Record<string, Running>>
   tasks: Readonly<Record<string, TaskText>>
   totals: RunSummary

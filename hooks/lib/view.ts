@@ -8,7 +8,7 @@ import { compactOf, shortOf, updatedOf } from './format'
 import { CH, LH, bodyWidthOf, liftOf } from './layout'
 import { familyOf } from './rows'
 import { NARRATIVE_MAX_ROWS, NARRATIVE_ROWS, NARRATIVE_STALE_MS } from './constants'
-import { ARCHIVED_PEEK, ageOf, blocksOf, clockOf, countsOfItems, groupsOf, isAllDone, itemsOf, openIdOf, rowsOf, shortNameOf } from './list'
+import { ARCHIVED_PEEK, ageOf, blocksOf, clockOf, countsOfItems, groupsOf, isAllDone, openIdOf, rowsOf, shortNameOf } from './list'
 import type { Context } from './list'
 import { processesPxOf, processesViewOf } from './processes'
 import { NARROW_PX, contentHeightOf, dotExtraOf, headerRowsOf, sectionTopsOf, tileInnerOf } from './sections'
@@ -50,9 +50,10 @@ export function narrativeOf(data: PaneData) {
 
 export function paneViewOf(data: PaneData) {
   const context: Context = { at: data.at, trees: data.trees, sessions: familyOf(data.live), agents: data.agents, rows: data.rows, running: data.running, tasks: data.tasks, self: data.live.self }
-  const items = itemsOf(data.rows, data.agents, data.workflows, { ...context, cleared: data.cleared, open: data.open, self: data.live.self })
+  const { items } = data
   const counts = countsOfItems(items, data.archived.length)
-  const groups = groupsOf(items, data.archived, data.chosen, data.archiveView, data.undone?.group)
+  const chosen = data.chosen === 'archived' && !counts.archived ? 'all' : data.chosen
+  const groups = groupsOf(items, data.archived, chosen, data.archiveView, data.undone?.group)
   const isDone = isAllDone(items)
   const isNarrow = data.columns * CH < NARROW_PX
   const chips: Chip[] = [
@@ -61,11 +62,12 @@ export function paneViewOf(data: PaneData) {
     { id: 'working', label: 'Working', count: counts.working, tone: 'green' },
     { id: 'waiting', label: 'Waiting', count: counts.waiting, tone: 'amber' },
     { id: 'done', label: 'Done', count: counts.done, tone: 'grey' },
-    { id: 'archived', label: 'Archived', count: counts.archived, icon: 'archive' },
+    ...(counts.archived ? [{ id: 'archived' as const, label: 'Archived', count: counts.archived, icon: 'archive' as const }] : []),
   ]
-  const isEmpty = data.chosen === 'all' ? !items.length : !counts[data.chosen]
+  const isEmpty = chosen === 'all' ? !items.length : !counts[chosen]
   return {
     context,
+    chosen,
     items,
     counts,
     groups,
@@ -78,7 +80,7 @@ export function paneViewOf(data: PaneData) {
     processes: data.processes ? processesViewOf(data.processes, Object.fromEntries(items.flatMap(item => (item.kind === 'session' ? [[item.row.id, shortNameOf(item)]] : [])))) : undefined,
     blocks: blocksOf(isDone ? { ...data.totals, duration: { ...data.totals.duration, ms: (data.board?.at ?? data.at) - data.totals.duration.since } } : data.totals, data.rows.length > 0 || items.length > 0, isDone ? data.board?.tick || clockOf(data.at) : undefined),
     perRow: isNarrow ? 3 : 4,
-    hasMore: data.chosen === 'all' && data.archiveView === 'open' && data.archived.length > ARCHIVED_PEEK,
+    hasMore: chosen === 'all' && data.archiveView === 'open' && data.archived.length > ARCHIVED_PEEK,
   }
 }
 
@@ -105,12 +107,12 @@ function sectionInputOf(data: PaneData, view: PaneView): SectionInput {
     hasNarrativeMore: view.narrative?.hasMore ?? false,
     blockRows: Math.ceil(view.blocks.length / view.perRow),
     processesPx: view.processes ? processesPxOf(view.processes, data.columns) : 0,
-    blockExtra: dotExtraOf(view.blocks.find(block => block.key === 'sessions'), tileInnerOf(bodyWidthOf(data.columns), view.perRow)),
+    blockExtra: dotExtraOf(view.blocks.find(block => block.key === 'plan'), tileInnerOf(bodyWidthOf(data.columns), view.perRow)),
     chips: view.chips.map(chip => ({ label: chip.label, count: chip.count, hasMark: !!markWidthOf(chip), markWidth: markWidthOf(chip) })),
     groups: view.groups
       .filter(group => group.id === 'archived' || group.items.length)
       .map(group => ({
-        rows: group.id === 'archived' ? (group.isOpen ? (data.chosen === 'archived' || data.archiveView === 'all' ? group.archived.length : Math.min(ARCHIVED_PEEK, group.archived.length)) : 0) : group.items.length,
+        rows: group.id === 'archived' ? (group.isOpen ? (view.chosen === 'archived' || data.archiveView === 'all' ? group.archived.length : Math.min(ARCHIVED_PEEK, group.archived.length)) : 0) : group.items.length,
         extra: 0,
         isArchived: group.id === 'archived',
       })),

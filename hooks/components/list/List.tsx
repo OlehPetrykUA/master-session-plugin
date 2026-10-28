@@ -28,11 +28,11 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
   const width = bodyWidthOf(data.columns)
   const { context } = view
   const empty = (id: string) => {
-    const text = EMPTY_TEXT[data.chosen]
-    const isAll = data.chosen === 'all'
+    const text = EMPTY_TEXT[view.chosen]
+    const isAll = view.chosen === 'all'
     return EmptyBox(ui, {
       id,
-      icon: isAll ? 'all' : data.chosen === 'archived' ? 'archive' : 'clock',
+      icon: isAll ? 'all' : view.chosen === 'archived' ? 'archive' : 'clock',
       title: text.title,
       body: text.body,
       command: isAll ? '/master-session:start' : undefined,
@@ -72,8 +72,8 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
       : null
   const groupOf = (group: ListGroup) => {
     if (group.id === 'archived') {
-      if (data.chosen === 'archived' && !group.archived.length) return empty('archived')
-      const isAllChip = data.chosen === 'all'
+      if (view.chosen === 'archived' && !group.archived.length) return empty('archived')
+      const isAllChip = view.chosen === 'all'
       const action = !isAllChip
         ? undefined
         : group.isOpen
@@ -86,7 +86,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
         tone: 'grey',
         isPinned: false,
         action,
-        children: group.isOpen ? shownArchived(group, data.archiveView, data.chosen).map(one => itemOf(archivedItemOf(one, data.board), width)) : [],
+        children: group.isOpen ? shownArchived(group, data.archiveView, view.chosen).map(one => itemOf(archivedItemOf(one, data.board), width)) : [],
       })
     }
     if (!group.items.length && undone?.group !== group.id) return empty(`group-${group.id}`)
@@ -105,7 +105,7 @@ export function List(ui: Ui, data: PaneData, view: PaneView) {
   const more = archived ? archived.archived.length - ARCHIVED_PEEK : 0
   return (
     <Box key="section-list" flexDirection="column" gap={down(16)} paddingLeft={across(16)} paddingRight={across(16)} paddingTop={down(16)} paddingBottom={down(16)}>
-      {data.chosen === 'all' && !view.items.length ? empty('all') : null}
+      {view.chosen === 'all' && !view.items.length ? empty('all') : null}
       {view.groups.map(groupOf)}
       {view.hasMore ? (
         <Box key="archived-more" flexDirection="row" justifyContent="center">

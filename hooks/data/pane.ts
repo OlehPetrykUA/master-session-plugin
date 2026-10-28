@@ -1,9 +1,8 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { PaneData } from '../components/types'
-import { listedRowsOf } from '../lib/list'
-import { archivedOf, familyOf, rowsOf } from '../lib/rows'
-import { runSummaryOf } from '../lib/totals'
+import { familyOf } from '../lib/rows'
+import { runSetOf, runSummaryOf } from '../lib/totals'
 import { UNDO_MS } from '../lib/constants'
 import { messageOf } from '../lib/format'
 import { getAgents, getArchiveView, getAsked, getCleared, getClearing, getConfirming, getExpanded, getFilter, getLive, getNarrativeNote, getNarrativeOpen, getRefreshing, getReports, getRepos, getTasks, getUndone, getWorkflows, setArchiveView, setConfirming, setExpanded, setFilter, setNarrativeOpen } from '../state/atoms'
@@ -17,11 +16,10 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
   const current = own && note.text && note.boardAt === own.at ? { ...own, narrative: note.text, narrativeAt: note.at } : own
   const live = await getLive($)
   const trees = await getRepos($)
-  const archived = archivedOf(live)
-  const agents = await getAgents($)
-  const workflows = await getWorkflows($)
-  const rows = listedRowsOf(rowsOf(current, live), agents, workflows)
   const at = await $.clock.now()
+  const cleared = await getCleared($)
+  const set = runSetOf({ board: current, live, agents: await getAgents($), workflows: await getWorkflows($), cleared, at, trees })
+  const { rows, archived, agents, workflows, items } = set
   const asked = await getAsked($)
   const isAnswered = !!asked && (await getReports($)).some(one => one.modelAt > asked.at)
   const undone = await getUndone($)
@@ -34,16 +32,17 @@ export async function paneData($: EngineInterface, columns: number, offset = 0, 
     archived,
     agents,
     workflows,
+    items,
     running: runningViewOf(await getReports($), live),
     tasks: await getTasks($),
-    totals: runSummaryOf({ rows, sessions: familyOf(live), agents, workflows, board: current, trees, at }),
+    totals: runSummaryOf({ rows, sessions: familyOf(live), agents, workflows, board: current, trees, at, cleared, items }),
     chosen: await getFilter($),
     open: await getExpanded($),
     asking: await getConfirming($),
     archiveView: await getArchiveView($),
     asked: isAnswered ? null : asked,
     undone: undone && at - undone.at < UNDO_MS ? undone : null,
-    cleared: await getCleared($),
+    cleared,
     isClearing: await getClearing($),
     isRefreshing: await getRefreshing($),
     isNarrativeOpen: await getNarrativeOpen($),
