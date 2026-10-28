@@ -29,7 +29,7 @@ export const AC40: FakeProc[] = [
   proc(510, 500, 'python', { cpu: 33, rss: 86016, etime: '03:00' }),
 ]
 
-export type Fake =ReturnType<typeof fakeProcesses>
+export type Fake = ReturnType<typeof fakeProcesses>
 
 export function fakeProcesses(procs: FakeProc[], options: { shellParent?: number; slow?: number } = {}) {
   const calls: string[][] = []
