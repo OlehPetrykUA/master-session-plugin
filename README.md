@@ -1,6 +1,6 @@
 # Master session
 
-A skills-only Claude Code plugin that turns one session into a feature factory. That session is the master session, a validator: it plans the work into tiered pieces, runs every persona as a subagent or a read-only workflow inside its own chat, verifies each `ready <sha>` with a checker, merges `--ff-only` and pushes when you ask. It never implements anything itself, and it never starts other sessions or sub-chats. Splitting work across chats is the chat orchestrator's job, a separate skill that is not in this repo.
+A skills-only Claude Code plugin that turns one session into a feature factory. That session is the master session, a validator: it plans the work into tiered pieces, runs every persona as a subagent or a read-only workflow inside its own chat, verifies each `ready <sha>` with a checker, merges `--ff-only` and pushes when you ask. It never implements anything itself, and it never starts other sessions or sub-chats and never calls `start_session`. Splitting work across chats is the chat orchestrator's job, a separate skill that is not in this repo.
 
 ## Install
 
