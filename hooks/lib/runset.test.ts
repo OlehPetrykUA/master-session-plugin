@@ -142,6 +142,17 @@ test('proof 6: helpers are listed and counted, and the plan and the band done/to
   expect(partsOf([])).toBe('1/2')
 })
 
+test('proof 6b: a session row whose id equals an agent id still counts that agent child in the band, as the run set does', () => {
+  const b = board({ sessions: [{ id: 'x', name: 'x', state: 'working' }] })
+  const agents = [agent('x', { state: 'running', endedAt: undefined }), agent('c', { parentAgentId: 'x' })]
+  const set = setOf(agents, { board: b })
+  expect(set.items.filter(item => item.kind === 'subagent').map(item => item.id)).toContain('c')
+  const counts = inRunOf(b, agentCountsOf(agents, [], NOW))
+  const progress = bandProgressWith(b, live(), counts)
+  const view = progress && bandViewOf(100, b, progress, false, counts, { board: () => undefined, chat: () => undefined }, live())
+  expect([view && countsText(view.parts), view?.percent]).toEqual(['1/2', 50])
+})
+
 test('proof 7: an archived session counts only when it is on the board or was created inside the run', () => {
   const old = session('z1', { isArchived: true, createdAt: SINCE - 5 * MINUTE })
   const fresh = session('z2', { isArchived: true })

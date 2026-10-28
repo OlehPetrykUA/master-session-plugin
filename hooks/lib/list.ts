@@ -31,7 +31,6 @@ export const isStartedBy = (live: LiveSession | undefined, self: string | undefi
 
 export type Name = { persona: string; task: string }
 
-
 export const GROUPS: readonly SessionState[] = ['needs-you', 'working', 'waiting', 'done']
 
 export const GROUP_LABEL: Record<SessionState | 'archived', string> = { 'needs-you': 'Needs you', working: 'Working', waiting: 'Waiting', done: 'Done', archived: 'Archived' }
