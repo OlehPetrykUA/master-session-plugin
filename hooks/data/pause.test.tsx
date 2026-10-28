@@ -459,7 +459,7 @@ test('a board master never stops a foreign running session', WITH, async ($, on)
 test('reading the pause atom fails while paused: spawn and start_session stay denied', WITH, async ($, on) => {
   let isBroken = false
   on('state.get', async (_, e, next) => {
-    if (isBroken && e.key === 'pause') throw new Error('state down')
+    if (isBroken && e.key === 'pause') return { value: { value: null, version: 999 } }
     return next(e)
   })
   const run = await full($, on)

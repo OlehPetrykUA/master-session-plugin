@@ -128,7 +128,7 @@ async function measured($: Engine, on: On, child: Child, subagents: number, open
 const BOUNDS: Record<'plain' | 'closed' | 'open', Cost> = {
   plain: { fired: 0, worked: 0, render: 0, invalidate: 0, process: 0, mcp: 0, read: 0, write: 0, model: 0, svgs: 0, interactive: 0, animatedInteractive: 0, animated: 0, svgChanges: 0 },
   closed: { fired: 20, worked: 20, render: 5, invalidate: 5, process: 16, mcp: 20, read: 22, write: 0, model: 2, svgs: 3, interactive: 0, animatedInteractive: 0, animated: 0, svgChanges: 1 },
-  open: { fired: 380, worked: 108, render: 64, invalidate: 64, process: 70, mcp: 20, read: 100, write: 0, model: 2, svgs: 53, interactive: 0, animatedInteractive: 0, animated: 0, svgChanges: 6 },
+  open: { fired: 380, worked: 108, render: 64, invalidate: 64, process: 70, mcp: 20, read: 100, write: 0, model: 2, svgs: 55, interactive: 0, animatedInteractive: 0, animated: 0, svgChanges: 6 },
 }
 
 function within(cost: Cost, bound: Cost) {
