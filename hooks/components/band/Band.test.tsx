@@ -641,15 +641,15 @@ test('the bar takes the room the button leaves: with the pane open the Hide boar
   await at120.unmount()
 })
 
-test('terminal: one bar of block characters, the percent, the counts with their numbers in semibold, and the same pressable action', async ($, on) => {
+test('terminal: one bar of block characters, the percent, the counts in one semibold text, and the same pressable action', async ($, on) => {
   const crew = crewOf($, on)
   const { opened } = await band($, on, WORKING)
   await crew.subagent('docs')
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const texts = await textsOf(ui)
   expect(texts.slice(0, 2)).toEqual(['64%', expect.stringMatching(/^█+░*$/)])
-  expect(texts.slice(2)).toEqual(['1/5', '1', '5', '◷ <1m'])
-  expect((await ui.findAll({ type: 'Text' })).filter(one => /^\d+$/.test(one.text)).every(one => one.props.weight === 'semibold')).toBe(true)
+  expect(texts.slice(2)).toEqual(['1/5', '◷ <1m'])
+  expect((await ui.findAll({ type: 'Text' })).filter(one => /^\d+$/.test(one.text))).toEqual([])
   const count = (await ui.findAll({ type: 'Text' })).find(one => one.text === '1/5')
   expect([count?.props.weight, count?.props.dimColor]).toEqual(['semibold', undefined])
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
@@ -1175,7 +1175,7 @@ test('AC59 the terminal draws one row: 57%, the bar, 3/7, ◷ 48m and Open board
   await crew.subagent('docs')
   await run.clock.advance(48 * MIN)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect(await textsOf(ui)).toEqual(['57%', expect.stringMatching(/^█+░+$/), '3/7', '3', '7', '◷ 48m'])
+  expect(await textsOf(ui)).toEqual(['57%', expect.stringMatching(/^█+░+$/), '3/7', '◷ 48m'])
   expect(await buttonsOf(ui)).toEqual([['band-board', 'Open board']])
   expect((await ui.findAll({ type: 'Box' })).filter(one => one.props.flexDirection === 'column')).toEqual([])
   await ui.unmount()

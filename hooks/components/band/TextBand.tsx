@@ -1,9 +1,9 @@
-import type { BandView } from '../../lib/band'
 import { countsText } from '../../lib/band'
+import type { PausedBandView } from '../../lib/bandpause'
 import type { BarTone } from '../../theme/strip'
 import type { TextUi } from '../types'
 
-export type TextBandProps = { view: BandView; columns: number }
+export type TextBandProps = { view: PausedBandView; columns: number }
 
 const TERMINAL: Record<BarTone, string> = { red: 'error', green: 'success', grey: 'subtle' }
 
@@ -13,7 +13,7 @@ export function TextBand(ui: TextUi, props: TextBandProps) {
   const { Box, Text, Button } = ui
   const { view, columns } = props
   const { asker, isAllDone, percent, parts, action, showCounts, pillText } = view
-  const lead = asker ? `● ${pillText}` : view.hasAllDone ? `✓ ${view.allDone}` : view.hasPercent ? `${percent}%`.padStart(4) : ''
+  const lead = asker ? `● ${pillText}` : view.hasAllDone ? `✓ ${view.allDone}` : view.pauseLead ? view.pauseLead.word : view.hasPercent ? `${percent}%`.padStart(4) : ''
   const counts = showCounts ? countsText(parts) : ''
   const elapsed = view.hasElapsed ? `◷ ${view.elapsed}` : ''
   const fixed = lead.length + counts.length + elapsed.length + (action?.label.length ?? 0) + 12
@@ -22,24 +22,12 @@ export function TextBand(ui: TextUi, props: TextBandProps) {
   return (
     <Box flexDirection="row" gap={1}>
       {lead ? (
-        <Text color={asker ? 'error' : view.hasAllDone ? 'success' : undefined} weight="semibold">
+        <Text color={asker ? 'error' : view.hasAllDone ? 'success' : view.pauseLead?.tone === 'amber' ? 'warning' : undefined} weight="semibold">
           {lead}
         </Text>
       ) : null}
       <Text color={TERMINAL[view.tone]}>{'█'.repeat(filled) + '░'.repeat(cells - filled)}</Text>
-      {counts ? (
-        <Text weight="semibold">
-          {parts.map((part, index) =>
-            part.isNumber ? (
-              <Text key={`c${index}`} weight="semibold">
-                {part.text}
-              </Text>
-            ) : (
-              part.text
-            ),
-          )}
-        </Text>
-      ) : null}
+      {counts ? <Text weight="semibold">{counts}</Text> : null}
       {elapsed ? <Text dimColor>{elapsed}</Text> : null}
       {action ? <Button key={`band-${action.name}`} variant="primary" label={action.label} onPress={action.press} /> : null}
     </Box>

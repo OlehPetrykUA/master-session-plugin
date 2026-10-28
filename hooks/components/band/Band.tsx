@@ -1,5 +1,5 @@
-import type { BandView } from '../../lib/band'
 import { ALL_DONE_GAP, ELAPSED_GAP, ELAPSED_ICON } from '../../lib/band'
+import type { PausedBandView } from '../../lib/bandpause'
 import { across, tall } from '../../lib/layout'
 import { BAR, BUTTON, CHECK, PERCENT, PILL } from '../../theme/band'
 import { glyph } from '../../theme/icons'
@@ -10,7 +10,7 @@ import type { Tone } from '../../theme/tokens'
 import type { Ui } from '../types'
 import { BandButton } from './BandButton'
 
-export type BandProps = { view: BandView }
+export type BandProps = { view: PausedBandView }
 
 export function Band(ui: Ui, props: BandProps) {
   const { Box, Text, Svg } = ui
@@ -30,6 +30,12 @@ export function Band(ui: Ui, props: BandProps) {
       {icon('check', CHECK, 'green', 2.4)}
       <Text weight="semibold" color={C.text} size="heading">
         {view.allDone}
+      </Text>
+    </Box>
+  ) : view.pauseLead ? (
+    <Box flexDirection="row" flexShrink={0}>
+      <Text weight="semibold" color={view.pauseLead.tone === 'amber' ? C.amber : C.text} size="heading">
+        {view.pauseLead.word}
       </Text>
     </Box>
   ) : view.hasPercent ? (
