@@ -1,7 +1,7 @@
 import type { RenderChildren } from 'claude-code'
 
 import { across, down, tall } from '../../lib/layout'
-import { clockOf, plural, runAgentsOf } from '../../lib/list'
+import { clockOf, plural, runAgentsOf, spanOf } from '../../lib/list'
 import type { Context, ListItem, RowItem } from '../../lib/list'
 import { STATUS } from '../../theme/icons'
 import { phaseStrip } from '../../theme/detail'
@@ -13,7 +13,7 @@ import { Quiet } from '../Quiet'
 import { Strong } from '../Strong'
 import type { Ui } from '../types'
 import { Block } from './Block'
-import { durationOf, runningTimeOf, tokensOf } from './format'
+import { runningTimeOf, tokensOf } from './format'
 import { Lead } from './Lead'
 import { Pair } from './Pair'
 
@@ -65,7 +65,7 @@ export function WorkflowDetail(ui: Ui, props: WorkflowDetailProps) {
           'Time',
           run.state === 'running'
             ? [Strong(ui, { text: `running ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(run.startedAt)}`, isFull: true })]
-            : [Strong(ui, { text: `took ${durationOf(end - run.startedAt)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(run.startedAt)}`, isFull: true })],
+            : [Strong(ui, { text: `took ${spanOf(run.startedAt, end, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(run.startedAt)}`, isFull: true })],
         ),
         right: half('usage', 'usage', 'Usage', [Strong(ui, { text: plural(counts.total, 'agent'), isFull: true }), run.tokens ? Quiet(ui, { text: tokensOf(run.tokens), isFull: true }) : null]),
       }),

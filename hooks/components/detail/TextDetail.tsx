@@ -2,15 +2,14 @@ import type { RenderChildren } from 'claude-code'
 
 import { compactOf, modelOf } from '../../lib/format'
 import { modelWordOf } from '../../lib/rowfit'
-import { ageOf, clockOf, displayNameOf, elapsedOfItem, isStartedBy, nameText, parentsOf, plural, runAgentsOf, shortNameOf } from '../../lib/list'
+import { ageOf, clockOf, displayNameOf, elapsedOfItem, isStartedBy, nameText, parentsOf, plural, runAgentsOf, shortNameOf, spanOf } from '../../lib/list'
 import type { Context, ListItem, RowItem } from '../../lib/list'
 import { headOf, syncOf, whereOf } from '../../lib/rows'
-import { activityWordsOf, nameIdentOf, partOfOf, starterOf, stateWordOf, statusSentenceOf, taskOf } from '../../lib/status'
+import { activityWordsOf, clean, nameIdentOf, partOfOf, starterOf, stateWordOf, statusSentenceOf, taskOf } from '../../lib/status'
 import { CARD_BORDER, TERMINAL_COLOR } from '../../theme/tokens'
 import type { Actions, TextUi } from '../types'
 import { LOST } from './ArchiveBox'
-import { durationOf, runningTimeOf, tokensOf } from './format'
-import { plainOf } from './gate'
+import { runningTimeOf, tokensOf } from './format'
 import { lossLineOf, lossesOf } from './losses'
 import { DESCRIBING } from './TaskBlock'
 import { pillsOf } from './Tests'
@@ -76,7 +75,7 @@ const timeOfAgent = (item: Extract<RowItem, { kind: 'subagent' | 'agent' }>, at:
     value:
       agent.state === 'running'
         ? `${item.status === 'needs' && agent.asking ? 'waiting' : 'running'} ${runningTimeOf(item, at)} · started ${clockOf(agent.startedAt)}`
-        : `took ${durationOf(end - agent.startedAt)} · ${clockOf(agent.startedAt)} – ${clockOf(end)}`,
+        : `took ${spanOf(agent.startedAt, end, at)} · ${clockOf(agent.startedAt)} – ${clockOf(end)}`,
   }
 }
 
@@ -103,8 +102,8 @@ export function TextSessionDetail(ui: TextUi, props: TextSessionProps) {
     head: headOfItem(item, context),
     lines: [
       ...leadOf(item, context, props.home),
-      { label: 'Now', value: plainOf(facts?.now) },
-      { label: 'Next', value: plainOf(facts?.next) },
+      { label: 'Now', value: clean(facts?.now) },
+      { label: 'Next', value: clean(facts?.next) },
       { label: 'Activity', value: activityWordsOf(row).map(one => [one.text, one.ago].filter(Boolean).join(' ')).join(' · ') },
       { label: 'Tests', value: (facts?.tests ?? []).length ? pillsOf(facts?.tests ?? []).map(pill => `${pill.isFailed ? '✗' : '✓'} ${pill.full}`).join(' · ') : '' },
       { label: 'Commits', value: (facts?.commits ?? []).slice(0, 3).join(' · ') },
@@ -170,7 +169,7 @@ export function TextWorkflowDetail(ui: TextUi, props: TextWorkflowProps) {
       ),
     ],
     tail: [
-      { label: 'Time', value: run.state === 'running' ? `running ${runningTimeOf(item, at)} · started ${clockOf(run.startedAt)}` : `took ${durationOf(end - run.startedAt)} · ${clockOf(run.startedAt)} – ${clockOf(end)}` },
+      { label: 'Time', value: run.state === 'running' ? `running ${runningTimeOf(item, at)} · started ${clockOf(run.startedAt)}` : `took ${spanOf(run.startedAt, end, at)} · ${clockOf(run.startedAt)} – ${clockOf(end)}` },
       { label: 'Usage', value: `${plural(counts.total, 'agent')}${run.tokens ? ` · ${tokensOf(run.tokens)}` : ''}` },
     ],
     onCollapse: props.onCollapse,

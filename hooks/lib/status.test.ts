@@ -239,16 +239,16 @@ test('R4 subagent and workflow agent: running, waiting on a child, needs you, do
   const run = runOf([wagent()], { parentSessionId: 'p1' })
   expect(text(inRun('needs', run, wagent({ asking: { text: 'Allow Read: /x', since: AT } })), here)).toBe('Needs you: it asks to use Read. Answer in Implementer · Env task’s chat.')
   const done = { startedAt: AT - 125_000, endedAt: AT, result: 'Found 12 calls.\nignored second line', tokens: 9400 }
-  expect(text(subagent('done', { state: 'done', ...done }))).toBe('Done in 2m 05s: Found 12 calls. Used 9.4k tokens.')
+  expect(text(subagent('done', { state: 'done', ...done }))).toBe('Done in 2m: Found 12 calls. Used 9.4k tokens.')
   expect(text(subagent('done', { state: 'done', startedAt: AT - 5_000, endedAt: AT }))).toBe('Done in 5s.')
-  expect(text(subagent('done', { state: 'done', ...done, result: SECRET }))).toBe('Done in 2m 05s. Used 9.4k tokens.')
+  expect(text(subagent('done', { state: 'done', ...done, result: SECRET }))).toBe('Done in 2m. Used 9.4k tokens.')
 })
 
 test('R4 subagent failed: the first line of the reason, nothing when it carries command text, a stop note when there is none', () => {
   const failed = { state: 'failed' as const, startedAt: AT - 60_000, endedAt: AT }
-  expect(statusSentenceOf(subagent('failed', { ...failed, result: 'agent() threw: timed out\nmore' }), ctx(), HOME)).toEqual({ text: 'Failed after 1m 00s: agent() threw: timed out.', isAlert: true })
-  expect(text(subagent('failed', { ...failed, result: SECRET }))).toBe('Failed after 1m 00s.')
-  expect(text(subagent('failed', failed))).toBe('Failed after 1m 00s; it stopped without an answer.')
+  expect(statusSentenceOf(subagent('failed', { ...failed, result: 'agent() threw: timed out\nmore' }), ctx(), HOME)).toEqual({ text: 'Failed after 1m: agent() threw: timed out.', isAlert: true })
+  expect(text(subagent('failed', { ...failed, result: SECRET }))).toBe('Failed after 1m.')
+  expect(text(subagent('failed', failed))).toBe('Failed after 1m; it stopped without an answer.')
 })
 
 test('R4 workflow run: starting, running, needs you, failed and done', () => {
@@ -264,7 +264,7 @@ test('R4 workflow run: starting, running, needs you, failed and done', () => {
   const bad = runOf([wagent({ id: 'w1', state: 'failed', result: SECRET })], { state: 'failed' })
   expect(text(workflow('failed', bad))).toBe('Failed: verify:band.ts failed; 0 of 1 agents finished.')
   const done = runOf([wagent({ state: 'done' }), wagent({ id: 'w2', state: 'done' })], { state: 'done', endedAt: AT })
-  expect(text(workflow('done', done))).toBe('Done in 6m 00s: 2 of 2 agents finished.')
+  expect(text(workflow('done', done))).toBe('Done in 6m: 2 of 2 agents finished.')
 })
 
 test('R4 archived: the age, after QA when verified, and the worktree note only when it is gone', () => {

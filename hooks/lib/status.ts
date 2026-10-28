@@ -1,7 +1,7 @@
 import type { AgentAsk, AgentRecord, Running, TaskText } from '../../types'
 
 import { lossLineOf, mergedLineOf } from '../components/detail/losses'
-import { durationOf, tokensOf } from '../components/detail/format'
+import { tokensOf } from '../components/detail/format'
 import { pillsOf } from '../components/detail/Tests'
 import type { Status } from '../theme/icons'
 import type { WorkflowAgent } from './agents'
@@ -50,7 +50,7 @@ export const isCommandText = (text: string) => OPERATOR.test(text) || FLAG.test(
 
 const SHELL = ['Bash', 'BashOutput', 'KillShell', 'PowerShell']
 
-const clean = (text: string | undefined) => {
+export const clean = (text: string | undefined) => {
   const flat = oneLine(text ?? '')
   return flat && !isCommandText(flat) ? flat : ''
 }
@@ -190,7 +190,7 @@ function sessionParts(item: Extract<RowItem, { kind: 'session' }>, context: Cont
 
 function agentParts(item: Extract<RowItem, { kind: 'subagent' | 'agent' }>, context: Context, home: string): string[] {
   const agent: Agent = item.agent
-  const durationAt = (end: number | undefined) => durationOf((end ?? context.at) - agent.startedAt)
+  const durationAt = (end: number | undefined) => spanOf(agent.startedAt, end, context.at)
   if (item.status === 'needs') return askedOf(agent.asking, 'it', chatOf(item.kind === 'agent' ? context.rows.find(row => row.id === item.run.parentSessionId) : sessionOfAgent(item.agent, context)))
   if (item.status === 'working') {
     const running = context.running?.[item.id]
@@ -222,7 +222,7 @@ function runParts(item: Extract<RowItem, { kind: 'workflow' }>, context: Context
     return [`Failed: ${failed?.label ?? 'an agent'} ${reason ? `threw “${reason}”` : 'failed'}; ${done} of ${total} agents finished`]
   }
   if (item.status === 'working') return [total ? `Running: ${done} of ${total} agents done` : 'Starting: no agent has started yet']
-  return [`Done in ${durationOf((run.endedAt ?? context.at) - run.startedAt)}: ${done} of ${total} agents finished`]
+  return [`Done in ${spanOf(run.startedAt, run.endedAt, context.at)}: ${done} of ${total} agents finished`]
 }
 
 function archivedParts(item: Extract<RowItem, { kind: 'archived' }>, context: Context): string[] {

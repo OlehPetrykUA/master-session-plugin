@@ -1,4 +1,4 @@
-import { clockOf, nameText, parentsOf } from '../../lib/list'
+import { clockOf, nameText, parentsOf, spanOf } from '../../lib/list'
 import type { Context, RowItem } from '../../lib/list'
 import { modelWordOf } from '../../lib/rowfit'
 import { partOfOf } from '../../lib/status'
@@ -8,7 +8,7 @@ import { Quiet } from '../Quiet'
 import { Strong } from '../Strong'
 import type { Ui } from '../types'
 import { Block } from './Block'
-import { durationOf, runningTimeOf } from './format'
+import { runningTimeOf } from './format'
 import { Lead } from './Lead'
 import { ModelValue } from './Model'
 import { Pair } from './Pair'
@@ -31,7 +31,7 @@ export function SubagentDetail(ui: Ui, props: SubagentDetailProps) {
       ? [Strong(ui, { text: `waiting ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
       : isRunning
         ? [Strong(ui, { text: `running ${runningTimeOf(item, at)}`, isFull: true }), Quiet(ui, { text: `started ${clockOf(agent.startedAt)}`, isFull: true })]
-        : [Strong(ui, { text: `took ${durationOf(end - agent.startedAt)}`, isFull: true }), Quiet(ui, { text: `${clockOf(agent.startedAt)} – ${clockOf(end)}`, isFull: true })]
+        : [Strong(ui, { text: `took ${spanOf(agent.startedAt, end, at)}`, isFull: true }), Quiet(ui, { text: `${clockOf(agent.startedAt)} – ${clockOf(end)}`, isFull: true })]
   const chain = item.kind === 'subagent' ? parentsOf(item, context).map(nameText) : []
   const [part, nth] = item.kind === 'agent' ? partOfOf(item) : ['', '']
   const pair = Pair(ui, {
