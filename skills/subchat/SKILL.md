@@ -13,7 +13,7 @@ This runs inside a validator session. If `/master-session:start` hasn't run in t
 Use it only for pieces that [Execution shape](../start/shape.md#execution-shape) rule 3 gives a worker session; anything else is a subagent (rule 5).
 
 1. Plan and brief the worker as [section 2 of the start skill](../start/SKILL.md#2-brief-the-worker) says, then start it as Session start below. The user typed the command, so it starts in this turn.
-2. Right after, start [the loop](../start/SKILL.md#3-the-loop) if none runs (the ledger's `Heartbeat:` line shows none, not `cron <job id>`), with section 3's `/loop 5m` args (folder `${CLAUDE_PLUGIN_ROOT}/skills/start`), and say so in one line. A loop that already runs picks the worker up from the ledger.
+2. Right after, start [the loop](../start/SKILL.md#3-the-loop) if the ledger's `Heartbeat:` line shows none, or if its `last tick` is over 15 minutes old and `CronList` doesn't list its job, with section 3's `/loop 5m` args (folder `${CLAUDE_PLUGIN_ROOT}/skills/start`), and say so in one line. A loop that already runs picks the worker up from the ledger.
 3. Tell the user in one line: the worker as `name (local_id)`, its persona and its Your checks.
 
 ## Session start
