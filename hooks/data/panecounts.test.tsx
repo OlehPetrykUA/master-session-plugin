@@ -134,3 +134,25 @@ test('cold start: the merged board file wins over the last board call, so the pl
   expect((await textsOf(ui)).length).toBeGreaterThan(0)
   await ui.unmount()
 })
+
+test('cold start keeps the since of a working piece, so the band time fill does not restart', LONG, async ($, on) => {
+  const since = 3_600_000 - 6 * MINUTE
+  const plan = [{ name: 'c', state: 'working', tier: 'T1', since }]
+  const file = JSON.stringify({ v: 1, kind: 'board', at: 3_500_000, masterId: SELF, board: { ...BOARD, plan, since: 3_000_000 } })
+  const child: Child = { files: { [`${HOME}/.claude/state/master-session/boards/${SELF}.json`]: file } }
+  const run = world(on, child)
+  await $.session.start({ cwd: HOME, surface: 'desktop', isInteractive: true })
+  await run.clock.settle()
+  await $.command.run(typed('master-session:info', ''))
+  await run.clock.settle()
+  const bandAlt = async () => {
+    const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    const alt = String((await band.findAll({ type: 'Svg' })).find(one => String(one.props.source).includes('width="4096"'))?.props.alt)
+    await band.unmount()
+    return alt
+  }
+  const first = await bandAlt()
+  expect(first).toContain('20%')
+  await run.clock.advance(1_000)
+  expect(await bandAlt()).toBe(first)
+})
