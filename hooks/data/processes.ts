@@ -120,7 +120,7 @@ async function contextOf($: EngineInterface, masterPid: number): Promise<ProcCon
 async function readOnce($: EngineInterface) {
   const { table, error } = await tableOf($)
   const [loaded, pid] = await Promise.all([run($, ['sysctl', '-n', 'vm.loadavg', 'hw.logicalcpu']).then(ran => (ran.exitCode === 0 ? parseLoad(ran.stdout) : ''), () => ''), error ? 0 : masterOf($, table)])
-  let next: Snapshot = { isRead: true, load: loaded, error: '', model: EMPTY.model, at: await $.clock.now() }
+  let next: Snapshot = { isRead: true, load: loaded, error: '', model: EMPTY.model, at: 0 }
   if (error) next = { ...next, error: `Can’t read processes: ${error}` }
   else if (!pid) next = { ...next, error: 'Can’t read processes: the session’s own process was not found' }
   else {
@@ -133,6 +133,7 @@ async function readOnce($: EngineInterface) {
       next = { ...next, error: `Can’t read processes: ${failure(failed)}` }
     }
   }
+  next = { ...next, at: await $.clock.now() }
   snapshot = next
   const sign = signOf(next.load, next.error, next.model)
   if (sign !== shown) {
@@ -153,7 +154,7 @@ export async function readProcesses($: EngineInterface) {
 export async function processesStateOf($: EngineInterface, at: number): Promise<ProcState | null> {
   if (!(await isMaster($))) return null
   const isOpen = await getProcessesOpen($)
-  if (!isOpen || at - snapshot.at > STALE_MS) drop()
+  if (snapshot !== EMPTY && at - snapshot.at > STALE_MS) drop()
   const asking = await getConfirming($)
   const since = Object.fromEntries([...stopping].map(([key, from]) => [key, Math.max(0, Math.floor((at - from) / 1000))]))
   return {

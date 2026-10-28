@@ -286,6 +286,51 @@ test('rows older than two refresh intervals are not shown while the pane is hidd
   await again.unmount()
 })
 
+test('with the pane shown and a read stalled, rows stay under two refresh intervals and go after', async ($, on) => {
+  const child: Child = { ...CHILD }
+  const { fake, run, ui } = await boot($, on, { child })
+  expect(await shown(ui, 'node')).toBeGreaterThan(0)
+  child.proc = argv => (argv[0] === 'ps' ? undefined : fake.handle(argv))
+  child.slowMs = { git: 600_000 }
+  await run.clock.advance(FILE_MS)
+  await run.clock.advance(FILE_MS - 1_000)
+  await ui.unmount()
+  const young = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await shown(young, 'node')).toBeGreaterThan(0)
+  await young.unmount()
+  await run.clock.advance(2_000)
+  const old = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await shown(old, 'node')).toBe(0)
+  await old.unmount()
+})
+
+test('a pane closed for one refresh and reopened with a stalled read shows no rows of the earlier read', async ($, on) => {
+  const child: Child = { ...CHILD }
+  const { fake, run, ui } = await boot($, on, { child })
+  expect(await shown(ui, 'node')).toBeGreaterThan(0)
+  child.isPaneOpen = false
+  await run.clock.advance(FILE_MS)
+  child.isPaneOpen = true
+  child.proc = argv => (argv[0] === 'ps' ? undefined : fake.handle(argv))
+  child.slowMs = { git: 600_000 }
+  await ui.unmount()
+  const again = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await shown(again, 'node')).toBe(0)
+  await again.unmount()
+})
+
+test('closing the section and opening it again at once with a stalled read shows no rows', async ($, on) => {
+  const child: Child = { ...CHILD }
+  const { fake, ui } = await boot($, on, { child })
+  expect(await shown(ui, 'node')).toBeGreaterThan(0)
+  child.proc = argv => (argv[0] === 'ps' ? undefined : fake.handle(argv))
+  child.slowMs = { git: 600_000 }
+  await click(ui, 'hit-processes-toggle')
+  await click(ui, 'hit-processes-toggle')
+  expect(await shown(ui, 'node')).toBe(0)
+  await ui.unmount()
+})
+
 test('AC18: every lsof names its pids with -p and never -u', async ($, on) => {
   const { fake, ui } = await boot($, on)
   expect(fake.argvs('lsof').length).toBeGreaterThan(0)
