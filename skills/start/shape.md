@@ -33,7 +33,14 @@ Design only when visuals change; logic behind an existing element (which rows sh
 
 ## Names
 
-Names describe the deliverable. `title`: `<Persona> · <task>`, 2 to 5 words, under 60 chars ("Implementer · Row details", not "Worker 3"). `name`: one or two kebab-case words (`[a-z0-9-]`, ≤24), stable for life. An `Agent` `description` or workflow `label`: the task alone, 2 to 5 words. Lists show `name (local_id | agentId)`.
+Names put the persona first, then the task.
+- **Display name:** every subagent, workflow agent and worker session is named `<Persona>: <short task>`. The persona is spelled as [personas.md](personas.md) spells it; the short task is 2 to 5 words in sentence case; the whole name is under 60 chars. Examples: "Implementer: board status lines", "QA verifier: recheck 25c7578", "Designer: launcher artboards", "Code reviewer: piece 2".
+- No bare ids and no generic names ("agent 3", "worker", "fix stuff").
+- A non-persona agent uses its agent type as the first part (`Explore: find token usages`). A `general-purpose` agent running a persona uses that persona.
+- **Where it goes:** the `Agent` call's `description`, every workflow `agent()` `label`, a worker session's `start_session` `title`, and every board row and heading ([board.md](board.md)).
+- **`name`:** the session's stable kebab-case address that SendMessage uses (the short task in kebab-case, `[a-z0-9-]`, at most 24 chars), stable for life. It never shows on the board.
+- A Workflow's `meta.name` stays a short kebab-case task id.
+- Lists show `name (local_id | agentId)`.
 
 ## Worker lifetime
 

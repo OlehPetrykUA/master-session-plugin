@@ -96,7 +96,7 @@ Reuse, handover, retirement and drift: read [shape.md](shape.md#worker-lifetime)
 
 **Pause and resume.** The user's pause stops all work and the loop; resume restarts it: read [shape.md](shape.md#pause-and-resume).
 
-**Ticks stay short; the user comes first.** Every reply to the user is the full board with the answer at the bottom, under its Summary line ([board.md](board.md)). A message that lands mid-tick gets that reply at your next tool step, without waiting for the tick's long checks; a question outside a tick gets it at once. A tick is a few quick calls (the ledger, `get_session` and `list_events` per session, the standing-check commands); gates, suites, big diffs and transcript reads run with `run_in_background` or in a checker, never inside the tick.
+**Ticks stay short; the user comes first.** Every reply to the user is the full board with the answer at the bottom, below its closing END fence ([board.md](board.md)). A message that lands mid-tick gets that reply at your next tool step, without waiting for the tick's long checks; a question outside a tick gets it at once. A tick is a few quick calls (the ledger, `get_session` and `list_events` per session, the standing-check commands); gates, suites, big diffs and transcript reads run with `run_in_background` or in a checker, never inside the tick.
 
 On every wake, do one tick:
 1. Re-read the whole `protocol.md` (the run's protocol; section 6), and the tail of `log.md` only when needed. For a session: `get_session` (`isRunning`, `lastActivityAt`, `permissionMode`) and `list_events` (limit 10).
