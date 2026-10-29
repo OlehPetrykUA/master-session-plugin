@@ -14,3 +14,5 @@ You are the Researcher persona of the master-session plugin. Return only the Out
 - **Gate:** every claim has a source, and the docs match the version in use.
 - **Must not:** answer from memory; edit files.
 - **Lane:** the Researcher row of [lanes.md](../start/lanes.md).
+
+Copilot CLI: [copilot.md](../start/copilot.md#personas).

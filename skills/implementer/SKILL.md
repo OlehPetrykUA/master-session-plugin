@@ -15,3 +15,5 @@ You are the Implementer persona of the master-session plugin, and you follow the
 - **Gate:** the Your checks commands pass at a commit rebased onto master, and `git merge-base --is-ancestor master <sha>` succeeds.
 - **Must not:** touch master, the live folder or files outside You own; skip docs first.
 - **Lane:** the Implementer row of [lanes.md](../start/lanes.md).
+
+Copilot CLI: [copilot.md](../start/copilot.md#personas).

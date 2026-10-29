@@ -143,7 +143,7 @@ rule 'worker: Lane bullet' skills/worker/SKILL.md '**Lane:** your lane is the Im
 rule 'lanes: validator Trash move' skills/start/lanes.md 'its cron jobs; moving Leftovers rows to the Trash with `trash` (section 6) |'
 rule 'start: validator Trash move' skills/start/SKILL.md 'its cron jobs and moving Leftovers rows to the Trash with `trash` (section 6).'
 rule 'lanes: mutual rule' skills/start/lanes.md 'The validator never edits the orchestrator'"'"'s files, and the orchestrator never edits the validator'"'"'s files (its run folder) or this plugin'"'"'s skills.'
-rule 'lanes: architect no file edits' skills/start/lanes.md 'read-only git | File edits outside that Copilot spec file (its agent denies Edit and Write); code'
+rule 'lanes: architect no file edits' skills/start/lanes.md 'read-only git | File edits outside that Copilot spec file (on Claude Code its agent denies Edit and Write); code'
 for r in Implementer Refactorer; do
   row=$(grep "^| $r |" "$root/skills/start/lanes.md")
   for s in '| `git worktree add --detach` of its own worktree; commits in that worktree;' 'a rebase onto master before `ready` (worker skill, Ready to merge) or when the validator says so' 'deleting its own merged branch (`git branch -d`, or `-D` when the git-safety hook proves it merged); `git worktree remove` of its own worktree and `git worktree prune`'; do
@@ -210,6 +210,32 @@ rule 'board: To delete later open rows' skills/start/board.md 'open means not `�
 rule 'stop: unfinished Leftovers stay open' skills/stop/SKILL.md 'lists every unfinished Leftovers row (not `🗑`) as still open'
 rule 'readme: Leftovers example' README.md '  - Leftovers: `~/Downloads/old-build.zip` 1.2 GB · 🗑 11:40'
 rule 'worker: report has Leftovers' skills/worker/SKILL.md 'Evidence / Leftovers / Open'
+for s in $(cd "$root" && ls skills); do
+  if grep -qF 'copilot.md' "$root/skills/$s/SKILL.md"; then echo "ok   copilot: $s links copilot.md"; else echo "FAIL copilot: $s links copilot.md"; fail=1; fi
+done
+if grep -n 'agent denies Edit' "$root"/skills/start/lanes.md | grep -v 'on Claude Code its agent denies' | grep -q .; then echo 'FAIL lanes: denial is Claude Code only'; fail=1; else echo 'ok   lanes: denial is Claude Code only'; fi
+rule 'personas: denial is Claude Code only' skills/start/personas.md 'On Claude Code the read-only personas'"'"' agents deny Edit, Write and NotebookEdit; Copilot ignores that field'
+rule 'copilot: read-only personas get every tool' skills/start/copilot.md 'Copilot ignores `disallowedTools`'
+rule 'copilot: briefs say no edits' skills/start/copilot.md 'each brief says "no edits"'
+rule 'copilot: personas section' skills/start/copilot.md '## personas'
+rule 'copilot: persona worktrees' skills/start/copilot.md '`$HOME/.copilot/worktrees/` wherever a skill says `$HOME/.claude/worktrees/`'
+rule 'copilot: nested task model' skills/start/copilot.md '**Nested `task` calls:** always with a Copilot `model`'
+rule 'copilot: docs and memory CLI fallbacks' skills/start/copilot.md 'basic-memory tool search-notes|read-note|write-note|edit-note|build-context'
+rule 'copilot: web_fetch' skills/start/copilot.md "Copilot's \`web_fetch\`"
+rule 'copilot: stop section' skills/start/copilot.md '## stop'
+rule 'copilot: stop has no cron' skills/start/copilot.md 'There is no cron to delete'
+rule 'copilot: stop with /tasks or Esc' skills/start/copilot.md 'with `/tasks` or by pressing Esc twice'
+rule 'copilot: fix rounds are fresh tasks' skills/start/copilot.md 'Copilot has no resume by ID. Each fix round, rebase or post-merge clean-up is a fresh `task`'
+rule 'copilot: no write_agent reliance' skills/start/copilot.md 'Do not rely on `write_agent`'
+rule 'lanes: validator Copilot run folder' skills/start/lanes.md 'on Copilot `~/.copilot/scratch/<run>/`: protocol.md'
+rule 'copilot: haiku model' skills/start/copilot.md '| haiku | `claude-haiku-5.5` |'
+rule 'copilot: sonnet model' skills/start/copilot.md '| sonnet | `claude-sonnet-5.5` |'
+rule 'copilot: opus model' skills/start/copilot.md '| opus | `claude-opus-5.5` |'
+rule 'copilot: always pass model' skills/start/copilot.md 'Always pass `model` on Copilot'
+rule 'copilot: subagent passes model' skills/start/copilot.md 'a Copilot `model` (see Models) as in the subagent skill'"'"'s step 1'
+rule 'copilot: workflow passes model' skills/start/copilot.md 'each with a Copilot `model` even though the workflow skill says to leave it unset'
+rule 'copilot: run_dynamic_workflow' skills/start/copilot.md '`run_dynamic_workflow` and `copilot workflow run`'
+rule 'copilot: no SendMessage route back' skills/start/copilot.md 'no route from a subagent back to the main session was seen'
 
 never='This session never starts sessions or sub-chats and never calls `start_session`'
 hits=$(grep -rnE 'start_session|stop_session|notify_when_idle|master-session:subchat' "$root/skills" | grep -v '^[^:]*/skills/start/lanes\.md:[0-9]*:| Orchestrator ' | sed "s/$never//" | grep -E 'start_session|stop_session|notify_when_idle|master-session:subchat')

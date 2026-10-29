@@ -1,6 +1,6 @@
 # Personas
 
-A persona is a fixed role the validator hands out. Each one has its own skill, `master-session:<persona>` (mission, inputs, output, gate, must-not), and its own agent of the same name, which preloads that skill as a subagent; a session the user starts with `claude --agent master-session:<persona>` gets it from the plugin's SessionStart hook. The validator runs every persona as a subagent or workflow agent in its own chat. Which personas a piece gets, and its checkers, come from the [tier table](SKILL.md#2-brief-the-worker). The agent frontmatter holds each persona's default model and effort; the tier table says when the `Agent` call overrides it.
+A persona is a fixed role the validator hands out. Each one has its own skill, `master-session:<persona>` (mission, inputs, output, gate, must-not), and its own agent of the same name, which preloads that skill as a subagent; a session the user starts with `claude --agent master-session:<persona>` (Copilot: `copilot --agent master-session:<persona>`) gets it from the plugin's SessionStart hook. The validator runs every persona as a subagent or workflow agent in its own chat. Which personas a piece gets, and its checkers, come from the [tier table](SKILL.md#2-brief-the-worker). The agent frontmatter holds each persona's default model and effort; the tier table says when the `Agent` call overrides it.
 
 | Persona | Runs as | Skill and agent |
 |---|---|---|
@@ -15,7 +15,7 @@ A persona is a fixed role the validator hands out. Each one has its own skill, `
 | Architect | subagent | [`master-session:architect`](../architect/SKILL.md) |
 | Designer | a fresh subagent per design pass | [`master-session:designer`](../designer/SKILL.md) |
 
-The read-only personas' agents deny Edit, Write and NotebookEdit.
+On Claude Code the read-only personas' agents deny Edit, Write and NotebookEdit; Copilot ignores that field, so there only the lane guards them ([copilot.md](copilot.md#read-only-personas)).
 
 ## Unregistered persona
 
