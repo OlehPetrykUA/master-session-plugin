@@ -11,7 +11,7 @@ Worktrees live at `$HOME/.copilot/worktrees/wt-<repo>-<branch>`. Never `/delegat
 Run the same protocol with what Copilot has:
 - **Persona subagents:** the `task` tool, as above; `/fleet` runs several in parallel.
 - **Loop and board:** no heartbeat. Do a tick on every user turn and every subagent result, and post the chat board as [board.md](board.md) shows; its header's next tick reads "on your next message".
-- **Ledger:** Copilot has no session scratchpad: keep `protocol.md` and `log.md` in `~/.copilot/scratch/<run>/`.
+- **Ledger:** Copilot keeps the run folder (start §6) at `~/.copilot/scratch/<run>/` instead of `claude-runs/`, with the same `protocol.md`, `log.md` and `summary.md`.
 
 ## worker
 

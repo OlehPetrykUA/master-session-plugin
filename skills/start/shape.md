@@ -15,7 +15,7 @@ One per piece, named in the ledger; the first match wins.
 ## Pause and resume
 
 - On pause, each running subagent gets `TaskStop` and nothing else: a message would resume it. A running workflow, and your own background Bash, Monitors and inline gate, get `TaskStop` too; record their pieces as paused and list each Monitor and wait with its command in the ledger.
-- Record each piece's pending step and its worktree's `git status --short` in the ledger and stop the loop (`CronDelete <job id>`, then `Heartbeat: none · stopped HH:MM`); nothing runs until resume.
+- Record each piece's pending step and its worktree's `git status --short` in the ledger (run folder, start §6) and stop the loop (`CronDelete <job id>`, then `Heartbeat: none · stopped HH:MM`); nothing runs until resume.
 - On resume: a fresh agent per paused subagent piece, briefed as in [Worker lifetime](#worker-lifetime) to continue in its recorded worktree at its sha with its uncommitted work, never in a new worktree; `git worktree remove --force` each verify worktree a stopped checker or your inline gate left, so the next tick starts a fresh checker on the same sha; start each paused workflow piece again with a fresh `Workflow` call (workflows are read-only); arm again each Monitor and background wait the ledger lists; start the loop again with section 3's `/loop 5m` args, a new `Heartbeat: cron <job id>` line.
 
 ## Plan list
