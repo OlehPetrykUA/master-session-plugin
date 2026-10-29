@@ -138,8 +138,18 @@ rule 'lanes: already happened needs-you' skills/start/lanes.md '4. add a ✋ Nee
 rule 'lanes: already happened log' skills/start/lanes.md '5. log it.'
 rule 'lanes: hard ban proposed' skills/start/lanes.md 'a PreToolUse lane guard is proposed, not installed'
 rule 'lanes: no skill writes the marker' skills/start/lanes.md 'no skill writes the marker'
-rule 'start: Lanes sentence' skills/start/SKILL.md '**Lanes:** every role works only inside its lane ([lanes.md](lanes.md)) and runs the lane check before every Edit, Write, commit, push or Trash move.'
-rule 'worker: Lane bullet' skills/worker/SKILL.md '**Lane:** your lane is the Implementer row of [lanes.md](../start/lanes.md)'
+rule 'start: Lanes sentence' skills/start/SKILL.md '**Lanes:** every role works only inside its lane ([lanes.md](lanes.md)) and runs the lane check before every write by any tool or shell command.'
+rule 'worker: Lane bullet' skills/worker/SKILL.md '**Lane:** your lane is the Implementer or Refactorer row of [lanes.md](../start/lanes.md). Run the lane check before every write by any tool or shell command: Edit, Write, NotebookEdit, a shell write, a git command that changes files or refs (commit, merge, rebase, reset, branch or tag changes, worktree add/remove), a push, or a move to the Trash;'
+rule 'lanes: validator Trash move' skills/start/lanes.md 'its cron jobs; moving Leftovers rows to the Trash with `trash` (section 6) |'
+rule 'start: validator Trash move' skills/start/SKILL.md 'its cron jobs and moving Leftovers rows to the Trash with `trash` (section 6).'
+rule 'lanes: mutual rule' skills/start/lanes.md 'The validator never edits the orchestrator'"'"'s files, and the orchestrator never edits the validator'"'"'s files (its run folder) or this plugin'"'"'s skills.'
+rule 'lanes: architect no file edits' skills/start/lanes.md 'read-only git | File edits (its agent denies Edit and Write); code'
+rule 'lanes: spec writer creates doc' skills/start/lanes.md 'the project'"'"'s spec doc and its overview tab when none exists'
+rule 'lanes: spec writer Copilot worktree' skills/start/lanes.md '`docs/specs/<feature>.md` in its own `wt-<repo>-spec-<feature>` worktree'
+rule 'lanes: architect no-spec tab' skills/start/lanes.md 'with no spec, the feature'"'"'s tab (and the doc when the project has none) with the brief'"'"'s ACs quoted'
+rule 'lanes: architect Copilot worktree' skills/start/lanes.md '`docs/specs/<feature>.md` in its own `wt-<repo>-design-<feature>` worktree'
+rule 'lanes: designer creates canvas' skills/start/lanes.md 'the project'"'"'s canvas when none exists; its scratch subfolder'
+rule 'lanes: check before every write' skills/start/lanes.md 'before every write by any tool or shell command: Edit, Write, NotebookEdit, a shell write, a git command that changes files or refs (commit, merge, rebase, reset, branch or tag changes, worktree add/remove), a push, or a move to the Trash, checks:'
 for p in implementer:Implementer refactorer:Refactorer reviewer:'Code reviewer' qa-verifier:'QA verifier' design-checker:'Design checker' researcher:Researcher investigator:Investigator spec-writer:'Spec writer' architect:Architect designer:Designer; do
   n=$(grep -cF -- "- **Lane:** the ${p#*:} row of [lanes.md](../start/lanes.md)." "$root/skills/${p%%:*}/SKILL.md")
   if [ "$n" -eq 1 ]; then echo "ok   ${p%%:*}: one Lane line"; else echo "FAIL ${p%%:*}: one Lane line ($n)"; fail=1; fi

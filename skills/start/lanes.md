@@ -4,23 +4,23 @@ Part of the [start](SKILL.md) skill. One row per role. Everything not in May wri
 
 | Role | May write | Git and shell | Never |
 |---|---|---|---|
-| Validator (this session) | Its run folder (`claude-runs/<date>-<run>/` protocol.md, log.md, summary.md); its memory-tool notes; the one `claude-runs/` line in `$(git rev-parse --git-path info/exclude)`; its own verify worktrees `wt-<repo>-verify-<sha>` (create and remove only, never edit inside); its cron jobs | `merge --ff-only` of a verified sha; a push or PR only when the task asks or the user approved | Edit or Write on any tracked file in any repo; a commit of its own; a rebase; skill, doc or config edits |
+| Validator (this session) | Its run folder (`claude-runs/<date>-<run>/` protocol.md, log.md, summary.md); its memory-tool notes; the one `claude-runs/` line in `$(git rev-parse --git-path info/exclude)`; its own verify worktrees `wt-<repo>-verify-<sha>` (create and remove only, never edit inside); its cron jobs; moving Leftovers rows to the Trash with `trash` (section 6) | `merge --ff-only` of a verified sha; a push or PR only when the task asks or the user approved | Edit or Write on any tracked file in any repo; a commit of its own; a rebase; skill, doc or config edits |
 | Implementer | Its own detached worktree `wt-<repo>-<name>`, only the files under the brief's `## You own`; its scratch subfolder | Commits in that worktree; a rebase when the validator says so | A push; a merge; main; the live checkout; another worktree; trashing a leftover |
 | Refactorer | Its own detached worktree `wt-<repo>-<name>`, only the files under the brief's `## You own`; its scratch subfolder | Commits in that worktree; a rebase when the validator says so | A push; a merge; main; the live checkout; another worktree; trashing a leftover |
 | Investigator | Its own `wt-<repo>-investigate-<name>` worktree (temporary edits, never committed); its scratch subfolder | Read-only git, runs and bisects in that worktree | A commit; a push; a merge; main; the live checkout; another worktree |
-| QA verifier | Its own verify worktree (create and remove); its scratch subfolder | Checks and gates in that worktree | File edits (its agent denies Edit and Write); a commit; a push; a merge |
+| QA verifier | Its own verify worktree (create and remove); its scratch subfolder | Checks and gates in that worktree; deleting its own merged branch | File edits outside its scratch subfolder (its agent denies Edit and Write); a commit; a push; a merge |
 | Code reviewer | Its own verify worktree (create and remove); its scratch subfolder | Read-only git | File edits (its agent denies Edit and Write); a commit; a push; a merge |
 | Design checker | Its own verify worktree (create and remove); its scratch subfolder | Read-only | File edits (its agent denies Edit and Write); a commit; a push; a merge |
 | Researcher | Nothing: read only | Read-only | Any write |
-| Spec writer | The feature's tab in the project's spec doc only | None | Code; designs; another tab or doc |
-| Architect | The Technical design section of that tab only | Read-only git | Code; designs; the spec's requirements |
-| Designer | The design canvas artboards only | None | UI code; the spec |
+| Spec writer | The feature's tab in the project's spec doc; the project's spec doc and its overview tab when none exists; on Copilot, `docs/specs/<feature>.md` in its own `wt-<repo>-spec-<feature>` worktree | On Copilot, one commit in that worktree; else none | Code; designs; another feature's tab; a second doc |
+| Architect | The Technical design section of that tab; with no spec, the feature's tab (and the doc when the project has none) with the brief's ACs quoted; on Copilot, `docs/specs/<feature>.md` in its own `wt-<repo>-design-<feature>` worktree | On Copilot, one commit in that worktree; else read-only git | File edits (its agent denies Edit and Write); code; designs; the spec's requirements |
+| Designer | The design canvas artboards; the project's canvas when none exists; its scratch subfolder | None | UI code; the spec |
 | Orchestrator (owned by the chat-orchestrator skill, listed so both skills agree) | Its run folder `claude-runs/<date>-orchestrator/`; memory notes; cron; messages; session management on the user's turns (start, unarchive, stop, detach) | `merge --ff-only` and pushes the user approved | Project code, skills, docs or config edits; project commits. Every change goes to the owning chat or a new session |
 
-"The validator sometimes edits" means only its own files above: the run folder, memory notes, the exclude line, its verify worktrees and its cron jobs. That is the list of its only writes in [start](SKILL.md), first paragraph.
+"The validator sometimes edits" means only its own files above: the run folder, memory notes, the exclude line, its verify worktrees, its cron jobs and its Trash moves of Leftovers rows. That is the list of its only writes in [start](SKILL.md), first paragraph.
 
-- The validator never edits the orchestrator's files, and the orchestrator never edits this plugin's skills.
-- **Lane check:** every role, before every Edit, Write, NotebookEdit, commit, push or move to the Trash, checks: `lane check: <role> · <action> <path> · in my lane?`
+- The validator never edits the orchestrator's files, and the orchestrator never edits the validator's files (its run folder) or this plugin's skills.
+- **Lane check:** every role, before every write by any tool or shell command: Edit, Write, NotebookEdit, a shell write, a git command that changes files or refs (commit, merge, rebase, reset, branch or tag changes, worktree add/remove), a push, or a move to the Trash, checks: `lane check: <role> · <action> <path> · in my lane?`
 - **Out of lane, before:** stop, don't do it, and hand it to the owner. The validator writes a worker brief. A worker puts it under `Open:` / NEEDS_CONTEXT. The orchestrator sends it to the owning chat, or to a new session the user creates. Log `lane: <role> stopped <action> <path> → <owner>` in log.md, or in the report for a worker.
 - **Out of lane, already happened:**
   1. stop;

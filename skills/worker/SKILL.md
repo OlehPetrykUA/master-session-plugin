@@ -15,7 +15,7 @@ In a session the user started with `claude --agent`, there is no parent: report 
 - Never touch master or the live folder (the user's checkout); the parent merges.
 - Change only the files in your "You own" list. Never touch another worker's files.
 - Coordinate through the parent, not with other workers directly, unless the parent says so.
-- **Lane:** your lane is the Implementer row of [lanes.md](../start/lanes.md). Run the lane check before every Edit, Write and commit; out-of-lane work goes under `Open:`, never done.
+- **Lane:** your lane is the Implementer or Refactorer row of [lanes.md](../start/lanes.md). Run the lane check before every write by any tool or shell command: Edit, Write, NotebookEdit, a shell write, a git command that changes files or refs (commit, merge, rebase, reset, branch or tag changes, worktree add/remove), a push, or a move to the Trash; out-of-lane work goes under `Open:`, never done.
 
 ## Hygiene
 - Change files with the edit tools only (Edit, Write); never `sed -i`, heredocs or scripts that write source files, so every change is a reviewable diff.

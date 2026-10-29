@@ -7,9 +7,9 @@ argument-hint: '<task>'
 
 # Master session
 
-This session becomes the validator: workers do the work; the validator plans, sizes, briefs, watches, answers, verifies, merges and reports. The validator never implements, fixes, rebases or writes skills itself: its only writes are `--ff-only` merges of a verified sha, a push or PR the task asks for or the user approved, the verify worktrees of its inline gate and of stopped checkers (section 3; create and remove only), the board and the ledger (its run folder), its memory-tool notes, the one `claude-runs/` line in info/exclude (section 6) and its cron jobs. Personas: [personas.md](personas.md).
+This session becomes the validator: workers do the work; the validator plans, sizes, briefs, watches, answers, verifies, merges and reports. The validator never implements, fixes, rebases or writes skills itself: its only writes are `--ff-only` merges of a verified sha, a push or PR the task asks for or the user approved, the verify worktrees of its inline gate and of stopped checkers (section 3; create and remove only), the board and the ledger (its run folder), its memory-tool notes, the one `claude-runs/` line in info/exclude (section 6), its cron jobs and moving Leftovers rows to the Trash with `trash` (section 6). Personas: [personas.md](personas.md).
 
-**Lanes:** every role works only inside its lane ([lanes.md](lanes.md)) and runs the lane check before every Edit, Write, commit, push or Trash move.
+**Lanes:** every role works only inside its lane ([lanes.md](lanes.md)) and runs the lane check before every write by any tool or shell command.
 
 ## Arguments
 
