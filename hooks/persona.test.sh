@@ -124,7 +124,26 @@ rule 'board: opening fence' skills/start/board.md '━━━━━━━━━�
 rule 'board: closing fence' skills/start/board.md '━━━━━━━━━━ 🏭 END ━━━━━━━━━━'
 rule 'board: answer below the closing fence' skills/start/board.md 'below the closing fence, never inside the board'
 rule 'start: CronDelete stops the loop' skills/start/SKILL.md 'CronDelete <job id>'
-rule 'start: tick reads board.md' skills/start/shape.md '${CLAUDE_SKILL_DIR}/shape.md and ${CLAUDE_SKILL_DIR}/board.md'
+rule 'start: tick reads board.md' skills/start/shape.md '${CLAUDE_SKILL_DIR}/shape.md, ${CLAUDE_SKILL_DIR}/board.md'
+rule 'start: tick reads lanes.md' skills/start/shape.md '${CLAUDE_SKILL_DIR}/board.md and ${CLAUDE_SKILL_DIR}/lanes.md, and <run folder>/protocol.md'
+for r in Validator Implementer Refactorer Investigator 'QA verifier' 'Code reviewer' 'Design checker' Researcher 'Spec writer' Architect Designer Orchestrator; do
+  if grep -q "^| $r[ |]" "$root/skills/start/lanes.md"; then echo "ok   lanes: row $r"; else echo "FAIL lanes: row $r"; fail=1; fi
+done
+rule 'lanes: lane check line' skills/start/lanes.md '`lane check: <role> · <action> <path> · in my lane?`'
+rule 'lanes: out-of-lane log line' skills/start/lanes.md '`lane: <role> stopped <action> <path> → <owner>`'
+rule 'lanes: already happened stop' skills/start/lanes.md '1. stop;'
+rule 'lanes: already happened revert nothing' skills/start/lanes.md '2. revert nothing that belongs to someone else;'
+rule 'lanes: already happened owner' skills/start/lanes.md '3. tell the owner;'
+rule 'lanes: already happened needs-you' skills/start/lanes.md '4. add a ✋ Needs-you item for the user;'
+rule 'lanes: already happened log' skills/start/lanes.md '5. log it.'
+rule 'lanes: hard ban proposed' skills/start/lanes.md 'a PreToolUse lane guard is proposed, not installed'
+rule 'lanes: no skill writes the marker' skills/start/lanes.md 'no skill writes the marker'
+rule 'start: Lanes sentence' skills/start/SKILL.md '**Lanes:** every role works only inside its lane ([lanes.md](lanes.md)) and runs the lane check before every Edit, Write, commit, push or Trash move.'
+rule 'worker: Lane bullet' skills/worker/SKILL.md '**Lane:** your lane is the Implementer row of [lanes.md](../start/lanes.md)'
+for p in implementer:Implementer refactorer:Refactorer reviewer:'Code reviewer' qa-verifier:'QA verifier' design-checker:'Design checker' researcher:Researcher investigator:Investigator spec-writer:'Spec writer' architect:Architect designer:Designer; do
+  n=$(grep -cF -- "- **Lane:** the ${p#*:} row of [lanes.md](../start/lanes.md)." "$root/skills/${p%%:*}/SKILL.md")
+  if [ "$n" -eq 1 ]; then echo "ok   ${p%%:*}: one Lane line"; else echo "FAIL ${p%%:*}: one Lane line ($n)"; fail=1; fi
+done
 rule 'start: ledger head order' skills/start/SKILL.md 'Run (name, repos, master ref, validator local_id); User'"'"'s words'
 rule 'start: protocol.md' skills/start/SKILL.md '`protocol.md` (the head)'
 rule 'start: log.md' skills/start/SKILL.md '`log.md` (the appended log)'

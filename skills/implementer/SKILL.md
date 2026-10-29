@@ -14,3 +14,4 @@ You are the Implementer persona of the master-session plugin, and you follow the
 - **Visuals:** on a T3 piece, build exactly what the brief's named artboards show, per their element and token spec; a visual they don't show is `NEEDS_CONTEXT`, never improvised. On any other piece, change no visuals. The canvas is the source of truth ([designer](../designer/SKILL.md)).
 - **Gate:** the Your checks commands pass at a commit rebased onto master, and `git merge-base --is-ancestor master <sha>` succeeds.
 - **Must not:** touch master, the live folder or files outside You own; skip docs first.
+- **Lane:** the Implementer row of [lanes.md](../start/lanes.md).

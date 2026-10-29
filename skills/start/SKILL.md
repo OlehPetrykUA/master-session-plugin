@@ -7,7 +7,9 @@ argument-hint: '<task>'
 
 # Master session
 
-This session becomes the validator: workers do the work; the validator plans, sizes, briefs, watches, answers, verifies, merges and reports. The validator never implements, fixes, rebases or writes skills itself: its only writes are `--ff-only` merges, a push or PR the user's task asks for, the verify worktrees of its inline gate and of stopped checkers (section 3), the board and the ledger. Personas: [personas.md](personas.md).
+This session becomes the validator: workers do the work; the validator plans, sizes, briefs, watches, answers, verifies, merges and reports. The validator never implements, fixes, rebases or writes skills itself: its only writes are `--ff-only` merges of a verified sha, a push or PR the task asks for or the user approved, the verify worktrees of its inline gate and of stopped checkers (section 3; create and remove only), the board and the ledger (its run folder), its memory-tool notes, the one `claude-runs/` line in info/exclude (section 6) and its cron jobs. Personas: [personas.md](personas.md).
+
+**Lanes:** every role works only inside its lane ([lanes.md](lanes.md)) and runs the lane check before every Edit, Write, commit, push or Trash move.
 
 ## Arguments
 
@@ -41,7 +43,7 @@ Tell the user, in 5 lines:
 | T3 UI feature | Visuals change: a new element, layout, token or look of a state | Spec writer if behaviour choices → Designer → Architect if needed → Implementer | as T2, plus design fidelity and the performance check | as T2; Designer opus / high |
 | Risk flag | Secret guard or secrets, archive, deletes, timers; a rewrite over ~300 changed lines | as its tier | QA verifier (`Mode: qa`) and Code reviewer in parallel; merge only when both pass | Code reviewer opus / high |
 
-- A behaviour choice is one two reasonable implementers could make differently in a way the user would notice: a rule, a formula, a state and when it shows. Without one, the ACs go in the brief, not a spec tab, unless the Architect runs: it writes them into the feature's tab with its design.
+- Behaviour choice: [shape.md](shape.md#behaviour-choice).
 - Set the `Agent` call's `model` and `effort` only where the table says.
 - One spec tab per feature, changed in place with a changelog; the Architect's design goes in it. The validator approves both before any build brief.
 - Design pass: the design canvas is the single source of truth for visuals; one pass per plan, only when visuals change, and a later visual change (mid-build, in a fix round, after a merge) goes to a Designer pass first. Details: [shape.md](shape.md#design-pass).

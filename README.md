@@ -68,6 +68,10 @@ Each persona is a skill plus an agent of the same name.
 
 To run one as your own session: `claude --agent master-session:<persona>`. The SessionStart hook `hooks/persona.sh` then loads its skill.
 
+## Lanes
+
+Every role, the master session and the chat orchestrator included, has one allowlist of what it may write, in `skills/start/lanes.md`; everything else is forbidden. Before every edit, commit, push or Trash move, a role runs a lane check. Out-of-lane work is stopped and handed to its owner; if it already happened, the role stops, reverts nothing of anyone else's, tells the owner, adds a decision for you and logs it. A PreToolUse hook that enforces the lanes is proposed, not installed.
+
 ## The board
 
 The master session posts the full board on every tick and in every reply. It opens with a `🏭 BOARD` fence and closes with a `🏭 END` fence right after 🔭 Current state. A reply to you puts its answer below the END fence.
@@ -111,7 +115,7 @@ Every worker is named `<Persona>: <short task>`.
   - branch `setup-import` · Implementer: setup import · piece dropped · owner retired ⚠
   - Leftovers: `~/my-app/dist` 786 MB · Implementer: setup build · after merge
   - Leftovers: `~/Downloads/old-build.zip` 1.2 GB · 🗑 11:40
-  - 🗑 In the Trash: 2 items, 1.2 GB
+  - 🗑 In the Trash: 1 item, 1.2 GB
 - ✅ PC load: CPU 62% idle · load 5.1 / 10 cores
 
 **📦 Results so far**
@@ -143,7 +147,7 @@ The run lives in a visible run folder, `claude-runs/<YYYY-MM-DD>-<run>/` in the 
 
 | Path | Contents |
 |---|---|
-| `skills/start`, `stop`, `subagent`, `workflow` | The four commands. `start` also holds `board.md`, `shape.md`, `answering.md`, `personas.md` and `copilot.md`. |
+| `skills/start`, `stop`, `subagent`, `workflow` | The four commands. `start` also holds `board.md`, `shape.md`, `answering.md`, `lanes.md`, `personas.md` and `copilot.md`. |
 | `skills/worker` | The builder-subagent protocol. |
 | `skills/<persona>` and `agents/<persona>.md` | The ten personas. |
 | `hooks/` | `persona.sh`, the SessionStart hook, and `persona.test.sh`. |
