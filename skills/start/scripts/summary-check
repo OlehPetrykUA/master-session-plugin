@@ -316,14 +316,15 @@ def check(path, archived):
                         v(n, "S-needs", "expected a when other than `now` on a 🟡 item")
 
     crow = table("## 🛡 Checks", "S-checks", "| | Check | State |", "|:-:|---|---|", 3)
-    if crow:
+    if "## 🛡 Checks" in bounds and (crow or not any(r == "S-checks" for _, r, _ in out)):
         names = [c[1] for _, c in crow]
         k = 0
         while k < len(names) and names[k] == "Git":
             k += 1
         if k == 0 or names[k:] != CHECK_NAMES[1:]:
-            v(crow[0][0], "S-checks", "expected rows Git (one or more), To delete later, Leftovers, PC load, Disk "
-              "in that order, found " + ", ".join(names))
+            v(crow[0][0] if crow else bounds["## 🛡 Checks"][0] + 1, "S-checks",
+              "expected rows Git (one or more), To delete later, Leftovers, PC load, Disk in that order, found "
+              + (", ".join(names) or "no rows"))
     for n, (mark, name, state) in crow:
         if mark not in ("✅", "🟡", "🔴", "⚠"):
             v(n, "S-checks", "expected marker ✅ 🟡 🔴 or ⚠️, found `" + mark + "`")
