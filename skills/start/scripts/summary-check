@@ -28,6 +28,8 @@ NEED = re.compile(r"([0-9]+)\. (🔴|🟡)(🖥|🔁|🗑|✋|🔑) \*\*[^*]+\*\
 HR = re.compile(r"\s*([-*_])(\s*\1){2,}\s*")
 CODE = re.compile(r"`[^`\n]*`")
 BOLD = re.compile(r"\*\*[^*]+\*\*")
+EMPH = re.compile(r"[\[\]`]|~~|(?:^|\s)_|_(?:\s|$)")
+FENCE = re.compile(r"\s*(?:(?:[-*+]|[0-9]+[.)])\s+)*(?:```|~~~)")
 ORDER = {"🟡": 0, "▶": 1, "⏸": 2, "✅": 3}
 PC_MARK = {"calm": "✅", "busy": "🟡", "overloaded": "⚠"}
 CHECK_NAMES = ["Git", "To delete later", "Leftovers", "PC load", "Disk"]
@@ -43,6 +45,8 @@ def cells(line):
 
 
 def master_name_error(text):
+    if EMPH.search(text):
+        return "expected plain text without link, code or emphasis, found `" + text + "`"
     m = NAME.fullmatch(text)
     if m:
         return None
@@ -134,15 +138,17 @@ def check(path, archived):
             v(n, "S-file", "expected no tab, found a tab")
         if l != l.rstrip():
             v(n, "S-file", "expected no trailing whitespace, found some")
-        if l.lstrip().startswith(("```", "~~~")):
+        if FENCE.match(l):
             v(n, "S-file", "expected no fenced code block, found a fence")
         if "━" in l:
             v(n, "S-file", "expected no ━ line, found one")
         if HR.fullmatch(l):
             v(n, "S-file", "expected no horizontal rule, found one")
-        for tag in re.findall(r"<[A-Za-z/!][^<>]*>", CODE.sub("", l)):
-            if not (tag == "<br>" and i in checks_lines):
-                v(n, "S-file", "expected no HTML tag, found " + tag)
+        segs = CODE.sub("", l).split("|")
+        if i in checks_lines and len(segs) == 5 and segs[0] == "" and segs[4] == "":
+            segs[3] = segs[3].replace("<br>", "")
+        for tag in re.findall(r"<[A-Za-z/!][^<>]*>", "|".join(segs)):
+            v(n, "S-file", "expected no HTML tag, found " + tag + " (`<br>` only in a 🛡 Checks State cell)")
         if l == "" and blank:
             v(n, "S-file", "expected one blank line, found two in a row")
         blank = l == ""
@@ -165,7 +171,9 @@ def check(path, archived):
     if hdr:
         idle, word = hdr["idle"], hdr["word"]
         want = "calm" if idle >= 40 else "overloaded" if idle < 15 else None
-        if (want and word != want) or (not want and word == "calm"):
+        if idle > 100:
+            v(3, "S-pc", "expected idle 0 to 100, found " + str(idle))
+        elif (want and word != want) or (not want and word == "calm"):
             v(3, "S-pc", "expected " + (want or "busy or overloaded") + " at " + str(idle) + "% idle, found " + word)
         lt = time.localtime(mtime)
         diff = (lt.tm_hour * 60 + lt.tm_min - hdr["min"]) % 1440
@@ -396,9 +404,12 @@ def check(path, archived):
 
     if hdr:
         got = hdr["n"]
+        bad_rows = any(r == "S-rows" for _, r, _ in out)
+        bad_needs = any(r == "S-needs" for _, r, _ in out)
         for label, k, want in (("▶", 0, counts["▶"]), ("🟡", 1, counts["🟡"]), ("🔴", 2, reds),
                                ("⏸", 3, counts["⏸"]), ("✅", 4, counts["✅"])):
-            if got[k] != want and (("## 🙋 Needs you" if label == "🔴" else second) in bounds):
+            if got[k] != want and (("## 🙋 Needs you" if label == "🔴" else second) in bounds) \
+                    and not (bad_needs if label == "🔴" else bad_rows):
                 v(3, "S-counts", "expected " + label + " " + str(want) + ", found " + str(got[k])
                   + " (fix: set it to " + str(want) + ")")
 
@@ -512,8 +523,8 @@ def self_test():
                 fails.append(n + ": name must be bad-<rule id>-<what>.md")
                 continue
             covered.add(m.group(1))
-            if rc != 1 or rules_of(out) != {m.group(1)}:
-                fails.append(n + ": expected only " + m.group(1) + ", got exit " + str(rc) + " " + str(sorted(rules_of(out))))
+            if rc != 1 or rules_of(out) != {m.group(1)} or len(out.strip().split("\n")) != 1:
+                fails.append(n + ": expected exactly one " + m.group(1) + " line, got exit " + str(rc) + " " + out.strip())
         for r in RULES:
             if r not in covered:
                 fails.append("no bad fixture for " + r)

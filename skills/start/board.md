@@ -101,6 +101,6 @@ The board is posted in chat in every reply to the user; a tick only rewrites sum
 
 ## summary.md
 
-The format of summary.md is [board-spec.md](board-spec.md): strict MUST rules and one example. Write it from the same facts as the chat board, never pasted from it.
+The format of summary.md is [board-spec.md](board-spec.md): strict MUST rules and two examples, one per kind. Write it from the same facts as the chat board, never pasted from it.
 
 After every rewrite of summary.md, run `python3 <this skill's folder>/scripts/summary-check <run folder>/summary.md` and fix every violation before posting, sending a status line or ending the tick; a summary.md with violations is never left as the latest. In Claude Code this skill's folder is `${CLAUDE_SKILL_DIR}`, which is expanded only in a loaded skill; in Copilot CLI it is `skills/start` in the plugin folder, two levels up from a skill file.
