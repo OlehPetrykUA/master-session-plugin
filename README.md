@@ -141,7 +141,7 @@ These lines are the primary signal. A tick is only a safeguard: `/loop 5m`, a re
 
 ## The run protocol
 
-The run lives in a visible run folder, `claude-runs/<YYYY-MM-DD>-<run>/` in the session's working folder, with three files: `protocol.md` (the head: run, your words, hard rules, plan, done criteria), `log.md` (the appended log) and `summary.md` (a readable status page rewritten on every tick and reply, while ticks post nothing in chat: open it from the app's files pane any time). The first two are re-read on every tick and survive compaction. The memory tool gets milestones, and a copy of protocol and log at wrap-up or on stop. The run folder is kept after Done.
+The run lives in a visible run folder, `claude-runs/<YYYY-MM-DD>-<run>/` in the session's working folder, with three files: `protocol.md` (the head: run, your words, hard rules, plan, done criteria), `log.md` (the appended log) and `summary.md` (a readable status page rewritten on every tick and reply, while ticks post nothing in chat: open it from the app's files pane any time; its strict format is `skills/start/board-spec.md`, and `skills/start/scripts/summary-check` must print nothing for it). The first two are re-read on every tick and survive compaction. The memory tool gets milestones, and a copy of protocol and log at wrap-up or on stop. The run folder is kept after Done.
 
 ## Repo layout
 

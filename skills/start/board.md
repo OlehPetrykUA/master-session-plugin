@@ -72,7 +72,7 @@ The board is posted in chat in every reply to the user; a tick only rewrites sum
 **Answer:** yes, Implementer: conductor build is on master as 07ab1b7 and its check passed.
 
 - **Header:** the fence line `━━━━━━━━━━ 🏭 BOARD · HH:MM · run <name> ━━━━━━━━━━` (the ledger's run name), then the line `🟢 N working · 🟡 N waiting · 🔴 N need you · ✅ N done · next tick HH:MM`: the counts of Quick-table rows by marker and the next tick time from the Heartbeat line.
-- **summary.md:** every tick and every reply overwrite `<run folder>/summary.md` (start §6) with the Write tool, in its own template ([below](#summarymd-template)), not the chat board. It has no fence lines: no ━━━ lines, no `---` dividers; the fences stay in chat posts only. The user opens it from the app's files pane at any time.
+- **summary.md:** every tick and every reply overwrite `<run folder>/summary.md` (start §6) with the Write tool, in the format of [board-spec.md](board-spec.md) ([below](#summarymd)), not the chat board. The user opens it from the app's files pane at any time.
 - **Closing fence:** `━━━━━━━━━━ 🏭 END ━━━━━━━━━━`, right after 🔭 Current state.
 - **Order:** header, Quick table, mini tables, 📋 Plan, 🙋 Needs you, 🛡 Standing checks, 📦 Results so far, 🔭 Current state, END fence; the Answer follows below it.
 - **Names:** every worker is shown by its display name `<Persona>: <short task>` ([shape.md Names](shape.md#names)) in every place on the board that names who is doing something: the Quick table rows, the mini table headings, each Plan step, Needs you, Standing checks, Results lines, Current state and the Answer. The board lists only subagents and workflow agents, every name as plain text with no link. Agent IDs never show on the board. The Plan keeps the ledger's piece names (start §2, stable for life) and each ▶ step names its active worker by display name. A piece with no worker yet, or done inline, appears only in the Plan.
@@ -99,60 +99,8 @@ The board is posted in chat in every reply to the user; a tick only rewrites sum
 - **Answer:** only when replying to the user: the answer to their message, at the bottom, below the closing fence, never inside the board. The full board always comes first, answer at the bottom.
 - A tick posts nothing in chat: it rewrites summary.md and updates `last tick`. It posts one short line only when a new 🔴 Needs-you item appears, and still sends the `PushNotification`. A reply to the user always posts the full board in chat, answer below END, and rewrites summary.md at the same moment. There is no other short form.
 
-## summary.md template
+## summary.md
 
-Written from the same facts as the chat board, never pasted from it. Bold the key items. Fill every section; `## ⏸ Later` is optional, one line, only when a later backlog (dropped or deferred extras) exists. The Checks rows are Git (one row per repo), To delete later, Leftovers, PC load and Disk. The Leftovers row lists the open rows of `protocol.md` → Leftovers (`| Path | Size | Owner | Why | When it goes |`), each as path, size, owner and when it goes, then `🗑 In the Trash: <n> items, <size>` summed from the `🗑` rows. Disk is the Avail column of `df -g ~` (GiB blocks, `man df`). PC reads calm, busy or overloaded.
+The format of summary.md is [board-spec.md](board-spec.md): strict MUST rules and one example. Write it from the same facts as the chat board, never pasted from it.
 
-# 🏭 setup-wizard summary
-
-> **Updated 19:20** · ▶ 1 working · 🟡 1 waiting · 🔴 0 need you · ✅ 2 done · 🖥 PC calm (62% idle) · 💾 33 GB free
-
-## 🎯 Goal right now
-
-**A setup wizard that installs and configures my-app in one run.**
-
-## 🤖 Workers
-
-| | Worker | Doing now | Next |
-|:-:|---|---|---|
-| ▶ | **Implementer: setup build** | Rewriting setup screens | Smoke, check, amend |
-| 🟡 | **QA verifier: check setup build** | Waiting on the ready sha | Verdict |
-| ✅ | **Implementer: conductor build** | Done · 07ab1b7 | — |
-
-## 🗺 Plan
-
-| Step | Tier | Who | Status |
-|---|---|---|:-:|
-| Conductor build | T2 | Implementer: conductor build | ✅ |
-| **Setup build** | T3 | Implementer: setup build | ▶ |
-| Setup import | T1 | Implementer: setup import | ⏳ |
-
-## 🙋 Needs you
-
-1. 🟡🔁 After QA verifier: check setup build passes: **reload the plugin** with `/reload-plugins` in your own chat
-2. 🟡🗑 After the merge: **move `~/.claude/worktrees/wt-my-app-setup-build` to Trash**, in your terminal
-
-## 🛡 Checks
-
-| | Check | State |
-|:-:|---|---|
-| ✅ | Git | **~/dotfiles** master, clean, nothing only in scratch |
-| 🟡 | Git | **my-app** branch `setup-ui` 9f95022, merges after the QA verdict |
-| 🟡 | To delete later | worktree `wt-my-app-setup-build`, branch `setup-ui` · after merge |
-| 🟡 | Leftovers | `~/my-app/dist` 786 MB · Implementer: setup build · after merge<br>`~/my-app/.cache` 4 KB · keep: sign-in token the user wants<br>🗑 In the Trash: 2 items, 1.2 GB (`~/Downloads/old-build.zip` 1.2 GB 🗑 11:40, `~/my-app/tmp` 4 KB 🗑 11:52) |
-| ✅ | PC load | calm · CPU 62% idle |
-| ✅ | Disk | 33 GB free |
-
-## 📦 Results
-
-- **Implementer: conductor build** merged and verified: 07ab1b7 on master
-- **Designer: setup design** approved: [canvas](<canvas link>) v4
-
-## ⏸ Later
-
-Dark-mode setup screens · silent install flag.
-
-## 🔭 Current state
-
-- **Implementer: setup build** is rewriting the setup screens, then runs a smoke test and its check.
-- **QA verifier: check setup build** waits for the ready sha; next comes the gate and a verdict.
+After every rewrite of summary.md, run `python3 <this skill's folder>/scripts/summary-check <run folder>/summary.md` and fix every violation before posting, sending a status line or ending the tick; a summary.md with violations is never left as the latest. In Claude Code this skill's folder is `${CLAUDE_SKILL_DIR}`, which is expanded only in a loaded skill; in Copilot CLI it is `skills/start` in the plugin folder, two levels up from a skill file.

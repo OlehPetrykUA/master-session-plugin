@@ -92,10 +92,20 @@ rule 'board: full plan before the first spawn' skills/start/board.md 'Post the f
 rule 'board: live detached worktree is fine' skills/start/board.md 'one whose owner is retired or gone is ⚠'
 rule 'stop: copies the ledger' skills/stop/SKILL.md 'copy the final `protocol.md` and `log.md` into the run'"'"'s note'
 rule 'stop: writes summary.md' skills/stop/SKILL.md 'write the final board to `summary.md` in the run folder'
-rule 'board: summary.md no fence lines' skills/start/board.md 'It has no fence lines: no ━━━ lines, no `---` dividers'
-rule 'stop: summary.md no fence lines' skills/stop/SKILL.md 'in the summary.md template with no fence lines'
+rule 'spec: no fence lines' skills/start/board-spec.md 'No fenced code block (``` or ~~~), no `━`, no horizontal rule'
+rule 'stop: summary.md follows the spec' skills/stop/SKILL.md 'in the format of `${CLAUDE_PLUGIN_ROOT}/skills/start/board-spec.md`'
+rule 'stop: summary.md is checked' skills/stop/SKILL.md 'skills/start/scripts/summary-check <run folder>/summary.md` and fix every violation'
 rule 'stop: keeps the run folder' skills/stop/SKILL.md 'keep the run folder'
-rule 'board: summary.md overwrite' skills/start/board.md 'overwrite `<run folder>/summary.md` (start §6) with the Write tool, in its own template'
+rule 'board: summary.md overwrite' skills/start/board.md 'overwrite `<run folder>/summary.md` (start §6) with the Write tool, in the format of [board-spec.md](board-spec.md)'
+rule 'board: summary.md check step' skills/start/board.md 'After every rewrite of summary.md, run `python3 <this skill'"'"'s folder>/scripts/summary-check <run folder>/summary.md` and fix every violation before posting, sending a status line or ending the tick; a summary.md with violations is never left as the latest.'
+rule 'board: summary.md check works in Copilot' skills/start/board.md 'in Copilot CLI it is `skills/start` in the plugin folder'
+if grep -q '^# 🏭 ' "$root/skills/start/board.md"; then echo 'FAIL board: no summary template heading'; fail=1; else echo 'ok   board: no summary template heading'; fi
+if [ -x "$root/skills/start/scripts/summary-check" ]; then echo 'ok   summary-check is executable'; else echo 'FAIL summary-check is executable'; fail=1; fi
+if python3 -I "$root/skills/start/scripts/summary-check" --self-test; then echo 'ok   summary-check self-test'; else echo 'FAIL summary-check self-test'; fail=1; fi
+for r in S-file S-title S-header S-counts S-pc S-time S-sections S-goal S-rows S-names S-links S-archived S-plan S-needs S-checks S-results S-later S-state; do
+  rule "spec: names $r" skills/start/board-spec.md "**$r:**"
+done
+rule 'spec: valid means summary-check prints nothing' skills/start/board-spec.md 'A summary.md is valid only when `summary-check` prints nothing for it.'
 rule 'start: run folder path' skills/start/SKILL.md '`<session cwd>/claude-runs/<YYYY-MM-DD>-<run>/`'
 rule 'start: run files hard rule' skills/start/SKILL.md 'Every run creates `<cwd>/claude-runs/<YYYY-MM-DD>-<run>/protocol.md`, `log.md` and `summary.md` before its first spawn (the run folder, section 6) and keeps all three current: summary.md is rewritten on every tick and every reply.'
 rule 'start: info/exclude' skills/start/SKILL.md 'add `claude-runs/` once to `$(git rev-parse --git-path info/exclude)`'
@@ -110,10 +120,9 @@ rule 'board: PC load check' skills/start/board.md 'PC load: CPU idle, 1-minute l
 rule 'board: posted in every reply' skills/start/board.md 'posted in chat in every reply to the user; a tick only rewrites summary.md'
 rule 'board: tick posts nothing in chat' skills/start/board.md 'A tick posts nothing in chat: it rewrites summary.md'
 rule 'board: reply still posts the board' skills/start/board.md 'A reply to the user always posts the full board in chat, answer below END, and rewrites summary.md'
-rule 'board: template headings in order' skills/start/board.md '# 🏭 setup-wizard summary'
-if awk '/^# 🏭 setup-wizard summary/{on=1} on&&/^## /{printf "%s|",$0} END{exit 0}' "$root/skills/start/board.md" | grep -qF '## 🎯 Goal right now|## 🤖 Workers|## 🗺 Plan|## 🙋 Needs you|## 🛡 Checks|## 📦 Results|## ⏸ Later|## 🔭 Current state|'; then echo 'ok   board: summary template headings in order'; else echo 'FAIL board: summary template headings in order'; fail=1; fi
-rule 'board: template Updated line' skills/start/board.md '> **Updated 19:20** · ▶ 1 working'
-rule 'board: template no dividers' skills/start/board.md 'no `---` dividers'
+rule 'spec: headings in order' skills/start/board-spec.md '`## 🎯 Goal right now`, `## 🤖 Workers` (master) or `## 💬 Chats` (orchestrator), `## 🗺 Plan`, `## 🙋 Needs you`, `## 🛡 Checks`, `## 📦 Results`, optional `## ⏸ Later`, `## 🔭 Current state`'
+rule 'spec: Updated line' skills/start/board-spec.md '> **Updated HH:MM** · ▶ N working · 🟡 N waiting · 🔴 N need you · ⏸ N paused · ✅ N done'
+rule 'board: points to the spec' skills/start/board.md '[board-spec.md](board-spec.md)'
 rule 'start: waiting heartbeat' skills/start/shape.md 'Heartbeat: none · waiting for <who> since HH:MM'
 rule 'start: quiet tick posts nothing' skills/start/SKILL.md 'The tick posts nothing in chat except one short line when a new 🔴 Needs-you item appears'
 rule 'start: re-arm on work' skills/start/shape.md 'Re-arm it with the same `/loop 5m` args on the next user message or worker event that opens work'
@@ -193,7 +202,7 @@ rule 'start: keep rows never trashed' skills/start/SKILL.md 'A `keep: <reason>` 
 rule 'start: protocol head has Leftovers' skills/start/SKILL.md 'Acknowledged (results the user acknowledged); Leftovers (below);'
 rule 'start: Leftovers table header' skills/start/SKILL.md '| Path | Size | Owner | Why | When it goes |'
 rule 'start: du measures size' skills/start/SKILL.md 'Size comes from `du -sh <path>`'
-rule 'board: template Leftovers row' skills/start/board.md '| 🟡 | Leftovers |'
+rule 'spec: Leftovers row' skills/start/board-spec.md '| 🟡 | Leftovers |'
 rule 'board: Trash line' skills/start/board.md '🗑 In the Trash: 2 items, 1.2 GB'
 rule 'start: report has Leftovers line' skills/start/SKILL.md 'Leftovers: `leftover: <path> <size>` lines, or "none"'
 rule 'start: Done rule needs Leftovers settled' skills/start/SKILL.md 'every Leftovers row is `🗑` or `keep: <reason>`, or the table is the single `(none yet)` row,'
