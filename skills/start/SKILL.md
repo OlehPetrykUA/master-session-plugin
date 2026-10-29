@@ -16,6 +16,8 @@ Invoked with: `$ARGUMENTS`, the task in the user's own words. There are no optio
 
 ## 1. Start
 
+**Hard rule:** Every run creates `<cwd>/claude-runs/<YYYY-MM-DD>-<run>/protocol.md`, `log.md` and `summary.md` before its first spawn (the run folder, section 6) and keeps all three current: summary.md is rewritten on every tick and every reply.
+
 Tell the user, in 5 lines:
 - This session is the validator now: workers build, I verify and merge `--ff-only`.
 - Each piece gets a tier (T0 to T3, plus a risk flag): T0 I check myself, T1 to T3 get one checker, the risk flag two.
@@ -44,14 +46,7 @@ Tell the user, in 5 lines:
 - One spec tab per feature, changed in place with a changelog; the Architect's design goes in it. The validator approves both before any build brief.
 - Design pass: the design canvas is the single source of truth for visuals; one pass per plan, only when visuals change, and a later visual change (mid-build, in a fix round, after a merge) goes to a Designer pass first. Details: [shape.md](shape.md#design-pass).
 
-**Count and waits.** Every tick that starts agents writes one ledger line: `Count: N running (ready: <pieces>; suite-runner: yes|no; ≤4 or <reason>)`. The rule:
-- run the ready pieces whose owned files are disjoint;
-- at most one suite-runner (an agent, or your inline Checker gate, running a full suite or build) at a time; in a risk-flagged pair only the QA verifier runs it; a builder runs only its Your checks;
-- doc-only work (research, spec, design, review) is never held back by machine load, nor gated on the user's own processes;
-- cost: fewer agents and cheaper models for simple work, one agent by default for T0 and T1;
-- soft ceiling 4 running agents, nested and a workflow's included; above it only with the reason (such as a read-only fan-out) in the count line.
-
-The only waits: a dependency not done (merged, or approved for a doc piece), the one-suite-runner rule, a user decision. Invent no other.
+**Count and waits.** Every tick that starts agents writes one ledger line: `Count: N running (ready: <pieces>; suite-runner: yes|no; ≤4 or <reason>)`. The count rules and the only waits: [shape.md](shape.md#count-and-waits).
 
 **Brief.** A brief starts `You are a background subagent of master session <validator local_id>; your final message is your report in the format below.` Then, in order:
 ```

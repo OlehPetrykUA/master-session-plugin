@@ -51,3 +51,14 @@ One agent per piece.
 - A fix round or rebase goes to the same agent by ID while its context is under ~150k tokens (`subagent_tokens` in its completion notice). Otherwise, and on every resume of a paused subagent, a fresh agent gets a handover brief: done so far, what is left, and "continue in <worktree> at <sha, or HEAD> (make no new worktree): review `git diff master...HEAD` and `git status --short` there, finish from the pending step, remove that worktree after the merge". Never a user question.
 - A new task gets a new worker; a retired worker is never resumed for new work. Retire one once its sha is on master: a subagent is resumed by ID for its post-merge worktree removal, then retires; `TaskStop` if mid-turn; its worktree gone. Before flagging a leftover worktree, check who holds it (`lsof +D <path>`).
 - Drift is a defect: stop the worker, hand over to a fresh one.
+
+## Count and waits
+
+The rule for the `Count:` ledger line (start §2):
+- run the ready pieces whose owned files are disjoint;
+- at most one suite-runner (an agent, or your inline Checker gate, running a full suite or build) at a time; in a risk-flagged pair only the QA verifier runs it; a builder runs only its Your checks;
+- doc-only work (research, spec, design, review) is never held back by machine load, nor gated on the user's own processes;
+- cost: fewer agents and cheaper models for simple work, one agent by default for T0 and T1;
+- soft ceiling 4 running agents, nested and a workflow's included; above it only with the reason (such as a read-only fan-out) in the count line.
+
+The only waits: a dependency not done (merged, or approved for a doc piece), the one-suite-runner rule, a user decision. Invent no other.
