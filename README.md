@@ -76,7 +76,7 @@ The master session posts the full board on every tick and in every reply. It ope
 - **Quick table and mini tables:** subagents and workflows only, as plain names.
 - **Plan:** every piece of the run, with the piece names kept; each ▶ step names its active worker.
 - **🙋 Needs you:** numbered actions, each marked 🔴 blocking now or 🟡 later, plus a kind emoji; `✅ Nothing right now.` when empty.
-- **🛡 Standing checks:** Git safety per repo (committed, on a branch, or uncommitted), a To delete later list of extra worktrees and branches, and PC load.
+- **🛡 Standing checks:** Git safety per repo (committed, on a branch, or uncommitted), a To delete later list of extra worktrees, branches and files outside git, a Leftovers row with `🗑 In the Trash: <n> items, <size>`, and PC load.
 - **📦 Results so far:** kept on every board until you say "acknowledged".
 - **🔭 Current state:** 2 to 4 bullets on what each worker is doing, waiting for and doing next.
 
@@ -109,6 +109,8 @@ Every worker is named `<Persona>: <short task>`.
   - worktree `wt-my-app-setup-build` (detached at 9f95022) · Implementer: setup build · holds the unmerged ready sha · after merge
   - branch `setup-ui` · Implementer: setup build · same commit 9f95022 as the worktree · after merge
   - branch `setup-import` · Implementer: setup import · piece dropped · owner retired ⚠
+  - Leftovers: `~/my-app/dist` 786 MB · Implementer: setup build · after merge
+  - 🗑 In the Trash: 2 items, 1.2 GB
 - ✅ PC load: CPU 62% idle · load 5.1 / 10 cores
 
 **📦 Results so far**

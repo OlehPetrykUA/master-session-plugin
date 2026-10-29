@@ -50,6 +50,8 @@ The board is posted in chat in every reply to the user; a tick only rewrites sum
   - worktree `wt-my-app-setup-build` (detached at 9f95022) · Implementer: setup build · holds the unmerged ready sha · after merge
   - branch `setup-ui` · Implementer: setup build · same commit 9f95022 as the worktree · after merge
   - branch `setup-import` · Implementer: setup import · piece dropped · owner retired ⚠
+  - `~/my-app/dist` · 786 MB · Implementer: setup build · build output · after merge
+  - 🗑 In the Trash: 2 items, 1.2 GB
 - ✅ PC load: CPU 62% idle · load 5.1 / 10 cores · no suites or builds
 
 | | 📦 Repo | 🌿 Branch | ✏️ Uncommitted | ⇅ Ahead/behind | 🔖 Last |
@@ -98,7 +100,7 @@ The board is posted in chat in every reply to the user; a tick only rewrites sum
 
 ## summary.md template
 
-Written from the same facts as the chat board, never pasted from it. Bold the key items. Fill every section; `## ⏸ Later` is optional, one line, only when a later backlog (dropped or deferred extras) exists. The Checks rows are Git (one row per repo), To delete later, PC load and Disk. Disk is the Avail column of `df -g ~` (GiB blocks, `man df`). PC reads calm, busy or overloaded.
+Written from the same facts as the chat board, never pasted from it. Bold the key items. Fill every section; `## ⏸ Later` is optional, one line, only when a later backlog (dropped or deferred extras) exists. The Checks rows are Git (one row per repo), To delete later, Leftovers, PC load and Disk. The Leftovers row lists the open rows of `protocol.md` → Leftovers (`| Path | Size | Owner | Why | When it goes |`), each as path, size, owner and when it goes, then `🗑 In the Trash: <n> items, <size>` summed from the `🗑` rows. Disk is the Avail column of `df -g ~` (GiB blocks, `man df`). PC reads calm, busy or overloaded.
 
 # 🏭 setup-wizard summary
 
@@ -136,6 +138,7 @@ Written from the same facts as the chat board, never pasted from it. Bold the ke
 | ✅ | Git | **~/dotfiles** master, clean, nothing only in scratch |
 | 🟡 | Git | **my-app** branch `setup-ui` 9f95022, merges after the QA verdict |
 | 🟡 | To delete later | worktree `wt-my-app-setup-build`, branch `setup-ui` · after merge |
+| 🟡 | Leftovers | `~/my-app/dist` 786 MB · Implementer: setup build · after merge<br>🗑 In the Trash: 2 items, 1.2 GB |
 | ✅ | PC load | calm · CPU 62% idle |
 | ✅ | Disk | 33 GB free |
 

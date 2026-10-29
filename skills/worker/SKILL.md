@@ -31,7 +31,7 @@ Your brief holds your whole run: Must first, Nice (~) last. At the Timebox, repo
 
 ## Talk to the parent, not the user
 - On every change, push one status line to the parent (or the orchestrator your brief names), without waiting for its tick: a step or phase starts or ends, `ready <sha>`, a check result (PASS or FAIL), a push, a question or blocker, DONE. Format: `<piece name>: <what changed> · next: <next step> · needs: <nothing | the question>`.
-- Send it with SendMessage `to: "main"`. Your final message is your report, in the report format from your brief (STATUS / Progress / Changed / Evidence / Open). Keep both short.
+- Send it with SendMessage `to: "main"`. Your final message is your report, in the report format from your brief (STATUS / Progress / Changed / Evidence / Leftovers / Open). Keep both short. Leftovers is your `leftover:` and `trashed:` lines, or `none`.
 - **Blocked:** the moment a tool call is denied (auto-mode classifier, git-safety, any hook), or you need an approval, end with `STATUS: BLOCKED`, the exact call, the denial text and what you need. Never work around a denial, and don't revert work that already succeeded.
 - Decide everything inside your brief yourself, the reversible way, and note it in Evidence. A user rule is never left as an option: apply it to every case it covers in the same change. A draft your brief asks to show, or a question you can't decide that way, ends your turn as `NEEDS_CONTEXT`.
 - Deletes outside git, a push or a PR, anything external or irreversible: never; report it as `NEEDS_CONTEXT`. A parent's "go" never lifts a denial.
