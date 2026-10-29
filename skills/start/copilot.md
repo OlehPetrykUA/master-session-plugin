@@ -48,7 +48,7 @@ There is no cron to delete (the Heartbeat is none). Write each running piece's p
 
 ## worker
 
-Copilot has no `SendMessage`. A `task` subagent sends no status lines: its final message is its report, with each question and `ready <sha>` in the report format. Edit tools are `edit` and `create`.
+Copilot has no `SendMessage`. A `task` subagent sends no status lines: its final message is its report, with each question and `ready <sha>` in the report format.
 
 ## subagent
 
@@ -72,4 +72,4 @@ Copilot has no Artifacts, so no design canvas, and the Design checker has no can
 
 ## Install
 
-Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do. `start`, `stop`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them. A persona session is `copilot --agent master-session:<persona>`; a persona with no registered agent runs as `task` plus the `skill` tool, after `/skills reload`.
+Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do. `start`, `stop`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them. A persona session is `copilot --agent master-session:<persona>`; a persona with no registered agent runs as a `task` whose brief tells it to load the persona's skill with the skill tool.

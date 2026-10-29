@@ -181,7 +181,7 @@ rule 'stop: stops subagents with TaskStop' skills/stop/SKILL.md 'then stop it wi
 rule 'answering: brief lists self-modifying edits' skills/start/answering.md 'A brief lists every self-modifying edit up front, quoting the user, so auto mode sees the intent at spawn (code.claude.com/docs/en/permission-modes, "How auto mode handles subagents").'
 rule 'start: stall needs a stale status line too' skills/start/SKILL.md 'and its latest status line'
 rule 'start: report goes to main' skills/start/SKILL.md 'to main (SendMessage `to: "main"`)'
-rule 'worker: claude --agent has no parent' skills/worker/SKILL.md 'In a session the user started with `claude --agent`, there is no parent'
+rule 'worker: claude --agent has no parent' skills/worker/SKILL.md 'In a session the user started with `claude --agent` (Copilot: `copilot --agent master-session:<persona>`), there is no parent'
 rule 'start: brief has a Scratch line' skills/start/SKILL.md '## Scratch       <scratchpad>/<piece>/ only; clean-up trashes that folder, never the root, the run folder, protocol.md, log.md or summary.md'
 rule 'worker: never the scratchpad root' skills/worker/SKILL.md 'never the scratchpad root, the run folder `claude-runs/`'
 rule 'qa-verifier: scratch subfolder only' skills/qa-verifier/SKILL.md 'go only in the scratch subfolder its prompt names'
@@ -235,6 +235,10 @@ rule 'copilot: always pass model' skills/start/copilot.md 'Always pass `model` o
 rule 'copilot: subagent passes model' skills/start/copilot.md 'a Copilot `model` (see Models) as in the subagent skill'"'"'s step 1'
 rule 'copilot: workflow passes model' skills/start/copilot.md 'each with a Copilot `model` even though the workflow skill says to leave it unset'
 rule 'copilot: run_dynamic_workflow' skills/start/copilot.md '`run_dynamic_workflow` and `copilot workflow run`'
+rule 'worker: copilot --agent has no parent' skills/worker/SKILL.md '(Copilot: `copilot --agent master-session:<persona>`)'
+rule 'copilot: unregistered persona via skill tool' skills/start/copilot.md "load the persona's skill with the skill tool"
+if grep -qF -- '/skills reload' "$root/skills/start/copilot.md"; then echo 'FAIL copilot: no unproven /skills reload'; fail=1; else echo 'ok   copilot: no unproven /skills reload'; fi
+if grep -qF -- 'Edit tools are' "$root/skills/start/copilot.md"; then echo 'FAIL copilot: no unproven edit tool names'; fail=1; else echo 'ok   copilot: no unproven edit tool names'; fi
 rule 'copilot: no SendMessage route back' skills/start/copilot.md 'no route from a subagent back to the main session was seen'
 
 never='This session never starts sessions or sub-chats and never calls `start_session`'
