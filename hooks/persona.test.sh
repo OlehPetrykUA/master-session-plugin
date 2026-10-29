@@ -143,7 +143,13 @@ rule 'worker: Lane bullet' skills/worker/SKILL.md '**Lane:** your lane is the Im
 rule 'lanes: validator Trash move' skills/start/lanes.md 'its cron jobs; moving Leftovers rows to the Trash with `trash` (section 6) |'
 rule 'start: validator Trash move' skills/start/SKILL.md 'its cron jobs and moving Leftovers rows to the Trash with `trash` (section 6).'
 rule 'lanes: mutual rule' skills/start/lanes.md 'The validator never edits the orchestrator'"'"'s files, and the orchestrator never edits the validator'"'"'s files (its run folder) or this plugin'"'"'s skills.'
-rule 'lanes: architect no file edits' skills/start/lanes.md 'read-only git | File edits (its agent denies Edit and Write); code'
+rule 'lanes: architect no file edits' skills/start/lanes.md 'read-only git | File edits outside that Copilot spec file (its agent denies Edit and Write); code'
+for r in Implementer Refactorer; do
+  row=$(grep "^| $r |" "$root/skills/start/lanes.md")
+  for s in 'a rebase onto master before `ready` (worker skill, Ready to merge) or when the validator says so' 'deleting its own merged branch (`git branch -d`); `git worktree remove` of its own worktree and `git worktree prune`'; do
+    if printf '%s' "$row" | grep -qF -- "$s"; then echo "ok   lanes: $r ${s%% (*}"; else echo "FAIL lanes: $r ${s%% (*}"; fail=1; fi
+  done
+done
 rule 'lanes: spec writer creates doc' skills/start/lanes.md 'the project'"'"'s spec doc and its overview tab when none exists'
 rule 'lanes: spec writer Copilot worktree' skills/start/lanes.md '`docs/specs/<feature>.md` in its own `wt-<repo>-spec-<feature>` worktree'
 rule 'lanes: architect no-spec tab' skills/start/lanes.md 'with no spec, the feature'"'"'s tab (and the doc when the project has none) with the brief'"'"'s ACs quoted'

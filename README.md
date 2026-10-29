@@ -70,7 +70,7 @@ To run one as your own session: `claude --agent master-session:<persona>`. The S
 
 ## Lanes
 
-Every role, the master session and the chat orchestrator included, has one allowlist of what it may write, in `skills/start/lanes.md`; everything else is forbidden. Before every edit, commit, push or Trash move, a role runs a lane check. Out-of-lane work is stopped and handed to its owner; if it already happened, the role stops, reverts nothing of anyone else's, tells the owner, adds a decision for you and logs it. A PreToolUse hook that enforces the lanes is proposed, not installed.
+Every role, the master session and the chat orchestrator included, has one allowlist of what it may write, in `skills/start/lanes.md`; everything else is forbidden. Before every write by any tool or shell command, a role runs a lane check. Out-of-lane work is stopped and handed to its owner; if it already happened, the role stops, reverts nothing of anyone else's, tells the owner, adds a decision for you and logs it. A PreToolUse hook that enforces the lanes is proposed, not installed.
 
 ## The board
 
