@@ -99,6 +99,7 @@ rule 'board: summary.md overwrite' skills/start/board.md 'overwrite `<run folder
 rule 'start: run folder path' skills/start/SKILL.md '`<session cwd>/claude-runs/<YYYY-MM-DD>-<run>/`'
 rule 'start: run files hard rule' skills/start/SKILL.md 'Every run creates `<cwd>/claude-runs/<YYYY-MM-DD>-<run>/protocol.md`, `log.md` and `summary.md` before its first spawn (the run folder, section 6) and keeps all three current: summary.md is rewritten on every tick and every reply.'
 rule 'start: info/exclude' skills/start/SKILL.md 'add `claude-runs/` once to `$(git rev-parse --git-path info/exclude)`'
+rule 'start: gitignore citation' skills/start/SKILL.md '(`git help gitignore`: `$GIT_DIR/info/exclude` holds patterns specific to one user'"'"'s workflow)'
 rule 'start: kept after Done' skills/start/SKILL.md 'The folder is kept after Done as the user'"'"'s record'
 rule 'subagent: restarts a dead loop' skills/subagent/SKILL.md '`CronList` doesn'"'"'t list its job'
 rule 'workflow: restarts a dead loop' skills/workflow/SKILL.md '`CronList` doesn'"'"'t list its job'
