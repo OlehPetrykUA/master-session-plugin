@@ -324,6 +324,7 @@ def check(path, archived):
                         v(n, "S-needs", "expected a when other than `now` on a 🟡 item")
 
     crow = table("## 🛡 Checks", "S-checks", "| | Check | State |", "|:-:|---|---|", 3)
+    crow = [(n, [c[0].replace("<br>", ""), c[1].replace("<br>", ""), c[2]]) for n, c in crow]
     if "## 🛡 Checks" in bounds and (crow or not any(r == "S-checks" for _, r, _ in out)):
         names = [c[1] for _, c in crow]
         k = 0
