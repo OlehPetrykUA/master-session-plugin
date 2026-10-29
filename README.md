@@ -110,6 +110,7 @@ Every worker is named `<Persona>: <short task>`.
   - branch `setup-ui` · Implementer: setup build · same commit 9f95022 as the worktree · after merge
   - branch `setup-import` · Implementer: setup import · piece dropped · owner retired ⚠
   - Leftovers: `~/my-app/dist` 786 MB · Implementer: setup build · after merge
+  - Leftovers: `~/Downloads/old-build.zip` 1.2 GB · 🗑 11:40
   - 🗑 In the Trash: 2 items, 1.2 GB
 - ✅ PC load: CPU 62% idle · load 5.1 / 10 cores
 

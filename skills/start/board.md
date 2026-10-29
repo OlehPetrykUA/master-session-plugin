@@ -51,7 +51,8 @@ The board is posted in chat in every reply to the user; a tick only rewrites sum
   - branch `setup-ui` · Implementer: setup build · same commit 9f95022 as the worktree · after merge
   - branch `setup-import` · Implementer: setup import · piece dropped · owner retired ⚠
   - `~/my-app/dist` · 786 MB · Implementer: setup build · build output · after merge
-  - 🗑 In the Trash: 2 items, 1.2 GB
+  - `~/my-app/.cache` · 4 KB · Implementer: setup build · keep: sign-in token the user wants
+  - 🗑 In the Trash: 2 items, 1.2 GB (`~/Downloads/old-build.zip` 1.2 GB 🗑 11:40, `~/my-app/tmp` 4 KB 🗑 11:52)
 - ✅ PC load: CPU 62% idle · load 5.1 / 10 cores · no suites or builds
 
 | | 📦 Repo | 🌿 Branch | ✏️ Uncommitted | ⇅ Ahead/behind | 🔖 Last |
@@ -88,7 +89,7 @@ The board is posted in chat in every reply to the user; a tick only rewrites sum
   - Kind: 🖥 run a command · 🔁 restart or reload · 🗑 Trash or files · ✋ decision · 🔑 sign-in or approval.
 - **Standing checks:** recomputed from fresh commands on every board, never copied from the last one.
   - Git safety: one line per repo the run touches, with exactly one of: ✅ committed and on main (and pushed, when the user's task asked for a push); 🟡 committed on a branch not yet merged, written `branch ＠ sha`, with its owner and when it merges; 🔴 uncommitted: the path count and whose they are (a working worker's own worktree edit is its owner's). The line also says nothing the run needs lives only in a scratch folder.
-  - To delete later: a list of every extra worktree and branch the run made, plus every open line of `protocol.md` → Leftovers (files and folders outside git, with size), then one line `🗑 In the Trash: <n> items, <size>`. Each entry has its owner, why it still exists and when it goes ("after merge", "after QA verdict", "owner retired ⚠"). Take them from `git worktree list --porcelain` and `git for-each-ref refs/heads`. A live worker's or checker's detached worktree is fine; one whose owner is retired or gone is ⚠. A removed entry leaves the list.
+  - To delete later: a list of every extra worktree and branch the run made, plus every open row of `protocol.md` → Leftovers (files and folders outside git, with size; open means not `🗑`, keep rows included and shown as `keep: <reason>`), then one line `🗑 In the Trash: <n> items, <size>`. Each entry has its owner, why it still exists and when it goes ("after merge", "after QA verdict", "owner retired ⚠"). Take them from `git worktree list --porcelain` and `git for-each-ref refs/heads`. A live worker's or checker's detached worktree is fine; one whose owner is retired or gone is ⚠. A removed entry leaves the list.
   - Merged check: a branch counts as merged when `git branch --merged main` lists it ("only list branches whose tips are reachable from <commit>", git-branch(1)), or when `git cherry main <branch>` prints only `-` lines ("prefixed with - for commits that have an equivalent in <upstream>, and + for commits that do not", git-cherry(1)), which catches the rebase-merged case where the tips differ. Use `--merged` first; use `git cherry` when it does not list the branch; fall back to the tree compare `git diff --quiet main <branch>` (exit 0, same content) when a squash merge leaves no equivalent commits; it can under-report a squash-merged branch whose files main changed later, which is safe for a delete list.
   - Then the Repos table, every repo the run touches.
   - Git facts: `git -C <repo> status --porcelain=v2 --branch` gives `# branch.oid`, `# branch.head`, `# branch.ab +A -B`; no `# branch.upstream` line means no upstream; every other line is one uncommitted path. It reads only that checkout: read a worker's worktree with `git -C <its worktree> status`, for its mini table's 🌿 row. Local branches with no upstream (📤): `git -C <repo> for-each-ref refs/heads --format='%(refname:short) %(upstream:short)'`. A Repos row is ✅ when clean and in sync, ⚠️ otherwise.
@@ -138,7 +139,7 @@ Written from the same facts as the chat board, never pasted from it. Bold the ke
 | ✅ | Git | **~/dotfiles** master, clean, nothing only in scratch |
 | 🟡 | Git | **my-app** branch `setup-ui` 9f95022, merges after the QA verdict |
 | 🟡 | To delete later | worktree `wt-my-app-setup-build`, branch `setup-ui` · after merge |
-| 🟡 | Leftovers | `~/my-app/dist` 786 MB · Implementer: setup build · after merge<br>🗑 In the Trash: 2 items, 1.2 GB |
+| 🟡 | Leftovers | `~/my-app/dist` 786 MB · Implementer: setup build · after merge<br>`~/my-app/.cache` 4 KB · keep: sign-in token the user wants<br>🗑 In the Trash: 2 items, 1.2 GB (`~/Downloads/old-build.zip` 1.2 GB 🗑 11:40, `~/my-app/tmp` 4 KB 🗑 11:52) |
 | ✅ | PC load | calm · CPU 62% idle |
 | ✅ | Disk | 33 GB free |
 

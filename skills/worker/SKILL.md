@@ -21,7 +21,7 @@ In a session the user started with `claude --agent`, there is no parent: report 
 - Never create or switch a branch in the main repo.
 - Scratch goes in a folder named after your piece; never reuse another piece's scratch.
 - Temp files go only in the scratch subfolder `<scratchpad>/<piece>/` your brief names. Clean up with `trash <scratchpad>/<piece>/`: never the scratchpad root, the run folder `claude-runs/`, `protocol.md`, `log.md` or `summary.md`, never `rm -rf`.
-- Anything you create outside your worktree and scratch subfolder (build output, app copies, downloads, temp backups) goes in your next status line and your report as `leftover: <path> <size>`, so the parent logs it in Leftovers. Anything you move to the Trash goes there as `trashed: <path> <size>`.
+- Anything you create outside your worktree and scratch subfolder (build output, app copies, downloads, temp backups) goes in your next status line and your report as `leftover: <path> <size>`, so the parent logs it in Leftovers. A worker never moves a leftover to the Trash: only the parent does, after checking the row isn't `keep:`. Your own scratch subfolder is not a leftover; trashing it at clean-up stays as is.
 - Start no CPU-load processes: no stress loops, parallel suites or extra watchers. You run only your brief's Your checks; the full suite and build are the checker's Checker gate.
 - Commits: one line, `type(scope): summary`, at most 72 characters, no body, no trailers.
 - **Status:** no timed loops, heartbeats or ScheduleWakeup for status; watch a long job with a Monitor or a background Bash `until` loop on its own log.
@@ -31,7 +31,7 @@ Your brief holds your whole run: Must first, Nice (~) last. At the Timebox, repo
 
 ## Talk to the parent, not the user
 - On every change, push one status line to the parent (or the orchestrator your brief names), without waiting for its tick: a step or phase starts or ends, `ready <sha>`, a check result (PASS or FAIL), a push, a question or blocker, DONE. Format: `<piece name>: <what changed> · next: <next step> · needs: <nothing | the question>`.
-- Send it with SendMessage `to: "main"`. Your final message is your report, in the report format from your brief (STATUS / Progress / Changed / Evidence / Leftovers / Open). Keep both short. Leftovers is your `leftover:` and `trashed:` lines, or `none`.
+- Send it with SendMessage `to: "main"`. Your final message is your report, in the report format from your brief (STATUS / Progress / Changed / Evidence / Leftovers / Open). Keep both short. Leftovers is your `leftover: <path> <size>` lines, or `none`.
 - **Blocked:** the moment a tool call is denied (auto-mode classifier, git-safety, any hook), or you need an approval, end with `STATUS: BLOCKED`, the exact call, the denial text and what you need. Never work around a denial, and don't revert work that already succeeded.
 - Decide everything inside your brief yourself, the reversible way, and note it in Evidence. A user rule is never left as an option: apply it to every case it covers in the same change. A draft your brief asks to show, or a question you can't decide that way, ends your turn as `NEEDS_CONTEXT`.
 - Deletes outside git, a push or a PR, anything external or irreversible: never; report it as `NEEDS_CONTEXT`. A parent's "go" never lifts a denial.
