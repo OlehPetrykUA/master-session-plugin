@@ -92,7 +92,7 @@ rule 'board: full plan before the first spawn' skills/start/board.md 'Post the f
 rule 'board: live detached worktree is fine' skills/start/board.md 'one whose owner is retired or gone is ⚠'
 rule 'stop: copies the ledger' skills/stop/SKILL.md 'copy the final `protocol.md` and `log.md` into the run'"'"'s note'
 rule 'stop: writes summary.md' skills/stop/SKILL.md 'write the final board to `summary.md` in the run folder'
-rule 'spec: no fence lines' skills/start/board-spec.md 'No fenced code block (``` or ~~~), no `━`, no horizontal rule'
+rule 'spec: no fence lines' skills/start/board-spec.md 'No fenced code block (a line whose content starts with ``` or ~~~'
 rule 'stop: summary.md follows the spec' skills/stop/SKILL.md 'in the format of `${CLAUDE_PLUGIN_ROOT}/skills/start/board-spec.md`'
 rule 'stop: summary.md is checked' skills/stop/SKILL.md 'skills/start/scripts/summary-check <run folder>/summary.md` and fix every violation'
 rule 'stop: keeps the run folder' skills/stop/SKILL.md 'keep the run folder'
