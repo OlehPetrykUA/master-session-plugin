@@ -146,9 +146,13 @@ rule 'lanes: mutual rule' skills/start/lanes.md 'The validator never edits the o
 rule 'lanes: architect no file edits' skills/start/lanes.md 'read-only git | File edits outside that Copilot spec file (its agent denies Edit and Write); code'
 for r in Implementer Refactorer; do
   row=$(grep "^| $r |" "$root/skills/start/lanes.md")
-  for s in 'a rebase onto master before `ready` (worker skill, Ready to merge) or when the validator says so' 'deleting its own merged branch (`git branch -d`); `git worktree remove` of its own worktree and `git worktree prune`'; do
+  for s in '| `git worktree add --detach` of its own worktree; commits in that worktree;' 'a rebase onto master before `ready` (worker skill, Ready to merge) or when the validator says so' 'deleting its own merged branch (`git branch -d`, or `-D` when the git-safety hook proves it merged); `git worktree remove` of its own worktree and `git worktree prune`'; do
     if printf '%s' "$row" | grep -qF -- "$s"; then echo "ok   lanes: $r ${s%% (*}"; else echo "FAIL lanes: $r ${s%% (*}"; fail=1; fi
   done
+done
+orch=$(grep '^| Orchestrator ' "$root/skills/start/lanes.md")
+for s in '`start_session` and `detach_session` only on user turns' 'The owning chat pushes; it pushes only if that chat is retired and the user approved' 'a gap goes back to its chat'; do
+  if printf '%s' "$orch" | grep -qF -- "$s"; then echo "ok   lanes: Orchestrator $s"; else echo "FAIL lanes: Orchestrator $s"; fail=1; fi
 done
 rule 'lanes: spec writer creates doc' skills/start/lanes.md 'the project'"'"'s spec doc and its overview tab when none exists'
 rule 'lanes: spec writer Copilot worktree' skills/start/lanes.md '`docs/specs/<feature>.md` in its own `wt-<repo>-spec-<feature>` worktree'
@@ -208,7 +212,7 @@ rule 'readme: Leftovers example' README.md '  - Leftovers: `~/Downloads/old-buil
 rule 'worker: report has Leftovers' skills/worker/SKILL.md 'Evidence / Leftovers / Open'
 
 never='This session never starts sessions or sub-chats and never calls `start_session`'
-hits=$(grep -rnE 'start_session|stop_session|notify_when_idle|master-session:subchat' "$root/skills" | sed "s/$never//" | grep -E 'start_session|stop_session|notify_when_idle|master-session:subchat')
+hits=$(grep -rnE 'start_session|stop_session|notify_when_idle|master-session:subchat' "$root/skills" | grep -v '^[^:]*/skills/start/lanes\.md:[0-9]*:| Orchestrator ' | sed "s/$never//" | grep -E 'start_session|stop_session|notify_when_idle|master-session:subchat')
 if [ -z "$hits" ]; then echo 'ok   skills: no session tools outside the never rule'; else echo 'FAIL skills: session tools outside the never rule'; printf '%s\n' "$hits"; fail=1; fi
 if [ -e "$root/skills/subchat" ]; then echo 'FAIL skills/subchat is gone'; fail=1; else echo 'ok   skills/subchat is gone'; fi
 
