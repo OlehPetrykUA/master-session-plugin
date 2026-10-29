@@ -21,6 +21,7 @@ In a session the user started with `claude --agent`, there is no parent: report 
 - Never create or switch a branch in the main repo.
 - Scratch goes in a folder named after your piece; never reuse another piece's scratch.
 - Temp files go only in the scratch subfolder `<scratchpad>/<piece>/` your brief names. Clean up with `trash <scratchpad>/<piece>/`: never the scratchpad root, the run folder `claude-runs/`, `protocol.md`, `log.md` or `summary.md`, never `rm -rf`.
+- Anything you create outside your worktree and scratch subfolder (build output, app copies, downloads, temp backups) goes in your next status line and your report as `leftover: <path> <size>`, so the parent logs it in Leftovers. Anything you move to the Trash goes there as `trashed: <path> <size>`.
 - Start no CPU-load processes: no stress loops, parallel suites or extra watchers. You run only your brief's Your checks; the full suite and build are the checker's Checker gate.
 - Commits: one line, `type(scope): summary`, at most 72 characters, no body, no trailers.
 - **Status:** no timed loops, heartbeats or ScheduleWakeup for status; watch a long job with a Monitor or a background Bash `until` loop on its own log.
