@@ -2,7 +2,7 @@
 
 Copilot CLI loads this plugin too, from the same skills and agents, with one source for both tools. It has no `SendMessage`, `/loop`, `CronCreate`, Claude Code's `Workflow` tool or API, Claude Docs or Artifacts (the design canvas). Its main session has `list_agents`, `read_agent` and `write_agent`, but no route from a subagent back to the main session was seen. It leaves `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` as written: read them as the plugin folder (two levels up from any skill file) and that skill's folder. The skills that need a Copilot change link their section here.
 
-Persona subagents everywhere: the `task` tool with `agent_type: "master-session:<persona>"` and `model` set to a Copilot model id. The persona arrives through the agent's `skills:` frontmatter. `/tasks` shows the subagents. The agents carry `reasoning-effort` for Copilot beside `effort` for Claude Code.
+Persona subagents everywhere: the `task` tool with `agent_type: "master-session:<persona>"` and `model` set to a Copilot model id. The persona arrives through the agent's `skills:` frontmatter. `/tasks` shows the subagents. The agents carry `reasoningEffort` for Copilot beside `effort` for Claude Code. A validator session starts with `copilot --reasoning-effort xhigh`.
 
 ## Models
 

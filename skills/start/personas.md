@@ -17,6 +17,22 @@ A persona is a fixed role the validator hands out. Each one has its own skill, `
 
 On Claude Code the read-only personas' agents deny Edit, Write and NotebookEdit; Copilot ignores that field, so there only the lane guards them ([copilot.md](copilot.md#read-only-personas)).
 
+## Effort
+
+| Role | Effort | Why |
+|---|---|---|
+| Validator chat | xhigh | [long agentic runs](https://platform.claude.com/docs/en/build-with-claude/effort) |
+| Implementer | medium | [well-specified tasks](https://platform.claude.com/docs/en/build-with-claude/effort) |
+| Implementer, fresh re-brief after 2 fix rounds | high | harder or longer work |
+| Refactorer | medium | baseline is the failure signal |
+| QA verifier, Design checker | high | [verification gains most](https://claude.dev/blog/spending-your-effort) |
+| Code reviewer, Investigator, Architect, Spec writer, Designer | high | [bug and design work](https://code.claude.com/docs/en/model-config) |
+| Researcher | medium | [research gains little](https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence) |
+
+- The validator chat runs at `xhigh`, set once at the start by whoever starts it (Copilot: `copilot --reasoning-effort xhigh`). It never changes its own effort: a change [breaks the prompt cache](https://platform.claude.com/docs/en/build-with-claude/thinking-steering-and-cost).
+- A non-persona subagent the validator spawns (Explore, Plan, general-purpose) gets an explicit `effort: "medium"` on the call; with none it [inherits the session's](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md) (2.1.316).
+- `xhigh` on a worker is never a default: only a deliberate second-opinion recheck of a risk-flagged piece. `max` never, it [may overthink](https://code.claude.com/docs/en/model-config).
+
 ## Unregistered persona
 
 A persona added to the plugin during a session isn't a registered agent type until the app restarts; skills hot-reload. Until then, run it as `subagent_type: "general-purpose"` with a brief starting `Load the master-session:<persona> skill with the Skill tool first and act as that persona.`

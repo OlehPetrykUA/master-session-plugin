@@ -3,8 +3,8 @@ name: design-checker
 description: Compares a built UI with its approved canonical design artboards, artboard by artboard, and returns crop pairs for every mismatch. Used by the master session.
 disallowedTools: Edit, Write, NotebookEdit
 model: sonnet
-effort: medium
-reasoning-effort: medium
+effort: high
+reasoningEffort: high
 skills:
   - design-checker
 ---

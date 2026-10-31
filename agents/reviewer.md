@@ -4,7 +4,7 @@ description: The Code reviewer for risk-flagged pieces, beside the QA verifier; 
 disallowedTools: Edit, Write, NotebookEdit
 model: opus
 effort: high
-reasoning-effort: high
+reasoningEffort: high
 skills:
   - reviewer
 ---

@@ -4,7 +4,7 @@ description: Turns an approved spec into a technical design in the spec's own ta
 disallowedTools: Edit, Write, NotebookEdit
 model: opus
 effort: high
-reasoning-effort: high
+reasoningEffort: high
 skills:
   - architect
 ---

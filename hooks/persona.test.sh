@@ -250,6 +250,17 @@ if grep -qF -- '/skills reload' "$root/skills/start/copilot.md"; then echo 'FAIL
 if grep -qF -- 'Edit tools are' "$root/skills/start/copilot.md"; then echo 'FAIL copilot: no unproven edit tool names'; fail=1; else echo 'ok   copilot: no unproven edit tool names'; fi
 rule 'copilot: no SendMessage route back' skills/start/copilot.md 'no route from a subagent back to the main session was seen'
 
+rule 'personas: Effort section names xhigh' skills/start/personas.md '## Effort'
+rule 'personas: validator runs at xhigh' skills/start/personas.md 'runs at `xhigh`'
+rule 'copilot: validator starts at xhigh' skills/start/copilot.md 'copilot --reasoning-effort xhigh'
+for f in "$root"/agents/*.md; do
+  n=$(basename "$f" .md)
+  e=$(sed -n 's/^effort: //p' "$f")
+  r=$(sed -n 's/^reasoningEffort: //p' "$f")
+  if [ -n "$e" ] && [ "$e" = "$r" ]; then echo "ok   agent $n: effort and reasoningEffort match"; else echo "FAIL agent $n: effort '$e' vs reasoningEffort '$r'"; fail=1; fi
+  case "$n" in qa-verifier|design-checker) if [ "$e" = high ]; then echo "ok   agent $n: high"; else echo "FAIL agent $n: high"; fail=1; fi;; esac
+done
+
 never='This session never starts sessions or sub-chats and never calls `start_session`'
 hits=$(grep -rnE 'start_session|stop_session|notify_when_idle|master-session:subchat' "$root/skills" | grep -v '^[^:]*/skills/start/lanes\.md:[0-9]*:| Orchestrator ' | sed "s/$never//" | grep -E 'start_session|stop_session|notify_when_idle|master-session:subchat')
 if [ -z "$hits" ]; then echo 'ok   skills: no session tools outside the never rule'; else echo 'FAIL skills: session tools outside the never rule'; printf '%s\n' "$hits"; fail=1; fi
