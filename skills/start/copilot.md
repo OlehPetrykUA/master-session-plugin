@@ -73,3 +73,5 @@ Copilot has no Artifacts, so no design canvas, and the Design checker has no can
 ## Install
 
 Copilot over ACP, as in JetBrains IDEs, loads no plugins from a local-folder marketplace; the interactive `copilot` and `copilot -p` do. `start`, `stop`, `subagent` and `workflow` are for the user to type, so `copilot -p` doesn't run them. A persona session is `copilot --agent master-session:<persona>`; a persona with no registered agent runs as a `task` whose brief tells it to load the persona's skill with the skill tool.
+
+In Copilot the four commands show as `/master-session:start`, `/master-session:stop`, `/master-session:subagent` and `/master-session:workflow`, one colon after the plugin name as in Claude Code; `copilot skill list` prints the bare skill names, and the personas and the worker skill have `user-invocable: false`, so they stay out of the slash menu by design.
