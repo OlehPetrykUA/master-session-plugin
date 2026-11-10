@@ -1,0 +1,11 @@
+{
+  "name": "master-session",
+  "owner": { "name": "Oleh Petryk", "url": "https://github.com/OlehPetrykUA" },
+  "plugins": [
+    {
+      "name": "master-session",
+      "source": "./",
+      "description": "A feature factory: give it a task and it lands merged where you use it, through persona subagents in their own git worktrees, one check per feature and a live board."
+    }
+  ]
+}

@@ -1,0 +1,702 @@
+#!/usr/bin/env python3
+import contextlib
+import io
+import os
+import re
+import sys
+import tempfile
+import time
+
+RULES = ["S-file", "S-title", "S-header", "S-counts", "S-pc", "S-time", "S-age", "S-sections", "S-goal", "S-state",
+         "S-rows", "S-names", "S-links", "S-archived", "S-plan", "S-needs", "S-open", "S-checks", "S-later", "S-protocol",
+         "S-short"]
+USAGE = ("usage: summary-check [--archived <id>[,<id>...]] [--max-age <minutes>] <file> [<file> ...]\n"
+         "       summary-check --self-test\n"
+         "       summary-check --help\n"
+         "--max-age: flag a board with work running whose Updated or file time is older (default $SUMMARY_MAX_AGE, else 20)")
+CLOCK = [time.time]
+PERSONAS = ("Main chat|Implementer|Refactorer|Code reviewer|QA verifier|Design checker|Researcher|Investigator|"
+            "Spec writer|Architect|Designer|Explore|Plan")
+MAIN = ("Main chat", "Validator")
+OLD_FORMS_UNTIL = "2026-11-04"
+TICKS = ("⬜", "✅")
+UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+CHAT = re.compile(r"\[([^\[\]*]+)\]\(#local_" + UUID + r"\)")
+NAME = re.compile(r"(" + PERSONAS + r"): (\S+(?: \S+){1,4})")
+HEADER = re.compile(
+    r"> \*\*Updated ([01][0-9]|2[0-3]):([0-5][0-9])\*\* · ▶ ([0-9]+) working · 🟡 ([0-9]+) waiting"
+    r" · 🔴 ([0-9]+) need you · ⏸ ([0-9]+) paused · ✅ ([0-9]+) done"
+    r" · 🖥 PC (calm|busy|overloaded) \(([0-9]+)% idle\) · 💾 ([0-9]+) GB free")
+HR = re.compile(r"\s*([-*_])(\s*\1){2,}\s*")
+CODE = re.compile(r"`[^`\n]*`")
+BOLD = re.compile(r"\*\*[^*]+\*\*")
+EMPH = re.compile(r"[\[\]`]|~~|(?:^|\s)_|_(?:\s|$)")
+FENCE = re.compile(r"\s*(?:(?:[-*+]|[0-9]+[.)])\s+)*(?:```|~~~)")
+ORDER = {"🟡": 0, "▶": 1, "⏸": 2, "✅": 3}
+PC_MARK = {"calm": "✅", "busy": "🟡", "overloaded": "⚠"}
+CHECK_NAMES = ["Git", "PC load", "Disk"]
+SHORT_HEAD = re.compile(r"> (?:\*\*Updated ([01][0-9]|2[0-3]):([0-5][0-9])\*\* · )?(?:▶ Working|🟡 Waiting|✅ Done)")
+SHORT_GOAL = re.compile(r"- \[[ x]\] \S.*")
+SHORT_ROW = re.compile(r"\| (?:\S.*?) \| (?:T[01]|S|M|L) \| [✅▶⏳⏸✖] \|")
+
+
+def cells(line):
+    if not (line.startswith("|") and line.endswith("|")):
+        return None
+    parts = re.split(r"(?<!\\)\|", line[1:-1])
+    if any(p != " " + p.strip() + " " or not p.strip() for p in parts):
+        return None
+    return [p.strip() for p in parts]
+
+
+def master_name_error(text):
+    if EMPH.search(text):
+        return "expected plain text without link, code or emphasis, found `" + text + "`"
+    m = NAME.fullmatch(text)
+    if m:
+        return None
+    return "expected `<Persona>: <2 to 5 words>` with a listed Persona, found `" + text + "`"
+
+
+def who_error(text, master):
+    if master:
+        m = re.fullmatch(r"\*\*([^*]+)\*\*", text)
+        if not m:
+            return "expected Who as a bold display name alone, found `" + text[:40] + "`"
+        if m.group(1) in MAIN:
+            return None
+        return master_name_error(m.group(1))
+    if text == "**Orchestrator**" or CHAT.fullmatch(text):
+        return None
+    return "expected Who as a chat link or **Orchestrator** alone, found `" + text[:40] + "`"
+
+
+def short_check(lines, v, mtime):
+    n = len(lines)
+    at = lambda i: lines[i] if i < n else None
+    m = SHORT_HEAD.fullmatch(at(2) or "")
+    if not m:
+        v(3, "S-short", "expected `> <▶ Working|🟡 Waiting|✅ Done>`, found `" + (at(2) or "nothing")[:50] + "`")
+    elif m.group(1):
+        lt = time.localtime(mtime)
+        if (lt.tm_hour * 60 + lt.tm_min - int(m.group(1)) * 60 - int(m.group(2))) % 1440 > 10:
+            v(3, "S-time", "expected Updated 0 to 10 minutes before the file time %02d:%02d, found %s:%s"
+              % (lt.tm_hour, lt.tm_min, m.group(1), m.group(2)))
+    for i, want in ((1, ""), (3, ""), (4, "## 🙋 Needs you"), (5, "")):
+        if at(i) != want:
+            v(i + 1, "S-short", "expected `" + want + "`, found `" + (at(i) or "nothing")[:40] + "`")
+    k = 6
+    if at(k) == "✅ Nothing right now.":
+        k += 1
+    else:
+        while at(k) is not None and at(k).startswith("|"):
+            k += 1
+        if k == 6:
+            v(7, "S-short", "expected `✅ Nothing right now.` or a Needs-you table, found `" + (at(6) or "nothing")[:40] + "`")
+    for want in ("", "## 🎯 Goal", ""):
+        if at(k) != want:
+            v(k + 1, "S-short", "expected `" + want + "`, found `" + (at(k) or "nothing")[:40] + "`")
+        k += 1
+    start = k
+    while at(k) and SHORT_GOAL.fullmatch(at(k)):
+        k += 1
+    if k == start:
+        v(k + 1, "S-goal", "expected at least one `- [ ] <item>` or `- [x] <item>`, found `" + (at(k) or "nothing")[:40] + "`")
+        k -= 1
+    for want in ("", "## 🧩 Pieces", "", "| Piece | Tier | Status |", "|---|---|:-:|"):
+        if at(k) != want:
+            v(k + 1, "S-short", "expected `" + want + "`, found `" + (at(k) or "nothing")[:40] + "`")
+        k += 1
+    start = k
+    while at(k):
+        if not SHORT_ROW.fullmatch(at(k)):
+            v(k + 1, "S-short", "expected `| <piece> | <S|M|L> | <✅|▶|⏳|⏸|✖> |`, found `" + at(k)[:40] + "`")
+        k += 1
+    if k == start:
+        v(k + 1, "S-short", "expected at least one Pieces row, found none")
+    if at(k) is None:
+        return
+    k += 1
+    for want in ("## 🧩 Still open", ""):
+        if at(k) != want:
+            v(k + 1, "S-short", "expected `" + want + "`, found `" + (at(k) or "nothing")[:40] + "`")
+        k += 1
+    if at(k) == "✅ Nothing open.":
+        k += 1
+    else:
+        for want in ("| What | Why not fixed | Who fixes it | Next step |", "|---|---|---|---|"):
+            if at(k) != want:
+                v(k + 1, "S-short", "expected `" + want + "`, found `" + (at(k) or "nothing")[:40] + "`")
+            k += 1
+        if at(k) is None:
+            v(k + 1, "S-short", "expected at least one Still open row, found none")
+        while at(k) is not None and len(cells(at(k)) or []) == 4:
+            k += 1
+    if at(k) is not None:
+        v(k + 1, "S-short", "expected the end of the file or a row of 4 cells, found `" + at(k)[:40] + "`")
+
+
+def check(path, archived, max_age=20):
+    with open(path, "rb") as f:
+        raw = f.read()
+    mtime = os.stat(path).st_mtime
+    out = []
+
+    def v(n, rule, msg):
+        out.append((n, rule, msg))
+
+    prot = os.path.join(os.path.dirname(os.path.abspath(path)), "protocol.md")
+    if os.path.isfile(prot):
+        with open(prot, "rb") as f:
+            plen = f.read().count(b"\n")
+        if plen > 60:
+            v(1, "S-protocol", "expected protocol.md of at most 60 lines, found " + str(plen))
+
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        v(1, "S-file", "expected UTF-8, found invalid bytes")
+        return out
+    text = text.replace("️", "")
+    first = text.split("\n", 1)[0].rstrip("\r")
+    master = first.startswith("# 🏭")
+    if not master and not first.startswith("# 🎼"):
+        v(1, "S-title", "expected `# 🏭 <run> summary` or `# 🎼 Orchestrator summary`, found `" + first[:40] + "`")
+        return out
+    if "\r" in text:
+        v(text[:text.index("\r")].count("\n") + 1, "S-file", "expected LF only, found CR")
+        text = text.replace("\r", "")
+    if not text.endswith("\n"):
+        v(text.count("\n") + 1, "S-file", "expected the file to end with one newline, found none")
+    elif text.endswith("\n\n"):
+        v(text.count("\n"), "S-file", "expected exactly one newline at the end, found more")
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+    total = len(lines)
+
+    folder = os.path.basename(os.path.dirname(os.path.abspath(path)))
+    fm = re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}-(.+)", folder)
+    if master:
+        if fm:
+            want = "# 🏭 " + re.sub(r"-[0-9]+$", "", fm.group(1)) + " summary"
+            if first != want:
+                v(1, "S-title", "expected `" + want + "`, found `" + first + "`")
+        elif not re.fullmatch(r"# 🏭 \S+ summary", first):
+            v(1, "S-title", "expected `# 🏭 <run> summary`, found `" + first + "`")
+    elif first != "# 🎼 Orchestrator summary":
+        v(1, "S-title", "expected `# 🎼 Orchestrator summary`, found `" + first + "`")
+
+    old_ok = not fm or folder[:10] <= OLD_FORMS_UNTIL
+    old_full = master and old_ok and "## 🎯 Goal right now" in lines
+    second = "## 🤖 Workers" if master else "## 💬 Chats"
+    goal_head = "## 🎯 Goal right now" if old_full else "## 🎯 Goal"
+    req = ["## 🙋 Needs you", goal_head, "## 🔭 Current state", second, "## 🗺 Plan", "## 🧩 Still open",
+           "## 🛡 Checks"]
+    opt = req + ["## ⏸ Later"]
+    heads = [i for i in range(1, total) if lines[i].startswith("#")]
+    titles = [lines[i] for i in heads]
+    bounds = {}
+    for k, i in enumerate(heads):
+        end = heads[k + 1] if k + 1 < len(heads) else total
+        if lines[i] not in bounds:
+            bounds[lines[i]] = (i, end)
+    blank = False
+    for i, l in enumerate(lines):
+        n = i + 1
+        if "\t" in l:
+            v(n, "S-file", "expected no tab, found a tab")
+        if l != l.rstrip():
+            v(n, "S-file", "expected no trailing whitespace, found some")
+        if FENCE.match(l):
+            v(n, "S-file", "expected no fenced code block, found a fence")
+        if "━" in l:
+            v(n, "S-file", "expected no ━ line, found one")
+        if HR.fullmatch(l):
+            v(n, "S-file", "expected no horizontal rule, found one")
+        for tag in re.findall(r"<[A-Za-z/!][^<>]*>", CODE.sub("", l)):
+            v(n, "S-file", "expected no HTML tag, found " + tag)
+        if l == "" and blank:
+            v(n, "S-file", "expected one blank line, found two in a row")
+        blank = l == ""
+
+    if master and old_ok and "## 🧩 Pieces" in lines:
+        short_check(lines, v, mtime)
+        return out
+
+    hdr = None
+    if total < 2 or lines[1] != "":
+        v(2, "S-header", "expected a blank line 2")
+    if total < 3 or not HEADER.fullmatch(lines[2]):
+        v(3, "S-header", "expected the status line `> **Updated HH:MM** · ▶ N working · 🟡 N waiting · "
+          "🔴 N need you · ⏸ N paused · ✅ N done · 🖥 PC <calm|busy|overloaded> (N% idle) · 💾 N GB free`, found "
+          + ("`" + lines[2][:50] + "`" if total >= 3 else "nothing"))
+    else:
+        m = HEADER.fullmatch(lines[2])
+        hdr = {"min": int(m.group(1)) * 60 + int(m.group(2)), "hhmm": m.group(1) + ":" + m.group(2),
+               "n": [int(m.group(g)) for g in (3, 4, 5, 6, 7)], "word": m.group(8), "idle": int(m.group(9)),
+               "disk": int(m.group(10))}
+    if total < 4 or lines[3] != "":
+        v(4, "S-header", "expected a blank line 4")
+
+    if hdr:
+        idle, word = hdr["idle"], hdr["word"]
+        want = "calm" if idle >= 40 else "overloaded" if idle < 15 else None
+        if idle > 100:
+            v(3, "S-pc", "expected idle 0 to 100, found " + str(idle))
+        elif (want and word != want) or (not want and word == "calm"):
+            v(3, "S-pc", "expected " + (want or "busy or overloaded") + " at " + str(idle) + "% idle, found " + word)
+        lt = time.localtime(mtime)
+        diff = (lt.tm_hour * 60 + lt.tm_min - hdr["min"]) % 1440
+        if diff > 10:
+            v(3, "S-time", "expected Updated 0 to 10 minutes before the file time %02d:%02d, found %s"
+              % (lt.tm_hour, lt.tm_min, hdr["hhmm"]))
+        now = CLOCK[0]()
+        nt = time.localtime(now)
+        upd_age = (nt.tm_hour * 60 + nt.tm_min - hdr["min"]) % 1440
+        age = max(round((now - mtime) / 60), upd_age if upd_age < 1430 else 0)
+        if hdr["n"][0] > 0 and age > max_age:
+            v(3, "S-age", "expected a board with %d working rewritten within %d minutes, found Updated %s and file time"
+              " %d minutes old" % (hdr["n"][0], max_age, hdr["hhmm"], round((now - mtime) / 60)))
+
+    if titles not in (req, opt):
+        exp = opt if "## ⏸ Later" in titles else req
+        k = 0
+        while k < len(titles) and k < len(exp) and titles[k] == exp[k]:
+            k += 1
+        found = titles[k] if k < len(titles) else "nothing"
+        at = heads[k] + 1 if k < len(titles) else total
+        v(at, "S-sections", "expected heading `" + (exp[k] if k < len(exp) else "none") + "`, found `" + found + "`")
+    elif heads[0] != 4:
+        v(5, "S-sections", "expected the first heading at line 5, found text before it")
+    for k, i in enumerate(heads):
+        if k and lines[i - 1] != "":
+            v(i + 1, "S-sections", "expected a blank line before the heading")
+        if i + 1 >= total or lines[i + 1] != "":
+            v(i + 1, "S-sections", "expected a blank line after the heading")
+
+    def body(title):
+        if title not in bounds:
+            return None, []
+        i, end = bounds[title]
+        items = [(j + 1, lines[j]) for j in range(i + 1, end)]
+        while items and items[0][1] == "":
+            items.pop(0)
+        while items and items[-1][1] == "":
+            items.pop()
+        for n, s in items:
+            if s == "":
+                v(n, "S-sections", "expected no blank line inside a section")
+        return i + 1, [x for x in items if x[1] != ""]
+
+    def table(title, rule, header, align, ncols, empty=None, least=0, most=None):
+        at, b = body(title)
+        rows = []
+        if at is None:
+            return rows
+        if empty and len(b) == 1 and b[0][1] == empty:
+            return rows
+        if not b or b[0][1] != header:
+            v(b[0][0] if b else at, rule, "expected " + ("`" + empty + "` or " if empty else "") + "header `" + header
+              + "`, found " + ("`" + b[0][1] + "`" if b else "nothing"))
+            return rows
+        if len(b) < 2 or b[1][1] != align:
+            v(b[1][0] if len(b) > 1 else at, rule, "expected align row `" + align + "`")
+            return rows
+        if len(b) - 2 < least or (most and len(b) - 2 > most):
+            v(b[1][0], rule, "expected " + (str(least) + " to " + str(most) if most else "at least " + str(least))
+              + " rows, found " + str(len(b) - 2))
+        for n, s in b[2:]:
+            if FENCE.match(s):
+                continue
+            c = cells(s)
+            if c is None or len(c) != ncols:
+                v(n, rule, "expected a row of " + str(ncols) + " cells, found `" + s[:50] + "`")
+            else:
+                rows.append((n, c))
+        return rows
+
+    goal_chats = set()
+    if old_full:
+        at, b = body(goal_head)
+        if at is not None:
+            if len(b) != 1:
+                v(b[0][0] if b else at, "S-goal", "expected one line, found " + str(len(b)))
+            elif not re.match(r"\*\*[^*]+\*\*", b[0][1]) or len(BOLD.findall(b[0][1])) != 1:
+                v(b[0][0], "S-goal", "expected one line starting with exactly one bold span")
+    elif master:
+        for n, c in table(goal_head, "S-goal", "| | Goal |", "|:-:|---|", 2, least=1, most=5):
+            if c[0] not in TICKS:
+                v(n, "S-goal", "expected a tick ⬜ or ✅, found `" + c[0][:40] + "`")
+            if len(c[1].split()) > 15:
+                v(n, "S-goal", "expected a Goal of 15 words or fewer, found " + str(len(c[1].split())))
+    else:
+        for n, c in table(goal_head, "S-goal", "| | Chat | Finish line |", "|:-:|---|---|", 3):
+            if c[0] not in TICKS:
+                v(n, "S-goal", "expected a tick ⬜ or ✅, found `" + c[0][:40] + "`")
+            if not CHAT.fullmatch(c[1]):
+                v(n, "S-goal", "expected a chat link, found `" + c[1][:40] + "`")
+            goal_chats.add(c[1])
+
+    who = "Worker" if master else "Chat"
+    rows = table(second, "S-rows", "| | " + who + " | Doing now | Next |", "|:-:|---|---|---|", 4)
+    if goal_head in bounds and not master:
+        for n, c in rows:
+            if CHAT.fullmatch(c[1]) and c[1] not in goal_chats:
+                v(n, "S-goal", "expected a Goal row for " + c[1])
+    counts = {k: 0 for k in ORDER}
+    top = -1
+    for n, c in rows:
+        mark, name, doing, nxt = c
+        if mark not in ORDER:
+            v(n, "S-rows", "expected marker ▶ 🟡 ⏸ or ✅, found `" + mark + "`")
+            continue
+        counts[mark] += 1
+        if ORDER[mark] < top:
+            v(n, "S-rows", "expected rows sorted 🟡, ▶, ⏸, ✅, found " + mark + " after a later marker")
+        top = max(top, ORDER[mark])
+        if master:
+            m = re.fullmatch(r"\*\*([^*]+)\*\*", name)
+            err = master_name_error(m.group(1)) if m else "expected a bold display name, found `" + name + "`"
+        else:
+            err = None if CHAT.fullmatch(name) else "expected a chat link `[text](#local_<uuid>)`, found `" + name + "`"
+        if err:
+            v(n, "S-names", err)
+        for label, cell in (("Doing now", doing), ("Next", nxt)):
+            if not 1 <= len(cell.split()) <= 10:
+                v(n, "S-rows", "expected 1 to 10 words in " + label + ", found " + str(len(cell.split())))
+        if mark == "✅":
+            if not doing.startswith("Done"):
+                v(n, "S-rows", "expected Doing now to start with `Done` on a ✅ row, found `" + doing + "`")
+            if nxt != "—":
+                v(n, "S-rows", "expected Next `—` on a ✅ row, found `" + nxt + "`")
+
+    if old_full:
+        prow = table("## 🗺 Plan", "S-plan", "| Step | Tier | Who | Status |", "|---|---|---|:-:|", 4)
+    else:
+        prow = table("## 🗺 Plan", "S-plan", "| Step | Who | Status |", "|---|---|:-:|", 3)
+    if "## 🗺 Plan" in bounds and not prow and not any(r == "S-plan" for _, r, _ in out):
+        v(bounds["## 🗺 Plan"][0] + 1, "S-plan", "expected at least one row")
+    for n, c in prow:
+        step, status = c[0], c[-1]
+        if status not in ("✅", "▶", "⏳", "⏸", "✖"):
+            v(n, "S-plan", "expected Status ✅ ▶ ⏳ ⏸ or ✖, found `" + status + "`")
+        if status == "▶":
+            if not re.fullmatch(r"\*\*[^*]+\*\*", step):
+                v(n, "S-plan", "expected a ▶ Step as one bold span, found `" + step + "`")
+        elif "**" in step:
+            v(n, "S-plan", "expected no bold in a non-▶ Step, found `" + step + "`")
+        if status == "✖" and not re.search(r" \(dropped: [^()]+\)$", step):
+            v(n, "S-plan", "expected a ✖ Step to end with ` (dropped: <why>)`")
+        if old_full and not re.fullmatch(r"(T[0-3]|doc)( risk)?", c[1]):
+            v(n, "S-plan", "expected Tier T0 to T3 or doc, found `" + c[1] + "`")
+        w = c[-2]
+        if master:
+            if w not in MAIN + ("—",) and master_name_error(w):
+                v(n, "S-plan", "expected Who as a plain display name, Main chat or —, found `" + w + "`")
+        elif w not in ("Orchestrator", "—") and not CHAT.fullmatch(w):
+            v(n, "S-plan", "expected Who as a chat link, Orchestrator or —, found `" + w + "`")
+
+    nrow = table("## 🙋 Needs you", "S-needs", "| # | | What | How | When |", "|---|:-:|---|---|---|", 5,
+                 "✅ Nothing right now.", 1)
+    reds = 0
+    seen_yellow = False
+    for n, (num, mark, what, _, when) in nrow:
+        want = n - bounds["## 🙋 Needs you"][0] - 4
+        if num != str(want):
+            v(n, "S-needs", "expected number " + str(want) + ", found `" + num + "`")
+        if "*" in what:
+            v(n, "S-needs", "expected What as plain text, found `" + what + "`")
+        m = re.fullmatch(r"(🔴|🟡)(🖥|🔁|🗑|✋|🔑)", mark)
+        if not m:
+            v(n, "S-needs", "expected a marker `<🔴|🟡><🖥|🔁|🗑|✋|🔑>`, found `" + mark + "`")
+            continue
+        if m.group(1) == "🔴":
+            reds += 1
+            if seen_yellow:
+                v(n, "S-needs", "expected every 🔴 row before the 🟡 rows")
+            if when != "now":
+                v(n, "S-needs", "expected When `now` on a 🔴 row, found `" + when + "`")
+        else:
+            seen_yellow = True
+            if when == "now":
+                v(n, "S-needs", "expected a When other than `now` on a 🟡 row")
+
+    orow = table("## 🧩 Still open", "S-open", "| What | Why not fixed | Who fixes it | Next step |", "|---|---|---|---|", 4,
+                 "✅ Nothing open.", 1)
+    needs_what = {c[2] for _, c in nrow}
+    for n, c in orow:
+        if "*" in c[0]:
+            v(n, "S-open", "expected What as plain text, found `" + c[0] + "`")
+        if c[0] in needs_what:
+            v(n, "S-open", "expected no row that repeats a Needs-you What, found `" + c[0] + "`")
+
+    crow = table("## 🛡 Checks", "S-checks", "| | Check | State |", "|:-:|---|---|", 3)
+    if "## 🛡 Checks" in bounds and (crow or not any(r == "S-checks" for _, r, _ in out)):
+        names = [c[1] for _, c in crow]
+        k = 0
+        while k < len(names) and names[k] == "Git":
+            k += 1
+        if k == 0 or names[k:] != CHECK_NAMES[1:]:
+            v(crow[0][0] if crow else bounds["## 🛡 Checks"][0] + 1, "S-checks",
+              "expected rows Git (one or more), PC load, Disk in that order, found "
+              + (", ".join(names) or "no rows"))
+    for n, (mark, name, state) in crow:
+        if mark not in ("✅", "🟡", "🔴", "⚠"):
+            v(n, "S-checks", "expected marker ✅ 🟡 🔴 or ⚠️, found `" + mark + "`")
+        if name == "Git":
+            if not re.match(r"\*\*[^*]+\*\*", state) or len(BOLD.findall(state)) != 1:
+                v(n, "S-checks", "expected State starting with one bold repo name and no other bold")
+        elif name == "PC load" and hdr:
+            if state != hdr["word"] + " · CPU " + str(hdr["idle"]) + "% idle":
+                v(n, "S-checks", "expected `" + hdr["word"] + " · CPU " + str(hdr["idle"]) + "% idle`, found `" + state + "`")
+            if mark != PC_MARK[hdr["word"]]:
+                v(n, "S-checks", "expected marker " + PC_MARK[hdr["word"]] + " on PC load, found " + mark)
+        elif name == "Disk" and hdr:
+            if state != str(hdr["disk"]) + " GB free":
+                v(n, "S-checks", "expected `" + str(hdr["disk"]) + " GB free`, found `" + state + "`")
+            if mark not in ("✅", "⚠"):
+                v(n, "S-checks", "expected marker ✅ or ⚠️ on Disk, found " + mark)
+
+    table("## ⏸ Later", "S-later", "| Item |", "|---|", 1, least=1)
+
+    least = 1 if master and not old_full else 2
+    for n, c in table("## 🔭 Current state", "S-state", "| Who | State |", "|---|---|", 2, least=least, most=4):
+        err = who_error(c[0], master)
+        if err:
+            v(n, "S-state", err)
+        elif len(c[1].split()) > 30:
+            v(n, "S-state", "expected State of 30 words or fewer, found " + str(len(c[1].split())))
+
+    if hdr:
+        got = hdr["n"]
+        bad_rows = any(r == "S-rows" for _, r, _ in out)
+        bad_needs = any(r == "S-needs" for _, r, _ in out)
+        for label, k, want in (("▶", 0, counts["▶"]), ("🟡", 1, counts["🟡"]), ("🔴", 2, reds),
+                               ("⏸", 3, counts["⏸"]), ("✅", 4, counts["✅"])):
+            if got[k] != want and (("## 🙋 Needs you" if label == "🔴" else second) in bounds) \
+                    and not (bad_needs if label == "🔴" else bad_rows):
+                v(3, "S-counts", "expected " + label + " " + str(want) + ", found " + str(got[k])
+                  + " (fix: set it to " + str(want) + ")")
+
+    for i, l in enumerate(lines):
+        n = i + 1
+        s = CODE.sub("", l)
+        if master:
+            if "#local_" in s:
+                v(n, "S-links", "expected no chat link in a master summary, found one")
+        elif "local_" in CHAT.sub("", s):
+            v(n, "S-links", "expected every local_ id inside a chat link `[text](#local_<uuid>)`")
+        if re.search(r"\[[^\[\]]*\]\((?!#local_)[^)]*\)|https?://", s):
+            v(n, "S-links", "expected no link other than a chat link")
+        for a in archived:
+            if a in l:
+                v(n, "S-archived", "expected no archived id, found " + a)
+    return out
+
+
+def main(argv):
+    if argv == ["--help"] or argv == ["-h"]:
+        print(USAGE)
+        return 0
+    if argv == ["--self-test"]:
+        return self_test()
+    archived = []
+    files = []
+    max_age = os.environ.get("SUMMARY_MAX_AGE") or "20"
+    k = 0
+    while k < len(argv):
+        a = argv[k]
+        if a == "--max-age":
+            if k + 1 >= len(argv):
+                print("summary-check: --max-age needs minutes\n" + USAGE, file=sys.stderr)
+                return 2
+            max_age = argv[k + 1]
+            k += 2
+            continue
+        if a == "--archived":
+            if k + 1 >= len(argv):
+                print("summary-check: --archived needs an id\n" + USAGE, file=sys.stderr)
+                return 2
+            archived += [x for x in argv[k + 1].split(",") if x]
+            k += 2
+            continue
+        if a.startswith("--"):
+            print("summary-check: unknown option " + a + "\n" + USAGE, file=sys.stderr)
+            return 2
+        files.append(a)
+        k += 1
+    if not files:
+        print("summary-check: no file given\n" + USAGE, file=sys.stderr)
+        return 2
+    if not max_age.isdigit():
+        print("summary-check: --max-age needs whole minutes, found " + max_age + "\n" + USAGE, file=sys.stderr)
+        return 2
+    found = []
+    unreadable = False
+    for f in files:
+        try:
+            fixture = os.path.abspath(f).endswith(os.sep.join(("", "tests", "summary", os.path.basename(f))))
+            for n, rule, msg in check(f, archived, int(max_age)):
+                if not (fixture and rule in ("S-time", "S-age")):
+                    found.append((f, n, rule, msg))
+        except OSError as e:
+            print("summary-check: cannot read " + f + ": " + e.strerror, file=sys.stderr)
+            unreadable = True
+    for f, n, rule, msg in sorted(found, key=lambda x: (x[0], x[1])):
+        print(f + ":" + str(n) + ": " + rule + " " + msg)
+    return 2 if unreadable else 1 if found else 0
+
+
+def self_test():
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.dirname(os.path.dirname(os.path.dirname(here)))
+    fx = os.path.join(root, "tests", "summary")
+    arch = "deadbeef-dead-beef-dead-beefdeadbeef"
+    noon = time.mktime((2026, 10, 29, 12, 0, 0, 0, 0, -1))
+    fails = []
+    stage_no = [0]
+    CLOCK[0] = lambda: noon
+
+    with tempfile.TemporaryDirectory() as tmp:
+        def stage(data, folder, mt=noon):
+            stage_no[0] += 1
+            d = os.path.join(tmp, str(stage_no[0]), folder)
+            os.makedirs(d)
+            p = os.path.join(d, "summary.md")
+            with open(p, "wb") as f:
+                f.write(data)
+            os.utime(p, (mt, mt))
+            return p
+
+        def run(args):
+            o, e = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(o), contextlib.redirect_stderr(e):
+                rc = main(args)
+            return rc, o.getvalue(), e.getvalue()
+
+        def rules_of(out):
+            return set(re.findall(r"^.*?:[0-9]+: (S-[a-z]+) ", out, re.M))
+
+        def folder_for(data):
+            return "2026-10-29-orchestrator" if data.startswith("# 🎼".encode()) else "2026-10-29-demo-run"
+
+        def read(name):
+            with open(os.path.join(fx, name), "rb") as f:
+                return f.read()
+
+        names = sorted(os.listdir(fx))
+        goods = [n for n in names if n.startswith("good-")]
+        bads = [n for n in names if n.startswith("bad-")]
+        for n in goods:
+            data = read(n)
+            rc, out, _ = run(["--archived", arch, stage(data, folder_for(data))])
+            if rc != 0 or out:
+                fails.append(n + ": expected clean, got exit " + str(rc) + " " + out.strip())
+            rc, out, _ = run(["--archived", arch, os.path.join(fx, n)])
+            if rc != 0 or out:
+                fails.append(n + ": a fresh checkout's file time must not fail it, got exit " + str(rc) + " " + out.strip())
+        covered = set()
+        for n in bads:
+            m = re.match(r"bad-(S-[a-z]+)-", n)
+            data = read(n)
+            rc, out, _ = run(["--archived", arch, stage(data, folder_for(data))])
+            if not m:
+                fails.append(n + ": name must be bad-<rule id>-<what>.md")
+                continue
+            covered.add(m.group(1))
+            if rc != 1 or rules_of(out) != {m.group(1)} or len(out.strip().split("\n")) != 1:
+                fails.append(n + ": expected exactly one " + m.group(1) + " line, got exit " + str(rc) + " " + out.strip())
+        for r in RULES:
+            if r not in covered and r not in ("S-protocol", "S-age"):
+                fails.append("no bad fixture for " + r)
+
+        gm = read("good-master.md")
+        for label, upd, mt, ok in (
+                ("+0", "12:00", noon, True), ("+10", "11:50", noon, True), ("+11", "11:49", noon, False),
+                ("Updated after mtime", "12:05", noon, False),
+                ("across midnight", "23:58", time.mktime((2026, 10, 30, 0, 3, 0, 0, 0, -1)), True)):
+            data = gm.replace(b"Updated 12:00", ("Updated " + upd).encode())
+            CLOCK[0] = lambda: mt
+            rc, out, _ = run([stage(data, "2026-10-29-demo-run", mt)])
+            if (rc == 0) != ok or (not ok and rules_of(out) != {"S-time"}):
+                fails.append("S-time " + label + ": exit " + str(rc) + " " + out.strip())
+        CLOCK[0] = lambda: noon
+
+        solo = read("good-master-solo.md")
+        for label, data, old, args, env, want in (
+                ("fresh", gm, 0, [], None, set()), ("20 min", gm, 20, [], None, set()),
+                ("21 min", gm, 21, [], None, {"S-age"}), ("an hour", gm, 60, [], None, {"S-age"}),
+                ("nothing working", solo, 60, [], None, set()),
+                ("--max-age 30", gm, 21, ["--max-age", "30"], None, set()),
+                ("--max-age 30 at 31", gm, 31, ["--max-age", "30"], None, {"S-age"}),
+                ("env 5", gm, 6, [], "5", {"S-age"}), ("flag wins over env", gm, 6, ["--max-age", "10"], "5", set())):
+            then = noon - old * 60
+            upd = time.strftime("%H:%M", time.localtime(then)).encode()
+            if env:
+                os.environ["SUMMARY_MAX_AGE"] = env
+            rc, out, _ = run(args + [stage(data.replace(b"Updated 12:00", b"Updated " + upd), "2026-10-29-demo-run", then)])
+            os.environ.pop("SUMMARY_MAX_AGE", None)
+            if rules_of(out) != want or (rc == 0) != (not want):
+                fails.append("S-age " + label + ": exit " + str(rc) + " " + out.strip())
+        rc, out, _ = run([stage(gm, "2026-10-29-demo-run", noon - 3600)])
+        if rules_of(out) != {"S-age", "S-time"}:
+            fails.append("S-age old file time with a fresh Updated: exit " + str(rc) + " " + out.strip())
+        rc, _, err = run(["--max-age", "x", stage(gm, "2026-10-29-demo-run")])
+        if rc != 2 or not err:
+            fails.append("--max-age x: expected exit 2 with a message")
+
+        go = read("good-orchestrator.md")
+        known = re.search(r"#local_(" + UUID + r")\)", go.decode()).group(1)
+        for label, ids, ok in (("present", known, False), ("absent", arch, True), ("list", arch + "," + known, False)):
+            rc, out, _ = run(["--archived", ids, stage(go, "2026-10-29-orchestrator")])
+            if (rc == 0) != ok or (not ok and rules_of(out) != {"S-archived"}):
+                fails.append("S-archived " + label + ": exit " + str(rc) + " " + out.strip())
+
+        data = gm.replace(b"# \xf0\x9f\x8f\xad demo-run summary", "# 🏭 copilot-load summary".encode())
+        rc, out, _ = run([stage(data, "2026-10-29-copilot-load-2")])
+        if rc != 0:
+            fails.append("run name drops a trailing -<digits>: " + out.strip())
+
+        for lines_n, ok in (("60", True), ("61", False)):
+            sp = stage(gm, "2026-10-29-demo-run")
+            with open(os.path.join(os.path.dirname(sp), "protocol.md"), "w") as f:
+                f.write("x\n" * int(lines_n))
+            rc, out, _ = run([sp])
+            if (rc == 0) != ok or (not ok and rules_of(out) != {"S-protocol"}):
+                fails.append("S-protocol " + lines_n + " lines: exit " + str(rc) + " " + out.strip())
+
+        for name, folder, ok in (("good-short.md", "2026-11-04-demo-run", True),
+                                 ("good-short.md", "2026-11-05-demo-run", False),
+                                 ("good-master-old.md", "2026-11-04-demo-run", True),
+                                 ("good-master-old.md", "2026-11-05-demo-run", False),
+                                 ("good-master.md", "2026-11-05-demo-run", True)):
+            rc, out, _ = run([stage(read(name), folder)])
+            if (rc == 0) != ok:
+                fails.append(name + " in " + folder + ": exit " + str(rc) + " " + out.strip())
+
+        rc, _, err = run([os.path.join(tmp, "missing.md")])
+        if rc != 2 or not err:
+            fails.append("missing file: expected exit 2 with a message")
+        rc, _, err = run([])
+        if rc != 2 or not err:
+            fails.append("no arguments: expected exit 2 with a message")
+
+        with open(os.path.join(root, "skills", "start", "board-spec.md"), "rb") as f:
+            blocks = re.findall(rb"^```markdown\n(.*?)^```$", f.read(), re.M | re.S)
+        for idx, (label, want) in enumerate((("orchestrator", "good-orchestrator.md"), ("master", "good-master.md"))):
+            if len(blocks) <= idx or blocks[idx] != read(want):
+                fails.append("spec " + label + " example differs from " + want)
+
+    CLOCK[0] = time.time
+    for f in fails:
+        print("FAIL " + f)
+    if fails:
+        print("self-test FAILED: " + str(len(fails)))
+        return 1
+    print("self-test OK")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

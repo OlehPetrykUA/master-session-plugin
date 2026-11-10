@@ -1,0 +1,10 @@
+{
+  "name": "master-session",
+  "version": "1.0.0",
+  "description": "A feature factory: give it a task and it lands merged where you use it, through persona subagents in their own git worktrees, one check per feature and a live board.",
+  "author": { "name": "Oleh Petryk", "url": "https://github.com/OlehPetrykUA" },
+  "homepage": "https://github.com/OlehPetrykUA/master-session-plugin",
+  "repository": "https://github.com/OlehPetrykUA/master-session-plugin",
+  "license": "MIT",
+  "keywords": ["subagents", "workflow", "worktrees", "qa", "orchestration"]
+}
